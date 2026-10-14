@@ -42,7 +42,7 @@ export function MarketingHome({ comingSoon = false }: { comingSoon?: boolean }) 
           </div>
           <p className="agenda-launch-note">{comingSoon ? "Próximamente · El registro, las reservas y los chats aún no están disponibles." : "7 días de prueba · Acceso con Google"}</p>
           <AgendaPreview />
-          <SarinArrival />
+          <SarinArrival comingSoon={comingSoon} />
         </section>
         <section id="como-funciona" className="agenda-how agenda-container" aria-labelledby="how-heading">
           <div className="agenda-section-heading">

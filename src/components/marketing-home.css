@@ -63,33 +63,44 @@
 .agenda-slots button:hover { border-color: var(--agenda-blue); }
 .agenda-slots button[aria-pressed="true"] { background: var(--agenda-blue); border-color: var(--agenda-blue); color: #fff; }
 .agenda-slots svg { width: 13px; height: 13px; }
-.sarin-arrival { --flight-start: -340px; position: relative; display: grid; align-items: center; min-height: 190px; max-width: 820px; margin: 24px auto 0; padding: 22px 48px; overflow: hidden; text-align: left; }
+.sarin-arrival { --sarin-turn: 95px; position: relative; display: grid; align-items: center; min-height: 250px; max-width: 820px; margin: 24px auto 0; padding: 44px 40px 12px; overflow: hidden; text-align: left; }
 .sarin-arrival-content { display: flex; align-items: center; justify-content: center; gap: 26px; }
-.sarin-arrival-actor { position: relative; flex: 0 0 106px; width: 106px; height: 128px; transform-origin: 50% 75%; }
+.sarin-arrival-actor { position: relative; flex: 0 0 106px; width: 106px; height: 128px; transform-origin: 50% 50%; }
 .sarin-arrival-actor img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .sarin-arrival-flight { opacity: 0; }
 .sarin-arrival-landed { opacity: 1; }
-.sarin-arrival-greeting { position: relative; width: 380px; max-width: 100%; padding: 18px 22px; border: 1px solid #c5d2fc; border-radius: 16px; background: var(--agenda-paper); }
+.sarin-arrival-greeting { position: relative; display: flex; align-items: center; width: 400px; min-height: 132px; max-width: 100%; padding: 18px 22px; border: 1px solid #c5d2fc; border-radius: 16px; background: var(--agenda-paper); }
 .sarin-arrival-greeting::before { content: ''; position: absolute; top: calc(50% - 6px); left: -7px; width: 12px; height: 12px; background: var(--agenda-paper); border-left: 1px solid #c5d2fc; border-bottom: 1px solid #c5d2fc; transform: rotate(45deg); }
 .sarin-arrival-greeting p { margin: 0; font-size: 14px; line-height: 1.7; }
 .sarin-arrival-greeting strong { display: block; font-weight: 600; }
 .sarin-arrival-greeting span { display: block; margin-top: 3px; color: var(--agenda-muted); }
-.sarin-arrival:not([data-motion="static"]) .sarin-arrival-actor { animation: sarin-flight-path 3.8s ease-in-out 1 both; }
-.sarin-arrival:not([data-motion="static"]) .sarin-arrival-flight { animation: sarin-flight-pose 3.8s linear 1 both; }
-.sarin-arrival:not([data-motion="static"]) .sarin-arrival-landed { animation: sarin-landed-pose 3.8s linear 1 both; }
-.sarin-arrival:not([data-motion="static"]) .sarin-arrival-greeting { animation: sarin-flight-greeting 3.8s ease-in-out 1 both; }
+.sarin-arrival:not([data-motion="static"]) .sarin-arrival-actor { animation: sarin-tour-flight 8s ease-in-out infinite both; }
+.sarin-arrival:not([data-motion="static"]) .sarin-arrival-flight { animation: sarin-flight-pose 8s linear infinite both; }
+.sarin-arrival:not([data-motion="static"]) .sarin-arrival-landed { animation: sarin-landed-pose 8s linear infinite both; }
+.sarin-arrival:not([data-motion="static"]) .sarin-arrival-greeting { animation: sarin-flight-greeting 8s ease-in-out infinite both; }
 .sarin-arrival[data-motion="paused"] .sarin-arrival-actor,
 .sarin-arrival[data-motion="paused"] .sarin-arrival-actor img,
 .sarin-arrival[data-motion="paused"] .sarin-arrival-greeting { animation-play-state: paused; }
-@keyframes sarin-flight-path {
-  0% { opacity: 0; transform: translate(var(--flight-start), 26px) rotate(-16deg); }
-  10% { opacity: 1; }
-  60% { opacity: 1; transform: translate(0, -5px) rotate(3deg); }
-  75%, 100% { opacity: 1; transform: translate(0, 0) rotate(0); }
+@keyframes sarin-tour-flight {
+  0% { transform: translate(0, 0) rotate(0); }
+  34%, 100% { transform: translate(0, 0) rotate(360deg); }
+  8% { transform: translate(calc(var(--sarin-turn) * .6), -10px) rotate(35deg); }
+  16% { transform: translate(var(--sarin-turn), -18px) rotate(160deg); }
+  24% { transform: translate(calc(var(--sarin-turn) * -.5), -12px) rotate(290deg); }
+  32% { transform: translate(0, -2px) rotate(360deg); }
 }
-@keyframes sarin-flight-pose { 0%, 50% { opacity: 1; } 60%, 100% { opacity: 0; } }
-@keyframes sarin-landed-pose { 0%, 50% { opacity: 0; } 60%, 100% { opacity: 1; } }
-@keyframes sarin-flight-greeting { 0%, 60% { opacity: 0; transform: translateY(8px); } 80%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes sarin-flight-pose { 0%, 30% { opacity: 1; } 34%, 100% { opacity: 0; } }
+@keyframes sarin-landed-pose { 0%, 30% { opacity: 0; } 34%, 100% { opacity: 1; } }
+@keyframes sarin-flight-greeting { 0%, 33% { opacity: 0; transform: translateY(8px); } 39%, 100% { opacity: 1; transform: translateY(0); } }
+.sarin-tour-controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--agenda-muted); }
+.sarin-tour-controls > span { font-variant-numeric: tabular-nums; }
+.sarin-tour-controls button { min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: var(--agenda-muted); font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.sarin-tour-controls button:hover { color: var(--agenda-blue); }
+.sarin-tour-transcript { width: 100%; max-width: 600px; padding: 20px 0 0 22px; margin: 12px auto 8px; border-top: 1px solid var(--agenda-line); font-size: 14px; }
+.sarin-tour-transcript[hidden] { display: none; }
+.sarin-tour-transcript li + li { margin-top: 18px; }
+.sarin-tour-transcript strong { font-weight: 600; }
+.sarin-tour-transcript p { margin: 4px 0 0; color: var(--agenda-muted); }
 .agenda-how { padding-block: 60px; border-top: 1px solid var(--agenda-line); scroll-margin-top: 24px; }
 .agenda-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
 .agenda-section-heading .agenda-eyebrow { justify-content: flex-start; }
@@ -149,10 +160,10 @@
   .agenda-availability { align-items: flex-start; flex-direction: column; gap: 12px; margin-top: 8px; }
   .agenda-slots { width: 100%; }
   .agenda-slots button { flex: 1; min-width: 0; }
-  .sarin-arrival { --flight-start: -180px; min-height: 270px; padding: 20px 10px; }
+  .sarin-arrival { --sarin-turn: 45px; min-height: 370px; padding: 38px 10px 12px; }
   .sarin-arrival-content { flex-direction: column; gap: 16px; }
   .sarin-arrival-actor { flex-basis: 108px; width: 80px; height: 108px; }
-  .sarin-arrival-greeting { width: 100%; padding: 14px 18px; text-align: center; }
+  .sarin-arrival-greeting { width: 100%; min-height: 158px; justify-content: center; padding: 14px 18px; text-align: center; }
   .sarin-arrival-greeting::before { top: -7px; left: calc(50% - 6px); border: 0; border-left: 1px solid #c5d2fc; border-top: 1px solid #c5d2fc; }
   .agenda-how { padding-block: 36px; }
   .agenda-steps { grid-template-columns: 1fr; gap: 24px; margin-top: 28px; }
