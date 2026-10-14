@@ -9,10 +9,12 @@ const links = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
 assert.ok(html.includes('aún no están disponibles') && html.includes('Próximamente'), 'The launch notice must be visible.');
 assert.ok(!links.some((link) => /^\/(admin|dashboard|api|b)(\/|$)/.test(link)), 'Private routes must not be linked.');
 assert.ok(!html.includes('/_next/image?'), 'The export must not require the Next image server.');
-for (const file of ['404.html', '_headers', 'robots.txt', 'sitemap.xml', 'brand/sarin-welcome.png', 'favicon.svg', 'favicon.ico', 'favicon.png', 'apple-touch-icon.png']) await stat(join(output, file));
-for (const icon of ['favicon.svg', 'favicon.ico', 'favicon.png', 'apple-touch-icon.png']) {
-  assert.ok(links.includes('/' + icon), `Missing icon metadata: ${icon}`);
+const icons = ['sarin-face.ico', 'sarin-face-32.png', 'sarin-face-48.png', 'sarin-face-apple.png'];
+for (const file of ['404.html', '_headers', 'robots.txt', 'sitemap.xml', 'brand/sarin-welcome.png', 'favicon.ico', ...icons]) await stat(join(output, file));
+for (const icon of icons) {
+  assert.ok(links.some((link) => link.split(/[?#]/)[0] === '/' + icon), `Missing icon metadata: ${icon}`);
 }
+assert.ok(!links.some((link) => link.includes('/favicon.svg')), 'The previous line-art favicon must not be selected.');
 
 let files = 0;
 async function inspect(directory) {

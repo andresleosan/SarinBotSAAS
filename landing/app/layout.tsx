@@ -13,11 +13,11 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   icons: {
     icon: [
-      { url: "/favicon.ico", type: "image/x-icon", sizes: "16x16 32x32 48x48" },
-      { url: "/favicon.png", type: "image/png", sizes: "32x32" },
-      { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/sarin-face.ico?v=1", type: "image/x-icon", sizes: "16x16 32x32 48x48" },
+      { url: "/sarin-face-32.png?v=1", type: "image/png", sizes: "32x32" },
+      { url: "/sarin-face-48.png?v=1", type: "image/png", sizes: "48x48" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+    apple: [{ url: "/sarin-face-apple.png?v=1", type: "image/png", sizes: "180x180" }],
   },
   openGraph: {
     type: "website", locale: "es_CO", siteName: "Sarin Bot",
