@@ -25,6 +25,7 @@
 - [x] Recorrido continuo de cinco mensajes sobre la app, vuelo/vuelta/aterrizaje y lectura completa accesible, según nueva elección del propietario. Publicación `2234442`, despliegue `4d3627ba`. Evidencia: `docs/qa/2026-10-14-cinco-mensajes-sarin.md`.
 - [x] Vuelo corregido según ALS: entrada lateral desde fuera, giro al frenar y salida por el otro borde; cinco mensajes conservados. Publicación `888773e`, despliegue `496e9e4d`. Evidencia: `docs/qa/2026-10-14-vuelo-con-desplazamiento.md`.
 - [x] Contador y enlace «Leer los 5 mensajes» retirados por petición del propietario; vuelo y mensajes continuos conservados. Publicación `1097112`, verificada en Pages. Evidencia: `docs/qa/2026-10-14-saludo-sin-contador.md`.
+- [x] Iconos, etiquetas «Paso 1/2/3» y rótulo «De un enlace a tu agenda» retirados según la captura del propietario. Publicación `bbd4c2e`, verificada en Pages, escritorio y móvil. Evidencia: `docs/qa/2026-10-14-seccion-sin-iconos.md`.
 - [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue de la aplicación completa. La portada temporal ya está publicada por separado en Pages.
 
 ## Evidencia final
