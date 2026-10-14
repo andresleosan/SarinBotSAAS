@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export function SarinArrival() {
@@ -10,7 +9,6 @@ export function SarinArrival() {
   const [imagesReady, setImagesReady] = useState(false);
   const [inView, setInView] = useState(false);
   const [pageVisible, setPageVisible] = useState(true);
-  const [userPaused, setUserPaused] = useState(false);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -42,7 +40,7 @@ export function SarinArrival() {
   }, []);
 
   const animated = motionAllowed && imagesReady;
-  const motion = !animated ? "static" : inView && pageVisible && !userPaused ? "running" : "paused";
+  const motion = !animated ? "static" : inView && pageVisible ? "running" : "paused";
 
   return <div ref={sceneRef} className="sarin-arrival" data-motion={motion}>
     <div className="sarin-arrival-content">
@@ -52,8 +50,5 @@ export function SarinArrival() {
       </div>
       <div className="sarin-arrival-greeting"><p><strong>¡Hola, soy Sarin!</strong><span>Tu asistente para los días ocupados.</span></p></div>
     </div>
-    {animated && <button type="button" className="sarin-motion-toggle" aria-label={userPaused ? "Reanudar animación de Sarin" : "Pausar animación de Sarin"} aria-pressed={userPaused} onClick={() => setUserPaused(paused => !paused)}>
-      {userPaused ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
-    </button>}
   </div>;
 }
