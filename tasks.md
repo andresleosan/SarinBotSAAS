@@ -17,6 +17,7 @@
 - [ ] Configurar proyecto Firebase real, Google OAuth, credenciales Admin, UID superadmin, bancos y túnel/modelos de la Mac.
 - [x] Portada temporal independiente para Pages: aviso de lanzamiento, exportación sin Firebase, 404, headers, revisión móvil y controles de artefacto. Evidencia: `docs/qa/2026-10-13-landing-temporal.md`.
 - [x] Publicar y verificar la portada temporal en `sarinbotsaas.pages.dev`: producción `1d4890a`, despliegue `7f2b08d0`, HTTP 200 y headers correctos; rutas privadas HTTP 404.
+- [x] Favicon propio de Sarin integrado y publicado: SVG, ICO 16/32/48, PNG 32 y Apple 180; producción `ccf5193`, despliegue `027d8f92`. Evidencia: `docs/qa/2026-10-13-favicon.md`.
 - [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue de la aplicación completa. La portada temporal ya está publicada por separado en Pages.
 
 ## Evidencia final
