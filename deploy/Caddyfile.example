@@ -1,0 +1,20 @@
+# PLANTILLA para Caddy 2 en el mismo host que Docker/Next.
+# Cambiar por el dominio web real; .invalid impide una publicacion accidental.
+sarin-web.example.invalid {
+    # Sin directiva log: access logs desactivados. No habilitar debug ni APM de bodies.
+    @private path /api/* /admin /admin/* /dashboard /dashboard/*
+    header @private Cache-Control "no-store"
+    @vault path /admin/vault /admin/vault/* /api/sarin/vault /api/sarin/vault/*
+    log_skip @vault
+
+    reverse_proxy 127.0.0.1:3000 {
+        # No reintentar POST: una accion puede haberse confirmado en Firestore.
+        lb_try_duration 0
+        transport http {
+            dial_timeout 5s
+            # Cola de 120 s + hasta cuatro inferencias de 120 s.
+            response_header_timeout 11m
+            read_timeout 11m
+        }
+    }
+}

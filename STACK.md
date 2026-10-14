@@ -1,0 +1,19 @@
+# Stack y decisiones
+
+Sarin es un monolito modular Next.js App Router con runtime Node.js 24, React 19 y TypeScript estricto. La interfaz conserva la identidad existente slate/emerald. Las credenciales se cargan del entorno y la inicialización Firebase es diferida para permitir builds sin secretos.
+
+Firestore guarda negocios privados, proyecciones públicas para clientes autenticados, citas, configuración de la plataforma y metadatos de pagos. Las imágenes de comprobantes viven en documentos separados de máximo 150 KiB binarios (Base64 añade aproximadamente un tercio), evitando lecturas pesadas de listas y Firebase Storage. Las escrituras de negocio/pagos/citas solo pasan por Admin SDK. No se migran ni borran datos existentes automáticamente.
+
+Vault guarda conversaciones, imágenes y análisis solo en IndexedDB del navegador, separado por UID. Sus exportaciones opcionalmente usan PBKDF2 y AES-GCM. El cifrado de exportaciones no cifra IndexedDB en reposo: la protección del dispositivo y del perfil del navegador sigue siendo necesaria. El servidor Next transmite transitoriamente los mensajes a Ollama; no los escribe, no los registra y responde no-store. El despliegue y cualquier proxy deben desactivar registro de cuerpos y captura de payloads de APM para `/api/sarin/vault`.
+
+La cola es un singleton por proceso con máximo cuatro slots y FIFO en dos prioridades. Se elige un proceso de larga vida, sin PM2 cluster, autoscaling ni réplicas: una cola en memoria no coordina procesos o funciones serverless. Para escalar, se requiere un coordinador compartido delante de Ollama. `CRITICAL` usa el próximo slot que se libera; no interrumpe los turnos activos. Con cuatro slots pueden seguir ejecutándose tres turnos públicos; usar uno si se quiere una única inferencia activa.
+
+Ollama debe usar modelos descargados locales y `OLLAMA_NO_CLOUD=1`. El túnel remoto requiere HTTPS y service token de Cloudflare Access, con política Service Auth y dos cabeceras oficiales. Los tags cloud y los endpoints conocidos de proveedores cloud se rechazan; la operación debe confirmar que el hostname configurado apunta a la Mac y no a un proveedor remoto.
+
+Costos: inferencia local usa equipo/energía propios; no hay API de LLM de pago ni Firebase Storage. Firestore y hosting dependen de lecturas/escrituras/tráfico y su tarifa vigente: sin un proyecto y volumen reales no se puede dar un costo mensual fiable. Antes de producción configurar presupuesto y alertas de facturación en el proyecto. No se contrata ni activa ningún servicio de pago en esta sesión.
+
+Referencias oficiales verificadas: [Ollama OpenAI compatibility](https://docs.ollama.com/api/openai-compatibility), [Cloudflare service tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/), [transacciones Firestore](https://firebase.google.com/docs/firestore/transaction-data-contention), [Next.js](https://nextjs.org/blog).
+
+Desarrollo independiente de la cuota de proyectos: `npm run dev:local` usa Auth + Firestore oficiales, proyecto `demo-sarin-bot`, puertos loopback y cuentas explícitas de prueba. Los SDK y las API verifican sesión/UID; no hay un bypass de autorización. El cliente y Admin rechazan emuladores en producción. El runner no escribe `.env.local` ni cambia Java/PATH del sistema. La CLI Firebase queda en la caché externa de npm, separada del runtime.
+
+El kit `deploy/` conserva web Node + Caddy en una instancia y motor Ollama en la Mac mediante Tunnel/Access. Para las peticiones síncronas actuales, el hostname web usa DNS only en Cloudflare: la cola y varias rondas pueden superar el timeout del proxy. El hostname del motor permanece protegido por Tunnel y Service Auth. Activar proxy web requiere adaptar el transporte a streaming o trabajos asíncronos; no se cambia DNS automáticamente.

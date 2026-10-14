@@ -1,0 +1,18 @@
+# PLANTILLA: sustituir ambos identificadores y el hostname antes de validar.
+# UUID_REAL_DEL_TUNEL representa un UUID asignado por Cloudflare, no una credencial.
+tunnel: UUID_REAL_DEL_TUNEL
+credentials-file: /RUTA/ABSOLUTA/PRIVADA/UUID_REAL_DEL_TUNEL.json
+
+ingress:
+  - hostname: sarin-engine.example.invalid
+    # Solo rutas necesarias por el cliente OpenAI-compatible y su health probe.
+    path: ^/v1/(chat/completions|models)$
+    service: http://127.0.0.1:11434
+    originRequest:
+      httpHostHeader: 127.0.0.1:11434
+      connectTimeout: 5s
+  # Prohibe /api/pull, /api/create, /api/delete y cualquier otra ruta Ollama.
+  - service: http_status:404
+
+# El hostname COMPLETO debe tener una aplicacion Cloudflare Access con Service Auth.
+# No poner Client Secret ni credenciales Firebase dentro de este archivo.

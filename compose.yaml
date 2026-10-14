@@ -1,0 +1,43 @@
+# Un unico proceso Node: la cola de prioridades vive en memoria de esta instancia.
+services:
+  app:
+    image: sarin-bot:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:?Completa deploy/firebase.public.env}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:?Completa deploy/firebase.public.env}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID:?Completa deploy/firebase.public.env}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID:?Completa deploy/firebase.public.env}
+    # Solo runtime. Dockerfile y .dockerignore impiden copiar .env* al build.
+    # raw conserva backslashes y simbolos de los secretos: requiere Compose 2.30+.
+    env_file:
+      - path: .env.production
+        required: true
+        format: raw
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:3000:3000"
+    deploy:
+      replicas: 1
+    init: true
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=1000,gid=1000
+      - /app/.next/cache:rw,nosuid,nodev,noexec,size=64m,uid=1000,gid=1000
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"

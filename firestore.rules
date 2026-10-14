@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function ownsBusiness(id) {
+      return signedIn()
+        && get(/databases/$(database)/documents/businesses/$(id)).data.ownerUid == request.auth.uid;
+    }
+    // Mutations are accepted only by authenticated Admin SDK API handlers.
+    // In particular a browser can never grant itself a role or subscription.
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /publicBusinesses/{slug} {
+      allow get: if signedIn();
+      allow list, write: if false;
+    }
+    match /businesses/{id} {
+      allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow write: if false;
+      match /appointments/{appointmentId} {
+        allow read: if ownsBusiness(id)
+          || (signedIn() && resource.data.client.uid == request.auth.uid);
+        allow write: if false;
+      }
+      match /{privateDocument=**} {
+        allow read, write: if false;
+      }
+    }
+    match /paymentReceipts/{id} {
+      allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow write: if false;
+    }
+    match /paymentImages/{id} {
+      allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow write: if false;
+    }
+    match /platformSettings/{id} {
+      allow read: if id == 'main' && signedIn();
+      allow write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
