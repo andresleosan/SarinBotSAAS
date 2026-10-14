@@ -1,5 +1,6 @@
 "use client";
 
+import { SarinBrand } from "@/components/sarin-brand";
 import {
   createContext,
   useCallback,
@@ -167,11 +168,11 @@ export function AuthGate({
     );
   if (!user)
     return (
-      <main className="min-h-screen grid place-items-center p-6">
-        <section className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8 space-y-5">
-          <p className="text-sm font-semibold text-emerald-400">SARIN BOT</p>
-          <h1 className="text-2xl font-bold">Inicia sesión para continuar</h1>
-          <p className="text-sm text-slate-400">
+      <main className="sarin-backdrop grid min-h-screen place-items-center px-5 py-12">
+        <section className="sarin-surface w-full max-w-md space-y-6 rounded-[28px] p-7 shadow-2xl shadow-slate-950/20 sm:p-9">
+          <a href="/" aria-label="Sarin Bot, inicio" className="mb-3 inline-block"><SarinBrand /></a>
+          <div><p className="sarin-eyebrow mb-3 text-emerald-500">Tu espacio está aquí</p><h1 className="text-3xl font-medium leading-tight tracking-[-0.04em]">Inicia sesión para continuar</h1></div>
+          <p className="text-sm leading-7 text-slate-400">
             {localEmulators
               ? "Usa una cuenta local de prueba para acceder a tu espacio."
               : "Usa tu cuenta de Google para acceder a tu espacio."}
@@ -194,7 +195,7 @@ export function AuthGate({
                   key={account}
                   onClick={() => enterLocal(account)}
                   disabled={localSigningIn !== null}
-                  className="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+                  className="min-h-12 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:border-emerald-500/50 hover:bg-emerald-500/10 disabled:opacity-50"
                 >
                   {localSigningIn === account ? "Entrando…" : label}
                 </button>
@@ -204,12 +205,13 @@ export function AuthGate({
           <button
             onClick={() => void signIn()}
             disabled={localSigningIn !== null}
-            className="w-full rounded-xl bg-emerald-500 px-4 py-3 font-semibold text-slate-950 hover:bg-emerald-400"
+            className="min-h-12 w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
           >
             {localEmulators
               ? "Entrar con Google emulado"
               : "Continuar con Google"}
           </button>
+          <p className="border-t border-white/10 pt-5 text-xs leading-6 text-slate-400">Tu agenda, tus servicios y tu forma de atender. Todo en un mismo espacio.</p>
         </section>
       </main>
     );

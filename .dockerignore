@@ -3,6 +3,7 @@ node_modules
 .env*
 !.env.local.example
 .git
+cloudflare
 .firebase
 *-debug.log
 *-debug*.log

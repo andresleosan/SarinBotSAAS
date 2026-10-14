@@ -1,6 +1,8 @@
 # Stack y decisiones
 
-Sarin es un monolito modular Next.js App Router con runtime Node.js 24, React 19 y TypeScript estricto. La interfaz conserva la identidad existente slate/emerald. Las credenciales se cargan del entorno y la inicialización Firebase es diferida para permitir builds sin secretos.
+Sarin es un monolito modular Next.js App Router con runtime Node.js 24, React 19 y TypeScript estricto. Las credenciales se cargan del entorno y la inicialización Firebase es diferida para permitir builds sin secretos.
+
+Identidad visual: referencia elegida por el propietario, [ALS DevStudio](https://www.alsdevstudio.com/). Marino `#071a2f`, paneles `#0d2746`, menta `#65d49d`, papel `#f5f8fb`; Space Grotesk, DM Sans e IBM Plex Mono autoalojadas. La mascota y las órbitas enlazan la portada con el estudio; agenda y Vault priorizan superficies legibles y navegación clara. Referencias de interacción consultadas mediante el MCP oficial de Mobbin: Square, Unify, Gumloop y Calendly. Fuentes y decisiones en [docs/design-system.md](docs/design-system.md).
 
 Firestore guarda negocios privados, proyecciones públicas para clientes autenticados, citas, configuración de la plataforma y metadatos de pagos. Las imágenes de comprobantes viven en documentos separados de máximo 150 KiB binarios (Base64 añade aproximadamente un tercio), evitando lecturas pesadas de listas y Firebase Storage. Las escrituras de negocio/pagos/citas solo pasan por Admin SDK. No se migran ni borran datos existentes automáticamente.
 
@@ -16,4 +18,8 @@ Referencias oficiales verificadas: [Ollama OpenAI compatibility](https://docs.ol
 
 Desarrollo independiente de la cuota de proyectos: `npm run dev:local` usa Auth + Firestore oficiales, proyecto `demo-sarin-bot`, puertos loopback y cuentas explícitas de prueba. Los SDK y las API verifican sesión/UID; no hay un bypass de autorización. El cliente y Admin rechazan emuladores en producción. El runner no escribe `.env.local` ni cambia Java/PATH del sistema. La CLI Firebase queda en la caché externa de npm, separada del runtime.
 
-El kit `deploy/` conserva web Node + Caddy en una instancia y motor Ollama en la Mac mediante Tunnel/Access. Para las peticiones síncronas actuales, el hostname web usa DNS only en Cloudflare: la cola y varias rondas pueden superar el timeout del proxy. El hostname del motor permanece protegido por Tunnel y Service Auth. Activar proxy web requiere adaptar el transporte a streaming o trabajos asíncronos; no se cambia DNS automáticamente.
+Decisión de hosting solicitada: `cloudflare/` aloja la aplicación en Cloudflare Containers con Worker frontal y DO de identidad constante. `max_instances: 1`, una réplica Node y un solo motor mantienen la prioridad global. Se conserva Firebase Admin nativo, evitando una migración a APIs REST/Workers o a un framework beta. El DO usa almacenamiento para metadatos de ciclo de vida del SDK; los cuerpos de Vault no se almacenan allí. El contenedor procesa datos transitorios y Vault conserva IndexedDB. Dormir, reiniciar o desplegar pierde la cola en memoria; la plataforma no garantiza continuidad de inferencias.
+
+Costo estimado propio para Containers basic con tráfico ligero: USD 12–20/mes, incluyendo Workers Paid, antes de Firestore, extras de CPU/red/build y dominio. Supone como máximo una instancia de 1 GiB; el consumo real depende del tiempo activa. Tarifas consultadas el 13 de octubre de 2026: [Containers](https://developers.cloudflare.com/containers/platform/pricing/). No se ha activado facturación ni verificado alertas de una cuenta. El kit no despliega automáticamente ni configura un dominio.
+
+Alternativa: `deploy/` conserva Node + Caddy en un servidor propio. En ese camino el hostname web usa DNS only porque las peticiones síncronas pueden superar el timeout del CDN. El hostname del motor permanece protegido por Tunnel y Service Auth en ambos destinos; no se cambia DNS automáticamente.

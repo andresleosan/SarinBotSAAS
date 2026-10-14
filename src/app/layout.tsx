@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
+
+const dmSans = localFont({ src: "../../public/fonts/dm-sans-latin.woff2", weight: "400 700", variable: "--font-dm-sans", display: "swap" });
+const spaceGrotesk = localFont({ src: "../../public/fonts/space-grotesk-latin.woff2", weight: "400 700", variable: "--font-space-grotesk", display: "swap" });
+const plexMono = localFont({ src: "../../public/fonts/ibm-plex-mono-latin.woff2", weight: "400", variable: "--font-plex-mono", display: "swap", preload: false });
 
 export const metadata: Metadata = {
   title: "Sarin Bot — Plataforma Inteligente de Citas con IA",
@@ -14,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${dmSans.variable} ${spaceGrotesk.variable} ${plexMono.variable}`}>
       <body className="min-h-screen antialiased selection:bg-emerald-500 selection:text-slate-950">
         <AuthProvider>{children}</AuthProvider>
       </body>

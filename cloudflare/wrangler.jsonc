@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "sarin-bot-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "send_metrics": false,
+  "observability": { "enabled": false, "logs": { "enabled": false }, "traces": { "enabled": false } },
+  "containers": [{
+    "class_name": "SarinApp",
+    "scheduling_policy": "default",
+    "image": "../Dockerfile",
+    "image_build_context": "..",
+    "instance_type": "basic",
+    "max_instances": 1,
+    "observability": { "enabled": false },
+    "image_vars": {
+      "NEXT_PUBLIC_FIREBASE_API_KEY": "",
+      "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": "",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID": "",
+      "NEXT_PUBLIC_FIREBASE_APP_ID": ""
+    }
+  }],
+  "durable_objects": { "bindings": [{ "name": "SARIN_APP", "class_name": "SarinApp" }] },
+  "exports": { "SarinApp": { "type": "durable-object", "storage": "sqlite" } }
+}

@@ -2,6 +2,8 @@
 
 Core SaaS de agenda multi-tenant y Sarin Vault personal. El documento rector es [arquitectura_maestro_sarin_bot.md](arquitectura_maestro_sarin_bot.md). Los contratos y decisiones de operación están en [STACK.md](STACK.md).
 
+La interfaz sigue la identidad de ALS DevStudio: marino, menta, Space Grotesk, DM Sans y la mascota de Sarin. Se consultaron referencias reales mediante el MCP oficial de Mobbin para navegación, agenda y chat; las decisiones y fuentes están en [el sistema visual](docs/design-system.md). Fuentes y mascota se sirven desde este proyecto.
+
 ## Desarrollo
 
 Puedes desarrollar y recorrer la aplicación **sin crear un proyecto Firebase**:
@@ -82,11 +84,13 @@ npm run build
 
 ## Producción
 
-El destino de despliegue actual es **Node 24 con una sola réplica**, mediante el Dockerfile y [el kit de infraestructura](deploy/README.md). El repositorio de origen es [andresleosan/SarinBotSAAS](https://github.com/andresleosan/SarinBotSAAS). Cloudflare administra el dominio y protege el túnel del motor; para esta configuración, el hostname web usa **DNS only** y apunta al servidor con Caddy.
+El destino solicitado es **Cloudflare Containers**, conservando **Node 24 en una sola réplica**. El [kit Cloudflare](cloudflare/README.md) incluye Worker frontal, contenedor y un Durable Object con nombre constante: todas las peticiones comparten el mismo proceso y la misma cola de inferencias. Firebase Admin continúa en Node nativo. El repositorio de origen es [andresleosan/SarinBotSAAS](https://github.com/andresleosan/SarinBotSAAS).
 
-Si quieres alojar también la aplicación en **Cloudflare Workers**, primero hay que adaptar la coordinación global de inferencias y comprobar la compatibilidad de Firebase Admin/Firestore en ese runtime. La cola actual vive en memoria de un proceso Node. Conectar GitHub a Pages como sitio estático no ejecuta las rutas API del SaaS. Consulta la [guía oficial de Next.js en Workers](https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/) antes de elegir ese destino; esta versión se verifica con `next build` para Node, sin un adaptador Workers configurado.
+En Workers Builds, conecta GitHub con raíz de build en el repositorio, instalación `npm --prefix cloudflare ci`, build `npm --prefix cloudflare run configure:build` y deploy `cd cloudflare && npx wrangler deploy --config wrangler.build.json`. La guía detalla las cuatro variables públicas de build y los secretos de runtime separados. Hace falta plan Workers Paid, configuración Firebase real, túnel operativo y dominio antes de habilitar tráfico. Este repositorio prepara la configuración; subir código no activa ni contrata esos recursos.
 
-Usa **un proceso Node de larga vida y una sola réplica**. No desplegar esta cola en funciones serverless, PM2 cluster ni múltiples contenedores: cada proceso tendría su propio contador. Para varias réplicas hace falta mover la cola a un coordinador compartido. Configura HTTPS, límites del proxy de al menos 2 MiB para Vault y timeouts suficientes para espera en cola e inferencias locales. No reintentes automáticamente POST en el proxy. Con un solo slot la inferencia VIP es el turno siguiente a la actual; con cuatro slots espera al primero que se libere.
+El Worker solo enruta al contenedor. La aplicación Next no se ejecuta como función Workers ni como exportación estática de Pages. El kit [tradicional de servidor y Caddy](deploy/README.md) sigue disponible como alternativa; su indicación **DNS only** aplica a ese camino, no al dominio del Worker de Containers.
+
+Usa **un proceso Node de larga vida y una sola réplica** para la aplicación. No ejecutes la cola en funciones aisladas, PM2 cluster ni múltiples contenedores: cada proceso tendría su propio contador. Para varias réplicas hace falta mover la cola a un coordinador compartido. Configura HTTPS, límites del proxy de al menos 2 MiB para Vault y timeouts suficientes para espera en cola e inferencias locales. No reintentes automáticamente POST en el proxy. Con un solo slot la inferencia VIP es el turno siguiente a la actual; con cuatro slots espera al primero que se libere. Reinicios y despliegues pueden interrumpir solicitudes en curso; no hay persistencia de la cola.
 
 Despliega `firestore.rules` y `firestore.indexes.json` en el **proyecto correcto** con Firebase CLI oficial, por separado del runtime:
 

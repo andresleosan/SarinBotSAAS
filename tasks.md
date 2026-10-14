@@ -10,6 +10,9 @@
 - [x] Desarrollo sin proyecto Firebase: Auth + Firestore oficiales locales, cuentas aisladas, accesos por rol, guardas de producción y runner con Java 21.
 - [x] Kit revisable de infraestructura: Compose, Caddy, Cloudflared y lanzador Ollama nativo para Mac, con pruebas de configuración.
 - [x] Diagnóstico independiente de Firebase: `npm run doctor`, consulta de modelos y pruebas sintéticas explícitas de texto/visión.
+- [x] Referencias de diseño mediante MCP oficial Mobbin autenticado; identidad de ALS DevStudio aplicada a portada, navegación, acceso, agenda y Vault.
+- [x] Kit Cloudflare Containers con Worker, DO singleton, tipos generados, secretos de runtime separados, ocho pruebas y dry-run del Worker.
+- [x] Imagen Docker Linux construida, iniciada en loopback con filesystem de solo lectura y comprobada por HTTP; dry-run completo de Wrangler con imagen aprobado.
 - [x] Verificación de código: TypeScript, suite local, suite de emulador Firestore, npm audit y build. Resultados finales abajo.
 - [ ] Configurar proyecto Firebase real, Google OAuth, credenciales Admin, UID superadmin, bancos y túnel/modelos de la Mac.
 - [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue en servidor/dominio indicado por el usuario. No se ha aplicado ningún cambio externo.
@@ -27,4 +30,4 @@
 - `npm run doctor`: pasa sin configuración real, informa dependencias pendientes y no hace peticiones por defecto.
 - Sintaxis Node/shell y estructura Compose: validaciones aprobadas; pruebas del lanzador Mac usan binarios sintéticos, sin ejecutar Ollama real.
 
-Docker requiere daemon activo; la imagen no se ha construido en esta máquina. Ninguno de estos resultados implica un despliegue de producción.
+Ampliación de diseño y hosting: ocho pruebas de Cloudflare aprobadas, TypeScript del Worker y dry-run completo con imagen aprobados. Docker Desktop se inició localmente para construir y probar la imagen, sin configurar servicios remotos. La comprobación de producción con Firebase/Ollama reales y red de Cloudflare sigue pendiente. Ninguno de estos resultados implica un despliegue de producción.

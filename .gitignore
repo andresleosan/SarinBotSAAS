@@ -20,3 +20,7 @@ test-results
 coverage
 *.vault.json
 sarin-vault-*.json
+cloudflare/.wrangler/
+cloudflare/.dev.vars*
+cloudflare/wrangler.build.json
+cloudflare/dist/
