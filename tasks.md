@@ -1,4 +1,4 @@
-# Estado de implementación — 2026-10-13
+# Estado de implementación — 2026-10-14
 
 - [x] Auditoría inicial del documento rector, dependencias y todos los módulos existentes. Detalle: `AUDITORIA.md`.
 - [x] Core: tipos, Firebase singleton, autenticación Admin, suscripción, cola FIFO priorizada y entorno de ejemplo.
@@ -20,6 +20,7 @@
 - [x] Favicon propio de Sarin integrado y publicado: SVG, ICO 16/32/48, PNG 32 y Apple 180; producción `ccf5193`, despliegue `027d8f92`. Evidencia: `docs/qa/2026-10-13-favicon.md`.
 - [x] Favicon sustituido por la cara de la mascota a petición del propietario: ICO 16/32/48, PNG 32/48 y Apple 180; producción `18bd4fd`, despliegue `a57cacb9`. Evidencia: `docs/qa/2026-10-13-favicon-cara-sarin.md`.
 - [x] Diseño Agenda clara elegido por el propietario, aplicado y publicado: fondo claro, acento azul, agenda ilustrativa accesible y selector local; revisión responsive/seguridad aprobada. Producción `776bc81`, despliegue `42f0e736`. Evidencia: `docs/qa/2026-10-13-agenda-clara.md`.
+- [x] Cara del favicon en cabecera y pie; secuencia de vuelo, aterrizaje y saludo con recursos originales de ALS, pausa y movimiento reducido. Publicación `9c4a2f8`, despliegue `ba6690e7`. Evidencia: `docs/qa/2026-10-14-sarin-vuelo-y-marca.md`.
 - [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue de la aplicación completa. La portada temporal ya está publicada por separado en Pages.
 
 ## Evidencia final

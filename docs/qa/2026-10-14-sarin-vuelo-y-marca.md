@@ -18,6 +18,7 @@ Solicitud: sustituir los símbolos de calendario de cabecera y pie por la cara d
 - `npm run check:landing`: aprobado, 41 archivos públicos y sin configuración de backend ni enlaces privados.
 - `git diff --check`: aprobado.
 - Revisión independiente de lógica, ciclo de vida, seguridad y accesibilidad: sin bloqueantes.
+- Revisión visual independiente final: aprobada; la cara coincide por SHA-256 con el favicon Apple y la secuencia conserva recursos y tiempos de la referencia.
 - Chrome real: vuelo observado, aterrizaje y globo con opacidad 1; pausa conserva exactamente el transform y el estado de reproducción; reanudación correcta.
 - Emulación de movimiento reducido: `data-motion=static`, sin animación ni control, saludo visible. Emulación retirada al finalizar.
 - Anchos de 360 y 320 px: sin desbordamiento, globo debajo de la mascota y ciclo móvil de 8 s. Preferencia reducida y tamaño de viewport restaurados después de las pruebas.
@@ -26,6 +27,12 @@ Solicitud: sustituir los símbolos de calendario de cabecera y pie por la cara d
 
 ## Publicación
 
-Pendiente de registrar el resultado de Pages tras el push.
+Publicado en [sarinbotsaas.pages.dev](https://sarinbotsaas.pages.dev/) desde `9c4a2f89eedef14041cc50e73116a04b83d8a2dc`, despliegue [ba6690e7](https://ba6690e7.sarinbotsaas.pages.dev/). Cloudflare lo muestra como producción actual.
+
+- HTML HTTP 200 con dos marcas de cara y saludo estático de respaldo, sin enlaces privados.
+- Los tres PNG y el ICO devuelven HTTP 200, MIME correcto y bytes idénticos a los assets locales aprobados.
+- Chrome en producción: cara de cabecera y pie cargadas; aterrizaje y globo observados con opacidad 1, pausa y reanudación correctas. Consola sin errores ni advertencias.
+- Capturas públicas: [cabecera](sarin-cara-cabecera-publicada.png), [saludo](sarin-saludo-publicado.png), [pie](sarin-cara-pie-publicada.png).
+- La pestaña pública queda con la animación reanudada. No se mantienen ajustes temporales de movimiento o viewport.
 
 Reversión: volver al despliegue anterior `42f0e736` de Pages o revertir el commit de este cambio. No hay migraciones.
