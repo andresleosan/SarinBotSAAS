@@ -28,7 +28,7 @@
 - [x] Iconos, etiquetas «Paso 1/2/3» y rótulo «De un enlace a tu agenda» retirados según la captura del propietario. Publicación `bbd4c2e`, verificada en Pages, escritorio y móvil. Evidencia: `docs/qa/2026-10-14-seccion-sin-iconos.md`.
 - [x] Agenda clara en pantallas internas: acceso, agenda, configuración, QR, facturación, administración, isla y Vault; revisión local desde 320 px. Evidencia: `docs/qa/2026-10-14-agenda-clara-interna-y-ci.md`.
 - [x] Ensayo local opt-in completo: 61 comprobaciones de reservas/pagos/permisos con Auth y Firestore oficiales, limpieza limitada y cero inferencia; ocho pruebas de aislamiento.
-- [ ] Confirmar CI real de GitHub: workflow implementado para tipos, pruebas, builds, reglas, recorrido local y dry-run del Worker; pendiente ejecución tras push.
+- [x] CI real de GitHub: tres jobs verdes para tipos, pruebas, builds, reglas, recorrido local y dry-run del Worker. Commit `d761de4`, ejecución `38523876656`.
 - [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue de la aplicación completa. La portada temporal ya está publicada por separado en Pages.
 
 ## Evidencia final

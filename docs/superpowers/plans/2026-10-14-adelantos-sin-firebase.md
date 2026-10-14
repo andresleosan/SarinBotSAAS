@@ -8,11 +8,11 @@ La interfaz usa el diseño ya elegido en `design-system.md`: canvas `#f7f9ff`, p
 
 ## Trabajo y verificación
 
-- [ ] Adaptar shell, acceso, agenda, configuración, QR, facturación, administración e isla. Revisar estados vacíos, errores y móvil de 320 px.
-- [ ] Adaptar Vault, tablas Markdown y diálogo de copias sin modificar IndexedDB ni sus handlers. Comprobar creación/reapertura y copia de hilos sintéticos sin inferencia.
-- [ ] Añadir un ensayo local repetible de negocio, reserva, colisión, cancelación/bloqueo, comprobante y aprobación idempotente. Solo proyecto demo, loopback y datos nuevos de cada corrida; limpieza acotada a esos datos.
-- [ ] Añadir CI de tipos, pruebas, reglas reales emuladas, recorrido local, builds y dry-run del Worker. Permisos de lectura, acciones oficiales fijadas por SHA y ninguna credencial/despliegue externo.
-- [ ] Ejecutar verificaciones conjuntas, revisar seguridad/diff, guardar pruebas visuales y push. Confirmar la ejecución real de CI.
+- [x] Adaptar shell, acceso, agenda, configuración, QR, facturación, administración e isla. Revisar estados vacíos, errores y móvil de 320 px.
+- [x] Adaptar Vault, tablas Markdown y diálogo de copias sin modificar IndexedDB ni sus handlers. Las pruebas automatizadas de persistencia y copias pasan; diálogos revisados en Chrome. El chooser de importación está limitado por el permiso de archivos de la extensión, documentado en QA.
+- [x] Añadir un ensayo local repetible de negocio, reserva, colisión, cancelación/bloqueo, comprobante y aprobación idempotente. Solo proyecto demo, loopback y datos nuevos de cada corrida; limpieza acotada a esos datos.
+- [x] Añadir CI de tipos, pruebas, reglas reales emuladas, recorrido local, builds y dry-run del Worker. Permisos de lectura, acciones oficiales fijadas por SHA y ninguna credencial/despliegue externo.
+- [x] Ejecutar verificaciones conjuntas, revisar seguridad/diff, guardar pruebas visuales y push. CI real `38523876656`: tres jobs aprobados para `d761de4`.
 
 ## Límites
 

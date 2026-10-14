@@ -31,4 +31,4 @@ Capturas: [agenda](sarin-dashboard-agenda-clara.png), [Vault](sarin-vault-agenda
 
 ## Publicación y reversión
 
-Pendiente confirmar los tres jobs reales de GitHub tras el push. Las pantallas privadas se revisan en `http://127.0.0.1:3030`; `sarinbotsaas.pages.dev` continúa siendo la portada temporal. Para revertir, revertir el commit de este adelanto y regenerar el build; no hay migraciones de datos. Referencia previa: `389d300`.
+Push del commit `d761de4d194a3017b7db60d0e27665e70fd03495`. Los tres jobs reales del [CI 38523876656](https://github.com/andresleosan/SarinBotSAAS/actions/runs/38523876656) finalizaron con `success`: tipos/pruebas/builds, reglas/recorrido local y comprobación del Worker. Las pantallas privadas se revisan en `http://127.0.0.1:3030`; `sarinbotsaas.pages.dev` continúa siendo la portada temporal, comprobada por HTTP 200 y sin enlaces a las rutas privadas. Para revertir, revertir el commit de este adelanto y regenerar el build; no hay migraciones de datos. Referencia previa: `389d300`.
