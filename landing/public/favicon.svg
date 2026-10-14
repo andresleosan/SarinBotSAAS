@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <title>Sarin Bot</title>
+  <rect width="32" height="32" rx="8" fill="#071a2f"/>
+  <path d="M10 9h12a5 5 0 0 1 5 5v12H5V14a5 5 0 0 1 5-5Z" fill="#0d2746" stroke="#65d49d" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M16 5v4M11 16v3m10-3v3m-9 4h8" stroke="#65d49d" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="16" cy="3.5" r="1.6" fill="#65d49d"/>
+</svg>

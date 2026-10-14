@@ -11,6 +11,14 @@ export const metadata: Metadata = {
   title: "Sarin Bot — Tu agenda, un poco más simple. Próximamente",
   description: "Conoce Sarin Bot, el asistente para organizar las citas de tu negocio. Estamos preparando el lanzamiento; registro, reservas y chats próximamente.",
   alternates: { canonical: "/" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", type: "image/x-icon", sizes: "16x16 32x32 48x48" },
+      { url: "/favicon.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+  },
   openGraph: {
     type: "website", locale: "es_CO", siteName: "Sarin Bot",
     title: "Sarin Bot — Próximamente",
