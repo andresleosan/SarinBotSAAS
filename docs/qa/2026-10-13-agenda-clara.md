@@ -10,6 +10,7 @@ El propietario eligió Agenda clara entre tres propuestas. Se adapta el componen
 - `npm audit --omit=dev --audit-level=high`: 0 vulnerabilidades.
 - `git diff --check`: aprobado.
 - Revisión de seguridad independiente: sin bloqueantes; selector local sin red, Firebase ni persistencia. No se modifican APIs, autenticación, reglas o datos.
+- Revisión visual independiente: aprobada sin bloqueantes; composición fiel a la dirección elegida y estilos acotados a marketing.
 - Navegador Chrome real: escritorio, tablet 768 px, móvil 360 px y pantalla estrecha 320 px. Sin desbordamiento horizontal; tabla y controles caben en todos los tamaños comprobados. Un único `h1`, imágenes cargadas y enlaces internos con destino existente.
 - Selector: clic cambia a 14:00; Tab + Enter seleccionan 10:30 con foco visible y anuncio de estado. Botones de 44 px como mínimo.
 - Navegación Próximamente: llega a `#lanzamiento`. Consola sin errores ni advertencias.
@@ -17,6 +18,12 @@ El propietario eligió Agenda clara entre tres propuestas. Se adapta el componen
 
 ## Publicación y reversión
 
-Pendiente de registrar el resultado del despliegue automático tras el push.
+Publicado en [sarinbotsaas.pages.dev](https://sarinbotsaas.pages.dev/) desde `776bc81c588b26207063e3307510c4c474862828`, despliegue [42f0e736](https://42f0e736.sarinbotsaas.pages.dev/). Cloudflare lo muestra como producción actual.
+
+- HTML público HTTP 200 con el nuevo título y diseño. Los 13 recursos enlazados responden HTTP 200.
+- `/admin`, `/dashboard` y `/api/sarin/chat` mantienen HTTP 404 en la portada temporal.
+- CSP y `nosniff` presentes. El favicon publicado coincide con el ICO de la cara de Sarin aprobado anteriormente.
+- Chrome en producción: selector cambia a 14:00, sin errores ni advertencias de consola.
+- [Captura de la portada publicada](agenda-clara-publicada.png).
 
 Reversión: volver al despliegue anterior aprobado `a57cacb9` de Pages, o revertir el commit del diseño y publicar la reversión. No hay migraciones ni cambios de configuración o secretos.
