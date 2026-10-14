@@ -23,6 +23,7 @@
 - [x] Cara del favicon en cabecera y pie; secuencia de vuelo, aterrizaje y saludo con recursos originales de ALS, pausa y movimiento reducido. Publicación `9c4a2f8`, despliegue `ba6690e7`. Evidencia: `docs/qa/2026-10-14-sarin-vuelo-y-marca.md`.
 - [x] Botón de pausa retirado por petición del propietario; entrada única de 3,8 s con saludo permanente. Publicación `345f8e7`, despliegue `40a8f9d6`. Evidencia: `docs/qa/2026-10-14-saludo-sin-boton.md`.
 - [x] Recorrido continuo de cinco mensajes sobre la app, vuelo/vuelta/aterrizaje y lectura completa accesible, según nueva elección del propietario. Publicación `2234442`, despliegue `4d3627ba`. Evidencia: `docs/qa/2026-10-14-cinco-mensajes-sarin.md`.
+- [x] Vuelo corregido según ALS: entrada lateral desde fuera, giro al frenar y salida por el otro borde; cinco mensajes conservados. Publicación `888773e`, despliegue `496e9e4d`. Evidencia: `docs/qa/2026-10-14-vuelo-con-desplazamiento.md`.
 - [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue de la aplicación completa. La portada temporal ya está publicada por separado en Pages.
 
 ## Evidencia final
