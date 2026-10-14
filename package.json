@@ -7,6 +7,8 @@
     "dev:local": "node scripts/dev-local.mjs",
     "doctor": "node --env-file-if-exists=.env.local scripts/doctor.mjs",
     "build": "next build",
+    "build:landing": "node scripts/build-landing.mjs",
+    "check:landing": "node scripts/verify-landing.mjs",
     "start": "next start",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",

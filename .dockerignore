@@ -4,6 +4,7 @@ node_modules
 !.env.local.example
 .git
 cloudflare
+landing
 .firebase
 *-debug.log
 *-debug*.log

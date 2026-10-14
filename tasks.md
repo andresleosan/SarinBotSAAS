@@ -15,6 +15,8 @@
 - [x] Imagen Docker Linux construida, iniciada en loopback con filesystem de solo lectura y comprobada por HTTP; dry-run completo de Wrangler con imagen aprobado.
 - [x] Verificación de código: TypeScript, suite local, suite de emulador Firestore, npm audit y build. Resultados finales abajo.
 - [ ] Configurar proyecto Firebase real, Google OAuth, credenciales Admin, UID superadmin, bancos y túnel/modelos de la Mac.
+- [x] Portada temporal independiente para Pages: aviso de lanzamiento, exportación sin Firebase, 404, headers, revisión móvil y controles de artefacto. Evidencia: `docs/qa/2026-10-13-landing-temporal.md`.
+- [ ] Publicar y verificar la portada temporal en `sarinbotsaas.pages.dev`.
 - [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue en servidor/dominio indicado por el usuario. No se ha aplicado ningún cambio externo.
 
 ## Evidencia final
