@@ -1,11 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowDown, ArrowRight, ArrowUpRight, CalendarCheck2, CalendarDays, Clock3, Link2, MessageCircle, ShieldCheck } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight, CalendarDays, Clock3, Link2, MessageCircle, ShieldCheck } from "lucide-react";
 import { AgendaPreview } from "./agenda-preview";
+import { SarinArrival } from "./sarin-arrival";
 import "./marketing-home.css";
 
-function MarketingBrand() {
-  return <span className="agenda-brand"><CalendarCheck2 aria-hidden="true" strokeWidth={1.8} /><span>sarin<span className="agenda-brand-suffix">bot</span></span></span>;
+function MarketingBrand({ eager = false }: { eager?: boolean }) {
+  return <span className="agenda-brand"><Image src="/brand/sarin-face-mark.png" alt="" width={40} height={40} className="agenda-brand-face" loading={eager ? "eager" : "lazy"} /><span>sarin<span className="agenda-brand-suffix">bot</span></span></span>;
 }
 
 const steps = [
@@ -19,7 +20,7 @@ export function MarketingHome({ comingSoon = false }: { comingSoon?: boolean }) 
     <div className="agenda-home">
       <a href="#main-content" className="sarin-skip">Saltar al contenido</a>
       <header className="agenda-header agenda-container">
-        <Link href="/" aria-label="Sarin Bot, inicio"><MarketingBrand /></Link>
+        <Link href="/" aria-label="Sarin Bot, inicio"><MarketingBrand eager /></Link>
         <nav aria-label="Navegación principal" className="agenda-nav">
           <a href="#como-funciona">El asistente</a>
           <a href="#tu-agenda">Tu agenda</a>
@@ -41,10 +42,7 @@ export function MarketingHome({ comingSoon = false }: { comingSoon?: boolean }) 
           </div>
           <p className="agenda-launch-note">{comingSoon ? "Próximamente · El registro, las reservas y los chats aún no están disponibles." : "7 días de prueba · Acceso con Google"}</p>
           <AgendaPreview />
-          <div className="agenda-mascot">
-            <Image src="/brand/sarin-welcome.png" alt="" width={64} height={96} className="agenda-mascot-image" />
-            <p><strong>Hola, soy Sarin.</strong><span>Tu asistente para los días ocupados.</span></p>
-          </div>
+          <SarinArrival />
         </section>
         <section id="como-funciona" className="agenda-how agenda-container" aria-labelledby="how-heading">
           <div className="agenda-section-heading">

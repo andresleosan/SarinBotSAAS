@@ -1,3 +1,5 @@
 La mascota `sarin-welcome.png` procede de `https://www.alsdevstudio.com/assets/brand/mascot-welcome.png`. El propietario del proyecto eligió su web como referencia visual para Sarin. El archivo se reutiliza sin modificar y se sirve desde este proyecto; las páginas privadas no descargan la imagen del sitio externo.
 
 `sarin-face.png` es la cabeza de esa misma mascota, preparada con `imagegen` a petición del propietario para usar su cara como favicon. Conserva transparencia, casco y ojos turquesa. Los formatos reducidos y el ICO de `landing/public/sarin-face*` proceden de esa imagen; el cuerpo de la mascota original se conserva sin cambios.
+
+`sarin-face-mark.png` es una copia del PNG transparente de 180 px del favicon, usada en cabecera y pie. `sarin-flight.png` procede de `https://www.alsdevstudio.com/assets/brand/mascot-flight.png` (320 × 383, PNG transparente); se reutiliza sin modificar para la secuencia de vuelo solicitada por el propietario. Los tres recursos de la portada se sirven desde Sarin, sin conexiones a ALS durante la visita.

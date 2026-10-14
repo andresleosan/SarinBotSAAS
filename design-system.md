@@ -9,6 +9,7 @@ Dirección elegida por el propietario el 13 de octubre de 2026 entre las tres pr
 - Tipografía: DM Sans local para títulos, cuerpo y datos; mantiene el carácter geométrico de la propuesta sin añadir descargas externas. Pesos 400–700; horas con cifras tabulares.
 - Composición: navegación horizontal con separador, titular centrado y agenda blanca como elemento principal. Bordes de 10–20 px, sombras suaves y espacios amplios.
 - Firma: la semana ilustrativa y un selector local de horarios muestran la relación entre conversación y agenda. La mascota y el favicon con la cara de Sarin conservan su identidad.
+- Ajuste solicitado: la cara del favicon identifica también cabecera y pie. Bajo la agenda, Sarin entra volando, saluda junto a un globo blanco y vuelve a salir, siguiendo la secuencia de ALS con sus assets originales. Se pausa al salir de pantalla, al ocultar la pestaña o mediante el control; movimiento reducido y HTML sin JavaScript muestran el saludo estático.
 - La portada temporal mantiene el aviso de lanzamiento. Los horarios son ejemplos sin conexión con datos, registro o reservas. El componente compartido conserva sus enlaces SaaS cuando `comingSoon` es falso.
 - Calidad: adaptación desde 320 px, controles de al menos 44 px, foco azul visible, tabla semántica, selección anunciada y movimiento reducido respetado.
 

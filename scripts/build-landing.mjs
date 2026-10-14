@@ -4,9 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-// Copy the single public illustration, never environment files or SaaS output.
+// Copy only the approved brand assets, never environment files or SaaS output.
 await mkdir(resolve(root, 'landing/public/brand'), { recursive: true });
-await copyFile(resolve(root, 'public/brand/sarin-welcome.png'), resolve(root, 'landing/public/brand/sarin-welcome.png'));
+for (const file of ['sarin-welcome.png', 'sarin-flight.png', 'sarin-face-mark.png']) {
+  await copyFile(resolve(root, 'public/brand', file), resolve(root, 'landing/public/brand', file));
+}
 
 const child = spawn(process.execPath, [resolve(root, 'node_modules/next/dist/bin/next'), 'build', 'landing'], {
   cwd: root, stdio: 'inherit', env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },

@@ -10,7 +10,7 @@ assert.ok(html.includes('aún no están disponibles') && html.includes('Próxima
 assert.ok(!links.some((link) => /^\/(admin|dashboard|api|b)(\/|$)/.test(link)), 'Private routes must not be linked.');
 assert.ok(!html.includes('/_next/image?'), 'The export must not require the Next image server.');
 const icons = ['sarin-face.ico', 'sarin-face-32.png', 'sarin-face-48.png', 'sarin-face-apple.png'];
-for (const file of ['404.html', '_headers', 'robots.txt', 'sitemap.xml', 'brand/sarin-welcome.png', 'favicon.ico', ...icons]) await stat(join(output, file));
+for (const file of ['404.html', '_headers', 'robots.txt', 'sitemap.xml', 'brand/sarin-welcome.png', 'brand/sarin-flight.png', 'brand/sarin-face-mark.png', 'favicon.ico', ...icons]) await stat(join(output, file));
 for (const icon of icons) {
   assert.ok(links.some((link) => link.split(/[?#]/)[0] === '/' + icon), `Missing icon metadata: ${icon}`);
 }
