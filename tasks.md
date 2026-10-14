@@ -31,7 +31,16 @@
 - [x] CI real de GitHub: tres jobs verdes para tipos, pruebas, builds, reglas, recorrido local y dry-run del Worker. Commit `d761de4`, ejecución `38523876656`.
 - [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue de la aplicación completa. La portada temporal ya está publicada por separado en Pages.
 
-## Evidencia final
+## Migración a pnpm verificada
+
+- [x] App y Cloudflare en pnpm 11.23.0 con lockfile único, overrides conservados y Node 24.
+- [x] Launcher, Docker, CI, Pages y documentación actualizados; ambos `package-lock.json` y sus metadatos internos de instalación npm retirados tras las verificaciones.
+- [x] Instalación congelada, tipos, 153 pruebas unitarias, 7 reglas Firestore, 61 comprobaciones del recorrido, 8 pruebas Worker, builds y Docker aprobados. Cero vulnerabilidades conocidas.
+- [x] Push `04d57cd` en `main`; CI `38527082839` con tres jobs verdes y Pages `07bcf4b6` publicado con pnpm. Evidencia: `docs/qa/2026-10-14-migracion-pnpm.md`.
+
+Comandos actuales: `pnpm install --frozen-lockfile`, `pnpm run dev:local`, `pnpm run typecheck`, `pnpm test` y `pnpm --filter sarin-cloudflare-host run check`.
+
+## Evidencia histórica anterior a pnpm
 
 - `npm run typecheck`: pasa, sin errores.
 - `npm test`: 142 pruebas aprobadas; 7 pruebas de emulador omitidas en esta invocación por no tener las variables de ese runner.

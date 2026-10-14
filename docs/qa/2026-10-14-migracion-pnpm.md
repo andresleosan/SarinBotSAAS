@@ -24,6 +24,13 @@ Launcher: usa la CLI real de pnpm y Firebase CLI 15.33.0 mediante `dlx`, con per
 - Docker Linux: build pnpm congelado y arranque standalone en loopback, filesystem de solo lectura, usuario no root y capacidades retiradas. `/` y `/admin/vault` responden 200; las siete API protegidas responden 401 usando sus métodos correctos.
 - Revisión independiente estática de workflow, Docker, integridades y versiones: sin bloqueantes.
 
-## Pendiente de cierre
+## Cierre verificado
 
-Instalación final sin lockfiles npm, integración/push, CI y despliegue de Pages con pnpm. Firebase real y Ollama continúan pendientes por decisión del propietario.
+- Commit de código `04d57cd22f9243b9e4e93c0c20ceb373f408178e`, integrado por fast-forward y publicado en `main`.
+- En la carpeta habitual: instalación congelada sin lockfiles npm, TypeScript y 153 pruebas aprobadas; humo local aprobado. Se retiraron también los dos archivos internos `.package-lock.json` del árbol de dependencias anterior. No se desinstaló npm global ni se borraron sus cachés.
+- [GitHub Actions 38527082839](https://github.com/andresleosan/SarinBotSAAS/actions/runs/38527082839): los tres jobs finalizaron con éxito, incluido el arranque aislado del launcher pnpm en Linux y su recorrido completo.
+- Pages producción `07bcf4b6-7f31-44ac-b500-bc4e1de8de94`: success. El log confirma pnpm 11.23.0, instalación del workspace y comando `pnpm run build:landing && pnpm run check:landing`. `NODE_VERSION=24` y `PNPM_VERSION=11.23.0` guardados. La plataforma emitió una advertencia de engines en su bootstrap de Corepack con Node 24.13.1; instalación, compilación y publicación terminaron sin errores.
+- Dominio `sarinbotsaas.pages.dev` y URL del despliegue: HTTP 200. Esta publicación sigue siendo la portada temporal, con Firebase real pendiente.
+- Contenedor de comprobación y Next temporal en 3040 retirados; los emuladores y la app habitual en 3030 permanecen activos. Datos manuales y Vault conservados. Ollama y la Mac siguen pendientes por decisión del propietario.
+
+Evidencia visual: `pnpm-pages-settings.png` y `pnpm-pages-deployment.png`.
