@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDevelopmentEnvironment, parseLocalArguments, javaMajorVersion } from '../scripts/lib/local-development.mjs';
+import { localDevelopmentEnvironment, parseLocalArguments, javaMajorVersion, pnpmFirebaseInvocation } from '../scripts/lib/local-development.mjs';
 
 describe('isolated local development launcher', () => {
   it('pins a demo project and loopback emulators while removing inherited cloud credentials', () => {
@@ -20,5 +20,30 @@ describe('isolated local development launcher', () => {
     expect(javaMajorVersion('openjdk version "21.0.12" 2026-07-21 LTS')).toBe(21);
     expect(javaMajorVersion('openjdk 24.0.1 2025-04-15')).toBe(24);
     expect(javaMajorVersion('not installed')).toBeNull();
+  });
+
+  it('uses the actual pnpm JavaScript CLI through Node with an isolated pinned Firebase tool', () => {
+    const invocation = pnpmFirebaseInvocation({ npm_execpath: '/opt/pnpm/bin/pnpm.mjs', npm_config_user_agent: 'pnpm/11.23.0 npm/? node/v24.13.1 linux x64' }, '/workspace/Sarin Bot', '/usr/bin/node');
+    expect(invocation.command).toBe('/usr/bin/node');
+    expect(invocation.args.slice(0, 3)).toEqual(['/opt/pnpm/bin/pnpm.mjs', 'dlx', '--allow-build=protobufjs']);
+    expect(invocation.args.slice(3)).toEqual(['firebase-tools@15.33.0', 'emulators:start', '--only', 'auth,firestore', '--project', 'demo-sarin-bot', '--config', '/workspace/Sarin Bot/firebase.json', '--non-interactive']);
+    expect(invocation.args).not.toContain('--yes');
+    expect(invocation.args.some(argument => argument.includes('allow-all-build'))).toBe(false);
+  });
+
+  it('constructs a Windows command without shell quoting and supports a native pnpm executable', () => {
+    const env = { npm_execpath: 'C:\\Program Files\\pnpm\\pnpm.exe', npm_config_user_agent: 'pnpm/11.23.0 npm/? node/v24.13.1 win32 x64' };
+    const invocation = pnpmFirebaseInvocation(env, 'F:\\Proyectos\\Sarin Bot pnpm-migration', 'C:\\Program Files\\nodejs\\node.exe');
+    expect(invocation.command).toBe(env.npm_execpath);
+    expect(invocation.args[0]).toBe('dlx');
+    expect(invocation.args).toContain('F:\\Proyectos\\Sarin Bot pnpm-migration\\firebase.json');
+    expect(invocation.args.every(argument => !argument.startsWith('"'))).toBe(true);
+  });
+
+  it('refuses npm, another pnpm version, missing provenance and shell wrappers before tool launch', () => {
+    const valid = { npm_execpath: '/opt/pnpm/bin/pnpm.mjs', npm_config_user_agent: 'pnpm/11.23.0 npm/? node/v24.13.1' };
+    for (const change of [{ npm_execpath: undefined }, { npm_config_user_agent: undefined }, { npm_config_user_agent: 'npm/11.6.0 node/v24' }, { npm_config_user_agent: 'pnpm/10.0.0 node/v24' }, { npm_config_user_agent: 'pnpm/12.0.0 node/v24' }, { npm_execpath: '/usr/bin/npm-cli.js' }, { npm_execpath: 'pnpm.mjs' }, { npm_execpath: 'C:\\pnpm\\pnpm.cmd' }, { npm_execpath: '/opt/pnpm/pnpm.mjs\n--help' }]) {
+      expect(() => pnpmFirebaseInvocation({ ...valid, ...change }, '/workspace/Sarin Bot', '/usr/bin/node')).toThrow(/pnpm/);
+    }
   });
 });

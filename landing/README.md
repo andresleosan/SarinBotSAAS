@@ -1,15 +1,16 @@
 # Portada temporal — Cloudflare Pages
 
-Publicación autorizada en `https://sarinbotsaas.pages.dev`. Reutiliza el diseño de ALS DevStudio con un aviso visible de lanzamiento pendiente. No contiene AuthProvider, Firebase, rutas API, registro ni acceso administrativo. El sitio completo continúa en `src/app` con su build habitual.
+Publicación autorizada en `https://sarinbotsaas.pages.dev`. Usa la identidad Agenda clara y la mascota de Sarin, con un aviso visible de lanzamiento pendiente. No contiene AuthProvider, Firebase, rutas API, registro ni acceso administrativo. El sitio completo continúa en `src/app` con su build habitual.
 
-Desde la raíz, con Node 24 y dependencias instaladas:
+Desde la raíz del workspace, con Node 24 y pnpm 11.23.0:
 
 ```sh
-npm run build:landing
-npm run check:landing
+pnpm install --frozen-lockfile
+pnpm run build:landing
+pnpm run check:landing
 ```
 
-En el formulario de **Pages**, rama `main`, directorio raíz `/`, preset `None`, build command `npm run build:landing && npm run check:landing`, output `landing/out`. Añadir solo la variable de build `NODE_VERSION=24`. No se requieren variables Firebase ni secretos. La instalación usa el `package-lock.json` de la raíz; no instalar desde `landing/`.
+En el formulario de **Pages**, rama `main`, directorio raíz `/`, preset `None`, build command `pnpm run build:landing && pnpm run check:landing`, output `landing/out`. Variables de build: `NODE_VERSION=24` y `PNPM_VERSION=11.23.0`, según la [imagen de build de Pages](https://developers.cloudflare.com/pages/configuration/build-image/). No se requieren variables Firebase ni secretos. La instalación usa el único `pnpm-lock.yaml` de la raíz y `pnpm install --frozen-lockfile`; no instalar desde `landing/` ni `cloudflare/`.
 
 La exportación incluye `404.html` para que las rutas desconocidas devuelvan 404 y `_headers` para seguridad/caché. Nunca subir la raíz del repositorio, `.next`, `cloudflare/` ni archivos de entorno como salida pública. La CSP admite scripts inline del render de Next; no hay analítica ni servicios externos en la portada.
 

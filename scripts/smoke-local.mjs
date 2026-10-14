@@ -4,7 +4,7 @@ import { LOCAL_FIREBASE_AUTH_HOST, LOCAL_TEST_ACCOUNTS } from '../src/lib/fireba
 // Exercises the actual local SDK/REST -> Next API -> Admin SDK -> Firestore path.
 // This script accepts a loopback port only, never a production URL or token.
 const options=parseLocalArguments(process.argv.slice(2));
-if(options.help){console.log('Uso: npm run test:local -- [--port 3030]\nRequiere npm run dev:local activo. Solo cuentas de prueba; no necesita Ollama.');process.exit(0);}
+if(options.help){console.log('Uso: pnpm run test:local [--port 3030]\nRequiere pnpm run dev:local activo. Solo cuentas de prueba; no necesita Ollama.');process.exit(0);}
 const base=`http://127.0.0.1:${options.port}`;
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 async function json(url,init={}) {
@@ -25,7 +25,7 @@ async function login(account) {
 const request=(path,token,method='GET',body)=>json(`${base}${path}`,{method,headers:{Authorization:`Bearer ${token}`,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
 try {
   const health=await json(`http://${LOCAL_FIREBASE_AUTH_HOST}/`);
-  assert(health.response.ok && health.data?.authEmulator?.ready===true,'Inicia npm run dev:local antes de esta prueba.');
+  assert(health.response.ok && health.data?.authEmulator?.ready===true,'Inicia pnpm run dev:local antes de esta prueba.');
   const admin=await login(LOCAL_TEST_ACCOUNTS.find(account=>account.role==='admin'));
   const client=await login(LOCAL_TEST_ACCOUNTS.find(account=>account.role==='client'));
   const [session,consoleResult,forbiddenConsole,forbiddenVault,emptyVault]=await Promise.all([

@@ -2,6 +2,7 @@
   "name": "sarin-bot-mvp",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.23.0",
   "scripts": {
     "dev": "next dev",
     "dev:local": "node scripts/dev-local.mjs",
@@ -43,14 +44,10 @@
     "react-test-renderer": "^19.3.0",
     "tailwindcss": "4.3.3",
     "typescript": "^5",
+    "vite": "8.3.4",
     "vitest": "5.0.4"
   },
   "engines": {
     "node": ">=24.0.0 <25"
-  },
-  "overrides": {
-    "@grpc/grpc-js": "1.14.6",
-    "basic-ftp": "6.2.3",
-    "postcss-selector-parser": "7.1.6"
   }
 }

@@ -11,7 +11,7 @@
     "configure:build": "node scripts/configure-build.mjs",
     "dry-run": "wrangler deploy --config wrangler.jsonc --dry-run --outdir .wrangler/dry-run",
     "dry-run:worker": "wrangler deploy --config wrangler.jsonc --dry-run --containers-rollout=none --outdir .wrangler/dry-run",
-    "check": "npm test && npm run typecheck && npm run dry-run:worker"
+    "check": "pnpm test && pnpm run typecheck && pnpm run dry-run:worker"
   },
   "dependencies": { "@cloudflare/containers": "0.3.7" },
   "devDependencies": { "@types/node": "^24", "typescript": "^5.9.3", "wrangler": "4.150.0" }

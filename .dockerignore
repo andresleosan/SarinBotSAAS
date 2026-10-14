@@ -1,15 +1,22 @@
 node_modules
+**/node_modules
+.pnpm-store
 .next
 .env*
 !.env.local.example
 .git
-cloudflare
+# Only this workspace manifest is needed by the frozen, filtered app install.
+cloudflare/**
+!cloudflare/package.json
 landing
+work
+docs/qa
 .firebase
 *-debug.log
 *-debug*.log
 test-results
 coverage
+playwright-report
 *.vault.json
 sarin-vault-*.json
 .firebaserc

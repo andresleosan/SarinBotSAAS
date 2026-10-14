@@ -1,4 +1,5 @@
 import { LOCAL_FIREBASE_AUTH_HOST, LOCAL_FIREBASE_FIRESTORE_HOST, LOCAL_FIREBASE_PROJECT_ID, LOCAL_SUPERADMIN_UID } from '../../src/lib/firebase/emulator-constants.mjs';
+import path from 'node:path';
 
 /** @param {Record<string, string | undefined>} input
  * @returns {Record<string, string | undefined>}
@@ -40,4 +41,25 @@ export function parseLocalArguments(args) {
 export function javaMajorVersion(output) {
   const match=/(?:openjdk|java)(?: version)?\s+"?(\d+)(?:\.(\d+))?/i.exec(output);
   return match ? (Number(match[1])===1 ? Number(match[2]) : Number(match[1])) : null;
+}
+
+/** Resolve pnpm's actual CLI from its standard lifecycle environment. Scripts
+ * must not treat npm_execpath as npm: pnpm supplies this variable too.
+ * @param {Record<string, string | undefined>} env
+ * @param {string} root @param {string} nodeBinary
+ */
+export function pnpmFirebaseInvocation(env, root, nodeBinary) {
+  const cli = env.npm_execpath ?? '';
+  const manager = /^pnpm\/11\.23\.0(?:\s|$)/.test(env.npm_config_user_agent ?? '');
+  const absolute = cli && (path.posix.isAbsolute(cli) || path.win32.isAbsolute(cli));
+  const name = cli ? cli.replaceAll('\\', '/').split('/').at(-1) : '';
+  if (!manager || !absolute || /[\r\n\0]/.test(cli) || !/^pnpm(?:\.mjs|\.cjs|\.js|\.exe)?$/i.test(name)) throw new Error('Inicia con pnpm 11.23.0: pnpm run dev:local. Se requiere su CLI real, sin wrappers de shell.');
+  const javascript = /\.(mjs|cjs|js)$/i.test(name);
+  const prefix = javascript ? [cli] : [];
+  const paths = /^(?:[A-Za-z]:[\\/]|\\\\)/.test(root) ? path.win32 : path.posix;
+  return {
+    command: javascript ? nodeBinary : cli,
+    versionArgs: [...prefix, '--version'],
+    args: [...prefix, 'dlx', '--allow-build=protobufjs', 'firebase-tools@15.33.0', 'emulators:start', '--only', 'auth,firestore', '--project', LOCAL_FIREBASE_PROJECT_ID, '--config', paths.join(root, 'firebase.json'), '--non-interactive'],
+  };
 }

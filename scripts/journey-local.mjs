@@ -10,7 +10,7 @@ import { assertEmulatorInventory, assertJourneyUrl, journeyEnvironment } from '.
 try {
   const options = parseLocalArguments(process.argv.slice(2));
   if (options.help) {
-    console.log('Uso: npm run test:journey -- [--port 3030]\nRequiere dev:local activo: Next en loopback, Auth 9099, Firestore 8080 y hub 4400.\nNode 24 y dependencias instaladas. Usa el proyecto demo-sarin-bot; no necesita Firebase real ni Ollama.\nCrea cuentas/datos sintéticos por corrida y verifica su limpieza; conserva cuentas sembradas, datos manuales y Vault.');
+    console.log('Uso: pnpm run test:journey [--port 3030]\nRequiere dev:local activo: Next en loopback, Auth 9099, Firestore 8080 y hub 4400.\nNode 24 y dependencias instaladas. Usa el proyecto demo-sarin-bot; no necesita Firebase real ni Ollama.\nCrea cuentas/datos sintéticos por corrida y verifica su limpieza; conserva cuentas sembradas, datos manuales y Vault.');
   } else {
     if (Number(process.versions.node.split('.')[0]) !== 24) throw new Error('Este ensayo requiere Node.js 24.');
     const env = journeyEnvironment(process.env, options.port, randomUUID());
@@ -19,7 +19,7 @@ try {
       checkedFetch('http://127.0.0.1:9099/'), checkedFetch('http://127.0.0.1:8080/'),
       checkedFetch('http://127.0.0.1:4400/emulators'), checkedFetch(`http://127.0.0.1:${options.port}/api/businesses`),
     ]);
-    if (!auth.ok || !(await auth.json()).authEmulator?.ready || !firestore.ok || !hub.ok || unauthorized.status !== 401) throw new Error('Los servicios locales no corresponden al ensayo. Inicia npm run dev:local y comprueba --port.');
+    if (!auth.ok || !(await auth.json()).authEmulator?.ready || !firestore.ok || !hub.ok || unauthorized.status !== 401) throw new Error('Los servicios locales no corresponden al ensayo. Inicia pnpm run dev:local y comprueba --port.');
     assertEmulatorInventory(await hub.json());
     console.log('Servicios oficiales en loopback confirmados. Ejecutando el recorrido real sin inferencia.');
     const root = fileURLToPath(new URL('../', import.meta.url));

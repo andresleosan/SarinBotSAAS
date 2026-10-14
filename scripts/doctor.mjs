@@ -2,7 +2,7 @@ import { parseDoctorFlags, runDoctor } from './lib/doctor.mjs';
 
 const help = `Sarin Doctor — diagnóstico local sin Firebase
 
-Uso: npm run doctor -- [--engine] [--generate] [--vision]
+Uso: pnpm run doctor [--engine] [--generate] [--vision]
 
 Sin opciones: revisa configuración local y Node.js 24, sin conexiones ni inferencia.
   --engine    Hace un GET /v1/models (máximo 8 segundos); no genera texto.
@@ -13,7 +13,7 @@ Sin opciones: revisa configuración local y Node.js 24, sin conexiones ni infere
 Firebase se comprueba solo por presencia de variables; no se validan credenciales reales.
 Los datos, secretos, direcciones y respuestas de modelos no se imprimen.
 Cada opción de inferencia hace una sola petición, sin reintentos.
-Las variables se cargan desde .env.local mediante el comando npm; no se aceptan secretos como argumentos.
+Las variables se cargan desde .env.local mediante el script doctor; no se aceptan secretos como argumentos.
 Los pendientes de Firebase permiten continuar el trabajo local; los errores terminan con código 1.`;
 
 try {

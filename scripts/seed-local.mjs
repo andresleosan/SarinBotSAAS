@@ -7,7 +7,7 @@ if (process.env.NODE_ENV !== 'development' || process.env.NEXT_PUBLIC_FIREBASE_E
   || process.env.FIREBASE_ADMIN_PROJECT_ID !== LOCAL_FIREBASE_PROJECT_ID
   || process.env.FIREBASE_AUTH_EMULATOR_HOST !== LOCAL_FIREBASE_AUTH_HOST
   || process.env.FIRESTORE_EMULATOR_HOST !== LOCAL_FIREBASE_FIRESTORE_HOST) {
-  throw new Error('La inicialización de cuentas solo se admite desde npm run dev:local.');
+  throw new Error('La inicialización de cuentas solo se admite desde pnpm run dev:local.');
 }
 const app=initializeApp({projectId:LOCAL_FIREBASE_PROJECT_ID},'sarin-local-accounts');
 try {

@@ -63,7 +63,7 @@ export function assertEmulatorInventory(inventory) {
   const data = record(inventory);
   for (const [name, port] of [['auth', 9099], ['firestore', 8080]]) {
     const endpoint = record(data[name]);
-    if (endpoint.host !== '127.0.0.1' || endpoint.port !== port) throw new Error('Inicia Auth y Firestore oficiales con npm run dev:local.');
+    if (endpoint.host !== '127.0.0.1' || endpoint.port !== port) throw new Error('Inicia Auth y Firestore oficiales con pnpm run dev:local.');
   }
 }
 

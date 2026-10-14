@@ -8,32 +8,35 @@ La interfaz usa **Agenda clara**, elegida por el propietario: fondo claro, super
 
 Puedes desarrollar y recorrer la aplicación **sin crear un proyecto Firebase**:
 
+Usa **Node 24 y pnpm 11.23.0**. El workspace reúne la aplicación de la raíz y `cloudflare/` con un único `pnpm-lock.yaml`; instala siempre desde la raíz:
+
 ```sh
-npm run dev:local
+pnpm install --frozen-lockfile
+pnpm run dev:local
 ```
 
-Abre `http://127.0.0.1:3030`. El comando inicia los emuladores oficiales Auth y Firestore en loopback y Next en desarrollo, con el proyecto aislado `demo-sarin-bot`. La primera ejecución descarga Firebase CLI 15.33.0 en la caché externa de npm; no la incorpora a las dependencias de la aplicación. Requiere Node 24 y Java 21+; en Windows busca un JDK Adoptium instalado si el Java predeterminado es antiguo, sin cambiar el PATH del sistema. No necesita `.env.local`, claves ni acceso a tus cuentas.
+Abre `http://127.0.0.1:3030`. El comando inicia los emuladores oficiales Auth y Firestore en loopback y Next en desarrollo, con el proyecto aislado `demo-sarin-bot`. La primera ejecución descarga Firebase CLI 15.33.0 en la caché externa de pnpm; no la incorpora a las dependencias de la aplicación. Requiere Java 21+; en Windows busca un JDK Adoptium instalado si el Java predeterminado es antiguo, sin cambiar el PATH del sistema. No necesita `.env.local`, claves ni acceso a tus cuentas.
 
-Hay tres cuentas de prueba: `admin@sarin.local`, `negocio@sarin.local` y `cliente@sarin.local`. Usa los botones **Administrador local**, **Negocio local** y **Cliente local** para iniciar sesión mediante Auth Emulator; también está disponible el popup Google emulado. La primera permite abrir `/admin/vault` y `/admin`; las otras permiten comprobar los roles y la isla. La interfaz identifica el entorno local. Los negocios y cuentas son temporales y se reinician al detener los emuladores; Vault conserva su IndexedDB en ese navegador. **Exporta una copia de Vault antes de pasar al UID o dominio real**, ya que cada uno tiene su propio almacenamiento. Ctrl+C detiene los procesos de esta sesión. Puedes elegir otro puerto web con `npm run dev:local -- --port 3040`.
+Hay tres cuentas de prueba: `admin@sarin.local`, `negocio@sarin.local` y `cliente@sarin.local`. Usa los botones **Administrador local**, **Negocio local** y **Cliente local** para iniciar sesión mediante Auth Emulator; también está disponible el popup Google emulado. La primera permite abrir `/admin/vault` y `/admin`; las otras permiten comprobar los roles y la isla. La interfaz identifica el entorno local. Los negocios y cuentas son temporales y se reinician al detener los emuladores; Vault conserva su IndexedDB en ese navegador. **Exporta una copia de Vault antes de pasar al UID o dominio real**, ya que cada uno tiene su propio almacenamiento. Ctrl+C detiene los procesos de esta sesión. Puedes elegir otro puerto web con `pnpm run dev:local --port 3040`.
 
 La conexión local utiliza los SDK de Firebase y las reglas reales; el modo está bloqueado en producción y no sustituye la inferencia con respuestas simuladas. El chat necesita Ollama disponible, mientras que formularios, agenda, pagos y almacenamiento de Vault pueden probarse sin él. [Emuladores oficiales de autenticación](https://firebase.google.com/docs/emulator-suite/connect_auth).
 
 Para revisar lo que ya puedes configurar sin Firebase:
 
 ```sh
-npm run doctor
-npm run doctor -- --engine
-npm run doctor -- --generate
-npm run doctor -- --vision
+pnpm run doctor
+pnpm run doctor --engine
+pnpm run doctor --generate
+pnpm run doctor --vision
 ```
 
-El diagnóstico predeterminado solo comprueba configuración, sin conexiones. `--engine` consulta el catálogo real; `--generate` y `--vision` hacen una petición sintética explícita por modelo. Carga `.env.local` si existe, no necesita Firebase y no imprime secretos, endpoints ni contenido del modelo. Usa `npm run doctor -- --help` para detalles. Las plantillas de Mac, Tunnel, Caddy y Compose están en [deploy/README.md](deploy/README.md).
+El diagnóstico predeterminado solo comprueba configuración, sin conexiones. `--engine` consulta el catálogo real; `--generate` y `--vision` hacen una petición sintética explícita por modelo. Carga `.env.local` si existe, no necesita Firebase y no imprime secretos, endpoints ni contenido del modelo. Usa `pnpm run doctor --help` para detalles. Las plantillas de Mac, Tunnel, Caddy y Compose están en [deploy/README.md](deploy/README.md).
 
 Para conectar con Firebase real, copia `.env.local.example` a `.env.local` y completa la configuración real sin compartir secretos en chats ni versionarlos.
 
 ```sh
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run dev
 ```
 
 Habilita Google como proveedor en Firebase Authentication y agrega el dominio de desarrollo/producción a Authorized domains. Crea Firestore y configura la cuenta de servicio Admin en el servidor. `SUPERADMIN_UID` es el UID exacto de tu cuenta Firebase Auth, no tu email. No existe un login demo: si falta configuración la interfaz lo indica y los endpoints fallan de forma explícita.
@@ -70,28 +73,28 @@ Límites explícitos: imágenes hasta 150 KiB después de compresión, cuatro po
 ## Verificación
 
 ```sh
-npm run typecheck
-npm test
-npm run test:rules
-npm run test:local
-npm run test:journey
-npm audit
-npm run build
+pnpm run typecheck
+pnpm test
+pnpm run test:rules
+pnpm run test:local
+pnpm run test:journey
+pnpm audit
+pnpm run build
 ```
 
-`test:rules` necesita Java 21+ seleccionado por `JAVA_HOME`. Descarga el emulador oficial Firestore 1.22.0 a la caché del usuario, verifica SHA-256 y usa solo proyectos `demo-*` y datos sintéticos. Prueba reglas de aislamiento y carreras reales de reserva/aprobación. Las siete pruebas del emulador se omiten en `npm test` cuando no está activo y se ejecutan con `test:rules`; no necesitan credenciales reales.
+`test:rules` necesita Java 21+ seleccionado por `JAVA_HOME`. Descarga el emulador oficial Firestore 1.22.0 a la caché del usuario, verifica SHA-256 y usa solo proyectos `demo-*` y datos sintéticos. Prueba reglas de aislamiento y carreras reales de reserva/aprobación. Las siete pruebas del emulador se omiten en `pnpm test` cuando no está activo y se ejecutan con `test:rules`; no necesitan credenciales reales.
 
-`test:local` requiere `dev:local` activo. Comprueba el recorrido real Auth Emulator → APIs Next → Admin SDK → Firestore, el UID superadmin y el rechazo 403 del cliente en administración y Vault. No crea negocios ni pagos, no modifica la bóveda y no ejecuta inferencia. Admite `--port` si elegiste otro puerto web.
+`test:local` requiere `dev:local` activo. Comprueba el recorrido real Auth Emulator → APIs Next → Admin SDK → Firestore, el UID superadmin y el rechazo 403 del cliente en administración y Vault. No crea negocios ni pagos, no modifica la bóveda y no ejecuta inferencia. Usa `pnpm run test:local --port 3040` si elegiste otro puerto web; `test:journey` admite la misma opción sin un separador `--` adicional.
 
 `test:journey` también requiere `dev:local` activo. Ejecuta el recorrido completo con cuentas y datos sintéticos aislados de cada corrida; prueba reservas, colisiones, cancelaciones, bloqueos y revisión de comprobantes. Usa las implementaciones reales sobre los emuladores y limpia únicamente sus propios datos. No envía conversaciones ni necesita Ollama. Las reservas se ejercitan mediante la función real porque la API de chat requiere el motor, que se conectará más adelante.
 
-El workflow [Verify Sarin](.github/workflows/verify.yml) ejecuta tipos, pruebas, builds, reglas Firestore, recorrido local y dry-run del Worker en cada push a `main` y cada PR. Usa Node 24, Java 21, permisos de lectura y acciones oficiales fijadas por SHA según [las prácticas de GitHub](https://docs.github.com/en/actions/reference/security/secure-use). No utiliza secretos ni despliega la aplicación. El autodeploy existente de Pages sigue siendo independiente de estos checks.
+El workflow [Verify Sarin](.github/workflows/verify.yml) ejecuta tipos, pruebas, builds, reglas Firestore, recorrido local y dry-run del Worker en cada push a `main` y cada PR. Usa Node 24, pnpm 11.23.0, Java 21, instalación con lockfile congelado, permisos de lectura y acciones oficiales fijadas por SHA según [las prácticas de GitHub](https://docs.github.com/en/actions/reference/security/secure-use). No utiliza secretos ni despliega la aplicación. El autodeploy existente de Pages sigue siendo independiente de estos checks.
 
 ## Producción
 
 El destino solicitado es **Cloudflare Containers**, conservando **Node 24 en una sola réplica**. El [kit Cloudflare](cloudflare/README.md) incluye Worker frontal, contenedor y un Durable Object con nombre constante: todas las peticiones comparten el mismo proceso y la misma cola de inferencias. Firebase Admin continúa en Node nativo. El repositorio de origen es [andresleosan/SarinBotSAAS](https://github.com/andresleosan/SarinBotSAAS).
 
-En Workers Builds, conecta GitHub con raíz de build en el repositorio, instalación `npm --prefix cloudflare ci`, build `npm --prefix cloudflare run configure:build` y deploy `cd cloudflare && npx wrangler deploy --config wrangler.build.json`. La guía detalla las cuatro variables públicas de build y los secretos de runtime separados. Hace falta plan Workers Paid, configuración Firebase real, túnel operativo y dominio antes de habilitar tráfico. Este repositorio prepara la configuración; subir código no activa ni contrata esos recursos.
+En Workers Builds, conecta GitHub con raíz de build en el repositorio, Node 24 y `PNPM_VERSION=11.23.0`. Usa instalación `pnpm install --frozen-lockfile`, build `pnpm --filter sarin-cloudflare-host configure:build` y deploy `pnpm --filter sarin-cloudflare-host exec wrangler deploy --config wrangler.build.json`. Todos parten de la raíz del workspace. La guía detalla las cuatro variables públicas de build y los secretos de runtime separados. Hace falta plan Workers Paid, configuración Firebase real, túnel operativo y dominio antes de habilitar tráfico. Este repositorio prepara la configuración; subir código no activa ni contrata esos recursos.
 
 El Worker solo enruta al contenedor. La aplicación Next no se ejecuta como función Workers ni como exportación estática de Pages. El kit [tradicional de servidor y Caddy](deploy/README.md) sigue disponible como alternativa; su indicación **DNS only** aplica a ese camino, no al dominio del Worker de Containers.
 
@@ -105,7 +108,7 @@ firebase deploy --project TU_PROYECTO --only firestore:rules,firestore:indexes
 
 Espera que los índices estén listos antes de habilitar tráfico. Las reglas permiten proyecciones de islas a usuarios autenticados y datos privados solo a sus dueños/clientes. El Superadmin lee los datos globales exclusivamente mediante las API protegidas con Admin SDK; no existe una bandera editable que conceda privilegios en Firestore.
 
-Para despliegue tradicional: configura `.env.local` en el servidor antes de `npm run build` (las cuatro variables `NEXT_PUBLIC_FIREBASE_*` se incorporan durante el build) y ejecuta `npm start`. También se incluye Dockerfile con salida standalone; pasa las cuatro variables públicas como build args y las credenciales servidor solamente como entorno del contenedor. No incluyas `.env.local` en la imagen. [Salida standalone de Next](https://nextjs.org/docs/app/api-reference/config/next-config-js/output).
+Para despliegue tradicional: configura `.env.local` en el servidor antes de `pnpm run build` (las cuatro variables `NEXT_PUBLIC_FIREBASE_*` se incorporan durante el build) y ejecuta `pnpm start`. También se incluye Dockerfile con salida standalone; pasa las cuatro variables públicas como build args y las credenciales servidor solamente como entorno del contenedor. No incluyas `.env.local` en la imagen. [Salida standalone de Next](https://nextjs.org/docs/app/api-reference/config/next-config-js/output).
 
 Antes de abrir producción, verifica una cuenta propietaria, otra cliente y el UID administrador en Firebase real; prueba una cita y un recibo propios, comprueba estado offline deteniendo Ollama, y prueba exportar/reimportar Vault. Configura presupuestos/alertas del proyecto y revisa los avisos de seguridad de Next/Firebase vigentes en la fecha del despliegue. No se han creado proyectos externos ni aplicado cambios a datos reales durante la implementación.
 

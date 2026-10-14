@@ -3,21 +3,19 @@ import { createConnection } from 'node:net';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { javaMajorVersion, localDevelopmentEnvironment, parseLocalArguments } from './lib/local-development.mjs';
+import { javaMajorVersion, localDevelopmentEnvironment, parseLocalArguments, pnpmFirebaseInvocation } from './lib/local-development.mjs';
 import { LOCAL_FIREBASE_AUTH_HOST } from '../src/lib/firebase/emulator-constants.mjs';
 
 const options=parseLocalArguments(process.argv.slice(2));
 if (options.help) {
-  console.log('Uso: npm run dev:local -- [--port 3030]\nInicia Auth y Firestore locales (proyecto demo-sarin-bot) y Next en loopback.\nRequiere Node 24 y Java 21+. No necesita proyecto Firebase ni credenciales.');
+  console.log('Uso: pnpm run dev:local [--port 3030]\nInicia Auth y Firestore locales (proyecto demo-sarin-bot) y Next en loopback.\nRequiere pnpm 11.23.0, Node 24 y Java 21+. No necesita proyecto Firebase ni credenciales.');
   process.exit(0);
 }
 const root=fileURLToPath(new URL('../',import.meta.url));
-const npmCli=process.env.npm_execpath;
-if (!npmCli) throw new Error('Inicia con npm run dev:local para usar la CLI de npm instalada.');
 const children=new Set(); let stopping=false;
 
-function launch(args,env) {
-  const child=spawn(process.execPath,args,{cwd:root,env,stdio:'inherit',windowsHide:true,detached:process.platform!=='win32'});
+function launch(args,env,command=process.execPath) {
+  const child=spawn(command,args,{cwd:root,env,stdio:'inherit',windowsHide:true,detached:process.platform!=='win32'});
   children.add(child);
   child.on('error',()=>void shutdown(1));
   child.on('exit',(code)=>{children.delete(child);if(!stopping)void shutdown(code??1);});
@@ -66,6 +64,9 @@ async function javaHome() {
 
 try {
   if(Number(process.versions.node.split('.')[0])!==24)throw new Error('Este proyecto requiere Node.js 24.');
+  const firebase=pnpmFirebaseInvocation(process.env,root,process.execPath);
+  const manager=spawnSync(firebase.command,firebase.versionArgs,{encoding:'utf8',windowsHide:true,timeout:5000});
+  if(manager.status!==0 || manager.stdout?.trim()!=='11.23.0')throw new Error('El launcher requiere la CLI real de pnpm 11.23.0.');
   for(const port of [options.port,8080,9099,4400,4500])if(await occupied(port))throw new Error(`El puerto local ${port} está ocupado. Detén el servicio correspondiente antes de iniciar Sarin local.`);
   const env=localDevelopmentEnvironment(process.env);const home=await javaHome();
   if(home) {
@@ -77,8 +78,8 @@ try {
   // Work around a missing es_US resource bundle in the official Firestore emulator.
   env.JAVA_TOOL_OPTIONS='-Duser.language=en -Duser.country=US';
   console.log('Iniciando Firebase Auth + Firestore oficiales en loopback. Las cuentas y negocios son temporales.');
-  console.log('La primera ejecución descarga Firebase CLI 15.33.0 en la caché externa de npm.');
-  const emulators=launch([npmCli,'exec','--yes','--package=firebase-tools@15.33.0','--','firebase','emulators:start','--only','auth,firestore','--project','demo-sarin-bot','--config',path.join(root,'firebase.json'),'--non-interactive'],env);
+  console.log('La primera ejecución descarga Firebase CLI 15.33.0 en la caché externa de pnpm dlx (sin añadirlo al workspace).');
+  const emulators=launch(firebase.args,env,firebase.command);
   let ready=false;
   for(let attempt=0;attempt<360;attempt++) {
     if(emulators.exitCode!==null)throw new Error('Los emuladores no pudieron iniciarse.');

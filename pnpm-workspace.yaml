@@ -1,0 +1,25 @@
+packages:
+  - cloudflare
+
+engineStrict: true
+strictDepBuilds: true
+
+# Reviewed lifecycle scripts for Firebase and the local build toolchains.
+allowBuilds:
+  '@firebase/util@1.15.3': true
+  esbuild@0.28.2: true
+  fsevents@2.3.3: true
+  protobufjs@7.6.6: true
+  workerd@1.20261006.1: true
+
+# Preserve the security overrides already verified with npm.
+overrides:
+  '@grpc/grpc-js': '1.14.6'
+  basic-ftp: '6.2.3'
+  postcss-selector-parser: '7.1.6'
+
+# These exact versions were already locked before the package-manager migration.
+minimumReleaseAgeExclude:
+  - caniuse-lite@1.0.30001816
+  - miniflare@5.20261006.2-beta
+  - wrangler@4.150.0

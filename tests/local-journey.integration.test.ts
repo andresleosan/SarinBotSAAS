@@ -12,7 +12,7 @@ import type { Appointment, Business, PaymentReceipt, PlatformSettings } from '@/
 import { LOCAL_TEST_ACCOUNTS, LOCAL_SUPERADMIN_UID } from '../src/lib/firebase/emulator-constants.mjs';
 import { assertJourneyEnvironment, assertJourneyUrl, cleanupOwnedDocuments, createJourneyFixture, removeJourneyBank } from '../scripts/lib/local-journey.mjs';
 
-// Ordinary npm test always skips this fixture. The CLI pins and validates the
+// Ordinary pnpm test always skips this fixture. The CLI pins and validates the
 // entire environment before SDK initialization and creates a new UUID per run.
 describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS journey', () => {
   it('completes onboarding, real reservations, manual billing and strict tenant isolation', async () => {

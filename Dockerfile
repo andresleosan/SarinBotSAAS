@@ -1,7 +1,12 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+# npm bootstraps only the pinned pnpm CLI in this disposable build stage.
+RUN npm install --global pnpm@11.23.0
+# Keep both workspace manifests with the one shared lockfile, even though only
+# the Next application is installed and Cloudflare source is outside this image.
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY cloudflare/package.json ./cloudflare/package.json
+RUN pnpm --filter sarin-bot-mvp --fail-if-no-match install --frozen-lockfile
 COPY . .
 # Public Firebase configuration is embedded at build time, never Admin credentials.
 ARG NEXT_PUBLIC_FIREBASE_API_KEY
@@ -13,7 +18,7 @@ ENV NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY \
     NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID \
     NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID \
     NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN pnpm run build
 
 FROM node:24-alpine AS runner
 WORKDIR /app

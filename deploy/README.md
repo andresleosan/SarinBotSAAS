@@ -38,6 +38,8 @@ Antes de publicar DNS o ejecutar el túnel, protege **todo el hostname del motor
 
 ## Aplicación: build público y secretos de runtime separados
 
+La aplicación usa Node 24 y pnpm 11.23.0, con un único lockfile para el workspace de la raíz y `cloudflare/`. Para revisar o construir Next directamente, instala desde la raíz con `pnpm install --frozen-lockfile` y ejecuta `pnpm run build`; `pnpm start` inicia el servidor con el build preparado. El build standalone de Docker conserva esta misma versión y lockfile, sin instalar Firebase CLI en el runtime.
+
 Compose requiere versión 2.30 o posterior por `env_file.format: raw`. Completa una copia `deploy/firebase.public.env` con las cuatro claves públicas. Crea `.env.production` a partir de `runtime.env.example` únicamente cuando tengas los valores reales: formato `KEY=value`, sin comillas, sin interpolación; la clave privada PEM ocupa una línea con `\n` literales. No uses este archivo como `--env-file` del build. [Formato raw oficial de Compose](https://docs.docker.com/reference/compose-file/services/#format).
 
 Revisa la estructura ahora sin resolver variables ni leer secretos:

@@ -4,25 +4,25 @@ Este kit conserva el Dockerfile Node 24 de la raíz y Firebase Admin nativo. Añ
 
 ## Revisar sin cuentas ni secretos
 
-Desde `cloudflare/`, con Node 24:
+Desde la raíz del workspace, con Node 24 y pnpm 11.23.0. La aplicación y este paquete comparten el lockfile de la raíz:
 
 ```sh
-npm ci
-npm run types
-npm run check
-npm audit
+pnpm install --frozen-lockfile
+pnpm --filter sarin-cloudflare-host types
+pnpm --filter sarin-cloudflare-host check
+pnpm audit
 ```
 
-`check` ejecuta pruebas, TypeScript y el dry-run **del Worker** con `--containers-rollout=none`. Valida configuración y bundle sin publicar recursos. No valida la imagen. `npm run dry-run` también construye la imagen y necesita Docker CLI y su motor activos, incluso con `--dry-run`. Se verificó ese ensayo completo en Docker Linux local; además se arrancó la imagen standalone con usuario sin privilegios, filesystem de solo lectura y cachés temporales. Portada, Vault e imágenes responden 200; las API rechazan solicitudes sin sesión con 401. La prueba usa build sin credenciales reales: no valida conexiones Firebase/Ollama ni comportamiento de la red de Cloudflare. Los tipos de `worker-configuration.d.ts` los genera Wrangler; no se editan manualmente. [Despliegue](https://developers.cloudflare.com/containers/guides/deploy/) y [desarrollo local](https://developers.cloudflare.com/containers/guides/local-dev/).
+`check` ejecuta pruebas, TypeScript y el dry-run **del Worker** con `--containers-rollout=none`. Valida configuración y bundle sin publicar recursos. No valida la imagen. `pnpm --filter sarin-cloudflare-host dry-run` también construye la imagen y necesita Docker CLI y su motor activos, incluso con `--dry-run`. Se verificó ese ensayo completo en Docker Linux local; además se arrancó la imagen standalone con usuario sin privilegios, filesystem de solo lectura y cachés temporales. Portada, Vault e imágenes responden 200; las API rechazan solicitudes sin sesión con 401. La prueba usa build sin credenciales reales: no valida conexiones Firebase/Ollama ni comportamiento de la red de Cloudflare. Los tipos de `worker-configuration.d.ts` los genera Wrangler; no se editan manualmente. [Despliegue](https://developers.cloudflare.com/containers/guides/deploy/) y [desarrollo local](https://developers.cloudflare.com/containers/guides/local-dev/).
 
 ## Preparar el build público
 
 El fichero versionado `wrangler.jsonc` deja vacíos los cuatro argumentos públicos Firebase. `configure:build` exige sus valores y genera `wrangler.build.json`, ignorado por Git. No lee archivos de secretos ni incluye credenciales Admin, tokens Cloudflare o variables arbitrarias.
 
-Para preparar únicamente esa configuración usando una copia local de `deploy/firebase.public.env.example`, desde `cloudflare/`:
+Para preparar únicamente esa configuración usando una copia local de `deploy/firebase.public.env.example`, desde la raíz del workspace. `--filter` ejecuta el comando dentro de `cloudflare/`, por eso el archivo de entorno usa `../deploy/`:
 
 ```sh
-node --env-file=../deploy/firebase.public.env scripts/configure-build.mjs
+pnpm --filter sarin-cloudflare-host exec node --env-file=../deploy/firebase.public.env scripts/configure-build.mjs
 ```
 
 El script acepta exclusivamente `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID` y `NEXT_PUBLIC_FIREBASE_APP_ID`. Rechaza proyectos `demo-*` y modo emulador. El Dockerfile existente ya declara esos cuatro `ARG`; los `image_vars` de Wrangler los transmiten como argumentos de Docker, sin introducir secretos de runtime. [Configuración de imágenes](https://developers.cloudflare.com/workers/wrangler/configuration/#containers).
@@ -47,9 +47,12 @@ El proceso duerme tras 15 minutos sin actividad. Un reinicio, despliegue o fallo
 
 Workers Builds admite construir el Dockerfile en Cloudflare: no requiere Docker local para ese camino. La configuración externa mínima es conectar el repositorio, seleccionar la rama de producción y mantener la raíz del repositorio como directorio de build. Comandos revisables para esa integración:
 
-- Instalación: `npm --prefix cloudflare ci`.
-- Build: `npm --prefix cloudflare run configure:build` con las cuatro variables públicas de build.
-- Deploy de producción: `cd cloudflare && npx wrangler deploy --config wrangler.build.json`.
+- Versión del entorno: `NODE_VERSION=24` y `PNPM_VERSION=11.23.0`, mediante las [variables oficiales de la imagen de build](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/).
+- Instalación: `pnpm install --frozen-lockfile`.
+- Build: `pnpm --filter sarin-cloudflare-host configure:build` con las cuatro variables públicas de build.
+- Deploy de producción: `pnpm --filter sarin-cloudflare-host exec wrangler deploy --config wrangler.build.json`.
+
+Mantén estos comandos y el lockfile único en la raíz del workspace; no instales un paquete Cloudflare por separado ni regeneres un `package-lock.json`.
 
 Estos comandos no se ejecutan automáticamente al instalar este kit. No hay workflow de GitHub ni script de autodeploy. El nombre del proyecto Worker debe coincidir con `sarin-bot-app` o actualizarse en la plantilla antes de vincularlo. No uses `wrangler versions upload` para actualizar la imagen: las ramas de preview no generan una URL completa para este Worker con DO. Usa un entorno separado para staging si se define posteriormente. [Workers Builds con Containers](https://developers.cloudflare.com/containers/guides/deploy/#deploy-with-workers-builds).
 
