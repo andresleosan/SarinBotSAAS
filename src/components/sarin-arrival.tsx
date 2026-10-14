@@ -10,7 +10,6 @@ export function SarinArrival({ comingSoon = false }: { comingSoon?: boolean }) {
   const [inView, setInView] = useState(false);
   const [pageVisible, setPageVisible] = useState(true);
   const [messageIndex, setMessageIndex] = useState(0);
-  const [showAll, setShowAll] = useState(false);
   const messages = [
     { title: "¡Hola, soy Sarin!", text: comingSoon ? "Pronto te ayudaré a organizar las citas de tu negocio." : "Te ayudo a organizar las citas de tu negocio." },
     { title: "Tu negocio, a tu manera.", text: comingSoon ? "Configurarás tus servicios, profesionales y horarios." : "Configura tus servicios, profesionales y horarios." },
@@ -48,7 +47,7 @@ export function SarinArrival({ comingSoon = false }: { comingSoon?: boolean }) {
     };
   }, []);
 
-  const animated = motionAllowed && imagesReady && !showAll;
+  const animated = motionAllowed && imagesReady;
   const motion = !animated ? "static" : inView && pageVisible ? "running" : "paused";
   const message = messages[messageIndex];
 
@@ -65,16 +64,7 @@ export function SarinArrival({ comingSoon = false }: { comingSoon?: boolean }) {
         <Image src="/brand/sarin-flight.png" alt="" width={320} height={383} loading="eager" className="sarin-arrival-flight" />
         <Image src="/brand/sarin-welcome.png" alt="" width={320} height={480} loading="eager" className="sarin-arrival-landed" />
       </div>
-      <div className="sarin-arrival-greeting"><p><strong>{showAll ? "Conoce a Sarin" : message.title}</strong><span>{showAll ? "Cinco ideas para organizar las citas de tu negocio." : message.text}</span></p></div>
+      <div className="sarin-arrival-greeting"><p><strong>{message.title}</strong><span>{message.text}</span></p></div>
     </div>
-    <div className="sarin-tour-controls">
-      <span>{showAll ? "Los 5 mensajes" : `Mensaje ${messageIndex + 1} de ${messages.length}`}</span>
-      <button type="button" aria-expanded={showAll} aria-controls="sarin-tour-transcript" onClick={() => { setShowAll(open => !open); setMessageIndex(0); }}>
-        {showAll ? "Volver al saludo" : "Leer los 5 mensajes"}
-      </button>
-    </div>
-    <ol id="sarin-tour-transcript" className="sarin-tour-transcript" hidden={!showAll}>
-      {messages.map(item => <li key={item.title}><strong>{item.title}</strong><p>{item.text}</p></li>)}
-    </ol>
   </div>;
 }

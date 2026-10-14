@@ -95,15 +95,6 @@
 @keyframes sarin-flight-pose { 0%, 27%, 81%, 100% { opacity: 1; } 30%, 76% { opacity: 0; } }
 @keyframes sarin-landed-pose { 0%, 27%, 81%, 100% { opacity: 0; } 30%, 76% { opacity: 1; } }
 @keyframes sarin-flight-greeting { 0%, 30%, 80%, 100% { opacity: 0; transform: translateY(8px); } 35%, 74% { opacity: 1; transform: translateY(0); } }
-.sarin-tour-controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--agenda-muted); }
-.sarin-tour-controls > span { font-variant-numeric: tabular-nums; }
-.sarin-tour-controls button { min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: var(--agenda-muted); font: inherit; text-decoration: underline; text-underline-offset: 3px; }
-.sarin-tour-controls button:hover { color: var(--agenda-blue); }
-.sarin-tour-transcript { width: 100%; max-width: 600px; padding: 20px 0 0 22px; margin: 12px auto 8px; border-top: 1px solid var(--agenda-line); font-size: 14px; }
-.sarin-tour-transcript[hidden] { display: none; }
-.sarin-tour-transcript li + li { margin-top: 18px; }
-.sarin-tour-transcript strong { font-weight: 600; }
-.sarin-tour-transcript p { margin: 4px 0 0; color: var(--agenda-muted); }
 .agenda-how { padding-block: 60px; border-top: 1px solid var(--agenda-line); scroll-margin-top: 24px; }
 .agenda-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
 .agenda-section-heading .agenda-eyebrow { justify-content: flex-start; }
