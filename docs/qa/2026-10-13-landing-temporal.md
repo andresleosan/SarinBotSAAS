@@ -19,4 +19,14 @@ Evidencia: [escritorio](landing-temporal-desktop.png), [móvil](landing-temporal
 
 Pages publica exclusivamente `landing/out`; los datos y secretos del SaaS no forman parte del artefacto. No hay migración de datos. El comando y la reversión están documentados en `landing/README.md`. La primera publicación puede sustituirse por mantenimiento; futuras versiones se revierten desde el historial de Pages. Al revertir una emergencia, pausar los builds automáticos hasta corregir la rama evita que un nuevo push reemplace esa reversión.
 
-La verificación de HTTP 200, headers de seguridad y HTTP 404 en rutas privadas se realiza sobre Pages después del primer despliegue; el servidor estático local no aplica `_headers`.
+## Resultado de producción
+
+Publicada y verificada el 13 de octubre de 2026 en [sarinbotsaas.pages.dev](https://sarinbotsaas.pages.dev/). Pages muestra producción `main`, commit `1d4890aa5b4e77ec896055ee1d1a0dd2c485dc7c` y despliegue [7f2b08d0](https://7f2b08d0.sarinbotsaas.pages.dev/), con integración automática de GitHub activada.
+
+- HTTP 200: `/`, ilustración, `robots.txt` y `sitemap.xml`.
+- HTTP 404: `/admin`, `/dashboard` y `/api/sarin/chat`.
+- Comprobadas en el dominio público: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` y CSP con `frame-ancestors 'none'`.
+- Chrome sobre HTTPS: fuentes e ilustración cargadas, sin errores ni advertencias en consola y sin scripts, hojas de estilo o imágenes de terceros en el DOM. Aviso de funciones pendientes visible.
+- [Captura de la portada publicada](landing-temporal-publicada.png).
+
+La portada está disponible sin Firebase; no se ha activado la aplicación SaaS ni se han configurado sus credenciales. El servidor estático local utilizado en QA no aplica `_headers`; las comprobaciones anteriores se ejecutaron contra Pages real.
