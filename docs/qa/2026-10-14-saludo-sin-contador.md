@@ -6,4 +6,6 @@ Verificación previa a publicación: `npm run build:landing`, `npm run check:lan
 
 Reversión: restaurar el despliegue Pages `496e9e4d-8bbc-4285-87ba-fc23b4dcd455` o revertir el commit de esta eliminación.
 
-Publicación y captura: pendientes de verificar después del despliegue automático.
+Publicado desde el commit `1097112` en [sarinbotsaas.pages.dev](https://sarinbotsaas.pages.dev/#tu-agenda). HTTP 200; el HTML y Chrome público confirman que el contador, el enlace y la transcripción ya no existen. El recorrido continúa activo y el mensaje avanzó del primero al segundo. Consola pública sin errores ni advertencias.
+
+[Captura pública sin controles](sarin-saludo-sin-contador-publicado.png), tomada con movimiento reducido temporal para mostrar el saludo completo. La emulación se retira tras la captura y la pestaña queda con el vuelo activo.
