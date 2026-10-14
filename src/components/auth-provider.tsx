@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {localEmulators && (
         <div
           role="status"
-          className="border-b border-amber-500/40 bg-amber-950 px-4 py-2 text-center text-xs text-amber-100"
+          className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900"
         >
           Entorno local · Firebase emulado · datos de negocio temporales
         </div>
@@ -160,8 +160,8 @@ export function AuthGate({
   }
   if (loading)
     return (
-      <main className="min-h-screen grid place-items-center p-6">
-        <p role="status" className="text-slate-300">
+      <main className="min-h-screen grid place-items-center bg-sarin-canvas p-6 text-sarin-ink">
+        <p role="status" className="text-sarin-muted">
           Verificando tu sesión…
         </p>
       </main>
@@ -169,16 +169,16 @@ export function AuthGate({
   if (!user)
     return (
       <main className="sarin-backdrop grid min-h-screen place-items-center px-5 py-12">
-        <section className="sarin-surface w-full max-w-md space-y-6 rounded-[28px] p-7 shadow-2xl shadow-slate-950/20 sm:p-9">
+        <section className="sarin-surface w-full max-w-md space-y-6 rounded-2xl p-7 shadow-[0_16px_48px_#233e7c09] sm:p-9">
           <a href="/" aria-label="Sarin Bot, inicio" className="mb-3 inline-block"><SarinBrand /></a>
-          <div><p className="sarin-eyebrow mb-3 text-emerald-500">Tu espacio está aquí</p><h1 className="text-3xl font-medium leading-tight tracking-[-0.04em]">Inicia sesión para continuar</h1></div>
-          <p className="text-sm leading-7 text-slate-400">
+          <div><p className="sarin-eyebrow mb-3 text-sarin-blue">Tu espacio está aquí</p><h1 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-sarin-ink">Inicia sesión para continuar</h1></div>
+          <p className="text-sm leading-7 text-sarin-muted">
             {localEmulators
               ? "Usa una cuenta local de prueba para acceder a tu espacio."
               : "Usa tu cuenta de Google para acceder a tu espacio."}
           </p>
           {error && (
-            <p role="alert" className="text-sm text-rose-300">
+            <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
               {error}
             </p>
           )}
@@ -195,7 +195,7 @@ export function AuthGate({
                   key={account}
                   onClick={() => enterLocal(account)}
                   disabled={localSigningIn !== null}
-                  className="min-h-12 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:border-emerald-500/50 hover:bg-emerald-500/10 disabled:opacity-50"
+                  className="min-h-12 w-full rounded-[10px] border border-sarin-line bg-sarin-paper px-4 py-3 text-sm font-medium text-sarin-ink hover:border-sarin-blue hover:bg-sarin-soft disabled:opacity-50"
                 >
                   {localSigningIn === account ? "Entrando…" : label}
                 </button>
@@ -205,31 +205,31 @@ export function AuthGate({
           <button
             onClick={() => void signIn()}
             disabled={localSigningIn !== null}
-            className="min-h-12 w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+            className="min-h-12 w-full rounded-[10px] bg-sarin-blue px-4 py-3 text-sm font-semibold text-white hover:bg-[#244dd0] disabled:opacity-50"
           >
             {localEmulators
               ? "Entrar con Google emulado"
               : "Continuar con Google"}
           </button>
-          <p className="border-t border-white/10 pt-5 text-xs leading-6 text-slate-400">Tu agenda, tus servicios y tu forma de atender. Todo en un mismo espacio.</p>
+          <p className="border-t border-sarin-line pt-5 text-xs leading-6 text-sarin-muted">Tu agenda, tus servicios y tu forma de atender. Todo en un mismo espacio.</p>
         </section>
       </main>
     );
   if (admin && !isSuperadmin)
     return (
-      <main className="min-h-screen grid place-items-center p-6">
-        <section className="max-w-md space-y-4">
+      <main className="min-h-screen grid place-items-center bg-sarin-canvas p-6 text-sarin-ink">
+        <section className="w-full max-w-md space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-6">
           <h1 className="text-2xl font-bold">Acceso restringido</h1>
-          <p className="text-slate-400">
+          <p className="text-sarin-muted">
             Esta sección está reservada para el administrador.
           </p>
           {error && (
-            <p role="alert" className="text-rose-300">
+            <p role="alert" className="text-rose-800">
               {error}
             </p>
           )}
           <button
-            className="text-emerald-400 underline"
+            className="min-h-11 text-sarin-blue underline"
             onClick={() => void signOut()}
           >
             Cambiar de cuenta

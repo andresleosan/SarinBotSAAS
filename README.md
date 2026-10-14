@@ -2,7 +2,7 @@
 
 Core SaaS de agenda multi-tenant y Sarin Vault personal. El documento rector es [arquitectura_maestro_sarin_bot.md](arquitectura_maestro_sarin_bot.md). Los contratos y decisiones de operación están en [STACK.md](STACK.md).
 
-La interfaz sigue la identidad de ALS DevStudio: marino, menta, Space Grotesk, DM Sans y la mascota de Sarin. Se consultaron referencias reales mediante el MCP oficial de Mobbin para navegación, agenda y chat; las decisiones y fuentes están en [el sistema visual](docs/design-system.md). Fuentes y mascota se sirven desde este proyecto.
+La interfaz usa **Agenda clara**, elegida por el propietario: fondo claro, superficies blancas, azul, DM Sans y el rostro de Sarin. La portada y las pantallas internas comparten esta identidad. Se consultaron referencias reales mediante el MCP oficial de Mobbin para navegación, agenda y chat; las decisiones y fuentes están en [el sistema visual](docs/design-system.md). Fuentes y mascota se sirven desde este proyecto.
 
 ## Desarrollo
 
@@ -74,6 +74,7 @@ npm run typecheck
 npm test
 npm run test:rules
 npm run test:local
+npm run test:journey
 npm audit
 npm run build
 ```
@@ -81,6 +82,10 @@ npm run build
 `test:rules` necesita Java 21+ seleccionado por `JAVA_HOME`. Descarga el emulador oficial Firestore 1.22.0 a la caché del usuario, verifica SHA-256 y usa solo proyectos `demo-*` y datos sintéticos. Prueba reglas de aislamiento y carreras reales de reserva/aprobación. Las siete pruebas del emulador se omiten en `npm test` cuando no está activo y se ejecutan con `test:rules`; no necesitan credenciales reales.
 
 `test:local` requiere `dev:local` activo. Comprueba el recorrido real Auth Emulator → APIs Next → Admin SDK → Firestore, el UID superadmin y el rechazo 403 del cliente en administración y Vault. No crea negocios ni pagos, no modifica la bóveda y no ejecuta inferencia. Admite `--port` si elegiste otro puerto web.
+
+`test:journey` también requiere `dev:local` activo. Ejecuta el recorrido completo con cuentas y datos sintéticos aislados de cada corrida; prueba reservas, colisiones, cancelaciones, bloqueos y revisión de comprobantes. Usa las implementaciones reales sobre los emuladores y limpia únicamente sus propios datos. No envía conversaciones ni necesita Ollama. Las reservas se ejercitan mediante la función real porque la API de chat requiere el motor, que se conectará más adelante.
+
+El workflow [Verify Sarin](.github/workflows/verify.yml) ejecuta tipos, pruebas, builds, reglas Firestore, recorrido local y dry-run del Worker en cada push a `main` y cada PR. Usa Node 24, Java 21, permisos de lectura y acciones oficiales fijadas por SHA según [las prácticas de GitHub](https://docs.github.com/en/actions/reference/security/secure-use). No utiliza secretos ni despliega la aplicación. El autodeploy existente de Pages sigue siendo independiente de estos checks.
 
 ## Producción
 

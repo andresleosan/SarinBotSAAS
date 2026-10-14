@@ -33,26 +33,26 @@ export function AppShell({
   const active = links.find(item => item.href === pathname);
   const name = user?.displayName || user?.email || "Mi cuenta";
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
+    <div className="min-h-screen bg-sarin-canvas text-sarin-ink lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
       <a href="#workspace-content" className="sarin-skip">Saltar al contenido</a>
-      <aside className="border-b border-white/8 bg-[#081d33] lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-b-0">
+      <aside className="border-b border-sarin-line bg-sarin-paper lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-b-0">
         <div className="flex items-center justify-between px-5 py-5 lg:px-6 lg:py-8">
           <Link href="/" aria-label="Sarin Bot, inicio"><SarinBrand /></Link>
-          <span className="rounded-full border border-white/10 px-2.5 py-1 font-mono text-[10px] tracking-wide text-slate-400 lg:hidden">{admin ? "ADMIN" : "NEGOCIO"}</span>
+          <span className="rounded-full border border-sarin-line px-2.5 py-1 text-xs text-sarin-muted lg:hidden">{admin ? "ADMIN" : "NEGOCIO"}</span>
         </div>
-        <p className="sarin-eyebrow mb-3 hidden px-7 text-slate-500 lg:block">{admin ? "Administración" : "Espacio de trabajo"}</p>
+        <p className="sarin-eyebrow mb-3 hidden px-7 text-sarin-muted lg:block">{admin ? "Administración" : "Espacio de trabajo"}</p>
         <nav aria-label={admin ? "Navegación de administración" : "Navegación del negocio"} className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:px-4">
-          {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-medium ${pathname === href ? "bg-emerald-500/12 text-emerald-500" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><Icon className="h-[18px] w-[18px]" strokeWidth={1.7} /><span>{label}</span>{pathname === href && <span className="ml-auto hidden h-1.5 w-1.5 rounded-full bg-emerald-500 lg:block" />}</Link>)}
+          {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-[10px] px-3 py-3 text-[13px] font-medium ${pathname === href ? "bg-sarin-soft text-sarin-blue" : "text-sarin-muted hover:bg-sarin-canvas hover:text-sarin-ink"}`}><Icon aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={1.7} /><span>{label}</span>{pathname === href && <span className="ml-auto hidden h-1.5 w-1.5 rounded-full bg-sarin-blue lg:block" />}</Link>)}
         </nav>
         <div className="mt-auto hidden px-6 pb-6 pt-10 lg:block">
-          {isSuperadmin && !admin && <Link href="/admin" className="mb-5 flex items-center gap-2 text-xs text-slate-300 hover:text-emerald-500"><ShieldCheck className="h-4 w-4" />Consola de administración<ArrowUpRight className="ml-auto h-3.5 w-3.5" /></Link>}
-          <div className="border-t border-white/8 pt-5"><p className="font-display text-sm text-slate-200">Un poco más de orden.</p><p className="mt-1 text-xs leading-6 text-slate-500">Un poco más de tiempo para ti.</p></div>
+          {isSuperadmin && !admin && <Link href="/admin" className="mb-5 flex min-h-11 items-center gap-2 text-xs text-sarin-muted hover:text-sarin-blue"><ShieldCheck aria-hidden="true" className="h-4 w-4" />Consola de administración<ArrowUpRight aria-hidden="true" className="ml-auto h-3.5 w-3.5" /></Link>}
+          <div className="border-t border-sarin-line pt-5"><p className="text-sm text-sarin-ink">Un poco más de orden.</p><p className="mt-1 text-xs leading-6 text-sarin-muted">Un poco más de tiempo para ti.</p></div>
         </div>
       </aside>
       <div className="min-w-0">
-        <header className="flex min-h-[76px] items-center justify-between gap-4 border-b border-white/8 px-4 sm:px-8 lg:px-10">
-          <div className="flex min-w-0 items-center gap-2 text-xs text-slate-400"><span className="hidden sm:inline">{admin ? "Administración" : "Mi espacio"}</span><ChevronRight className="hidden h-3.5 w-3.5 text-slate-600 sm:block" /><span className="truncate text-slate-200">{active?.label ?? "Sarin Bot"}</span></div>
-          <div className="flex items-center gap-3"><span aria-hidden className="grid h-8 w-8 place-items-center rounded-full bg-slate-800 font-display text-xs font-semibold text-emerald-300">{name.charAt(0).toUpperCase()}</span><span className="hidden max-w-44 truncate text-xs text-slate-300 sm:block">{name}</span><button onClick={() => void signOut()} aria-label="Cerrar sesión" title="Cerrar sesión" className="grid h-10 w-10 place-items-center rounded-xl text-slate-400 hover:bg-white/5 hover:text-white"><LogOut className="h-4 w-4" /></button></div>
+        <header className="flex min-h-[76px] items-center justify-between gap-4 border-b border-sarin-line bg-sarin-paper px-4 sm:px-8 lg:px-10">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-sarin-muted"><span className="hidden sm:inline">{admin ? "Administración" : "Mi espacio"}</span><ChevronRight aria-hidden="true" className="hidden h-3.5 w-3.5 sm:block" /><span className="truncate text-sarin-ink">{active?.label ?? "Sarin Bot"}</span></div>
+          <div className="flex shrink-0 items-center gap-3"><span aria-hidden className="grid h-8 w-8 place-items-center rounded-full bg-sarin-soft text-xs font-semibold text-sarin-blue">{name.charAt(0).toUpperCase()}</span><span className="hidden max-w-44 truncate text-xs text-sarin-muted sm:block">{name}</span><button onClick={() => void signOut()} aria-label="Cerrar sesión" title="Cerrar sesión" className="grid h-11 w-11 place-items-center rounded-[10px] text-sarin-muted hover:bg-sarin-soft hover:text-sarin-blue"><LogOut aria-hidden="true" className="h-4 w-4" /></button></div>
         </header>
         <main id="workspace-content" className="mx-auto max-w-[1440px] px-4 py-7 sm:px-8 lg:px-10 lg:py-9">{children}</main>
       </div>
@@ -69,13 +69,13 @@ export function Notice({
   return (
     <p
       role={error ? "alert" : "status"}
-      className={`rounded-xl border p-4 text-sm leading-6 ${error ? "border-rose-500/30 bg-rose-500/10 text-rose-200" : "border-white/10 bg-slate-900/50 text-slate-300"}`}
+      className={`rounded-xl border p-4 text-sm leading-6 ${error ? "border-rose-200 bg-rose-50 text-rose-800" : "border-sarin-line bg-sarin-paper text-sarin-muted"}`}
     >
       {children}
     </p>
   );
 }
 export const fieldClass =
-  "min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15";
+  "min-h-11 min-w-0 w-full rounded-[10px] border border-sarin-line bg-sarin-paper px-3.5 py-2.5 text-sm text-sarin-ink outline-none transition placeholder:text-sarin-muted focus:border-sarin-blue focus:ring-2 focus:ring-sarin-blue focus:ring-offset-2 focus:ring-offset-sarin-paper disabled:cursor-not-allowed disabled:bg-sarin-canvas disabled:opacity-70";
 export const buttonClass =
-  "min-h-11 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50";
+  "min-h-11 rounded-[10px] bg-sarin-blue px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#244dd0] disabled:cursor-not-allowed disabled:opacity-50";

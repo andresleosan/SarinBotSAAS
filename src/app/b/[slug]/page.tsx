@@ -3,7 +3,8 @@
 import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
-import { Bot, CalendarCheck, Download, Send } from "lucide-react";
+import { CalendarCheck, Download, Send } from "lucide-react";
+import { SarinMark } from "@/components/sarin-brand";
 import { AuthGate, useAuth } from "@/components/auth-provider";
 import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
 import { useDebouncedChat } from "@/hooks/useDebouncedChat";
@@ -124,7 +125,7 @@ function Island({ slug }: { slug: string }) {
           {error ||
             "No encontramos este negocio. Revisa el enlace o escanea nuevamente su QR."}
         </Notice>
-        <Link href="/" className="text-emerald-300 underline">
+        <Link href="/" className="text-sarin-blue underline">
           Volver al inicio
         </Link>
       </div>
@@ -132,17 +133,15 @@ function Island({ slug }: { slug: string }) {
   const allowed = isSubscriptionAllowed(business, now);
   const future = appointments.filter((item) => item.endAt > now);
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col border-x border-slate-800 bg-slate-950">
-      <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 p-4 backdrop-blur">
+    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col border-x border-sarin-line bg-sarin-canvas">
+      <header className="sticky top-0 z-20 border-b border-sarin-line bg-sarin-paper/95 p-4 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="rounded-xl bg-emerald-500/15 p-2.5 text-emerald-400">
-              <Bot className="h-6 w-6" />
-            </div>
+            <SarinMark className="h-11 w-11" />
             <div className="min-w-0">
               <h1 className="truncate font-bold">{business.name}</h1>
               <p
-                className={`mt-1 text-xs ${engine.health?.status === "online" && allowed ? "text-emerald-300" : "text-slate-400"}`}
+                className={`mt-1 text-xs ${engine.health?.status === "online" && allowed ? "text-sarin-blue" : "text-sarin-muted"}`}
               >
                 {!allowed
                   ? "Agenda en pausa"
@@ -155,7 +154,7 @@ function Island({ slug }: { slug: string }) {
             </div>
           </div>
           <button
-            className="max-w-28 truncate rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:text-white"
+            className="min-h-11 max-w-28 shrink-0 truncate rounded-[10px] border border-sarin-line px-3 py-2 text-xs text-sarin-muted hover:bg-sarin-soft hover:text-sarin-blue"
             onClick={() => void signOut()}
             title="Cerrar sesión"
           >
@@ -173,7 +172,7 @@ function Island({ slug }: { slug: string }) {
               <>
                 {" "}
                 <a
-                  className="text-emerald-300 underline"
+                  className="text-sarin-blue underline"
                   href={`https://wa.me/${business.phoneWhatsApp.replace(/\D/g, "")}`}
                   target="_blank"
                   rel="noreferrer"
@@ -191,7 +190,7 @@ function Island({ slug }: { slug: string }) {
               si necesitas reintentarlo.
             </Notice>
             <button
-              className="text-xs text-emerald-300 underline"
+              className="min-h-11 text-xs text-sarin-blue underline"
               disabled={engine.checking}
               onClick={() => void engine.refresh()}
             >
@@ -199,11 +198,11 @@ function Island({ slug }: { slug: string }) {
             </button>
           </div>
         )}
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <p className="mb-2 text-sm font-semibold text-emerald-300">
+        <section className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
+          <p className="mb-2 text-sm font-semibold text-sarin-blue">
             Hola, {user?.displayName?.split(" ")[0] || "bienvenido"}.
           </p>
-          <p className="text-sm leading-relaxed text-slate-300">
+          <p className="text-sm leading-relaxed text-sarin-ink">
             Soy Sarin, el asistente de {business.name}. Cuéntame qué servicio
             necesitas y cuándo te gustaría venir.
           </p>
@@ -211,7 +210,7 @@ function Island({ slug }: { slug: string }) {
             <div className="mt-4 flex flex-wrap gap-2">
               {business.services.map((service) => (
                 <span
-                  className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400"
+                  className="min-w-0 max-w-full break-words rounded-lg border border-sarin-line px-2.5 py-1.5 text-xs text-sarin-muted [overflow-wrap:anywhere]"
                   key={service.id}
                 >
                   {service.name} ·{" "}
@@ -228,14 +227,14 @@ function Island({ slug }: { slug: string }) {
         <div aria-live="polite" className="space-y-4">
           {chat.messages.map((message) => (
             <div
-              className={`whitespace-pre-wrap break-words rounded-2xl p-4 text-sm leading-relaxed ${message.role === "user" ? "ml-8 bg-emerald-500/15 text-emerald-100" : "mr-5 border border-slate-800 bg-slate-900 text-slate-200"}`}
+              className={`whitespace-pre-wrap break-words rounded-2xl p-4 text-sm leading-relaxed ${message.role === "user" ? "ml-8 bg-sarin-blue text-white" : "mr-5 border border-sarin-line bg-sarin-canvas text-sarin-ink"}`}
               key={message.id}
             >
               {message.content}
             </div>
           ))}
           {(chat.isWaitingBatch || chat.isGenerating) && (
-            <p role="status" className="text-xs text-emerald-300">
+            <p role="status" className="text-xs text-sarin-blue">
               {chat.isGenerating
                 ? "Sarin está revisando tu solicitud…"
                 : "Preparando tu mensaje…"}
@@ -245,7 +244,7 @@ function Island({ slug }: { slug: string }) {
             <div className="space-y-3">
               <Notice error>{chat.error}</Notice>
               <button
-                className="text-sm text-emerald-300 underline"
+                className="min-h-11 text-sm text-sarin-blue underline"
                 onClick={chat.retry}
                 disabled={chat.isGenerating || !allowed}
               >
@@ -257,22 +256,22 @@ function Island({ slug }: { slug: string }) {
         </div>
         {future.length > 0 && (
           <section className="space-y-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-emerald-300">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-sarin-blue">
               <CalendarCheck className="h-4 w-4" />
               Tus próximas citas
             </h2>
             {future.map((appointment) => (
               <article
                 key={appointment.id}
-                className="space-y-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4"
+                className="space-y-3 rounded-2xl border border-sarin-blue/20 bg-sarin-soft p-4"
               >
                 <h3 className="font-semibold">{appointment.serviceName}</h3>
-                <p className="text-sm text-slate-300">
+                <p className="text-sm text-sarin-ink">
                   {appointment.dateKey} · {appointment.startTimeStr}–
                   {appointment.endTimeStr} (Colombia)
                 </p>
                 <button
-                  className="flex items-center gap-2 text-sm font-semibold text-emerald-300"
+                  className="flex min-h-11 items-center gap-2 text-sm font-semibold text-sarin-blue"
                   onClick={() => download(appointment)}
                 >
                   <Download className="h-4 w-4" />
@@ -285,7 +284,7 @@ function Island({ slug }: { slug: string }) {
       </div>
       <form
         onSubmit={submit}
-        className="sticky bottom-0 flex gap-2 border-t border-slate-800 bg-slate-950 p-3"
+        className="sticky bottom-0 flex gap-2 border-t border-sarin-line bg-sarin-canvas p-3"
       >
         <input
           className={fieldClass}

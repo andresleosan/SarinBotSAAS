@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Bot, Plus, Send, Trash2 } from "lucide-react";
+import { Plus, Send, Trash2 } from "lucide-react";
+import { SarinMark } from "@/components/sarin-brand";
 import { AuthGate } from "@/components/auth-provider";
 import {
   AppShell,
@@ -154,13 +155,13 @@ function Configuration() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-widest text-emerald-400">
+        <p className="text-xs uppercase tracking-widest text-sarin-blue">
           Configuración
         </p>
         <h1 className="mt-2 text-3xl font-bold">
           {business ? "Así trabaja tu negocio" : "Abre tu isla privada"}
         </h1>
-        <p className="mt-3 text-sm text-slate-400">
+        <p className="mt-3 text-sm text-sarin-muted">
           Cuéntaselo a Sarin o completa los datos. Los negocios nuevos reciben 7
           días de prueba al guardar su configuración.
         </p>
@@ -173,16 +174,16 @@ function Configuration() {
         </Notice>
       )}
       <div className="grid items-start gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-        <section className="flex min-h-[28rem] flex-col rounded-2xl border border-slate-800 bg-slate-900 xl:sticky xl:top-6">
-          <h2 className="flex items-center gap-2 border-b border-slate-800 p-5 font-semibold">
-            <Bot className="h-5 w-5 text-emerald-400" />
+        <section className="flex min-h-[28rem] flex-col rounded-2xl border border-sarin-line bg-sarin-paper xl:sticky xl:top-6">
+          <h2 className="flex items-center gap-2 border-b border-sarin-line p-5 font-semibold">
+            <SarinMark className="h-8 w-8" />
             Configurar con Sarin
           </h2>
           <div
             aria-live="polite"
             className="max-h-[32rem] min-h-72 flex-1 space-y-4 overflow-auto p-5"
           >
-            <p className="text-sm leading-relaxed text-slate-400">
+            <p className="text-sm leading-relaxed text-sarin-muted">
               Describe el nombre de tu negocio, sus servicios, precios,
               profesionales y horarios. Revisa los datos antes de pedirle a
               Sarin que guarde la configuración.
@@ -190,13 +191,13 @@ function Configuration() {
             {chat.messages.map((message) => (
               <div
                 key={message.id}
-                className={`whitespace-pre-wrap rounded-xl p-3 text-sm ${message.role === "user" ? "ml-5 bg-emerald-500/15 text-emerald-100" : "mr-5 bg-slate-950 text-slate-200"}`}
+                className={`whitespace-pre-wrap break-words rounded-xl p-3 text-sm leading-6 ${message.role === "user" ? "ml-5 bg-sarin-blue text-white" : "mr-5 bg-sarin-canvas text-sarin-ink"}`}
               >
                 {message.content}
               </div>
             ))}
             {(chat.isGenerating || chat.isWaitingBatch) && (
-              <p role="status" className="text-xs text-emerald-300">
+              <p role="status" className="text-xs text-sarin-blue">
                 {chat.isGenerating
                   ? "Sarin está preparando tu configuración…"
                   : "Preparando tu mensaje…"}
@@ -207,7 +208,7 @@ function Configuration() {
                 <Notice error>{chat.error}</Notice>
                 <button
                   type="button"
-                  className="text-sm text-emerald-300 underline"
+                  className="min-h-11 text-sm text-sarin-blue underline"
                   onClick={chat.retry}
                 >
                   Reintentar mensaje
@@ -223,7 +224,7 @@ function Configuration() {
                 setInput("");
               }
             }}
-            className="flex gap-2 border-t border-slate-800 p-3"
+            className="flex gap-2 border-t border-sarin-line p-3"
           >
             <input
               aria-label="Mensaje para Sarin"
@@ -243,12 +244,12 @@ function Configuration() {
           </form>
         </section>
         <form
-          className="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6"
+          className="space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6"
           onSubmit={(event) => void save(event)}
         >
           <h2 className="text-lg font-semibold">Datos de tu negocio</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-sarin-muted">
               Nombre
               <input
                 className={fieldClass + " mt-2"}
@@ -261,7 +262,7 @@ function Configuration() {
                 }}
               />
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-sarin-muted">
               Categoría
               <input
                 className={fieldClass + " mt-2"}
@@ -271,7 +272,7 @@ function Configuration() {
                 onChange={(event) => setCategory(event.target.value)}
               />
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-sarin-muted">
               Enlace /b/
               <input
                 className={fieldClass + " mt-2"}
@@ -284,12 +285,12 @@ function Configuration() {
                 onChange={(event) => setSlug(event.target.value)}
               />
               {business && (
-                <span className="mt-2 block text-slate-500">
+                <span className="mt-2 block text-sarin-muted">
                   El enlace queda reservado a tu negocio.
                 </span>
               )}
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-sarin-muted">
               WhatsApp (código de país y número)
               <input
                 className={fieldClass + " mt-2"}
@@ -326,7 +327,7 @@ function Configuration() {
                   type="button"
                   aria-label="Eliminar recurso"
                   disabled={resources.length === 1}
-                  className="p-2 text-slate-400 hover:text-rose-300 disabled:opacity-30"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] text-sarin-muted hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30"
                   onClick={() => {
                     const rest = resources.filter(
                       (item) => item.id !== resource.id,
@@ -352,7 +353,7 @@ function Configuration() {
             ))}
             <button
               type="button"
-              className="flex items-center gap-1 text-sm text-emerald-300"
+              className="flex min-h-11 items-center gap-1 text-sm text-sarin-blue"
               onClick={() =>
                 setResources((previous) => [
                   ...previous,
@@ -368,7 +369,7 @@ function Configuration() {
             <h3 className="font-semibold">Servicios</h3>
             {services.map((service, index) => (
               <div
-                className="space-y-3 rounded-xl border border-slate-800 p-4"
+                className="space-y-3 rounded-xl border border-sarin-line p-4"
                 key={service.id}
               >
                 <div className="flex gap-2">
@@ -393,7 +394,7 @@ function Configuration() {
                     type="button"
                     aria-label="Eliminar servicio"
                     disabled={services.length === 1}
-                    className="p-2 text-slate-400 hover:text-rose-300 disabled:opacity-30"
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] text-sarin-muted hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30"
                     onClick={() =>
                       setServices((previous) =>
                         previous.filter((item) => item.id !== service.id),
@@ -403,7 +404,7 @@ function Configuration() {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid gap-3 sm:grid-cols-3">
                   {(
                     [
                       ["durationMinutes", "Duración (min)", 5],
@@ -411,7 +412,7 @@ function Configuration() {
                       ["price", "Precio COP", 0],
                     ] as const
                   ).map(([key, label, minimum]) => (
-                    <label className="text-xs text-slate-400" key={key}>
+                    <label className="text-xs text-sarin-muted" key={key}>
                       {label}
                       <input
                         className={fieldClass + " mt-2"}
@@ -441,12 +442,12 @@ function Configuration() {
                   ))}
                 </div>
                 <fieldset className="flex flex-wrap gap-3">
-                  <legend className="mb-2 text-xs text-slate-400">
+                  <legend className="mb-2 text-xs text-sarin-muted">
                     Disponible con
                   </legend>
                   {resources.map((resource) => (
                     <label
-                      className="flex items-center gap-2 text-xs text-slate-300"
+                      className="flex min-h-11 items-center gap-2 text-xs text-sarin-ink"
                       key={resource.id}
                     >
                       <input
@@ -477,7 +478,7 @@ function Configuration() {
             ))}
             <button
               type="button"
-              className="flex items-center gap-1 text-sm text-emerald-300"
+              className="flex min-h-11 items-center gap-1 text-sm text-sarin-blue"
               onClick={() =>
                 setServices((previous) => [
                   ...previous,
@@ -506,9 +507,9 @@ function Configuration() {
               return (
                 <div
                   key={day}
-                  className="rounded-xl border border-slate-800 p-3"
+                  className="rounded-xl border border-sarin-line p-3"
                 >
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className="flex min-h-11 items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={config.isOpen}
@@ -524,7 +525,7 @@ function Configuration() {
                       }
                     />
                     {day}
-                    <span className="ml-auto text-xs text-slate-400">
+                    <span className="ml-auto text-xs text-sarin-muted">
                       {config.isOpen ? "Abierto" : "Cerrado"}
                     </span>
                   </label>
@@ -533,7 +534,7 @@ function Configuration() {
                       {config.intervals.map((interval, intervalIndex) => (
                         <div
                           key={intervalIndex}
-                          className="flex items-center gap-2"
+                          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_44px] sm:items-center"
                         >
                           <input
                             aria-label={`${day} apertura ${intervalIndex + 1}`}
@@ -552,7 +553,7 @@ function Configuration() {
                               })
                             }
                           />
-                          <span className="text-slate-500">a</span>
+                          <span className="hidden text-sarin-muted sm:inline">a</span>
                           <input
                             aria-label={`${day} cierre ${intervalIndex + 1}`}
                             className={fieldClass}
@@ -574,7 +575,7 @@ function Configuration() {
                             aria-label="Eliminar intervalo"
                             type="button"
                             disabled={config.intervals.length === 1}
-                            className="p-1 text-slate-400 disabled:opacity-30"
+                            className="grid h-11 w-11 place-items-center justify-self-end rounded-[10px] text-sarin-muted hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30"
                             onClick={() =>
                               updateDay(index, {
                                 ...config,
@@ -590,7 +591,7 @@ function Configuration() {
                       ))}
                       <button
                         type="button"
-                        className="text-xs text-emerald-300"
+                        className="min-h-11 text-xs text-sarin-blue"
                         onClick={() =>
                           updateDay(index, {
                             ...config,
@@ -609,7 +610,7 @@ function Configuration() {
               );
             })}
           </section>
-          <label className="block text-xs text-slate-400">
+          <label className="block text-xs text-sarin-muted">
             Preguntas obligatorias para reservar (una por línea)
             <textarea
               className={fieldClass + " mt-2 min-h-24"}
@@ -618,7 +619,7 @@ function Configuration() {
               onChange={(event) => setIntake(event.target.value)}
             />
           </label>
-          <label className="block text-xs text-slate-400">
+          <label className="block text-xs text-sarin-muted">
             Tono del asistente
             <input
               className={fieldClass + " mt-2"}
@@ -627,7 +628,7 @@ function Configuration() {
               onChange={(event) => setTone(event.target.value)}
             />
           </label>
-          <label className="block text-xs text-slate-400">
+          <label className="block text-xs text-sarin-muted">
             Indicaciones del negocio
             <textarea
               className={fieldClass + " mt-2 min-h-24"}

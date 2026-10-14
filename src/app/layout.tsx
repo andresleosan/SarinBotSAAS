@@ -19,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className={`${dmSans.variable} ${spaceGrotesk.variable} ${plexMono.variable}`}>
-      <body className="min-h-screen antialiased selection:bg-emerald-500 selection:text-slate-950">
+    <html lang="es" data-scroll-behavior="smooth" className={`${dmSans.variable} ${spaceGrotesk.variable} ${plexMono.variable}`}>
+      <body className="min-h-screen antialiased selection:bg-sarin-blue selection:text-white">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

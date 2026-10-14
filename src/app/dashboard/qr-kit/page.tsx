@@ -25,7 +25,7 @@ function QRKit() {
         Configura primero tu negocio en{" "}
         <Link
           href="/dashboard/onboarding"
-          className="text-emerald-300 underline"
+          className="text-sarin-blue underline"
         >
           Configuración
         </Link>
@@ -55,27 +55,28 @@ function QRKit() {
     setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
   return (
-    <section className="mx-auto max-w-3xl space-y-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-center sm:p-10">
-      <p className="text-xs uppercase tracking-widest text-emerald-400">
+    <section className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 text-center sm:p-10">
+      <p className="text-xs uppercase tracking-widest text-sarin-blue">
         Kit de tu isla privada
       </p>
-      <h1 className="text-3xl font-bold">{business.name}</h1>
-      <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-400">
+      <h1 className="break-words text-3xl font-semibold tracking-tight">{business.name}</h1>
+      <p className="mx-auto max-w-md text-sm leading-relaxed text-sarin-muted">
         Descarga el QR para imprimirlo en tu local o comparte el enlace para que
         tus clientes reserven contigo.
       </p>
       {origin && (
-        <div className="mx-auto w-fit rounded-2xl bg-white p-6" ref={qr}>
+        <div className="mx-auto w-full max-w-[272px] rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-6" ref={qr}>
           <QRCodeSVG
             value={url}
             size={224}
+            className="h-auto w-full"
             level="M"
             marginSize={2}
             title={`Agenda de ${business.name}`}
           />
         </div>
       )}
-      <p className="break-all font-mono text-sm text-slate-300">{url}</p>
+      <p className="break-all tabular-nums text-sm text-sarin-ink">{url}</p>
       <div className="flex flex-wrap justify-center gap-3">
         <button
           className={buttonClass + " flex items-center gap-2"}
@@ -86,14 +87,14 @@ function QRKit() {
           Descargar QR
         </button>
         <button
-          className="flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm hover:bg-slate-800"
+          className="flex min-h-11 items-center gap-2 rounded-[10px] border border-sarin-line px-4 py-2.5 text-sm text-sarin-ink hover:bg-sarin-soft"
           onClick={() => void copy()}
         >
           <Copy className="h-4 w-4" />
           Copiar enlace
         </button>
         <Link
-          className="flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm hover:bg-slate-800"
+          className="flex min-h-11 items-center gap-2 rounded-[10px] border border-sarin-line px-4 py-2.5 text-sm text-sarin-ink hover:bg-sarin-soft"
           href={`/b/${business.slug}`}
         >
           <ExternalLink className="h-4 w-4" />

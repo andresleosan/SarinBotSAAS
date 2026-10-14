@@ -32,6 +32,12 @@ interface AdminData {
   receipts: PaymentReceipt[];
   settings: PlatformSettings;
 }
+const subscriptionLabels: Record<Business["subscription"]["status"], string> = {
+  trial: "Prueba gratis",
+  active: "Activa",
+  past_due: "Pago pendiente",
+  suspended: "Suspendida",
+};
 function Console() {
   const [data, setData] = useState<AdminData | null>(null);
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
@@ -157,11 +163,11 @@ function Console() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-widest text-emerald-400">
+          <p className="text-xs uppercase tracking-widest text-sarin-blue">
             Administración
           </p>
           <h1 className="mt-2 text-3xl font-bold">Negocios y pagos</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-sarin-muted">
             Revisa comprobantes y supervisa el acceso de cada negocio.
           </p>
         </div>
@@ -176,13 +182,13 @@ function Console() {
       {error && <Notice error>{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
       <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <p className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
+          <p className="flex items-center gap-2 text-xs text-sarin-muted">
             <Cpu className="h-4 w-4" />
             Motor local
           </p>
           <p
-            className={`mt-2 text-lg font-semibold ${engine.health?.status === "online" ? "text-emerald-300" : "text-amber-300"}`}
+            className={`mt-2 text-lg font-semibold ${engine.health?.status === "online" ? "text-sarin-blue" : "text-amber-800"}`}
           >
             {engine.health
               ? engine.health.status === "online"
@@ -191,40 +197,40 @@ function Console() {
               : "Verificando…"}
           </p>
           {engine.error && (
-            <p className="mt-2 text-xs text-slate-400">{engine.error}</p>
+            <p className="mt-2 text-xs text-sarin-muted">{engine.error}</p>
           )}
           <button
             disabled={engine.checking}
             onClick={() => void engine.refresh()}
-            className="mt-3 flex items-center gap-1 text-xs text-slate-300 disabled:opacity-50"
+            className="mt-3 flex min-h-11 items-center gap-1 text-xs text-sarin-blue disabled:opacity-50"
           >
             <RefreshCw className="h-3 w-3" />
             Comprobar conexión
           </button>
         </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <p className="text-xs text-slate-400">Cola de inferencia</p>
+        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
+          <p className="text-xs text-sarin-muted">Cola de inferencia</p>
           <p className="mt-2 text-lg font-semibold">
             {engine.health?.queue
               ? `${engine.health.queue.activeSlots}/${engine.health.queue.maxSlots} en curso`
               : "Sin datos"}
           </p>
           {engine.health?.queue && (
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-sarin-muted">
               {engine.health.queue.queuedRequests} en espera ·{" "}
               {engine.health.queue.criticalQueued} de Vault
             </p>
           )}
         </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <p className="text-xs text-slate-400">Comprobantes pendientes</p>
-          <p className="mt-2 text-3xl font-semibold text-emerald-300">
+        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
+          <p className="text-xs text-sarin-muted">Comprobantes pendientes</p>
+          <p className="mt-2 text-3xl font-semibold text-sarin-blue">
             {pending.length}
           </p>
           <button
             onClick={() => void refresh()}
             disabled={Boolean(working)}
-            className="mt-3 text-xs text-slate-300 underline disabled:opacity-50"
+            className="mt-3 min-h-11 text-xs text-sarin-blue underline disabled:opacity-50"
           >
             Actualizar bandeja
           </button>
@@ -245,18 +251,18 @@ function Console() {
               )
               .map((receipt) => (
                 <article
-                  className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5"
+                  className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-5"
                   key={receipt.id}
                 >
                   <div className="flex justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold">{receipt.tenantName}</h3>
-                      <p className="mt-1 break-all text-xs text-slate-400">
+                    <div className="min-w-0">
+                      <h3 className="break-words font-semibold">{receipt.tenantName}</h3>
+                      <p className="mt-1 break-all text-xs text-sarin-muted">
                         {receipt.ownerEmail}
                       </p>
                     </div>
                     <span
-                      className={`text-xs ${receipt.status === "approved" ? "text-emerald-300" : receipt.status === "rejected" ? "text-rose-300" : "text-amber-300"}`}
+                      className={`shrink-0 text-xs ${receipt.status === "approved" ? "text-sarin-blue" : receipt.status === "rejected" ? "text-rose-700" : "text-amber-800"}`}
                     >
                       {receipt.status === "approved"
                         ? "Aprobado"
@@ -265,7 +271,7 @@ function Console() {
                           : "Pendiente"}
                     </span>
                   </div>
-                  <p className="font-mono text-sm text-emerald-300">
+                  <p className="tabular-nums text-sm text-sarin-blue">
                     {receipt.amountCOP.toLocaleString("es-CO", {
                       style: "currency",
                       currency: "COP",
@@ -273,13 +279,13 @@ function Console() {
                     })}{" "}
                     · {receipt.bankSelected}
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-sarin-muted">
                     {new Date(receipt.submittedAt).toLocaleString("es-CO", {
                       timeZone: "America/Bogota",
                     })}
                   </p>
                   <button
-                    className="flex items-center gap-2 text-sm text-slate-300 underline disabled:opacity-50"
+                    className="flex min-h-11 items-center gap-2 text-sm text-sarin-blue underline disabled:opacity-50"
                     disabled={Boolean(working)}
                     onClick={() => void viewImage(receipt.id)}
                   >
@@ -294,8 +300,8 @@ function Console() {
                     />
                   )}
                   {receipt.status === "pending" ? (
-                    <div className="space-y-3 border-t border-slate-800 pt-4">
-                      <label className="block text-xs text-slate-400">
+                    <div className="space-y-3 border-t border-sarin-line pt-4">
+                      <label className="block text-xs text-sarin-muted">
                         Motivo si rechazas el comprobante
                         <input
                           className={fieldClass + " mt-2"}
@@ -309,7 +315,7 @@ function Console() {
                           }
                         />
                       </label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <button
                           className={
                             buttonClass +
@@ -322,7 +328,7 @@ function Console() {
                           Aprobar +30 días
                         </button>
                         <button
-                          className="flex items-center gap-1 rounded-xl border border-rose-500/40 px-3 py-2 text-sm text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+                          className="flex min-h-11 items-center justify-center gap-1 rounded-[10px] border border-rose-200 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
                           disabled={
                             Boolean(working) || !reasons[receipt.id]?.trim()
                           }
@@ -333,14 +339,14 @@ function Console() {
                         </button>
                       </div>
                       {!images[receipt.id] && (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-sarin-muted">
                           Abre la captura para revisarla antes de aprobar.
                         </p>
                       )}
                     </div>
                   ) : (
                     receipt.rejectionReason && (
-                      <p className="text-sm text-rose-300">
+                      <p className="text-sm text-rose-700">
                         {receipt.rejectionReason}
                       </p>
                     )
@@ -355,9 +361,9 @@ function Console() {
         {data.businesses.length === 0 ? (
           <Notice>Todavía no hay negocios registrados.</Notice>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-800">
+          <div className="overflow-x-auto rounded-2xl border border-sarin-line bg-sarin-paper">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-900 text-xs text-slate-400">
+              <thead className="bg-sarin-canvas text-xs text-sarin-muted">
                 <tr>
                   <th className="p-4">Negocio</th>
                   <th className="p-4">Estado</th>
@@ -365,31 +371,31 @@ function Console() {
                   <th className="p-4">Vigencia mensual</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-sarin-line">
                 {data.businesses.map((business) => (
                   <tr key={business.id}>
                     <td className="p-4">
                       <Link
                         href={`/b/${business.slug}`}
-                        className="font-semibold text-emerald-300 hover:underline"
+                        className="font-semibold text-sarin-blue hover:underline"
                       >
                         {business.name}
                       </Link>
-                      <span className="mt-1 block text-xs text-slate-400">
+                      <span className="mt-1 block text-xs text-sarin-muted">
                         {business.ownerEmail}
                       </span>
                     </td>
-                    <td className="p-4 text-slate-300">
-                      {business.subscription.status}
+                    <td className="p-4 text-sarin-ink">
+                      {subscriptionLabels[business.subscription.status]}
                     </td>
-                    <td className="whitespace-nowrap p-4 text-slate-400">
+                    <td className="whitespace-nowrap p-4 text-sarin-muted">
                       {new Date(
                         business.subscription.trialEndsAt,
                       ).toLocaleDateString("es-CO", {
                         timeZone: "America/Bogota",
                       })}
                     </td>
-                    <td className="whitespace-nowrap p-4 text-slate-400">
+                    <td className="whitespace-nowrap p-4 text-sarin-muted">
                       {new Date(
                         business.subscription.currentPeriodEndsAt,
                       ).toLocaleDateString("es-CO", {
@@ -405,12 +411,12 @@ function Console() {
       </section>
       {settings && (
         <form
-          className="space-y-5 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6"
+          className="space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6"
           onSubmit={(event) => void saveSettings(event)}
         >
           <h2 className="text-xl font-semibold">Datos de facturación</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-sarin-muted">
               Nombre comercial
               <input
                 required
@@ -422,7 +428,7 @@ function Console() {
                 }
               />
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-sarin-muted">
               Mensualidad en COP
               <input
                 required
@@ -442,10 +448,10 @@ function Console() {
           </div>
           {settings.bankAccounts.map((account) => (
             <fieldset
-              className="grid gap-3 rounded-xl border border-slate-800 p-4 sm:grid-cols-2"
+              className="grid gap-3 rounded-xl border border-sarin-line p-4 sm:grid-cols-2"
               key={account.id}
             >
-              <legend className="px-2 text-xs text-slate-400">
+              <legend className="px-2 text-xs text-sarin-muted">
                 Cuenta de pago
               </legend>
               {(
@@ -457,7 +463,7 @@ function Console() {
                   ["holderDoc", "Documento del titular (opcional)"],
                 ] as const
               ).map(([key, label]) => (
-                <label className="text-xs text-slate-400" key={key}>
+                <label className="text-xs text-sarin-muted" key={key}>
                   {label}
                   <input
                     required={key !== "holderDoc"}
@@ -479,7 +485,7 @@ function Console() {
               ))}
               <button
                 type="button"
-                className="flex items-center gap-2 self-end p-2 text-sm text-rose-300"
+                className="flex min-h-11 items-center gap-2 self-end rounded-[10px] p-2 text-sm text-rose-700 hover:bg-rose-50"
                 onClick={() =>
                   setSettings({
                     ...settings,
@@ -496,7 +502,7 @@ function Console() {
           ))}
           <button
             type="button"
-            className="flex items-center gap-1 text-sm text-emerald-300"
+            className="flex min-h-11 items-center gap-1 text-sm text-sarin-blue"
             onClick={() =>
               setSettings({
                 ...settings,

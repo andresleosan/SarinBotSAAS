@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${dmSans.variable} ${spaceGrotesk.variable} ${plexMono.variable}`}>
+    <html lang="es" data-scroll-behavior="smooth" className={`${dmSans.variable} ${spaceGrotesk.variable} ${plexMono.variable}`}>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

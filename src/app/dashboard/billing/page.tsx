@@ -23,6 +23,12 @@ interface BillingData {
   receipts: PaymentReceipt[];
   business: Business | null;
 }
+const subscriptionLabels: Record<Business["subscription"]["status"], string> = {
+  trial: "Prueba gratis",
+  active: "Activa",
+  past_due: "Pago pendiente",
+  suspended: "Suspendida",
+};
 function readDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -145,7 +151,7 @@ function Billing() {
       <Notice>
         Configura primero tu negocio en{" "}
         <Link
-          className="text-emerald-300 underline"
+          className="text-sarin-blue underline"
           href="/dashboard/onboarding"
         >
           Configuración
@@ -157,21 +163,21 @@ function Billing() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-widest text-emerald-400">
+          <p className="text-xs uppercase tracking-widest text-sarin-blue">
             Suscripción
           </p>
           <h1 className="mt-2 text-3xl font-bold">Mantén tu agenda abierta</h1>
-          <p className="mt-2 text-sm text-slate-400">
-            {data.business.name} · Estado: {data.business.subscription.status}
+          <p className="mt-2 text-sm text-sarin-muted">
+            {data.business.name} · Estado: {subscriptionLabels[data.business.subscription.status]}
           </p>
         </div>
-        <p className="text-2xl font-bold text-emerald-300">
+        <p className="text-2xl font-bold text-sarin-blue">
           {data.settings.monthlyPriceCOP.toLocaleString("es-CO", {
             style: "currency",
             currency: "COP",
             maximumFractionDigits: 0,
           })}
-          <span className="mt-1 block text-right text-xs font-normal text-slate-400">
+          <span className="mt-1 block text-right text-xs font-normal text-sarin-muted">
             por 30 días
           </span>
         </p>
@@ -180,7 +186,7 @@ function Billing() {
       {notice && <Notice>{notice}</Notice>}
       <form
         onSubmit={(event) => void submit(event)}
-        className="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6"
+        className="space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6"
       >
         <h2 className="font-semibold">Datos para tu transferencia</h2>
         {data.settings.bankAccounts.length === 0 ? (
@@ -192,7 +198,7 @@ function Billing() {
             {data.settings.bankAccounts.map((account) => (
               <label
                 key={account.id}
-                className={`cursor-pointer space-y-2 rounded-xl border p-4 ${bank === account.id ? "border-emerald-500/50 bg-emerald-500/5" : "border-slate-700"}`}
+                className={`cursor-pointer space-y-2 rounded-xl border p-4 ${bank === account.id ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"}`}
               >
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <input
@@ -204,20 +210,20 @@ function Billing() {
                   />
                   {account.bankName}
                 </span>
-                <span className="block text-xs text-slate-400">
+                <span className="block text-xs text-sarin-muted">
                   {account.accountType} · {account.holderName}
                 </span>
-                <span className="block font-mono text-sm">
+                <span className="block break-all tabular-nums text-sm">
                   {account.accountNumber}
                 </span>
                 {account.holderDoc && (
-                  <span className="block text-xs text-slate-400">
+                  <span className="block text-xs text-sarin-muted">
                     {account.holderDoc}
                   </span>
                 )}
                 <button
                   type="button"
-                  className="flex items-center gap-1 text-xs text-emerald-300"
+                  className="flex min-h-11 items-center gap-1 text-xs text-sarin-blue"
                   onClick={() => void copy(account.accountNumber)}
                 >
                   <Copy className="h-3.5 w-3.5" />
@@ -229,13 +235,13 @@ function Billing() {
         )}
         <div className="space-y-3">
           <h2 className="font-semibold">Envía el comprobante</h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-sarin-muted">
             La captura se optimiza antes de enviarla y se revisa manualmente. El
             acceso preventivo de 24 horas se aplica según el estado de tu
             suscripción.
           </p>
-          <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border border-dashed border-slate-600 p-6 text-center hover:border-emerald-500">
-            <UploadCloud className="h-8 w-8 text-emerald-400" />
+          <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border border-dashed border-sarin-line bg-sarin-canvas p-4 text-center hover:border-sarin-blue sm:p-6">
+            <UploadCloud className="h-8 w-8 text-sarin-blue" />
             <span className="text-sm">
               {compressing
                 ? "Optimizando imagen…"
@@ -256,7 +262,7 @@ function Billing() {
                 alt="Vista previa del comprobante seleccionado"
                 className="max-h-72 w-full rounded-xl object-contain"
               />
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-sarin-muted">
                 Imagen optimizada · {Math.ceil(imageSize / 1024)} KB
               </p>
             </div>
@@ -277,7 +283,7 @@ function Billing() {
           data.receipts.map((receipt) => (
             <article
               key={receipt.id}
-              className="flex flex-wrap justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4"
+              className="flex flex-wrap justify-between gap-3 rounded-xl border border-sarin-line bg-sarin-paper p-4"
             >
               <div>
                 <p className="font-semibold">
@@ -287,19 +293,19 @@ function Billing() {
                     maximumFractionDigits: 0,
                   })}
                 </p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-sarin-muted">
                   {new Date(receipt.submittedAt).toLocaleString("es-CO", {
                     timeZone: "America/Bogota",
                   })}
                 </p>
                 {receipt.rejectionReason && (
-                  <p className="mt-2 text-sm text-rose-300">
+                  <p className="mt-2 text-sm text-rose-700">
                     {receipt.rejectionReason}
                   </p>
                 )}
               </div>
               <span
-                className={`text-sm ${receipt.status === "approved" ? "text-emerald-300" : receipt.status === "rejected" ? "text-rose-300" : "text-amber-300"}`}
+                className={`text-sm ${receipt.status === "approved" ? "text-sarin-blue" : receipt.status === "rejected" ? "text-rose-700" : "text-amber-800"}`}
               >
                 {receipt.status === "approved"
                   ? "Aprobado"

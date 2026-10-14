@@ -17,7 +17,6 @@ import {
   FileText,
   HardDrive,
   LoaderCircle,
-  LockKeyhole,
   MessageSquare,
   Paperclip,
   Plus,
@@ -52,7 +51,7 @@ import { VaultBackupDialog } from "./vault-backup-dialog";
 import { VaultMarkdown } from "./vault-markdown";
 
 const secondaryButton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sarin-line bg-sarin-paper px-3 py-2 text-xs font-medium text-sarin-ink transition hover:border-sarin-blue/40 hover:bg-sarin-soft disabled:cursor-not-allowed disabled:opacity-40";
 function money(amount: number, currency: string) {
   try {
     return new Intl.NumberFormat("es-CO", {
@@ -395,7 +394,7 @@ function VaultWorkspace() {
           setError(null);
           setNotice(null);
         }}
-        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-40"
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl bg-sarin-blue px-4 py-3 text-sm font-semibold text-white transition hover:bg-sarin-blue/95 disabled:opacity-40"
       >
         Nueva conversación <Plus className="h-4 w-4" />
       </button>
@@ -403,14 +402,14 @@ function VaultWorkspace() {
         aria-label="Conversaciones de la bóveda"
         className="mt-5 max-h-64 space-y-1 overflow-y-auto overscroll-contain lg:max-h-[43dvh]"
       >
-        <p className="mb-3 px-2 font-mono text-xs uppercase tracking-wider text-slate-400">
+        <p className="mb-3 px-2 font-mono text-xs uppercase tracking-wider text-sarin-muted">
           Conversaciones{" "}
-          <span className="ml-1 text-slate-300">{threads.length}</span>
+          <span className="ml-1 text-sarin-muted">{threads.length}</span>
         </p>
         {!loaded ? (
-          <p className="px-2 py-4 text-sm text-slate-400">Abriendo bóveda…</p>
+          <p className="px-2 py-4 text-sm text-sarin-muted">Abriendo bóveda…</p>
         ) : !threads.length ? (
-          <p className="px-2 py-3 text-sm leading-6 text-slate-400">
+          <p className="px-2 py-3 text-sm leading-6 text-sarin-muted">
             Aquí encontrarás las conversaciones que guardes en este dispositivo.
           </p>
         ) : (
@@ -429,8 +428,8 @@ function VaultWorkspace() {
               className={
                 "flex min-h-12 w-full items-start gap-2.5 rounded-xl px-3 py-3 text-left text-sm transition disabled:opacity-50 " +
                 (selectedId === thread.id
-                  ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-inset ring-emerald-500/30"
-                  : "text-slate-300 hover:bg-slate-800")
+                  ? "bg-sarin-soft text-sarin-blue ring-1 ring-inset ring-sarin-blue/20"
+                  : "text-sarin-muted hover:bg-sarin-soft")
               }
             >
               <MessageSquare className="mt-0.5 h-4 w-4 shrink-0" />
@@ -439,7 +438,7 @@ function VaultWorkspace() {
           ))
         )}
       </nav>
-      <div className="mt-5 border-t border-slate-700/70 pt-4">
+      <div className="mt-5 border-t border-sarin-line pt-4">
         <div className="grid grid-cols-2 gap-2">
           <button
             disabled={!loaded || busy}
@@ -459,8 +458,8 @@ function VaultWorkspace() {
           </button>
         </div>
         <div className="mt-4 flex items-start gap-2.5 px-1">
-          <HardDrive className="mt-1 h-4 w-4 shrink-0 text-emerald-300" />
-          <p className="text-xs leading-6 text-slate-400">
+          <HardDrive className="mt-1 h-4 w-4 shrink-0 text-sarin-blue" />
+          <p className="text-xs leading-6 text-sarin-muted">
             Guardado en este navegador. Exporta una copia antes de cambiar de
             dispositivo.
           </p>
@@ -468,7 +467,7 @@ function VaultWorkspace() {
         <button
           disabled={!loaded || busy || !threads.length}
           onClick={() => void clearVault()}
-          className="mt-4 flex min-h-11 items-center gap-2 px-1 text-xs text-slate-400 transition hover:text-rose-300 disabled:opacity-40"
+          className="mt-4 flex min-h-11 items-center gap-2 px-1 text-xs text-sarin-muted transition hover:text-rose-700 disabled:opacity-40"
         >
           <Trash2 className="h-4 w-4" />
           Borrar bóveda del dispositivo
@@ -481,18 +480,18 @@ function VaultWorkspace() {
     <div className="space-y-5">
       <section
         aria-label="Cuentas de esta conversación"
-        className="rounded-2xl border border-slate-700/70 bg-slate-900 p-5"
+        className="rounded-2xl border border-sarin-line bg-sarin-paper p-5"
       >
         <div className="mb-5 flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold">Tus cuentas</h2>
-          <FileText className="h-4 w-4 text-emerald-300" />
+          <FileText className="h-4 w-4 text-sarin-blue" />
         </div>
         {!totals.length ? (
-          <div className="rounded-xl border border-dashed border-slate-600 p-4">
-            <p className="text-sm leading-6 text-slate-400">
+          <div className="rounded-xl border border-dashed border-sarin-line p-4">
+            <p className="text-sm leading-6 text-sarin-muted">
               Los movimientos extraídos de tus facturas aparecerán aquí.
             </p>
-            <p className="mt-3 font-mono text-xs text-slate-400">
+            <p className="mt-3 font-mono text-xs text-sarin-muted">
               Solo esta conversación
             </p>
           </div>
@@ -501,31 +500,31 @@ function VaultWorkspace() {
             {totals.map((total) => (
               <div
                 key={total.currency}
-                className="rounded-xl bg-slate-950/70 p-4"
+                className="rounded-xl bg-sarin-canvas p-4"
               >
-                <p className="mb-4 font-mono text-xs uppercase tracking-widest text-slate-400">
+                <p className="mb-4 font-mono text-xs uppercase tracking-widest text-sarin-muted">
                   {total.currency}
                 </p>
                 <p className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                  <span className="text-slate-400">Ingresos</span>
-                  <span className="break-all font-mono text-emerald-300">
+                  <span className="text-sarin-muted">Ingresos</span>
+                  <span className="break-all font-mono text-sarin-blue">
                     {money(total.income, total.currency)}
                   </span>
                 </p>
                 <p className="mt-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                  <span className="text-slate-400">Gastos</span>
-                  <span className="break-all font-mono text-slate-100">
+                  <span className="text-sarin-muted">Gastos</span>
+                  <span className="break-all font-mono text-sarin-ink">
                     {money(total.expense, total.currency)}
                   </span>
                 </p>
-                <div className="mt-4 border-t border-slate-700 pt-4">
-                  <p className="text-xs text-slate-400">Balance</p>
+                <div className="mt-4 border-t border-sarin-line pt-4">
+                  <p className="text-xs text-sarin-muted">Balance</p>
                   <p
                     className={
                       "mt-1 break-all font-mono text-xl tracking-tight " +
                       (total.balance < 0
-                        ? "text-amber-200"
-                        : "text-emerald-300")
+                        ? "text-amber-800"
+                        : "text-sarin-blue")
                     }
                   >
                     {money(total.balance, total.currency)}
@@ -541,20 +540,20 @@ function VaultWorkspace() {
               <caption className="sr-only">
                 Movimientos de esta conversación
               </caption>
-              <thead className="border-b border-slate-700 text-slate-400">
+              <thead className="border-b border-sarin-line text-sarin-muted">
                 <tr>
                   <th className="w-[57%] pb-3 pr-2 font-medium">Concepto</th>
                   <th className="pb-3 text-right font-medium">Importe</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/60">
+              <tbody className="divide-y divide-sarin-line">
                 {current?.entries.map((entry) => (
                   <tr key={entry.id}>
                     <td className="py-3 pr-2 align-top">
-                      <p className="break-words leading-5 text-slate-200">
+                      <p className="break-words leading-5 text-sarin-ink">
                         {entry.description}
                       </p>
-                      <p className="mt-1 break-words leading-5 text-slate-400">
+                      <p className="mt-1 break-words leading-5 text-sarin-muted">
                         {entry.date ?? "Sin fecha"} · {entry.category}
                       </p>
                     </td>
@@ -562,8 +561,8 @@ function VaultWorkspace() {
                       className={
                         "break-all py-3 text-right align-top font-mono leading-5 " +
                         (entry.kind === "income"
-                          ? "text-emerald-300"
-                          : "text-slate-200")
+                          ? "text-sarin-blue"
+                          : "text-sarin-ink")
                       }
                     >
                       {entry.kind === "income" ? "+" : "−"}
@@ -576,13 +575,13 @@ function VaultWorkspace() {
           </div>
         )}
       </section>
-      <section className="rounded-2xl border border-slate-700/70 bg-slate-900 p-5">
+      <section className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
         <h2 className="mb-5 flex items-center justify-between gap-2 text-base font-semibold">
           Vencimientos
-          <CalendarArrowDown className="h-4 w-4 text-emerald-300" />
+          <CalendarArrowDown className="h-4 w-4 text-sarin-blue" />
         </h2>
         {!current?.reminders.length ? (
-          <p className="text-sm leading-6 text-slate-400">
+          <p className="text-sm leading-6 text-sarin-muted">
             Adjunta una cuenta con fecha de vencimiento para preparar tu
             recordatorio.
           </p>
@@ -591,18 +590,18 @@ function VaultWorkspace() {
             {current.reminders.map((reminder) => (
               <li
                 key={reminder.id}
-                className="rounded-xl border border-slate-700 bg-slate-950/60 p-4"
+                className="rounded-xl border border-sarin-line bg-sarin-canvas p-4"
               >
-                <p className="break-words text-sm font-medium text-slate-100">
+                <p className="break-words text-sm font-medium text-sarin-ink">
                   {reminder.title}
                 </p>
-                <p className="mt-2 font-mono text-xs leading-5 text-amber-200">
+                <p className="mt-2 font-mono text-xs leading-5 text-amber-800">
                   {reminder.date} · {reminder.time}
                 </p>
-                <p className="mt-1 text-xs text-slate-400">Hora de Colombia</p>
+                <p className="mt-1 text-xs text-sarin-muted">Hora de Colombia</p>
                 <button
                   onClick={() => downloadReminder(reminder)}
-                  className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-emerald-300 underline-offset-4 hover:underline"
+                  className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-sarin-blue underline-offset-4 hover:underline"
                 >
                   <Download className="h-4 w-4" />
                   Descargar recordatorio
@@ -612,29 +611,35 @@ function VaultWorkspace() {
           </ul>
         )}
       </section>
-      <p className="flex items-start gap-2 px-1 text-xs leading-6 text-slate-400">
-        <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-emerald-300" />
+      <p className="flex items-start gap-2 px-1 text-xs leading-6 text-sarin-muted">
+        <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-sarin-blue" />
         Comprueba importes y fechas extraídos antes de usarlos.
       </p>
     </div>
   );
 
   return (
-    <main className="min-h-dvh bg-slate-950 text-slate-100">
+    <main className="sarin-agenda min-h-dvh bg-sarin-canvas font-sans text-sarin-ink [color-scheme:light]">
       <div className="mx-auto max-w-[1600px] px-3 py-4 sm:px-5 lg:px-6">
         <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10">
-              <LockKeyhole className="h-5 w-5 text-emerald-300" />
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sarin-soft">
+              <img
+                src="/brand/sarin-face-mark.png"
+                alt=""
+                width={44}
+                height={44}
+                className="h-11 w-11 object-contain"
+              />
             </div>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">
                 Sarin Vault
-                <span className="ml-2 align-middle font-mono text-xs font-normal uppercase tracking-widest text-emerald-300">
+                <span className="ml-2 align-middle font-mono text-xs font-normal uppercase tracking-widest text-sarin-blue">
                   Privado
                 </span>
               </h1>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-sarin-muted">
                 Un espacio para tus ideas y tus cuentas.
               </p>
             </div>
@@ -645,10 +650,10 @@ function VaultWorkspace() {
               className={
                 "inline-flex items-center gap-2 rounded-full border px-3 py-2 font-mono text-xs " +
                 (health === "online"
-                  ? "border-emerald-500/30 text-emerald-200"
+                  ? "border-green-200 bg-green-50 text-green-800"
                   : health === "offline"
-                    ? "border-amber-700/50 text-amber-200"
-                    : "border-slate-700 text-slate-300")
+                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                    : "border-sarin-line text-sarin-muted")
               }
             >
               <span
@@ -656,10 +661,10 @@ function VaultWorkspace() {
                 className={
                   "h-1.5 w-1.5 rounded-full " +
                   (health === "online"
-                    ? "bg-emerald-400"
+                    ? "bg-green-600"
                     : health === "offline"
                       ? "bg-amber-400"
-                      : "bg-slate-400")
+                      : "bg-sarin-muted")
                 }
               />
               {health === "online"
@@ -676,33 +681,33 @@ function VaultWorkspace() {
         </header>
         <div className="grid items-start gap-4 lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)_260px]">
           <aside
-            className="hidden min-w-0 rounded-2xl border border-slate-700/60 bg-slate-900/45 p-3 lg:sticky lg:top-5 lg:block"
+            className="hidden min-w-0 rounded-2xl border border-sarin-line bg-sarin-paper p-3 lg:sticky lg:top-5 lg:block"
             aria-label="Historial y copias de la bóveda"
           >
             {conversations}
           </aside>
-          <details className="group min-w-0 rounded-xl border border-slate-700 bg-slate-900/60 lg:hidden">
+          <details className="group min-w-0 rounded-xl border border-sarin-line bg-sarin-paper lg:hidden">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
               <span className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-emerald-300" />
+                <MessageSquare className="h-4 w-4 text-sarin-blue" />
                 Conversaciones y copias
               </span>
-              <ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180 motion-reduce:transition-none" />
+              <ChevronDown className="h-4 w-4 text-sarin-muted transition group-open:rotate-180 motion-reduce:transition-none" />
             </summary>
-            <div className="border-t border-slate-700 p-4">{conversations}</div>
+            <div className="border-t border-sarin-line p-4">{conversations}</div>
           </details>
 
           <section
             aria-label="Chat personal"
-            className="sarin-paper flex h-[calc(100dvh-215px)] min-h-[520px] min-w-0 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#f5f8fb] text-[#16314f] shadow-[0_18px_70px_-40px_#0009] [color-scheme:light] sm:h-[calc(100dvh-170px)] lg:h-[calc(100dvh-160px)] lg:min-h-[560px]"
+            className="sarin-paper flex h-[calc(100dvh-215px)] min-h-[520px] min-w-0 flex-col overflow-hidden rounded-[24px] border border-sarin-line bg-sarin-paper text-sarin-ink shadow-[0_18px_70px_-40px_#16234433] [color-scheme:light] sm:h-[calc(100dvh-170px)] lg:h-[calc(100dvh-160px)] lg:min-h-[560px]"
           >
-            <div className="flex min-h-[76px] shrink-0 items-center justify-between gap-3 border-b border-[#dce5ee] px-4 py-4 sm:px-6">
+            <div className="flex min-h-[76px] shrink-0 items-center justify-between gap-3 border-b border-sarin-line px-4 py-4 sm:px-6">
               <div className="min-w-0">
                 <h2 className="truncate text-base font-semibold">
                   {current?.title ?? "Tu espacio personal"}
                 </h2>
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-[#536b83]">
-                  <ShieldCheck className="h-3.5 w-3.5 text-[#25704e]" />
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-sarin-muted">
+                  <ShieldCheck className="h-3.5 w-3.5 text-sarin-blue" />
                   Guardado en tu dispositivo
                 </p>
               </div>
@@ -713,7 +718,7 @@ function VaultWorkspace() {
                   onClick={() => void deleteCurrent()}
                   aria-label="Eliminar conversación"
                   title="Eliminar conversación"
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#536b83] transition hover:bg-rose-100 hover:text-rose-700 disabled:opacity-40"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-sarin-muted transition hover:bg-rose-100 hover:text-rose-700 disabled:opacity-40"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -726,13 +731,13 @@ function VaultWorkspace() {
               {!current?.messages.length && (
                 <div className="mx-auto flex min-h-full max-w-lg flex-col items-center justify-center py-3 text-center">
                   <img
-                    src="/brand/sarin-welcome.png"
+                    src="/brand/sarin-face-mark.png"
                     alt=""
                     width={104}
                     height={104}
                     className="mb-3 h-16 w-16 shrink-0 object-contain sm:h-28 sm:w-28"
                   />
-                  <p className="mb-2 font-mono text-xs uppercase tracking-[0.16em] text-[#25704e]">
+                  <p className="mb-2 font-mono text-xs uppercase tracking-[0.16em] text-sarin-blue">
                     Hola, estoy para ayudarte
                   </p>
                   <h2 className="text-2xl font-semibold leading-tight tracking-tight sm:text-[30px]">
@@ -740,7 +745,7 @@ function VaultWorkspace() {
                     <br />
                     Un pendiente menos.
                   </h2>
-                  <p className="mt-3 max-w-sm text-sm leading-6 text-[#536b83]">
+                  <p className="mt-3 max-w-sm text-sm leading-6 text-sarin-muted">
                     Revisa una factura, ordena tus gastos o pon una idea en
                     marcha.
                   </p>
@@ -754,7 +759,7 @@ function VaultWorkspace() {
                         disabled={!loaded}
                         key={suggestion}
                         onClick={() => setDraft(suggestion)}
-                        className="min-h-10 rounded-full border border-[#cbd8e4] bg-white px-3 py-2 text-xs text-[#304e6b] transition hover:border-[#4d9bff] hover:bg-[#eaf2fb] disabled:opacity-50"
+                        className="min-h-10 rounded-full border border-sarin-line bg-sarin-paper px-3 py-2 text-xs text-sarin-ink transition hover:border-sarin-blue hover:bg-sarin-soft disabled:opacity-50"
                       >
                         {suggestion}
                       </button>
@@ -773,7 +778,7 @@ function VaultWorkspace() {
                   <div
                     className={
                       message.role === "user"
-                        ? "max-w-[95%] rounded-[20px] rounded-br-md bg-[#0d2746] p-4 text-[#f5f8fb] sm:max-w-[90%]"
+                        ? "max-w-[95%] rounded-[20px] rounded-br-md bg-sarin-soft p-4 text-sarin-ink sm:max-w-[90%]"
                         : "min-w-0 w-full"
                     }
                   >
@@ -781,15 +786,15 @@ function VaultWorkspace() {
                       className={
                         "mb-2 flex items-center gap-2 font-mono text-xs font-medium " +
                         (message.role === "user"
-                          ? "text-[#b6c7da]"
-                          : "text-[#25704e]")
+                          ? "text-sarin-muted"
+                          : "text-sarin-blue")
                       }
                     >
                       {message.role === "user" ? (
                         "Tú"
                       ) : (
                         <>
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#4ebd87]" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-sarin-blue" />
                           Sarin
                         </>
                       )}
@@ -803,7 +808,7 @@ function VaultWorkspace() {
                             alt={image.name}
                             width={104}
                             height={104}
-                            className="h-24 w-24 rounded-xl border border-[#526c87] bg-white object-contain"
+                            className="h-24 w-24 rounded-xl border border-sarin-line bg-sarin-paper object-contain"
                             loading="lazy"
                           />
                         ))}
@@ -822,7 +827,7 @@ function VaultWorkspace() {
               {sending && (
                 <div
                   role="status"
-                  className="mx-auto flex w-full max-w-[70ch] items-center gap-2 text-sm text-[#25704e]"
+                  className="mx-auto flex w-full max-w-[70ch] items-center gap-2 text-sm text-sarin-blue"
                 >
                   <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" />
                   Sarin está preparando tu respuesta…
@@ -830,7 +835,7 @@ function VaultWorkspace() {
               )}
               <div ref={conversationEnd} />
             </div>
-            <div className="max-h-[65%] shrink-0 space-y-3 overflow-y-auto overscroll-contain border-t border-[#dce5ee] bg-[#edf3f8] p-3 sm:p-4">
+            <div className="max-h-[65%] shrink-0 space-y-3 overflow-y-auto overscroll-contain border-t border-sarin-line bg-sarin-canvas p-3 sm:p-4">
               {error && (
                 <div
                   role="alert"
@@ -860,14 +865,14 @@ function VaultWorkspace() {
               {notice && (
                 <p
                   role="status"
-                  className="rounded-xl border border-[#b9deca] bg-[#e5f4eb] p-3 text-xs leading-5 text-[#205a3e]"
+                  className="rounded-xl border border-green-200 bg-green-50 p-3 text-xs leading-5 text-green-800"
                 >
                   {notice}
                 </p>
               )}
               {health === "offline" && (
-                <p className="flex items-start gap-2 px-1 text-xs leading-5 text-[#6d572a]">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#b88b33]" />
+                <p className="flex items-start gap-2 px-1 text-xs leading-5 text-amber-800">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
                   Modelo sin conexión. Puedes consultar lo guardado y reintentar
                   más tarde.
                 </p>
@@ -877,7 +882,7 @@ function VaultWorkspace() {
                   {attachments.map((image) => (
                     <div
                       key={image.id}
-                      className="flex min-w-0 max-w-full shrink-0 items-center gap-2 rounded-xl border border-[#cbd8e4] bg-white p-2 pr-1"
+                      className="flex min-w-0 max-w-full shrink-0 items-center gap-2 rounded-xl border border-sarin-line bg-sarin-paper p-2 pr-1"
                     >
                       <img
                         src={image.dataUrl}
@@ -886,7 +891,7 @@ function VaultWorkspace() {
                         height={42}
                         className="h-10 w-10 shrink-0 rounded-lg object-contain"
                       />
-                      <span className="max-w-[130px] truncate text-xs text-[#304e6b]">
+                      <span className="max-w-[130px] truncate text-xs text-sarin-ink">
                         {image.name}
                       </span>
                       <button
@@ -898,7 +903,7 @@ function VaultWorkspace() {
                           )
                         }
                         aria-label={"Quitar " + image.name}
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[#536b83] hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40"
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-sarin-muted hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -908,7 +913,7 @@ function VaultWorkspace() {
               )}
               <form
                 onSubmit={(event) => void send(event)}
-                className="rounded-2xl border border-[#c5d3e1] bg-white p-3 shadow-sm focus-within:border-[#4d9bff] focus-within:ring-2 focus-within:ring-[#4d9bff]/15"
+                className="rounded-2xl border border-sarin-line bg-sarin-paper p-3 shadow-sm focus-within:border-sarin-blue focus-within:ring-2 focus-within:ring-sarin-blue/15"
               >
                 <label htmlFor="vault-message" className="sr-only">
                   Mensaje para Sarin Vault
@@ -931,7 +936,7 @@ function VaultWorkspace() {
                   maxLength={16000}
                   rows={2}
                   placeholder="¿Qué resolvemos hoy?"
-                  className="max-h-36 min-h-[56px] w-full resize-y bg-transparent text-sm leading-6 text-[#16314f] outline-none placeholder:text-[#536b83] disabled:opacity-60"
+                  className="max-h-36 min-h-[56px] w-full resize-y bg-transparent text-sm leading-6 text-sarin-ink outline-none placeholder:text-sarin-muted disabled:opacity-60"
                 />
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
@@ -949,7 +954,7 @@ function VaultWorkspace() {
                       type="button"
                       disabled={!loaded || busy || attachments.length >= 4}
                       onClick={() => inputFile.current?.click()}
-                      className="flex min-h-11 items-center gap-2 rounded-xl px-2 py-2 text-xs text-[#405c78] transition hover:bg-[#edf3f8] disabled:opacity-40"
+                      className="flex min-h-11 items-center gap-2 rounded-xl px-2 py-2 text-xs text-sarin-muted transition hover:bg-sarin-canvas disabled:opacity-40"
                     >
                       {addingImages ? (
                         <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" />
@@ -958,7 +963,7 @@ function VaultWorkspace() {
                       )}
                       <span>{addingImages ? "Optimizando…" : "Adjuntar"}</span>
                     </button>
-                    <span className="font-mono text-xs text-[#536b83]">
+                    <span className="font-mono text-xs text-sarin-muted">
                       {attachments.length}/4
                     </span>
                   </div>
@@ -966,7 +971,7 @@ function VaultWorkspace() {
                     <button
                       type="button"
                       onClick={() => request.current?.abort()}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#cbd8e4] px-3 py-2 text-sm font-semibold text-[#304e6b] hover:bg-[#edf3f8]"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sarin-line px-3 py-2 text-sm font-semibold text-sarin-ink hover:bg-sarin-canvas"
                     >
                       <Square className="h-3.5 w-3.5" />
                       Detener
@@ -979,15 +984,15 @@ function VaultWorkspace() {
                         busy ||
                         (!draft.trim() && !attachments.length)
                       }
-                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0d2746] px-4 py-2 text-sm font-semibold text-[#f5f8fb] transition hover:bg-[#164675] disabled:opacity-35"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sarin-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-sarin-blue/95 disabled:opacity-35"
                     >
-                      <Send className="h-4 w-4 text-[#65d49d]" />
+                      <Send className="h-4 w-4 text-white" />
                       Enviar
                     </button>
                   )}
                 </div>
               </form>
-              <p className="px-1 text-center text-xs leading-5 text-[#536b83]">
+              <p className="px-1 text-center text-xs leading-5 text-sarin-muted">
                 Tu consulta viaja a tu modelo local mediante una conexión
                 privada.
               </p>
@@ -1000,20 +1005,20 @@ function VaultWorkspace() {
           >
             {financialSummary}
           </aside>
-          <details className="group min-w-0 rounded-xl border border-slate-700 bg-slate-900/60 lg:col-start-2 xl:hidden">
+          <details className="group min-w-0 rounded-xl border border-sarin-line bg-sarin-paper lg:col-start-2 xl:hidden">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
               <span className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-emerald-300" />
+                <FileText className="h-4 w-4 text-sarin-blue" />
                 Cuentas y vencimientos
                 {Boolean(current?.entries.length) && (
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-xs text-emerald-200">
+                  <span className="rounded-full bg-sarin-soft px-2 py-0.5 font-mono text-xs text-sarin-blue">
                     {current?.entries.length}
                   </span>
                 )}
               </span>
-              <ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180 motion-reduce:transition-none" />
+              <ChevronDown className="h-4 w-4 text-sarin-muted transition group-open:rotate-180 motion-reduce:transition-none" />
             </summary>
-            <div className="border-t border-slate-700 p-3">
+            <div className="border-t border-sarin-line p-3">
               {financialSummary}
             </div>
           </details>

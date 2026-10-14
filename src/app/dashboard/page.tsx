@@ -124,10 +124,10 @@ function Agenda() {
   if (businessError) return <Notice error>{businessError}</Notice>;
   if (!business)
     return (
-      <section className="sarin-paper relative overflow-hidden rounded-[28px] border border-white/10 bg-[#f5f8fb] px-6 py-10 text-[#16314f] sm:px-10 sm:py-14">
+      <section className="sarin-paper relative overflow-hidden rounded-2xl border border-sarin-line bg-sarin-paper px-6 py-10 text-sarin-ink sm:px-10 sm:py-14">
         <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_180px]">
           <div className="max-w-xl">
-            <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-[#25704e]">
+            <p className="mb-4 tabular-nums text-xs uppercase tracking-[0.18em] text-sarin-blue">
               Un buen comienzo
             </p>
             <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
@@ -135,7 +135,7 @@ function Agenda() {
               <br />
               empieza aquí.
             </h1>
-            <p className="mt-4 max-w-md text-sm leading-7 text-[#536b83]">
+            <p className="mt-4 max-w-md text-sm leading-7 text-sarin-muted">
               Configura tus servicios, profesionales y horarios. Después,
               comparte tu isla privada y deja que Sarin te ayude a organizar la
               agenda.
@@ -181,29 +181,29 @@ function Agenda() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.18em] text-emerald-300">
+          <p className="mb-3 tabular-nums text-xs uppercase tracking-[0.18em] text-sarin-blue">
             Tu día, en orden
           </p>
           <h1 className="break-words text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
             {business.name}
           </h1>
-          <p className="mt-3 text-sm text-slate-400">
+          <p className="mt-3 text-sm text-sarin-muted">
             Cada reserva en su lugar. Cada cliente, a tiempo.
           </p>
         </div>
         <Link
           href={"/b/" + business.slug}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-emerald-500/50 hover:text-emerald-200"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sarin-line px-4 py-2 text-sm text-sarin-ink transition hover:border-sarin-blue hover:text-sarin-blue"
         >
           Ver mi isla
-          <ArrowUpRight className="h-4 w-4 text-emerald-300" />
+          <ArrowUpRight className="h-4 w-4 text-sarin-blue" />
         </Link>
       </header>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-700/70 bg-slate-900/60 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sarin-line bg-sarin-paper px-4 py-3">
         <p className="flex items-center gap-3 text-sm">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-500/10">
-            <Clock className="h-4 w-4 text-emerald-300" />
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-sarin-soft">
+            <Clock className="h-4 w-4 text-sarin-blue" />
           </span>
           {isSubscriptionAllowed(business, now)
             ? (sub.status === "trial" ? "Prueba gratis" : "Suscripción") +
@@ -214,7 +214,7 @@ function Agenda() {
         </p>
         <Link
           href="/dashboard/billing"
-          className="inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-emerald-300 underline-offset-4 hover:underline"
+          className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-sarin-blue underline-offset-4 hover:underline"
         >
           Ver suscripción <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
@@ -222,26 +222,26 @@ function Agenda() {
       {error && <Notice error>{error}</Notice>}
 
       <section
-        className="sarin-paper overflow-hidden rounded-[24px] border border-white/10 bg-[#f5f8fb] text-[#16314f] shadow-[0_18px_70px_-40px_#0009] [color-scheme:light]"
+        className="sarin-paper overflow-hidden rounded-2xl border border-sarin-line bg-sarin-paper text-sarin-ink shadow-[0_16px_48px_#233e7c09] [color-scheme:light]"
         aria-label="Agenda del negocio"
       >
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#dce5ee] px-4 py-5 sm:px-7 sm:py-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-sarin-line px-4 py-5 sm:px-7 sm:py-6">
           <div>
             <h2 className="flex items-center gap-2.5 text-xl font-semibold">
-              <Calendar className="h-5 w-5 text-[#25704e]" />
+              <Calendar className="h-5 w-5 text-sarin-blue" />
               Tu agenda
             </h2>
-            <p className="mt-2 text-sm capitalize text-[#536b83]">
+            <p className="mt-2 text-sm capitalize text-sarin-muted">
               {dateLabel}
             </p>
-            <p className="mt-1 font-mono text-xs text-[#536b83]">
+            <p className="mt-1 tabular-nums text-xs text-sarin-muted">
               Hora de Colombia · Actualización en vivo
             </p>
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <button
               type="button"
-              className="min-h-11 rounded-xl border border-[#cbd8e4] bg-white px-4 py-2 text-sm font-medium text-[#304e6b] transition hover:bg-[#eaf2fb]"
+              className="min-h-11 rounded-xl border border-sarin-line bg-white px-4 py-2 text-sm font-medium text-sarin-ink transition hover:bg-sarin-soft"
               onClick={() => setDate(today())}
             >
               Hoy
@@ -250,7 +250,7 @@ function Agenda() {
               <span className="sr-only">Fecha de la agenda</span>
               <input
                 aria-label="Fecha de la agenda"
-                className="min-h-11 w-full min-w-0 rounded-xl border border-[#cbd8e4] bg-white px-3 py-2 text-sm text-[#304e6b] outline-none focus:border-[#4d9bff] focus:ring-2 focus:ring-[#4d9bff]/15 sm:w-auto"
+                className="min-h-11 w-full min-w-0 rounded-xl border border-sarin-line bg-white px-3 py-2 text-sm text-sarin-ink outline-none focus:border-sarin-blue focus:ring-2 focus:ring-sarin-blue sm:w-auto"
                 type="date"
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
@@ -259,8 +259,8 @@ function Agenda() {
             </label>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dce5ee] px-4 py-3 sm:px-7">
-          <p className="text-xs text-[#536b83]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sarin-line px-4 py-3 sm:px-7">
+          <p className="text-xs text-sarin-muted">
             {agendaLoading
               ? "Actualizando turnos…"
               : confirmed === 1
@@ -269,7 +269,7 @@ function Agenda() {
           </p>
           <Link
             href="/dashboard/qr-kit"
-            className="inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-[#25704e] underline-offset-4 hover:underline"
+            className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-sarin-blue underline-offset-4 hover:underline"
           >
             <QrCode className="h-4 w-4" />
             Compartir mi QR
@@ -280,30 +280,30 @@ function Agenda() {
           {agendaLoading ? (
             <div
               role="status"
-              className="flex min-h-60 items-center justify-center gap-3 text-sm text-[#536b83]"
+              className="flex min-h-60 items-center justify-center gap-3 text-sm text-sarin-muted"
             >
               <Clock className="h-4 w-4" />
               Cargando agenda…
             </div>
           ) : !date ? (
             <div className="py-14 text-center">
-              <Calendar className="mx-auto mb-4 h-8 w-8 text-[#6d8297]" />
+              <Calendar className="mx-auto mb-4 h-8 w-8 text-sarin-muted" />
               <h3 className="text-lg font-semibold">
                 Elige el día que quieres revisar
               </h3>
-              <p className="mt-2 text-sm text-[#536b83]">
+              <p className="mt-2 text-sm text-sarin-muted">
                 Puedes volver a la fecha actual con el botón Hoy.
               </p>
             </div>
           ) : appointments.length === 0 ? (
             <div className="mx-auto max-w-lg py-12 text-center sm:py-16">
-              <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl border border-[#d5e6dd] bg-[#e5f4eb]">
-                <Calendar className="h-7 w-7 text-[#25704e]" />
+              <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl border border-sarin-line bg-sarin-soft">
+                <Calendar className="h-7 w-7 text-sarin-blue" />
               </div>
               <h3 className="text-xl font-semibold tracking-tight">
                 Hay espacio para lo que viene.
               </h3>
-              <p className="mt-3 text-sm leading-7 text-[#536b83]">
+              <p className="mt-3 text-sm leading-7 text-sarin-muted">
                 Todavía no hay citas ni bloqueos para este día. Comparte tu
                 enlace o tu QR para que tus clientes encuentren su próximo
                 horario.
@@ -311,14 +311,14 @@ function Agenda() {
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <Link
                   href="/dashboard/qr-kit"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0d2746] px-4 py-2.5 text-sm font-semibold text-[#f5f8fb] transition hover:bg-[#164675]"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sarin-blue px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#244dd0]"
                 >
-                  <QrCode className="h-4 w-4 text-[#65d49d]" />
+                  <QrCode className="h-4 w-4 text-white" />
                   Abrir mi kit QR
                 </Link>
                 <Link
                   href="/dashboard/onboarding"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#cbd8e4] px-4 py-2.5 text-sm font-medium text-[#304e6b] transition hover:bg-white"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sarin-line px-4 py-2.5 text-sm font-medium text-sarin-ink transition hover:bg-white"
                 >
                   Revisar horarios
                   <ArrowUpRight className="h-4 w-4" />
@@ -327,11 +327,11 @@ function Agenda() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 border-b border-[#dce5ee] py-4 font-mono text-xs uppercase tracking-wide text-[#536b83] sm:grid-cols-[88px_minmax(0,1fr)] sm:gap-5">
+              <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 border-b border-sarin-line py-4 tabular-nums text-xs uppercase tracking-wide text-sarin-muted sm:grid-cols-[88px_minmax(0,1fr)] sm:gap-5">
                 <span>Hora</span>
                 <span>Servicio y cliente</span>
               </div>
-              <ol className="divide-y divide-[#dce5ee]">
+              <ol className="divide-y divide-sarin-line">
                 {appointments.map((appointment) => {
                   const cancelled =
                     appointment.status === "cancelled_by_client" ||
@@ -345,14 +345,14 @@ function Agenda() {
                     no_show: "No asistió",
                   };
                   const badgeClass = cancelled
-                    ? "bg-[#f6e8ed] text-[#8d4c60]"
+                    ? "bg-rose-50 text-rose-700"
                     : appointment.status === "no_show"
-                      ? "bg-[#fff0d5] text-[#8f681d]"
+                      ? "bg-amber-50 text-amber-800"
                       : appointment.status === "completed"
-                        ? "bg-[#e4eefb] text-[#306ca2]"
+                        ? "bg-sarin-soft text-sarin-blue"
                         : blocked
-                          ? "bg-[#e4edf5] text-[#4d6882]"
-                          : "bg-[#e1f3e8] text-[#24724d]";
+                          ? "bg-sarin-canvas text-sarin-muted"
+                          : "bg-sarin-soft text-sarin-blue";
                   return (
                     <li
                       key={appointment.id}
@@ -366,11 +366,11 @@ function Agenda() {
                             appointment.startTimeStr +
                             ":00-05:00"
                           }
-                          className="font-mono text-base font-medium tracking-tight text-[#16314f] sm:text-lg"
+                          className="tabular-nums text-base font-medium tracking-tight text-sarin-ink sm:text-lg"
                         >
                           {appointment.startTimeStr}
                         </time>
-                        <p className="mt-1 font-mono text-xs text-[#536b83]">
+                        <p className="mt-1 tabular-nums text-xs text-sarin-muted">
                           {appointment.endTimeStr}
                         </p>
                       </div>
@@ -378,12 +378,12 @@ function Agenda() {
                         className={
                           "min-w-0 rounded-2xl border p-4 sm:p-5 " +
                           (blocked
-                            ? "border-[#d3dfe9] bg-[#eaf0f6]"
-                            : "border-[#dce5ee] bg-white")
+                            ? "border-sarin-line bg-sarin-canvas"
+                            : "border-sarin-line bg-white")
                         }
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="break-words font-mono text-xs text-[#536b83]">
+                          <p className="break-words tabular-nums text-xs text-sarin-muted">
                             {
                               business.resources.find(
                                 (item) => item.id === appointment.resourceId,
@@ -403,8 +403,8 @@ function Agenda() {
                           className={
                             "mt-3 break-words text-base font-semibold leading-6 " +
                             (cancelled
-                              ? "text-[#536b83] line-through decoration-[#a9bbc9]"
-                              : "text-[#16314f]")
+                              ? "text-sarin-muted line-through decoration-sarin-muted/50"
+                              : "text-sarin-ink")
                           }
                         >
                           {blocked
@@ -413,21 +413,21 @@ function Agenda() {
                         </h3>
                         {appointment.client && (
                           <div className="mt-2 space-y-1">
-                            <p className="break-words text-sm text-[#445f79]">
+                            <p className="break-words text-sm text-sarin-muted">
                               {appointment.client.name}
                             </p>
-                            <p className="break-all text-xs text-[#536b83]">
+                            <p className="break-all text-xs text-sarin-muted">
                               {appointment.client.phone ||
                                 appointment.client.email}
                             </p>
                           </div>
                         )}
                         {appointment.status === "confirmed" && (
-                          <div className="mt-4 flex justify-end border-t border-[#e5ecf2] pt-3">
+                          <div className="mt-4 flex justify-end border-t border-sarin-line pt-3">
                             <button
                               disabled={saving}
                               onClick={() => void cancel(appointment.id)}
-                              className="min-h-10 rounded-lg px-2 py-2 text-xs font-medium text-[#536b83] transition hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                              className="min-h-11 rounded-lg px-2 py-2 text-xs font-medium text-sarin-muted transition hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
                             >
                               Cancelar {blocked ? "bloqueo" : "cita"}
                             </button>
@@ -443,28 +443,28 @@ function Agenda() {
         </div>
       </section>
 
-      <details className="group rounded-2xl border border-slate-700/70 bg-slate-900/60">
+      <details className="group rounded-2xl border border-sarin-line bg-sarin-paper">
         <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/10">
-              <Plus className="h-4 w-4 text-emerald-300" />
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sarin-soft">
+              <Plus className="h-4 w-4 text-sarin-blue" />
             </span>
             <span>
               <span className="block text-sm font-semibold">
                 Bloquear un horario
               </span>
-              <span className="mt-1 block text-xs text-slate-400">
+              <span className="mt-1 block text-xs text-sarin-muted">
                 Reserva tiempo para atención presencial o una pausa.
               </span>
             </span>
           </span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180 motion-reduce:transition-none" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-sarin-muted transition group-open:rotate-180 motion-reduce:transition-none" />
         </summary>
         <form
-          className="grid gap-4 border-t border-slate-700/70 px-5 py-5 sm:grid-cols-2 xl:grid-cols-4"
+          className="grid gap-4 border-t border-sarin-line px-5 py-5 sm:grid-cols-2 xl:grid-cols-4"
           onSubmit={(event) => void block(event)}
         >
-          <label className="text-xs text-slate-400">
+          <label className="text-xs text-sarin-muted">
             Desde
             <input
               className={fieldClass + " mt-2"}
@@ -474,7 +474,7 @@ function Agenda() {
               required
             />
           </label>
-          <label className="text-xs text-slate-400">
+          <label className="text-xs text-sarin-muted">
             Hasta
             <input
               className={fieldClass + " mt-2"}
@@ -484,7 +484,7 @@ function Agenda() {
               required
             />
           </label>
-          <label className="text-xs text-slate-400">
+          <label className="text-xs text-sarin-muted">
             Profesional o estación
             <select
               className={fieldClass + " mt-2"}

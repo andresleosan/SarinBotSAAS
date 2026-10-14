@@ -1,0 +1,98 @@
+name: Verify Sarin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+  CI: 'true'
+
+jobs:
+  quality:
+    name: Types, tests and builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm audit --audit-level=high
+      - run: npm run build
+      - run: npm run build:landing
+      - run: npm run check:landing
+
+  emulators:
+    name: Firebase rules and local journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm run test:rules
+      - name: Run the complete local journey
+        shell: bash
+        run: |
+          npm_execpath="$(command -v npm)" node scripts/dev-local.mjs --port 3040 > "$RUNNER_TEMP/sarin-local.log" 2>&1 &
+          sarin_test_pid=$!
+          trap 'kill -TERM "$sarin_test_pid" 2>/dev/null || true; wait "$sarin_test_pid" 2>/dev/null || true' EXIT
+          node --input-type=module <<'NODE'
+          const deadline = Date.now() + 180000;
+          let ready = false;
+          while (Date.now() < deadline) {
+            try {
+              const response = await fetch('http://127.0.0.1:3040/api/session', {signal: AbortSignal.timeout(2500)});
+              await response.arrayBuffer();
+              if (response.status === 401) { ready = true; break; }
+            } catch { /* Emulators and Next are still starting. */ }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          if (!ready) throw new Error('The isolated local application did not become ready.');
+          NODE
+          npm run test:local -- --port 3040
+          npm run test:journey -- --port 3040
+
+  cloudflare:
+    name: Cloudflare configuration dry-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: cloudflare
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: cloudflare/package-lock.json
+      - run: npm ci
+      - run: npm run check
