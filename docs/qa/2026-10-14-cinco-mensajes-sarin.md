@@ -20,6 +20,10 @@ Cada escena dura 8 s: vuelo y vuelta al inicio, después unos cinco segundos de 
 
 ## Publicación
 
-Pendiente de registrar el resultado de Pages tras el push.
+Publicado en [sarinbotsaas.pages.dev](https://sarinbotsaas.pages.dev/#tu-agenda), commit `223444238f792b1b8b60396404ade7d05340433c`, despliegue [4d3627ba](https://4d3627ba.sarinbotsaas.pages.dev/), confirmado como producción en Cloudflare.
+
+- HTTP 200 con recorrido y transcripción; cliente público con duración 8 s e iteración infinita.
+- Chrome público: cambio real de mensajes comprobado, aterrizaje y texto visible; lectura completa estática con cinco elementos y retorno al recorrido correctos. Consola sin errores ni advertencias.
+- [Captura del recorrido publicado](sarin-cinco-mensajes-publicado.png). La pestaña se deja con el recorrido continuo activo.
 
 Reversión: volver al despliegue anterior `40a8f9d6`, o revertir el commit del recorrido. No hay migraciones ni cambios en APIs o datos.
