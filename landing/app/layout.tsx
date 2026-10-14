@@ -8,7 +8,7 @@ const plexMono = localFont({ src: "../../public/fonts/ibm-plex-mono-latin.woff2"
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://sarinbotsaas.pages.dev"),
-  title: "Sarin Bot — Tu agenda, un poco más simple. Próximamente",
+  title: "Sarin Bot — Menos mensajes. Más citas en orden. Próximamente",
   description: "Conoce Sarin Bot, el asistente para organizar las citas de tu negocio. Estamos preparando el lanzamiento; registro, reservas y chats próximamente.",
   alternates: { canonical: "/" },
   icons: {

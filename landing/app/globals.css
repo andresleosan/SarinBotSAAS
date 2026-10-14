@@ -2,3 +2,6 @@
 @source '../../src/components/marketing-home.tsx';
 @source '../../src/components/sarin-brand.tsx';
 @source './';
+
+html { color-scheme: light; }
+body { background: #f7f9ff; color: #162344; }
