@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowDown, ArrowRight, ArrowUpRight, CalendarDays, Clock3, Link2, MessageCircle, ShieldCheck } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight } from "lucide-react";
 import { AgendaPreview } from "./agenda-preview";
 import { SarinArrival } from "./sarin-arrival";
 import "./marketing-home.css";
@@ -10,9 +10,9 @@ function MarketingBrand({ eager = false }: { eager?: boolean }) {
 }
 
 const steps = [
-  { icon: Clock3, title: "Prepara tu espacio", text: "Agrega tus servicios, profesionales y horarios. Tu prueba empieza al crear el negocio." },
-  { icon: Link2, title: "Comparte tu enlace", text: "En tu perfil, por mensaje o con un QR en tu local. Tus clientes llegan a tu propio espacio." },
-  { icon: CalendarDays, title: "Recibe cada reserva", text: "Consulta tu agenda, bloquea horarios y mantén el control de las citas desde un solo lugar." },
+  { title: "Prepara tu espacio", text: "Agrega tus servicios, profesionales y horarios. Tu prueba empieza al crear el negocio." },
+  { title: "Comparte tu enlace", text: "En tu perfil, por mensaje o con un QR en tu local. Tus clientes llegan a tu propio espacio." },
+  { title: "Recibe cada reserva", text: "Consulta tu agenda, bloquea horarios y mantén el control de las citas desde un solo lugar." },
 ];
 
 export function MarketingHome({ comingSoon = false }: { comingSoon?: boolean }) {
@@ -46,20 +46,19 @@ export function MarketingHome({ comingSoon = false }: { comingSoon?: boolean }) 
         </section>
         <section id="como-funciona" className="agenda-how agenda-container" aria-labelledby="how-heading">
           <div className="agenda-section-heading">
-            <div><p className="agenda-eyebrow">De un enlace a tu agenda</p><h2 id="how-heading">Tú atiendes.<br />Sarin organiza la conversación.</h2></div>
+            <h2 id="how-heading">Tú atiendes.<br />Sarin organiza la conversación.</h2>
             <p>Tú defines cómo trabajas. Sarin ayuda a que tus clientes encuentren el momento.</p>
           </div>
           <ol className="agenda-steps">
-            {steps.map(({ icon: Icon, title, text }, index) => <li key={title}>
-              <div className="agenda-step-top"><span>Paso {index + 1}</span><Icon aria-hidden="true" strokeWidth={1.7} /></div>
+            {steps.map(({ title, text }) => <li key={title}>
               <h3>{title}</h3><p>{text}</p>
             </li>)}
           </ol>
         </section>
         <section id="tu-espacio" className="agenda-details agenda-container" aria-labelledby="space-heading">
           <h2 id="space-heading" className="agenda-sr-only">Tu espacio con Sarin</h2>
-          <div className="agenda-detail"><MessageCircle aria-hidden="true" /><div><h3>Una conversación, una cita</h3><p>El cliente consulta tus servicios y elige un horario que encaje en tu agenda.</p></div></div>
-          <div className="agenda-detail"><ShieldCheck aria-hidden="true" /><div><h3>Tu negocio tiene su propio espacio</h3><p>Tus servicios, tus horarios y un enlace privado para compartir con tus clientes.</p></div></div>
+          <div className="agenda-detail"><h3>Una conversación, una cita</h3><p>El cliente consulta tus servicios y elige un horario que encaje en tu agenda.</p></div>
+          <div className="agenda-detail"><h3>Tu negocio tiene su propio espacio</h3><p>Tus servicios, tus horarios y un enlace privado para compartir con tus clientes.</p></div>
         </section>
         <section id={comingSoon ? "lanzamiento" : "empezar"} className="agenda-launch agenda-container" aria-labelledby="launch-heading">
           <p className="agenda-eyebrow">{comingSoon ? "Estamos preparando el lanzamiento" : "Hecho para tu día a día"}</p>
