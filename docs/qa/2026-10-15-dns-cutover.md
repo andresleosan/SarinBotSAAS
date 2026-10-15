@@ -1,6 +1,6 @@
 # QA del cambio DNS y protección del motor — 2026-10-15
 
-Resultado: `alsdevstudio.com` ya delega en Cloudflare y la zona aparece activa. Se creó Access para todo el hostname del motor antes de publicar su ruta. El acceso HTTPS sin credenciales y con credenciales inválidas devuelve 403. La conexión completa con Ollama sigue pendiente: el túnel aparece `Down`, con cero réplicas, y algunos resolvers conservan NXDOMAIN para el hostname nuevo.
+Resultado final operativo del 2026-10-15: **Ollama está activo en la VPS y respondió desde el chat autenticado del panel**. La resolución se corrigió únicamente para `app` en Compose mediante el secundario `46.38.225.230`, manteniendo intacto el resolver del host. Pasaron DNS nativo del contenedor, catálogo 200 con el modelo esperado, `/api/tags` 404 y los 16 controles de autenticación, páginas, assets y Firebase antes y después. DeepSeek queda como respaldo manual con su clave retenida y Gemini continúa ausente del runtime. Las comprobaciones finales del motor, modelo instalado y generación del diagnóstico pasaron desde la VPS con DNS nativo. El historial y los límites de cada comprobación se conservan abajo.
 
 ## Alcance y autorización
 
@@ -52,7 +52,7 @@ Los MX y SPF conservados coinciden con la [guía oficial de Porkbun para email y
 - Ruta creada después de Access: `^/v1/(chat/completions|models)$` hacia `http://127.0.0.1:11434`, con `httpHostHeader: 127.0.0.1:11434`.
 - DNS nuevo del motor: CNAME con proxy y TTL Auto a `baac8f41-73ac-45e9-a394-59260ea07e25.cfargotunnel.com`. El listado final de Cloudflare mostró ocho registros: este registro nuevo y los siete originales, conservados DNS only y TTL 600.
 
-La UI consultada no mostró la regla final del túnel. El requisito sigue siendo terminar en `http_status:404`; no se afirma que esa configuración efectiva ni el rechazo autenticado de `/api/tags` se hayan verificado.
+La UI consultada no mostró la regla final del túnel. El requisito sigue siendo terminar en `http_status:404`. El rechazo autenticado de `/api/tags` estaba pendiente en esta revisión inicial; la comprobación posterior dio 404, como se registra abajo. Ese comportamiento no acredita haber leído toda la configuración final de ingress.
 
 Ambos NS Cloudflare resolvieron `ia-sarin.alsdevstudio.com` a `172.67.189.108` y `104.21.49.86`. El resolver local y `1.1.1.1` conservaron NXDOMAIN durante la comprobación. Se consultó HTTPS mediante `curl --resolve`, fijando una dirección obtenida del NS autoritativo y manteniendo el hostname, SNI y validación normal de TLS; no se utilizó `--insecure`.
 
@@ -63,17 +63,61 @@ Ambos NS Cloudflare resolvieron `ia-sarin.alsdevstudio.com` a `172.67.189.108` y
 | `/`, sin credenciales Access | HTTP 403 |
 | `/api/tags`, sin credenciales Access | HTTP 403 |
 | `/v1/chat/completions`, sin credenciales Access | HTTP 403 |
-| `/v1/models`, con credenciales válidas desde la VPS | Pendiente |
+| `/v1/models`, con credenciales válidas desde la VPS | Pendiente en la revisión inicial; resultado posterior abajo |
 
-Los 403 verifican rechazo en Cloudflare. No demuestran que el token válido sea aceptado, que el conector llegue a Ollama ni que la inferencia funcione.
+Esos 403 iniciales verificaron rechazo en Cloudflare. Por sí solos no demostraban aceptación del token válido, llegada a Ollama ni inferencia; las pruebas posteriores se documentan abajo.
 
-## Pendientes y límite de esta revisión
+## Observaciones iniciales y seguimiento
 
-Cloudflare mostró `sarin-mac-ollama` en estado `Down`, con cero réplicas; la nueva revisión de las 22:47:43 UTC mantuvo ese estado. La consulta de solo lectura desde la VPS de las 22:47:52 UTC identificó el peer exacto `MacBook Pro de Luis`, con `Online=false` y `LastSeen=2026-10-15T22:40:00.1Z`; también verificó la configuración correcta del backend y obtuvo `ENOTFOUND` al resolver el motor. El propietario confirmó que la Mac está encendida, tiene Internet y mantiene la sesión de Luis iniciada. Esa confirmación no demuestra que el conector esté activo. Se solicitó la lectura local del LaunchAgent limitada a estado, PID y código de salida, y el código HTTP de `/v1/models`; sus resultados siguen pendientes. Las cuatro conexiones y HTTP 200 del 2026-10-14 se conservan como evidencia histórica; no prueban disponibilidad actual. No se determinó la causa de la desconexión.
+Cloudflare mostró inicialmente `sarin-mac-ollama` en estado `Down`, con cero réplicas; la revisión de las 22:47:43 UTC mantuvo ese estado. La consulta de solo lectura desde la VPS de las 22:47:52 UTC identificó el peer exacto `MacBook Pro de Luis`, con `Online=false` y `LastSeen=2026-10-15T22:40:00.1Z`; también verificó la configuración correcta del backend y obtuvo `ENOTFOUND` al resolver el motor. El propietario confirmó que la Mac estaba encendida, con Internet y sesión Luis iniciada. Se solicitaron el estado local del LaunchAgent y el código HTTP de `/v1/models`; sus resultados se recibieron después y constan en la siguiente sección. Las cuatro conexiones y HTTP 200 del 2026-10-14 se conservan como evidencia histórica. No se determinó la causa de aquella desconexión.
 
 La nueva comprobación DNS del backend a las **22:44:56 UTC** del 2026-10-15 todavía devolvió `ENGINE_HOSTNAME_NOT_FOUND`. Las pruebas mediante IP explícita no sustituyen la resolución y conexión normal desde la VPS.
 
-Cuando la Mac esté conectada, comprobar primero el LaunchAgent existente, sus registros, sesión, alimentación, red y Ollama. Después verificar la resolución desde la VPS, `/v1/models` autenticado con HTTP 200, `/api/tags` autenticado con HTTP 404, `pnpm run doctor --engine` y `pnpm run doctor --generate`. El recorrido completo de Sarin y su publicación pública siguen pendientes. No se modificaron permisos de Tailscale ni se reinició la Mac.
+## Verificación posterior: Mac, DNS y transporte
+
+El propietario entregó la salida local de `launchctl`: `state = running`, PID 71314 y sin salidas previas del proceso. Ollama devolvió HTTP 200 en `/v1/models` por loopback de la Mac. La UI actualizada de Cloudflare mostró `Healthy` y dos conectores activos de la misma Mac. No se reinició ni se reinstaló el conector; la ruta permaneció igual. No se modificaron permisos de Tailscale.
+
+Entre **23:32:49 y 23:33:18 UTC (18:32:49–18:33:18 Colombia)**, ambos NS autoritativos respondieron correctamente para el motor. `1.1.1.1` y `8.8.8.8` devolvieron los NS Cloudflare y A/AAAA correctos; el resolver predeterminado de Windows también resolvió. Los A fueron `172.67.189.108` y `104.21.49.86`, con TTL 300. Algunas consultas UDP a Sullivan agotaron el tiempo; otras direcciones del mismo NS y TCP respondieron NOERROR, AA=true. No se observó error autoritativo de contenido. Ambos servidores `.com` mantuvieron la delegación Cloudflare y DS ausente con NOERROR, AA=true y pruebas NSEC3/SOA/RRSIG; el plazo de 48 horas no cambia.
+
+| Comprobación posterior | Resultado y alcance |
+| --- | --- |
+| VPS, `/v1/models` con Access válido, hostname original y resolución diagnóstica a IP autoritativa | HTTP 200; catálogo incluye `qwen3.8:27b-q4_K_M` |
+| VPS, sin Access o con credenciales inválidas, mismo diagnóstico | HTTP 403 |
+| VPS, `/api/tags` con Access válido, mismo diagnóstico | HTTP 404; verifica esa ruta, no la lectura de toda la configuración ingress |
+| VPS, DNS nativo del runtime, antes de la corrección | `ENOTFOUND`; pendiente en esa revisión |
+| Windows, cliente real importado `probeEngine` y `completeChat`, con DNS nativo | Catálogo y conversación sintética de dos rondas con herramienta correctos, en 13,24 segundos, a las 18:34:40 Colombia (23:34:40 UTC) |
+
+Las pruebas diagnósticas de la VPS conservaron hostname, SNI y validación TLS normal. No sustituyen la resolución nativa de ese equipo. La prueba sintética de Windows verifica el cliente real y el recorrido por Access hacia Ollama; no acredita inferencia desde el contenedor VPS ni el cambio del proveedor del panel.
+
+**En esa revisión, DeepSeek continuaba activo.** Quedaban por resolver y verificar DNS normal desde la VPS, repetir catálogo e inferencia allí, ejecutar `pnpm run doctor --engine` y `pnpm run doctor --generate`, y realizar el cambio explícito a Ollama con su comprobación del panel. No se cambió ningún proveedor durante esa comprobación. El resultado de la restauración posterior se documenta a continuación; la publicación pública y la prueba de reinicio pospuesta mantienen su estado pendiente.
+
+A las **23:38:59 UTC (18:38:59 Colombia)**, la revisión desde la VPS identificó caché anterior en el upstream activo del host `46.38.252.230`: cuatro NS Porkbun, TTL aproximado de 82.958 segundos, y NODATA para el motor con SOA Porkbun y TTL negativo 1.800 segundos. El secundario ya configurado, `46.38.225.230`, devolvió los NS Cloudflare y direcciones correctas. Las consultas UDP de la VPS a resolvers públicos agotaron el tiempo; las consultas TCP funcionaron. La evidencia quedó fuera de Git en `sarin-vps-dns-root-cause-20261015T233859Z.json`. Durante ese diagnóstico aún no se habían modificado resolvers ni aplicado una excepción DNS al contenedor.
+
+## Restauración de Ollama en el backend y comprobación del panel
+
+El script privado revisado finalizó con código 0 y mantuvo la misma imagen de la aplicación. Cambió únicamente `SARIN_CHAT_PROVIDER` de `deepseek` a `ollama` en el entorno y configuró `dns: 46.38.225.230` solo para el servicio `app` de Compose. El resolver del host, las rutas del túnel y los controles de Access permanecieron intactos. La clave DeepSeek se conservó para respaldo manual; Gemini continúa ausente del runtime.
+
+| Verificación tras recrear `app` | Resultado |
+| --- | --- |
+| Resolución DNS nativa dentro del contenedor | Correcta |
+| `/v1/models` autenticado | HTTP 200, con `qwen3.8:27b-q4_K_M` |
+| `/api/tags` autenticado | HTTP 404 |
+| Controles de autenticación | 16 comprobaciones correctas antes y después |
+| Páginas, assets y lecturas Firebase | Correctos antes y después |
+| Onboarding autenticado, recargado por acceso privado en puerto 3032 | Una consulta sintética nueva recibió una lista coherente en español |
+| `doctor --engine` | Correcto |
+| Primera prueba breve `doctor --generate` | HTTP 200, `finish_reason: length`, texto final vacío y presupuesto de 32 tokens consumido en razonamiento |
+| Diagnóstico final desde la VPS, con DNS nativo | Motor, modelo principal instalado y generación correctos; código 0 hacia las 23:44:42 UTC |
+
+La comprobación del panel no guardó ni creó negocios; su formulario quedó vacío. La prueba anterior del cliente real desde Windows también había verificado dos rondas con herramienta sintética en 13,24 segundos.
+
+El fallo inicial del diagnóstico breve se debió al presupuesto consumido en razonamiento, no a la red. La corrección de una línea reemplazó `think: false` por `reasoning_effort: 'none'`, conforme al [contrato OpenAI de Ollama](https://docs.ollama.com/api/openai-compatibility). Se actualizó únicamente la copia privada `/opt/sarin-bot/diagnostics/lib/doctor.mjs`, con respaldo `doctor-before-reasoning-fix-20261015.mjs`; no se cambió la imagen de la aplicación. La repetición desde la VPS pasó con DNS nativo. La validación local posterior dio 229 pruebas aprobadas y 8 omitidas, 27 aprobadas en la suite dirigida del diagnóstico y typecheck correcto.
+
+Estos resultados no significan que toda la configuración esté completa: visión sigue sin configurar y el UID superadmin continúa pendiente. Las variables cliente Firebase no están presentes en el entorno de runtime; su cliente compilado sí fue comprobado desde la UI. El resumen final de evidencia se conserva fuera de Git en `sarin-ollama-final-verification-20261015.json`.
+
+![Chat autenticado de Sarin con Ollama, después de restaurar el proveedor](sarin-ollama-chat-verified.jpg)
+
+El respaldo de entorno y Compose permanece fuera de Git en `/opt/sarin-bot/runtime/rollbacks/restore-ollama-dns-20261015T233822Z-581f0478`. El reloj de la VPS difiere aproximadamente cuatro minutos; el sello del nombre del respaldo no determina el orden de las observaciones UTC de esta QA. El script privado `/root/sarin-restore-ollama-dns-reviewed.py` acepta `rollback BACKUP`, con ese directorio como argumento, para restaurar entorno y Compose con la misma imagen. No se ejecutó rollback. La publicación pública, visión y pruebas de reinicio mantienen sus límites previos.
 
 ## Evidencia y reversión
 

@@ -2,6 +2,8 @@
 
 Decisión del 15 de octubre de 2026: activación manual y temporal desde el servidor para chat de negocio, copiloto y onboarding mientras se recupera la Mac. El proveedor predeterminado sigue siendo Ollama. No hay conmutación automática ni reintento de un turno con otro proveedor.
 
+Estado posterior del mismo día: la conexión con la Mac y el chat autenticado quedaron verificados y el proveedor activo volvió a **Ollama**. La clave DeepSeek permanece en el runtime privado para volver a seleccionarlo manualmente si se necesita. Se conserva la misma imagen; [evidencia y reversión](qa/2026-10-15-dns-cutover.md).
+
 ## Límite de privacidad
 
 Cuando se selecciona DeepSeek, la API recibe las instrucciones, el historial enviado en la solicitud, el contexto del negocio y los resultados de herramientas que necesite el chat. Esto puede incluir los datos de contacto y reserva que el usuario introduzca. No debe describirse este modo como inferencia local.

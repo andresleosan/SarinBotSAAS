@@ -169,7 +169,7 @@ export async function runDoctor({ env = {}, nodeVersion = '', flags = {}, fetchI
       ] : 'Esta es una prueba sintética sin datos personales. Responde únicamente SARIN_DOCTOR_OK.';
       const data = await boundedJson(await fetchImpl(url.toString(), {
         method: 'POST', headers, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(120000),
-        body: JSON.stringify({ model, messages: [{ role: 'user', content }], stream: false, temperature: 0, max_tokens: vision ? 64 : 32, think: false }),
+        body: JSON.stringify({ model, messages: [{ role: 'user', content }], stream: false, temperature: 0, max_tokens: vision ? 64 : 32, reasoning_effort: 'none' }),
       }));
       if (!validCompletion(data)) throw new Error('Invalid completion');
       checks.push(result(check, 'ok', vision ? 'El modelo de visión completó una prueba con una imagen sintética local. Su respuesta se omitió.' : 'El modelo principal completó una prueba de texto sintético. Su respuesta se omitió.'));

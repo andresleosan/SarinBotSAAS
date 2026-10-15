@@ -111,6 +111,28 @@ describe('local configuration doctor', () => {
     expect(JSON.stringify(result)).not.toContain('RAW-CONTENT');
   });
 
+  it.each([
+    { flags: { generate: true }, check: 'probe.generate', maxTokens: 32 },
+    { flags: { vision: true }, check: 'probe.vision', maxTokens: 64 },
+  ])('disables OpenAI-compatible reasoning so $check receives content within its token budget', async ({ flags, check, maxTokens }) => {
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, options?: RequestInit) => {
+      const request = JSON.parse(String(options?.body)) as { reasoning_effort?: string };
+      // Ollama ignores native API `think` on /v1/chat/completions; reasoning can consume this small budget.
+      return request.reasoning_effort === 'none' ? completion() : Response.json({
+        choices: [{ index: 0, finish_reason: 'length', message: { role: 'assistant', content: '', reasoning: 'PRIVATE-REASONING-DO-NOT-PRINT' } }],
+      });
+    });
+    const report = await runDoctor({ env: local, nodeVersion: '24.18.0', flags, fetchImpl });
+    expect(report.exitCode).toBe(0);
+    expect(report.checks.find(item => item.check === check)?.status).toBe('ok');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const request = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect(request.reasoning_effort).toBe('none');
+    expect(request.max_tokens).toBe(maxTokens);
+    expect(request).not.toHaveProperty('think');
+    expect(JSON.stringify(report)).not.toMatch(/RAW-CONTENT|PRIVATE-REASONING/);
+  });
+
   it('sends only a local embedded image to the vision model without function calling', async () => {
     const fetchImpl = vi.fn(async () => completion());
     const result = await runDoctor({ env: local, nodeVersion: '24.18.0', flags: { vision: true }, fetchImpl });

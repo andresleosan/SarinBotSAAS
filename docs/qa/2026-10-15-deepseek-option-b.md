@@ -2,7 +2,7 @@
 
 ## Estado
 
-El propietario eligió DeepSeek como opción B manual y temporal desde el servidor y entregó una clave dedicada. Se desplegó y seleccionó `deepseek` en la instancia privada de la VPS el 15 de octubre de 2026. Gemini está implementado como tercera opción y probado con datos ficticios, pero no está activo ni tiene clave en la VPS: la cuenta es de Colombia y continúa en nivel gratuito. No se autorizó ni habilitó facturación Google.
+El propietario eligió DeepSeek como opción B manual y temporal desde el servidor y entregó una clave dedicada. Se desplegó y seleccionó `deepseek` en la instancia privada de la VPS el 15 de octubre de 2026. Después se verificó la conexión con la Mac y se devolvió el chat a **Ollama**, conservando la misma imagen y la clave DeepSeek para activación manual. El retorno y su prueba en pantalla están en la [QA de conexión local](2026-10-15-dns-cutover.md). Gemini está implementado como tercera opción y probado con datos ficticios, pero no está activo ni tiene clave en la VPS: la cuenta es de Colombia y continúa en nivel gratuito. No se autorizó ni habilitó facturación Google.
 
 El valor predeterminado del código sigue siendo Ollama. Vault lo selecciona explícitamente en sus tres caminos (texto, transcripción y análisis), con salud independiente y almacenamiento local del navegador. No hay conmutación automática ni reintento con otro proveedor.
 
@@ -45,9 +45,9 @@ Después del cambio:
 
 La configuración anterior y la imagen `sarin-bot:staging-20261014t232158z` se conservan. Respaldo verificado: `/opt/sarin-bot/runtime/rollbacks/option-b-20261015T231739Z`. El rollback comprueba integridad y rechaza sobrescribir cambios posteriores, pero **no fue ejercitado** al resultar satisfactoria la activación. El sello de la carpeta usa el reloj de la VPS, que difiere del reloj de la sesión; la activación quedó observada a las 23:22:20 UTC de la sesión.
 
-El script privado de activación/reversión es `/opt/sarin-bot/staging/option-b-20261015T231909Z/activate-rollback.py`. Para restaurar exactamente la imagen y configuración anteriores: `python3 /opt/sarin-bot/staging/option-b-20261015T231909Z/activate-rollback.py rollback /opt/sarin-bot/runtime/rollbacks/option-b-20261015T231739Z`. Esto devuelve el chat a Ollama, cuyo acceso remoto sigue pendiente; no confundir reversión del despliegue con recuperación de la Mac.
+El script privado de aquella activación/reversión es `/opt/sarin-bot/staging/option-b-20261015T231909Z/activate-rollback.py`. Su rollback restaura la imagen y configuración anteriores a la integración; **no usarlo para alternar proveedores después del retorno a Ollama**, ya que el runtime cambió y sus guardas rechazan sobrescribirlo. La reversión del cambio posterior de proveedor y DNS, que mantiene la imagen actual, se documenta en la [QA de conexión local](2026-10-15-dns-cutover.md).
 
-Evidencia sanitizada privada: `%LOCALAPPDATA%/SarinBot/deployment/sarin-option-b-activation-20261015T231909Z.json`, manifiesto y registro de build del mismo identificador. Se preservaron los cambios de trabajo previos; no se crearon commits.
+Evidencia sanitizada privada: `%LOCALAPPDATA%/SarinBot/deployment/sarin-option-b-activation-20261015T231909Z.json`, manifiesto y registro de build del mismo identificador. Se preservaron los cambios de trabajo previos. El soporte de proveedores se publicó después en `main`, commit `a5ece3e`.
 
 ## Límites pendientes
 
@@ -57,8 +57,8 @@ La instancia continúa privada y se accede temporalmente mediante SSH en `http:/
 
 Gemini gratuito se limita a datos sintéticos por las condiciones aplicables a Colombia; su disponibilidad técnica no autoriza usar conversaciones personales de clientes. Ver [opción C y condiciones de Google](../gemini-option-c.md). No se trasladó su clave al servidor.
 
-La conexión completa con Ollama sigue pendiente y conserva su [evidencia DNS independiente](2026-10-15-dns-cutover.md). Esperar el diagnóstico local solicitado a Luis; no reiniciar ni reinstalar la Mac sin conocer su estado. La publicación web y el DS nuevo son trabajos separados pendientes.
+La conexión completa con Ollama se verificó después: DNS nativo del contenedor, Access, catálogo y respuesta del chat autenticado en pantalla. El diagnóstico de Luis confirmó LaunchAgent activo y Ollama HTTP 200; no se reinició ni reinstaló la Mac. La [evidencia de conexión local](2026-10-15-dns-cutover.md) documenta la corrección DNS exclusiva del contenedor y el retorno a Ollama. La publicación web y el DS nuevo son trabajos separados pendientes.
 
-La revisión de solo lectura posterior mantuvo `ENOTFOUND` para el hostname del motor desde el contenedor. Tailscale mostró la Mac `Online=true`, con `LastSeen=2026-10-15T23:00:00.1Z`; ese estado no demuestra funcionamiento del conector Cloudflare ni de Ollama.
+La revisión de solo lectura anterior al retorno mantuvo `ENOTFOUND` para el hostname del motor desde el contenedor. Tailscale mostró la Mac `Online=true`, con `LastSeen=2026-10-15T23:00:00.1Z`; ese estado por sí solo no demostraba funcionamiento del conector Cloudflare ni de Ollama. Las comprobaciones posteriores superaron ese límite.
 
 Guías operativas: [DeepSeek](../deepseek-option-b.md), [Gemini](../gemini-option-c.md).
