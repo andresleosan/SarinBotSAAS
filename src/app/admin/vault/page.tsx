@@ -136,7 +136,7 @@ function VaultWorkspace() {
       }
       try {
         const result = await apiFetch<{ online: boolean }>(
-          "/api/sarin/health",
+          "/api/sarin/health?scope=vault",
           { signal: controller.signal },
         );
         if (!controller.signal.aborted)

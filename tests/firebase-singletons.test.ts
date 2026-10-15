@@ -14,6 +14,7 @@ const sdk = vi.hoisted(() => ({
   initializeClient: vi.fn(),
   initializeAdmin: vi.fn(),
   cert: vi.fn(),
+  applicationDefault: vi.fn(),
   connectAuth: vi.fn(),
   connectFirestore: vi.fn(),
 }));
@@ -34,6 +35,7 @@ vi.mock("firebase-admin/app", () => ({
   getApps: () => sdk.adminApps,
   initializeApp: sdk.initializeAdmin,
   cert: sdk.cert,
+  applicationDefault: sdk.applicationDefault,
 }));
 vi.mock("firebase-admin/auth", () => ({ getAuth: () => sdk.adminAuth }));
 vi.mock("firebase-admin/firestore", () => ({
@@ -50,6 +52,9 @@ const emulatorVariables = [
   "FIREBASE_ADMIN_PROJECT_ID",
   "FIREBASE_ADMIN_CLIENT_EMAIL",
   "FIREBASE_ADMIN_PRIVATE_KEY",
+  "FIREBASE_ADMIN_CREDENTIAL_MODE",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "CLOUDSDK_CONFIG",
 ] as const;
 
 describe("Firebase singleton emulator connections", () => {
@@ -73,6 +78,7 @@ describe("Firebase singleton emulator connections", () => {
       },
     );
     sdk.cert.mockReturnValue({ localTestCredential: true });
+    sdk.applicationDefault.mockReturnValue({ localAdcCredential: true });
     for (const key of emulatorVariables) vi.stubEnv(key, undefined);
     vi.stubEnv("NODE_ENV", "development");
   });
@@ -200,6 +206,81 @@ describe("Firebase singleton emulator connections", () => {
     admin.getAdminAuth();
     vi.stubEnv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8181");
     vi.stubEnv("NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST", "127.0.0.1:8181");
+    expect(() => admin.getAdminDb()).toThrow(/Reinicia/);
+  });
+
+  it("uses explicitly selected ADC without requiring a downloaded service account key", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("FIREBASE_ADMIN_PROJECT_ID", "sarin-real");
+    vi.stubEnv("FIREBASE_ADMIN_CREDENTIAL_MODE", "adc");
+    vi.stubEnv("GOOGLE_APPLICATION_CREDENTIALS", "/private/sarin-adc.json");
+    const admin = await import("@/lib/firebase/admin");
+    expect(admin.getAdminAuth()).toBe(sdk.adminAuth);
+    expect(admin.getAdminDb()).toBe(sdk.adminDb);
+    expect(sdk.initializeAdmin).toHaveBeenCalledExactlyOnceWith(
+      { projectId: "sarin-real", credential: { localAdcCredential: true } },
+      "sarin-admin",
+    );
+    expect(sdk.cert).not.toHaveBeenCalled();
+  });
+
+  it("never falls back to ambient ADC when certificate configuration is missing", async () => {
+    vi.stubEnv("FIREBASE_ADMIN_PROJECT_ID", "sarin-real");
+    const admin = await import("@/lib/firebase/admin");
+    expect(() => admin.getAdminAuth()).toThrow(/configurado/);
+    expect(sdk.applicationDefault).not.toHaveBeenCalled();
+    expect(sdk.initializeAdmin).not.toHaveBeenCalled();
+  });
+
+  it.each(["unknown", "emulator"])("rejects unsupported credential mode %s even with a complete certificate", async (mode) => {
+    vi.stubEnv("FIREBASE_ADMIN_PROJECT_ID", "sarin-real");
+    vi.stubEnv("FIREBASE_ADMIN_CREDENTIAL_MODE", mode);
+    vi.stubEnv("FIREBASE_ADMIN_CLIENT_EMAIL", "admin@example.test");
+    vi.stubEnv("FIREBASE_ADMIN_PRIVATE_KEY", "test-key");
+    const admin = await import("@/lib/firebase/admin");
+    expect(() => admin.getAdminAuth()).toThrow(/credenciales/);
+    expect(sdk.initializeAdmin).not.toHaveBeenCalled();
+  });
+
+  it("rejects certificate variables in ADC mode rather than silently choosing an identity", async () => {
+    vi.stubEnv("FIREBASE_ADMIN_PROJECT_ID", "sarin-real");
+    vi.stubEnv("FIREBASE_ADMIN_CREDENTIAL_MODE", "adc");
+    vi.stubEnv("FIREBASE_ADMIN_CLIENT_EMAIL", "admin@example.test");
+    vi.stubEnv("FIREBASE_ADMIN_PRIVATE_KEY", "test-key");
+    const admin = await import("@/lib/firebase/admin");
+    expect(() => admin.getAdminAuth()).toThrow(/ADC|adc/);
+    expect(sdk.initializeAdmin).not.toHaveBeenCalled();
+  });
+
+  it("requires a restart when a cached certificate app switches to ADC", async () => {
+    vi.stubEnv("FIREBASE_ADMIN_PROJECT_ID", "sarin-real");
+    vi.stubEnv("FIREBASE_ADMIN_CLIENT_EMAIL", "admin@example.test");
+    vi.stubEnv("FIREBASE_ADMIN_PRIVATE_KEY", "test-key");
+    const admin = await import("@/lib/firebase/admin");
+    admin.getAdminAuth();
+    vi.stubEnv("FIREBASE_ADMIN_CLIENT_EMAIL", undefined);
+    vi.stubEnv("FIREBASE_ADMIN_PRIVATE_KEY", undefined);
+    vi.stubEnv("FIREBASE_ADMIN_CREDENTIAL_MODE", "adc");
+    expect(() => admin.getAdminDb()).toThrow(/Reinicia/);
+  });
+
+  it("requires a restart when the selected ADC file changes", async () => {
+    vi.stubEnv("FIREBASE_ADMIN_PROJECT_ID", "sarin-real");
+    vi.stubEnv("FIREBASE_ADMIN_CREDENTIAL_MODE", "adc");
+    vi.stubEnv("GOOGLE_APPLICATION_CREDENTIALS", "/private/first-adc.json");
+    const admin = await import("@/lib/firebase/admin");
+    admin.getAdminAuth();
+    vi.stubEnv("GOOGLE_APPLICATION_CREDENTIALS", "/private/second-adc.json");
+    expect(() => admin.getAdminDb()).toThrow(/Reinicia/);
+  });
+
+  it("requires a restart when the default ADC configuration directory changes", async () => {
+    vi.stubEnv("FIREBASE_ADMIN_PROJECT_ID", "sarin-real");
+    vi.stubEnv("FIREBASE_ADMIN_CREDENTIAL_MODE", "adc");
+    vi.stubEnv("CLOUDSDK_CONFIG", "/private/first-gcloud");
+    const admin = await import("@/lib/firebase/admin");
+    admin.getAdminAuth();
+    vi.stubEnv("CLOUDSDK_CONFIG", "/private/second-gcloud");
     expect(() => admin.getAdminDb()).toThrow(/Reinicia/);
   });
 });

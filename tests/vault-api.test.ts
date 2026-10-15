@@ -49,6 +49,7 @@ describe('Vault server privacy boundary', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toContain('no-store');
     expect(dependencies.priorities).toEqual(['CRITICAL']);
+    expect(dependencies.complete.mock.calls[0][2]).toMatchObject({ provider: 'ollama' });
     const body = await response.json() as { message: string; analysis: { entries: { amount: number }[] } };
     expect(body.message).toContain('15 de enero');
     expect(body.analysis.entries[0].amount).toBe(45000);
@@ -64,8 +65,9 @@ describe('Vault server privacy boundary', () => {
   });
   it('routes embedded images through local vision and rejects invalid extracted dates', async () => {
     const calls: boolean[] = [];
-    dependencies.complete.mockImplementation(async (_messages, tools, options: { vision: boolean }) => {
+    dependencies.complete.mockImplementation(async (_messages, tools, options: { vision: boolean; provider?: string }) => {
       calls.push(options.vision);
+      expect(options.provider).toBe('ollama');
       if (options.vision) {
         expect(tools).toBeUndefined();
         return { role: 'assistant', content: 'Factura: el documento indica una fecha ilegible.' };

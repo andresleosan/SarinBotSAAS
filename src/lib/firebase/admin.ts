@@ -1,5 +1,11 @@
 import "server-only";
-import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
+import {
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+  type App,
+} from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { readAdminEmulatorConfig } from "@/lib/firebase/emulator-config";
@@ -15,8 +21,35 @@ function getAdminApp() {
   if (!projectId) throw new Error("Firebase Admin no está configurado.");
   if (!emulator && projectId.startsWith("demo-"))
     throw new Error("El proyecto demo requiere los emuladores locales.");
+  const credentialMode = emulator
+    ? "emulator"
+    : process.env.FIREBASE_ADMIN_CREDENTIAL_MODE || "cert";
+  if (!emulator && !["cert", "adc"].includes(credentialMode))
+    throw new Error("El modo de credenciales Firebase Admin debe ser cert o adc.");
+  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(
+    /\\n/g,
+    "\n",
+  );
+  if (credentialMode === "adc" && (clientEmail || privateKey))
+    throw new Error(
+      "Configura ADC sin FIREBASE_ADMIN_CLIENT_EMAIL ni FIREBASE_ADMIN_PRIVATE_KEY.",
+    );
   const connections = (state.__sarinAdminConnections ??= new WeakMap());
-  const fingerprint = JSON.stringify({ projectId, emulator });
+  const fingerprint = JSON.stringify({
+    projectId,
+    emulator,
+    credentialMode,
+    credentialSource:
+      credentialMode === "adc"
+        ? {
+            file: process.env.GOOGLE_APPLICATION_CREDENTIALS || null,
+            cloudSdkConfig: process.env.CLOUDSDK_CONFIG || null,
+            appData: process.env.APPDATA || null,
+            home: process.env.HOME || null,
+          }
+        : null,
+  });
   const existing = getApps().find((app) => app.name === "sarin-admin");
   if (existing) {
     if (
@@ -28,20 +61,21 @@ function getAdminApp() {
       );
     return existing;
   }
-  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(
-    /\\n/g,
-    "\n",
-  );
   if (emulator) {
     const app = initializeApp({ projectId: emulator.projectId }, "sarin-admin");
     connections.set(app, fingerprint);
     return app;
   }
-  if (!clientEmail || !privateKey)
-    throw new Error("Firebase Admin no está configurado.");
+  let credential;
+  if (credentialMode === "adc") {
+    credential = applicationDefault();
+  } else {
+    if (!clientEmail || !privateKey)
+      throw new Error("Firebase Admin no está configurado.");
+    credential = cert({ projectId, clientEmail, privateKey });
+  }
   const app = initializeApp(
-    { projectId, credential: cert({ projectId, clientEmail, privateKey }) },
+    { projectId, credential },
     "sarin-admin",
   );
   connections.set(app, fingerprint);

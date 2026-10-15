@@ -41,9 +41,27 @@ pnpm run dev
 
 Habilita Google como proveedor en Firebase Authentication y agrega el dominio de desarrollo/producción a Authorized domains. Crea Firestore y configura la cuenta de servicio Admin en el servidor. `SUPERADMIN_UID` es el UID exacto de tu cuenta Firebase Auth, no tu email. No existe un login demo: si falta configuración la interfaz lo indica y los endpoints fallan de forma explícita.
 
+### Firebase Admin sin claves descargables
+
+Si la organización bloquea claves de servicio, el backend admite `FIREBASE_ADMIN_CREDENTIAL_MODE=adc`. El modo predeterminado sigue siendo `cert`; ADC debe seleccionarse explícitamente y no admite mezclar `FIREBASE_ADMIN_CLIENT_EMAIL` o `FIREBASE_ADMIN_PRIVATE_KEY`.
+
+Para desarrollo con Firebase real, usa una cuenta de servicio dedicada con `roles/firebaseauth.viewer` y `roles/datastore.user`. El operador necesita `roles/iam.serviceAccountTokenCreator` sobre esa cuenta y la API `iamcredentials.googleapis.com` habilitada. Autoriza ADC de impersonación con la CLI oficial:
+
+```sh
+gcloud auth application-default login --impersonate-service-account=CUENTA_DE_SERVICIO --project=ID_DEL_PROYECTO
+```
+
+Configura el proyecto, el modo `adc` y `GOOGLE_APPLICATION_CREDENTIALS` con la ruta privada del archivo generado en `.env.local`. Para aislarlo de otros proyectos, configura `CLOUDSDK_CONFIG` en un directorio privado antes de ejecutar la CLI. No copies ese archivo al repositorio: contiene credenciales de la identidad de origen aunque no tenga una clave de servicio. Reinicia Next al cambiar de identidad o modo. `pnpm run doctor` solo inspecciona configuración; no valida ADC ni permisos reales. [Impersonación oficial](https://docs.cloud.google.com/docs/authentication/use-service-account-impersonation).
+
+Esta conexión local no configura la identidad del despliegue de Cloudflare. Producción requiere su propia identidad renovable y validación de Auth y Firestore; las credenciales de un job de GitHub no sustituyen una identidad de runtime.
+
+Para un VPS con ADC, sigue la [configuración de identidad de producción y montaje de solo lectura](deploy/README.md#firebase-admin-identidad-de-producción); no traslades ADC humano de desarrollo al servidor permanente.
+
 En `/dashboard/onboarding` se configura un negocio por propietario, con prueba única de siete días; editar conserva sus fechas y enlace. `/dashboard` muestra citas en vivo, bloqueos y cancelaciones, `/dashboard/qr-kit` descarga el QR SVG y `/dashboard/billing` permite subir el comprobante. Configura primero cuentas bancarias reales en `/admin`: el sistema no inventa números de cuenta ni simula pagos recibidos.
 
 ## Motor local y túnel
+
+Para conectar otro proyecto al mismo motor, consulta [cómo reutilizar el motor local](docs/reusing-local-engine.md).
 
 Usa la API OpenAI-compatible **de tu propia Mac** y los modelos descargados. Ejemplo de entorno Ollama en la Mac:
 
@@ -58,7 +76,9 @@ export OLLAMA_KV_CACHE_TYPE=q8_0
 
 Configura `OLLAMA_MAIN_MODEL`, `OLLAMA_VISION_MODEL` y `SARIN_TUNNEL_URL` en Next. Para un hostname remoto se exige HTTPS, `CF_ACCESS_CLIENT_ID` y `CF_ACCESS_CLIENT_SECRET`. Configura una aplicación Cloudflare Access con política **Service Auth** que acepte ese service token; no publiques Ollama directamente ni uses una política Bypass. Loopback permite HTTP para desarrollo. No se usa el servicio cloud de Ollama. [API local oficial](https://docs.ollama.com/api/openai-compatibility), [configuración de Ollama](https://docs.ollama.com/faq), [service tokens de Cloudflare](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/).
 
-`/api/sarin/health` comprueba realmente `/v1/models`, el modelo principal y la visión, con caché interna de diez segundos. Requiere sesión y devuelve 503 cuando el motor/túnel no responde. Las credenciales y la URL del túnel nunca se devuelven al navegador. La visión primero transcribe localmente sin herramientas; el modelo principal interpreta esos datos y devuelve análisis estructurado.
+`/api/sarin/health` comprueba el catálogo del proveedor de chat seleccionado, con caché interna de diez segundos por proveedor. Requiere sesión y devuelve 503 si la comprobación falla. `?scope=vault` exige superadministrador y comprueba exclusivamente Ollama, incluso al seleccionar DeepSeek o Gemini. Las credenciales y la URL del túnel nunca se devuelven al navegador. La visión de Vault primero transcribe localmente sin herramientas; el modelo principal local interpreta esos datos y devuelve análisis estructurado.
+
+Existen una [opción B manual con DeepSeek](docs/deepseek-option-b.md) y una [opción C manual con Gemini](docs/gemini-option-c.md) para chat de negocio, copiloto y onboarding. `SARIN_CHAT_PROVIDER` conserva `ollama` por defecto. Gemini pasó pruebas sintéticas reales, pero permanece sin activar para el chat y en nivel gratuito de Google; su guía explica la diferencia de privacidad frente al nivel de pago. Vault sigue usando únicamente Ollama y no se reintentan turnos automáticamente con otro proveedor. `doctor` continúa siendo el diagnóstico de Ollama/Vault; no valida ni consume DeepSeek o Gemini.
 
 La prioridad es FIFO dentro de `NORMAL` y `CRITICAL`. Vault dispone de un puesto de espera reservado aun cuando la cola normal esté llena y usa el próximo slot libre, sin interrumpir inferencias activas. Se admite una consulta pendiente/en curso por UID, sin cuota diaria. El debounce de 2.5 segundos agrupa ráfagas y serializa turnos.
 
@@ -106,7 +126,7 @@ Despliega `firestore.rules` y `firestore.indexes.json` en el **proyecto correcto
 firebase deploy --project TU_PROYECTO --only firestore:rules,firestore:indexes
 ```
 
-Espera que los índices estén listos antes de habilitar tráfico. Las reglas permiten proyecciones de islas a usuarios autenticados y datos privados solo a sus dueños/clientes. El Superadmin lee los datos globales exclusivamente mediante las API protegidas con Admin SDK; no existe una bandera editable que conceda privilegios en Firestore.
+Verifica que los seis índices compuestos del [manifiesto](firestore.indexes.json) estén en estado `READY` y que la exención de `paymentImages.receiptDataUrl` esté aplicada antes de habilitar tráfico. Las reglas permiten proyecciones de islas a usuarios autenticados y datos privados solo a sus dueños/clientes. El Superadmin lee los datos globales exclusivamente mediante las API protegidas con Admin SDK; no existe una bandera editable que conceda privilegios en Firestore.
 
 Para despliegue tradicional: configura `.env.local` en el servidor antes de `pnpm run build` (las cuatro variables `NEXT_PUBLIC_FIREBASE_*` se incorporan durante el build) y ejecuta `pnpm start`. También se incluye Dockerfile con salida standalone; pasa las cuatro variables públicas como build args y las credenciales servidor solamente como entorno del contenedor. No incluyas `.env.local` en la imagen. [Salida standalone de Next](https://nextjs.org/docs/app/api-reference/config/next-config-js/output).
 

@@ -26,6 +26,15 @@ describe('local journey isolation', () => {
     }
   });
 
+  it('rejects cloud inference credentials and provider overrides in the isolated journey', () => {
+    const unsafe = { SARIN_CHAT_PROVIDER: 'gemini', DEEPSEEK_API_KEY: 'synthetic-key', DEEPSEEK_MODEL: 'deepseek-flash', GEMINI_API_KEY: 'synthetic-google-key', GEMINI_MODEL: 'gemini-3.5-flash-lite' };
+    const env = journeyEnvironment(unsafe, 3040, runId);
+    for (const [key, value] of Object.entries(unsafe)) {
+      expect(env[key]).toBeUndefined();
+      expect(() => assertJourneyEnvironment({ ...env, [key]: value })).toThrow();
+    }
+  });
+
   it('accepts only fixed loopback origins and forbids credentials and redirects to another host', () => {
     expect(assertJourneyUrl('http://127.0.0.1:3040/api/businesses', 3040)).toBe('http://127.0.0.1:3040/api/businesses');
     expect(assertJourneyUrl('http://127.0.0.1:9099/', 3040)).toBe('http://127.0.0.1:9099/');

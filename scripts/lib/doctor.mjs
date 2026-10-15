@@ -51,7 +51,11 @@ function modelCheck(model, check) {
 export function inspectConfiguration(env = {}, nodeVersion = '') {
   const url = inspectUrl(env);
   const clientPresent = ['NEXT_PUBLIC_FIREBASE_API_KEY', 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', 'NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'NEXT_PUBLIC_FIREBASE_APP_ID'].every(key => present(env[key]));
-  const adminPresent = ['FIREBASE_ADMIN_PROJECT_ID', 'FIREBASE_ADMIN_CLIENT_EMAIL'].every(key => present(env[key]));
+  const adminMode = env.FIREBASE_ADMIN_CREDENTIAL_MODE || 'cert';
+  const adc = adminMode === 'adc';
+  const invalidAdmin = !['cert', 'adc'].includes(adminMode) || (adc && (present(env.FIREBASE_ADMIN_CLIENT_EMAIL) || present(env.FIREBASE_ADMIN_PRIVATE_KEY)));
+  const adminPresent = present(env.FIREBASE_ADMIN_PROJECT_ID) && (adc || present(env.FIREBASE_ADMIN_CLIENT_EMAIL));
+  const adminKeyPresent = present(env.FIREBASE_ADMIN_PRIVATE_KEY);
   const accessId = present(env.CF_ACCESS_CLIENT_ID);
   const accessSecret = present(env.CF_ACCESS_CLIENT_SECRET);
   /** @type {DoctorCheck} */
@@ -63,8 +67,8 @@ export function inspectConfiguration(env = {}, nodeVersion = '') {
   return [
     result('runtime.node', /^v?24\.\d+\.\d+$/.test(nodeVersion) ? 'ok' : 'error', /^v?24\.\d+\.\d+$/.test(nodeVersion) ? 'Node.js 24 disponible.' : 'Se requiere Node.js 24 LTS.'),
     result('firebase.client', clientPresent ? 'ok' : 'pending', clientPresent ? 'Variables públicas presentes; Firebase no se ha conectado.' : 'Firebase Client pendiente. Puedes continuar con el trabajo local sin conectarlo.'),
-    result('firebase.admin', adminPresent ? 'ok' : 'pending', adminPresent ? 'Proyecto y cuenta Admin presentes; las credenciales reales no se han validado.' : 'Firebase Admin pendiente. Este diagnóstico no necesita una cuenta conectada.'),
-    result('firebase.admin-key', present(env.FIREBASE_ADMIN_PRIVATE_KEY) ? 'ok' : 'pending', present(env.FIREBASE_ADMIN_PRIVATE_KEY) ? 'Solo se comprobó la presencia de la clave Admin; no se leyó su estructura ni se autenticó.' : 'Clave Admin pendiente; no se necesita para las pruebas del motor local.'),
+    result('firebase.admin', invalidAdmin ? 'error' : adminPresent ? 'ok' : 'pending', invalidAdmin ? 'Elige cert o adc; el modo ADC no admite variables de certificado.' : adminPresent ? 'Proyecto y modo de credenciales Admin presentes; las credenciales reales no se han validado.' : 'Firebase Admin pendiente. Este diagnóstico no necesita una cuenta conectada.'),
+    result('firebase.admin-key', invalidAdmin ? 'error' : adc || adminKeyPresent ? 'ok' : 'pending', invalidAdmin ? 'Configuración de credenciales Admin incompatible.' : adc ? 'Modo ADC seleccionado; las credenciales no se han leído ni validado.' : adminKeyPresent ? 'Solo se comprobó la presencia de la clave Admin; no se leyó su estructura ni se autenticó.' : 'Clave Admin pendiente; no se necesita para las pruebas del motor local.'),
     result('firebase.superadmin', present(env.SUPERADMIN_UID) ? 'ok' : 'pending', present(env.SUPERADMIN_UID) ? 'UID presente; no se comprobó contra Firebase Auth.' : 'UID del administrador pendiente; no impide diagnosticar el motor.'),
     result('queue.slots', integerSetting(env, 'MAX_CONCURRENT_LLM_SLOTS', 4, 1, 4) ? 'ok' : 'error', 'La concurrencia debe ser un entero entre 1 y 4.'),
     result('queue.capacity', integerSetting(env, 'MAX_QUEUED_LLM_REQUESTS', 64, 1, Number.MAX_SAFE_INTEGER) ? 'ok' : 'error', 'La capacidad de espera debe ser un entero positivo seguro.'),

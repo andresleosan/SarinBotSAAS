@@ -9,6 +9,8 @@ export function localDevelopmentEnvironment(input) {
   for (const name of ['FIREBASE_TOKEN','GOOGLE_APPLICATION_CREDENTIALS','FIREBASE_CONFIG','GOOGLE_CLOUD_PROJECT','GCLOUD_PROJECT','FIREBASE_ADMIN_PRIVATE_KEY','FIREBASE_ADMIN_CLIENT_EMAIL','DEBUG','FIREBASE_DEBUG_PATH']) delete env[name];
   return {
     ...env, NODE_ENV:'development', NEXT_TELEMETRY_DISABLED:'1', CI:'1',
+    // Explicit values also prevent Next's dotenv loading from enabling cloud inference.
+    SARIN_CHAT_PROVIDER:'ollama', DEEPSEEK_API_KEY:'', DEEPSEEK_MODEL:'', GEMINI_API_KEY:'', GEMINI_MODEL:'',
     NEXT_PUBLIC_FIREBASE_EMULATORS:'true',
     NEXT_PUBLIC_FIREBASE_API_KEY:'sarin-local-emulator-only',
     NEXT_PUBLIC_FIREBASE_APP_ID:'sarin-local-emulator-only',

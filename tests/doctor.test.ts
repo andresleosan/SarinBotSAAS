@@ -35,6 +35,30 @@ describe('local configuration doctor', () => {
     expect(JSON.stringify(checks)).not.toContain('private-main:32b');
   });
 
+  it('accepts explicit ADC configuration without demanding or reading a private key', async () => {
+    const fetchImpl = vi.fn();
+    const report = await runDoctor({ env: { ...local, FIREBASE_ADMIN_PROJECT_ID: 'project', FIREBASE_ADMIN_CREDENTIAL_MODE: 'adc', GOOGLE_APPLICATION_CREDENTIALS: 'PRIVATE-PATH-DO-NOT-PRINT' }, nodeVersion: '24.18.0', fetchImpl });
+    expect(report.exitCode).toBe(0);
+    expect(report.checks.find(check => check.check === 'firebase.admin')?.status).toBe('ok');
+    expect(report.checks.find(check => check.check === 'firebase.admin-key')?.status).toBe('ok');
+    expect(report.checks.find(check => check.check === 'firebase.admin-key')?.message).toContain('ADC');
+    expect(JSON.stringify(report)).not.toContain('PRIVATE-PATH');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { FIREBASE_ADMIN_CREDENTIAL_MODE: 'unknown' },
+    { FIREBASE_ADMIN_CREDENTIAL_MODE: 'adc', FIREBASE_ADMIN_CLIENT_EMAIL: 'PRIVATE-EMAIL' },
+    { FIREBASE_ADMIN_CREDENTIAL_MODE: 'adc', FIREBASE_ADMIN_PRIVATE_KEY: 'PRIVATE-KEY' },
+  ])('rejects unsupported or ambiguous Admin credential configuration without contacting services', async (overrides) => {
+    const fetchImpl = vi.fn();
+    const report = await runDoctor({ env: { ...local, FIREBASE_ADMIN_PROJECT_ID: 'project', ...overrides }, nodeVersion: '24.18.0', fetchImpl });
+    expect(report.exitCode).toBe(1);
+    expect(report.checks.find(check => check.check === 'firebase.admin')?.status).toBe('error');
+    expect(JSON.stringify(report)).not.toMatch(/PRIVATE-EMAIL|PRIVATE-KEY/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it.each([
     [{ MAX_CONCURRENT_LLM_SLOTS: '0' }, 'queue.slots'],
     [{ MAX_CONCURRENT_LLM_SLOTS: '5' }, 'queue.slots'],

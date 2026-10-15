@@ -44,7 +44,7 @@ export function assertJourneyEnvironment(env) {
   assertRun(env.SARIN_JOURNEY_RUN ?? '');
   if (!/^\d+$/.test(env.SARIN_JOURNEY_PORT ?? '')) throw new Error('Falta el puerto local del ensayo.');
   assertPort(Number(env.SARIN_JOURNEY_PORT));
-  for (const name of ['FIREBASE_ADMIN_PRIVATE_KEY', 'FIREBASE_ADMIN_CLIENT_EMAIL', 'GOOGLE_APPLICATION_CREDENTIALS', 'FIREBASE_TOKEN', 'GOOGLE_CLOUD_PROJECT', 'GCLOUD_PROJECT', 'FIREBASE_CONFIG', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NODE_OPTIONS', 'SARIN_TUNNEL_URL', 'CF_ACCESS_CLIENT_ID', 'CF_ACCESS_CLIENT_SECRET']) if (env[name]) throw new Error(`No se admite ${name} en el ensayo local.`);
+  for (const name of ['FIREBASE_ADMIN_PRIVATE_KEY', 'FIREBASE_ADMIN_CLIENT_EMAIL', 'GOOGLE_APPLICATION_CREDENTIALS', 'FIREBASE_TOKEN', 'GOOGLE_CLOUD_PROJECT', 'GCLOUD_PROJECT', 'FIREBASE_CONFIG', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NODE_OPTIONS', 'SARIN_TUNNEL_URL', 'CF_ACCESS_CLIENT_ID', 'CF_ACCESS_CLIENT_SECRET', 'SARIN_CHAT_PROVIDER', 'DEEPSEEK_API_KEY', 'DEEPSEEK_MODEL', 'GEMINI_API_KEY', 'GEMINI_MODEL']) if (env[name]) throw new Error(`No se admite ${name} en el ensayo local.`);
 }
 
 /** Reject DNS, alternate ports, credentials, SSL endpoints and redirect targets before fetch.
