@@ -4,6 +4,7 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Business, PaymentReceipt, PlatformSettings } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { BILLING_PLANS, getBillingPlan, RESPONSE_PACK } from '@/lib/billing-plans';
+import { commercialPriceCOP } from '@/lib/commercial-offer';
 import { canPurchasePaidTrial, PAID_TRIAL_APPOINTMENT_LIMIT, PAID_TRIAL_INCLUDED_RESPONSES, PAID_TRIAL_PERIOD_END, PAID_TRIAL_PRICE_COP } from '@/lib/paid-trial';
 import { isSuperadmin } from './auth';
 import { HttpError } from './http';
@@ -98,9 +99,9 @@ export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof 
     const quota = parsed.kind === 'response_pack' ? await readResponsePeriodState(business, db, transaction) : undefined;
     if (quota && (!quota.current || quota.current.source === 'trial' || quota.current.endsAt <= Date.now() || business.subscription.status !== 'active')) throw new HttpError(409, 'La ampliación requiere un período pagado vigente.', 'RESPONSE_PACK_UNAVAILABLE');
     const receipt: PaymentReceipt = { id, tenantId: business.id, tenantName: business.name, ownerUid: user.uid, ownerEmail: user.email ?? '', kind: parsed.kind,
-      ...(plan ? { planId: plan.id, periodDays: plan.periodDays, responseAllowance: plan.includedResponses, amountCOP: settings[plan.priceField] }
+      ...(plan ? { planId: plan.id, periodDays: plan.periodDays, responseAllowance: plan.includedResponses, amountCOP: commercialPriceCOP(settings, 'subscription', plan.id) }
         : parsed.kind === 'paid_trial' ? { appointmentAllowance: PAID_TRIAL_APPOINTMENT_LIMIT, amountCOP: PAID_TRIAL_PRICE_COP }
-          : { responseAllowance: RESPONSE_PACK.responses, quotaPeriodId: quota!.current!.id, amountCOP: settings.responsePackPriceCOP }),
+          : { responseAllowance: RESPONSE_PACK.responses, quotaPeriodId: quota!.current!.id, amountCOP: commercialPriceCOP(settings, 'response_pack') }),
       bankSelected: bank.bankName, status: 'pending', submittedAt: now };
     const updatedBusiness: Business = { ...business, subscription: plan ? grantReceiptGrace(business.subscription, id, now) : { ...business.subscription, lastPaymentId: id } };
     if (quota) initializeResponsePeriods(transaction, db, quota);
