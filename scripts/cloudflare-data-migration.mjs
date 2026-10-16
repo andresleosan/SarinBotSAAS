@@ -8,7 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import {
   PROJECT_ID, buildReversePlan, canonicalJson, captureFirestoreSnapshot, normalizeImportedRow,
   prepareMigration, privateDirectory, readPreparedBundle, readPrivateFile, readSourceBackup,
-  sha256, verifyImportedRows, verifyMigration, writePreparedBundle, writePrivateFile, writeSourceBackup,
+  sha256, validateBlobReference, verifyImportedRows, verifyMigration, writePreparedBundle, writePrivateFile, writeSourceBackup,
 } from './lib/data-migration.mjs';
 
 const fail = (code) => { throw new Error(`MIGRATION_${code}`); };
@@ -149,8 +149,10 @@ async function downloadBlobs(directory, options, references, subdirectory) {
   await mkdir(destination, { mode: 0o700 });
   const blobs = [];
   for (const reference of references) {
-    if (!/^[a-f0-9]{64}$/.test(reference.sha256) || reference.key !== `payment-images/${reference.sha256}`) fail('R2_REFERENCE');
+    validateBlobReference(reference);
     const file = join(destination, reference.sha256);
+    // Fetch every remote key even when the two namespaces contain identical bytes.
+    // The local hash-named file can be reused only after this download verifies it.
     runWrangler(directory, ['r2', 'object', 'get', `${options['--bucket']}/${reference.key}`, '--file', file, ...storageFlags(directory, options)]);
     await chmod(file, 0o600);
     const info = await lstat(file);
@@ -185,7 +187,12 @@ export async function runMigration(options) {
   if (operation === '--verify') return { operation: 'verify', ...verifyMigration(await readPreparedBundle(directory)) };
   if (operation === '--export-d1') {
     const state = await readD1(directory, options);
-    const references = [...new Map(state.rows.filter((row) => row.blob).map((row) => [row.blob.sha256, row.blob])).values()];
+    const unique = new Map();
+    for (const row of state.rows.filter((row) => row.blob)) {
+      if (unique.has(row.blob.key) && canonicalJson(unique.get(row.blob.key)) !== canonicalJson(row.blob)) fail('R2_REFERENCE');
+      unique.set(row.blob.key, row.blob);
+    }
+    const references = [...unique.values()];
     const blobs = await downloadBlobs(directory, options, references, 'blobs');
     const bytes = canonicalJson(state);
     const manifest = { version: 1, projectId: PROJECT_ID, revision: state.revision, documents: state.rows.length, sha256: sha256(bytes), blobs: references };
@@ -201,7 +208,7 @@ export async function runMigration(options) {
     if (sha256(bytes) !== manifest.sha256 || manifest.projectId !== PROJECT_ID) fail('D1_EXPORT_HASH');
     const state = JSON.parse(bytes.toString('utf8')), blobs = [];
     for (const reference of manifest.blobs) {
-      if (!/^[a-f0-9]{64}$/.test(reference.sha256)) fail('R2_REFERENCE');
+      validateBlobReference(reference);
       blobs.push({ ...reference, bytes: await readPrivateFile(join(directory, 'blobs'), reference.sha256) });
     }
     const plan = buildReversePlan({ baseline, rows: state.rows, revision: state.revision, blobs });

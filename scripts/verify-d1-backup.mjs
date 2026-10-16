@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { privateDirectory, readPrivateFile, writePrivateFile } from './lib/data-migration.mjs';
+import { normalizeImportedRow, privateDirectory, readPrivateFile, writePrivateFile } from './lib/data-migration.mjs';
 
 const tables = ['app_commits', 'app_documents', 'app_revision'];
 const sha256 = value => createHash('sha256').update(value).digest('hex');
@@ -26,9 +26,10 @@ export async function verifyD1Backup(inputDirectory) {
     const found = source.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name IN ('app_commits','app_documents','app_revision') ORDER BY name").all();
     if (found.map(row => row.name).join(',') !== tables.join(',')) throw new Error('D1_BACKUP_SCHEMA');
     const references = new Map();
-    for (const row of source.prepare('SELECT blob FROM app_documents WHERE blob IS NOT NULL').all()) {
-      const reference = JSON.parse(row.blob);
-      if (!/^[a-f0-9]{64}$/.test(reference.sha256) || reference.key !== `payment-images/${reference.sha256}` || !Number.isSafeInteger(reference.byteLength) || reference.byteLength < 12 || reference.byteLength > 150 * 1024 || !['image/png', 'image/jpeg', 'image/webp'].includes(reference.contentType)) throw new Error('D1_BACKUP_R2_REFERENCE');
+    for (const row of source.prepare('SELECT * FROM app_documents WHERE blob IS NOT NULL').all()) {
+      let reference;
+      try { reference = normalizeImportedRow(row).blob; } catch { throw new Error('D1_BACKUP_R2_REFERENCE'); }
+      if (!reference) throw new Error('D1_BACKUP_R2_REFERENCE');
       if (references.has(reference.key) && canonical(references.get(reference.key)) !== canonical(reference)) throw new Error('D1_BACKUP_R2_REFERENCE');
       references.set(reference.key, reference);
     }

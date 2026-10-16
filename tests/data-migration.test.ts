@@ -5,17 +5,23 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
   buildImportSql, buildReversePlan, canonicalJson, captureFirestoreSnapshot, collectFirestoreDocuments, decodeFirestoreValue,
-  prepareMigration, privateDirectory, restoreFirestoreWrites, sha256, verifyImportedRows, verifyMigration,
+  prepareMigration, privateDirectory, restoreFirestoreWrites, sha256, verifyImportedRows, verifyMigration, normalizeImportedRow,
   readPreparedBundle, resolveBackupDirectory, writePreparedBundle, writeSourceBackup,
 } from '../scripts/lib/data-migration.mjs';
 import { firestoreRequester, googleCloudSdkCommand, parseArguments, queryD1 } from '../scripts/cloudflare-data-migration.mjs';
 import { createDataTestRuntime } from '../cloudflare/tests/data-runtime.mjs';
+import { verifyD1Backup } from '../scripts/verify-d1-backup.mjs';
 
 const prefix = 'projects/sarinbotsaas/databases/(default)/documents/';
 const stamp = '2026-10-16T12:00:00.123456Z';
 const image = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
 const dataUrl = `data:image/png;base64,${image.toString('base64')}`;
 const rawDocument = (path: string, fields: Record<string, unknown>) => ({ name: `${prefix}${path}`, fields, createTime: stamp, updateTime: stamp });
+const webp = (length = 20) => { const bytes = Buffer.alloc(length); bytes.write('RIFF'); bytes.write('WEBP', 8); return bytes; };
+function logoDocument(bytes: Buffer) {
+  const digest = sha256(bytes);
+  return rawDocument(`businessLogos/owner_${digest}`, { businessId: { stringValue: 'owner' }, ownerUid: { stringValue: 'owner' }, sha256: { stringValue: digest }, createdAt: { integerValue: '1000' }, logoDataUrl: { stringValue: `data:image/webp;base64,${bytes.toString('base64')}` } });
+}
 function snapshot() {
   return { version: 1, projectId: 'sarinbotsaas', databaseId: '(default)', readTime: stamp,
     collections: ['businesses', 'businesses/missing/appointments', 'paymentImages'], missingAncestors: ['businesses/missing'],
@@ -28,6 +34,82 @@ function snapshot() {
 }
 
 describe('Firestore migration artifacts', () => {
+  it('preserves both R2 prefixes with identical bytes and reopens old-style hash-named files', async () => {
+    const bytes = webp(), source = snapshot();
+    source.documents.push(logoDocument(bytes), rawDocument('paymentImages/shared', { receiptDataUrl: { stringValue: `data:image/webp;base64,${bytes.toString('base64')}` } }));
+    const bundle = prepareMigration(source, { updatedAt: 1000 });
+    expect(bundle.blobs.filter((blob: { sha256: string }) => blob.sha256 === sha256(bytes)).map((blob: { key: string }) => blob.key).sort()).toEqual([`business-logos/${sha256(bytes)}`, `payment-images/${sha256(bytes)}`]);
+    expect(verifyMigration(bundle).blobs).toBe(3);
+    const directory = await mkdtemp(join(tmpdir(), 'sarin-migration-fixture-'));
+    try {
+      await writeSourceBackup(directory, source);
+      await writePreparedBundle(directory, bundle);
+      expect(verifyMigration(await readPreparedBundle(directory)).blobs).toBe(3);
+    } finally {
+      expect(dirname(resolve(directory))).toBe(resolve(tmpdir()));
+      expect(basename(directory).startsWith('sarin-migration-fixture-')).toBe(true);
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('roundtrips large logos through real D1/R2 and a local SQL backup recovery', async () => {
+    const bytes = webp(151 * 1024), source = snapshot();
+    source.documents.push(logoDocument(bytes));
+    const bundle = prepareMigration(source, { updatedAt: 1000 });
+    const directory = await mkdtemp(join(tmpdir(), 'sarin-migration-fixture-'));
+    const runtime = await createDataTestRuntime();
+    try {
+      for (const blob of bundle.blobs) await runtime.bucket.put(blob.key, blob.bytes, { httpMetadata: { contentType: blob.contentType } });
+      const schema = await readFile(new URL('../cloudflare/migrations/0001_data.sql', import.meta.url), 'utf8');
+      const sql = `${schema}\n${buildImportSql(bundle)}`;
+      await runtime.db.exec(buildImportSql(bundle));
+      const rows = (await runtime.db.prepare('SELECT * FROM app_documents ORDER BY path').all()).results;
+      expect(verifyImportedRows(bundle, rows).documents).toBe(4);
+      const path = `businessLogos/owner_${sha256(bytes)}`;
+      const hydrated = await runtime.fetch({ action: 'read', read: { kind: 'document', path } });
+      expect((await hydrated.json()).documents[0].data.logoDataUrl).toBe(`data:image/webp;base64,${bytes.toString('base64')}`);
+      const plan = buildReversePlan({ baseline: source, rows, blobs: bundle.blobs, revision: 0 });
+      const restored = plan.upserts.find((write: { update: { name: string } }) => write.update.name.endsWith(path));
+      expect(restored.update.fields.logoDataUrl).toEqual(source.documents.at(-1)!.fields.logoDataUrl);
+      expect(restored.update.fields.receiptDataUrl).toBeUndefined();
+      const sqlBytes = Buffer.from(sql), sqlHash = sha256(sqlBytes);
+      await writeFile(join(directory, 'sarin-bot-data.sql'), sqlBytes);
+      await writeFile(join(directory, 'export-manifest.json'), JSON.stringify({ ok: true, filename: 'sarin-bot-data.sql', sha256: sqlHash, bytes: sqlBytes.length }));
+      const { mkdir } = await import('node:fs/promises');
+      await mkdir(join(directory, 'r2-objects'));
+      for (const blob of bundle.blobs) await writeFile(join(directory, 'r2-objects', blob.sha256), blob.bytes);
+      await writeFile(join(directory, 'r2-backup-manifest.json'), JSON.stringify({ sourceSqlSha256: sqlHash, bucket: 'sarin-bot-files', references: bundle.manifest.blobs }));
+      expect(await verifyD1Backup(directory)).toMatchObject({ ok: true, localOnly: true, r2: { objects: 2, bytes: bytes.length + image.length, verified: true } });
+    } finally {
+      await runtime.dispose();
+      expect(dirname(resolve(directory))).toBe(resolve(tmpdir()));
+      expect(basename(directory).startsWith('sarin-migration-fixture-')).toBe(true);
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('binds blob size, type and digest to the correct collection and rejects restore collisions', () => {
+    const bytes = webp(), source = snapshot();
+    source.documents.push(logoDocument(bytes));
+    const bundle = prepareMigration(source, { updatedAt: 1000 });
+    const row = bundle.rows.find((item: { path: string }) => item.path.startsWith('businessLogos/'));
+    for (const changed of [
+      { ...row, blob: { ...row.blob, key: `payment-images/${sha256(bytes)}` } },
+      { ...row, blob: { ...row.blob, contentType: 'image/png' } },
+      { ...row, blob: { ...row.blob, byteLength: 256 * 1024 + 1 } },
+      { ...row, data: { ...row.data, sha256: 'a'.repeat(64) } },
+      { ...row, path: `businessLogos/other_${sha256(bytes)}`, document_id: `other_${sha256(bytes)}` },
+      { ...row, path: 'users/owner', parent: 'users', document_id: 'owner' },
+    ]) expect(() => normalizeImportedRow(changed)).toThrow(/ROW_BLOB/);
+    expect(() => buildReversePlan({ baseline: source, rows: [{ ...row, data: { ...row.data, logoDataUrl: 'collision' } }], blobs: bundle.blobs, revision: 0 })).toThrow(/RESTORE_BLOB_COLLISION/);
+    for (const invalid of [image, webp(256 * 1024 + 1)]) {
+      const input = snapshot(); input.documents.push(logoDocument(invalid));
+      expect(() => prepareMigration(input)).toThrow(/IMAGE_/);
+    }
+    const receipt = snapshot(); receipt.documents.push(rawDocument('paymentImages/too_large', { receiptDataUrl: { stringValue: `data:image/webp;base64,${webp(151 * 1024).toString('base64')}` } }));
+    expect(() => prepareMigration(receipt)).toThrow(/IMAGE_BYTES/);
+  });
+
   it('decodes only exactly representable JSON types and rejects unsupported values without printing contents', () => {
     expect(decodeFirestoreValue({ integerValue: '9007199254740991' })).toBe(Number.MAX_SAFE_INTEGER);
     expect(decodeFirestoreValue({ mapValue: {} })).toEqual({});
@@ -162,7 +244,7 @@ describe('Firestore migration artifacts', () => {
       if (process.platform === 'win32') {
         const { execFileSync } = await import('node:child_process');
         const code = "$backupAcl=Get-Acl -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + Buffer.from(directory).toString('base64') + "'))); $backupSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value; $backupRules=@($backupAcl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])); if(-not $backupAcl.AreAccessRulesProtected -or $backupRules.Count -ne 2 -or @($backupRules | Where-Object {$_.IdentityReference.Value -notin @($backupSid,'S-1-5-18') -or $_.IsInherited -or $_.AccessControlType -ne 'Allow'}).Count -gt 0){exit 1}; 'private'";
-        expect(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(code, 'utf16le').toString('base64')], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim()).toBe('private');
+        expect(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', code], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim()).toBe('private');
       }
     } finally {
       expect(dirname(resolve(temporary))).toBe(resolve(tmpdir()));

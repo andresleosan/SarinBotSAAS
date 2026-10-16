@@ -22,7 +22,7 @@ Los archivos se crean exclusivamente, sin sobrescribir copias anteriores:
 | `firestore-export.json` | Respuesta documental tipada original, colecciones, ancestros faltantes e instante de lectura. |
 | `firestore-manifest.json` | SHA-256 y conteos de la copia original. |
 | `documents.json` | Filas D1 con ruta, padre, ID, JSON, fecha de import y referencia de archivo opcional. |
-| `blobs/<sha256>` | Bytes originales deduplicados de los comprobantes. |
+| `blobs/<sha256>` | Bytes originales deduplicados de comprobantes y logos; las referencias conservan cada clave R2. |
 | `migration-manifest.json` | Hash de origen, compatibilidad de todas las rutas/JSON, conteos, reservas y hashes de filas/archivos. |
 | `import.sql` | Inserciones con escape literal SQL y guard que exige destino vacío. |
 | `baseline-restore.json` | Escrituras Firestore originales con precondición de `updateTime`; no se ejecutan automáticamente. |
@@ -32,6 +32,8 @@ La transformación conserva null, booleanos, cadenas Unicode válidas, enteros e
 Se rechazan sin imprimir sus valores: Timestamp, bytes, referencias Firestore, GeoPoint, enteros fuera del rango seguro, NaN/Infinity, cero negativo, arrays directamente anidados, uniones tipadas malformadas, Unicode inválido y objetos no JSON. También se rechazan claves reservadas (`__proto__`, `prototype`, `constructor`), claves con NUL, profundidad fuera del contrato y documentos JSON de más de 1 MiB. Las rutas deben cumplir exactamente `isDataPath` de `shared/data-protocol.ts`: colecciones admitidas, subcolecciones explícitas, dos o cuatro segmentos para documentos e IDs de hasta 128 caracteres alfanuméricos, `_` o `-`. Una incompatibilidad bloquea toda la preparación con `MIGRATION_RUNTIME_COMPATIBILITY`; nunca se omite una fila. El manifiesto solo declara `runtimeCompatibility.allCompatible=true` cuando todos los documentos pasan.
 
 `paymentImages` y los comprobantes antiguos en `paymentReceipts` extraen `receiptDataUrl` a R2. Solo se aceptan PNG/JPEG/WebP canónicos, firma compatible y 12–153600 bytes. D1 conserva el propietario y demás metadatos, junto con `{key,contentType,byteLength,sha256}`; la clave es `payment-images/<sha256>`. La lectura individual del puente vuelve a formar el data URL canónico; las consultas no incluyen imágenes. Cada sentencia SQL se limita a 90000 bytes; un documento mayor que ese límite de import se rechaza antes de escribir artefactos preparados, conservando la copia original para resolverlo explícitamente.
+
+El piloto a?ade `businessLogos`: extrae `logoDataUrl` a `business-logos/<sha256>`, solo WebP can?nico de 12 a 262144 bytes. Valida `businessId`, propietario, fecha, SHA y el ID compuesto del documento; no ampl?a el l?mite ni los tipos de comprobantes. La reversi?n repone `logoDataUrl` para logos y `receiptDataUrl` para comprobantes. Los manifiestos deduplican por clave R2, preservando dos referencias si ambos prefijos contienen los mismos bytes; los archivos privados locales conservan el nombre hist?rico `<sha256>` y se escriben una sola vez. La exportaci?n/verificaci?n descarga cada clave remota, incluso si comparten hash. `verify-d1-backup.mjs` valida la pol?tica por colecci?n y ensaya recuperaci?n SQL y R2 en almacenamiento local aislado. La prueba sint?tica del piloto incluye un logo de 151 KiB, ambos prefijos con el mismo SHA y lectura de bundles hist?ricos; no sustituye el respaldo consistente de producci?n bajo mantenimiento.
 
 ## Ensayo local
 

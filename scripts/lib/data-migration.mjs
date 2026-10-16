@@ -178,18 +178,37 @@ function validateSnapshot(snapshot) {
   canonicalJson(snapshot);
 }
 
-function parseImage(value) {
+function imagePolicy(path) {
+  if (/^payment(?:Images|Receipts)\/[^/]+$/.test(path)) return { prefix: 'payment-images', field: 'receiptDataUrl', max: 150 * 1024, types: ['image/png', 'image/jpeg', 'image/webp'] };
+  if (/^businessLogos\/[^/]+$/.test(path)) return { prefix: 'business-logos', field: 'logoDataUrl', max: 256 * 1024, types: ['image/webp'] };
+  return null;
+}
+
+/** A reference without a document context is still restricted to the two private image namespaces. */
+export function validateBlobReference(blob, context) {
+  if (!record(blob)) fail('ROW_BLOB');
+  const policy = context ? imagePolicy(context.path) : imagePolicy(typeof blob.key === 'string' && blob.key.startsWith('business-logos/') ? 'businessLogos/asset' : 'paymentImages/asset');
+  if (!policy || !/^[a-f0-9]{64}$/.test(blob.sha256) || blob.key !== `${policy.prefix}/${blob.sha256}` || !policy.types.includes(blob.contentType) || !Number.isSafeInteger(blob.byteLength) || blob.byteLength < 12 || blob.byteLength > policy.max) fail('ROW_BLOB');
+  if (context && policy.field === 'logoDataUrl') {
+    const data = context.data;
+    if (typeof data.businessId !== 'string' || !/^[A-Za-z0-9_-]{1,60}$/.test(data.businessId) || data.sha256 !== blob.sha256 || context.path !== `businessLogos/${data.businessId}_${blob.sha256}` || typeof data.ownerUid !== 'string' || !data.ownerUid || data.ownerUid.length > 256 || !Number.isSafeInteger(data.createdAt) || data.createdAt < 0) fail('ROW_BLOB');
+  }
+  return blob;
+}
+
+function parseImage(value, policy) {
   if (typeof value !== 'string') fail('IMAGE_FORMAT');
   const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
   if (!match || match[0] !== value) fail('IMAGE_FORMAT');
   const bytes = Buffer.from(match[2], 'base64');
-  if (bytes.length < 12 || bytes.length > 150 * 1024 || bytes.toString('base64') !== match[2]) fail('IMAGE_BYTES');
+  if (bytes.length < 12 || bytes.length > policy.max || bytes.toString('base64') !== match[2]) fail('IMAGE_BYTES');
   const type = match[1];
+  if (!policy.types.includes(type)) fail('IMAGE_FORMAT');
   if ((type === 'image/png' && !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
     || (type === 'image/jpeg' && !(bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255))
     || (type === 'image/webp' && !(bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP'))) fail('IMAGE_SIGNATURE');
   const hash = sha256(bytes);
-  return { key: `payment-images/${hash}`, contentType: type, byteLength: bytes.length, sha256: hash, bytes };
+  return { key: `${policy.prefix}/${hash}`, contentType: type, byteLength: bytes.length, sha256: hash, bytes };
 }
 
 function imageReference(blob) { return { key: blob.key, contentType: blob.contentType, byteLength: blob.byteLength, sha256: blob.sha256 }; }
@@ -206,10 +225,12 @@ export function prepareMigration(snapshot, { updatedAt = Date.now() } = {}) {
     const path = documentPath(document.name), parts = validatePath(path, true), data = decodeFields(document.fields ?? {});
     validateRuntimeDocument(path, data);
     let blob = null;
-    if (parts.length === 2 && ['paymentImages', 'paymentReceipts'].includes(parts[0]) && own(data, 'receiptDataUrl')) {
-      const extracted = parseImage(data.receiptDataUrl);
-      delete data.receiptDataUrl;
-      unique.set(extracted.sha256, extracted);
+    const policy = imagePolicy(path);
+    if (policy && own(data, policy.field)) {
+      const extracted = parseImage(data[policy.field], policy);
+      validateBlobReference(extracted, { path, data });
+      delete data[policy.field];
+      unique.set(extracted.key, extracted);
       blob = imageReference(extracted);
     }
     return { path, parent: parts.slice(0, -1).join('/'), document_id: parts.at(-1), data, updated_at: updatedAt, blob };
@@ -235,10 +256,10 @@ export function verifyMigration(bundle) {
   const expected = prepareMigration(bundle.source, { updatedAt: bundle.manifest?.updatedAt });
   if (canonicalJson(expected.manifest) !== canonicalJson(bundle.manifest) || canonicalJson(expected.rows) !== canonicalJson(bundle.rows)) fail('MANIFEST_HASH');
   if (!Array.isArray(bundle.blobs) || bundle.blobs.length !== expected.blobs.length) fail('BLOB_COUNT');
-  const byHash = new Map(bundle.blobs.map((blob) => [blob.sha256, blob]));
-  if (byHash.size !== bundle.blobs.length) fail('BLOB_DUPLICATE');
+  const byKey = new Map(bundle.blobs.map((blob) => [blob.key, blob]));
+  if (byKey.size !== bundle.blobs.length) fail('BLOB_DUPLICATE');
   for (const blob of expected.blobs) {
-    const actual = byHash.get(blob.sha256);
+    const actual = byKey.get(blob.key);
     if (!actual || !Buffer.isBuffer(actual.bytes) || sha256(actual.bytes) !== blob.sha256 || canonicalJson(imageReference(actual)) !== canonicalJson(imageReference(blob))) fail('BLOB_HASH');
   }
   return { documents: bundle.rows.length, blobs: bundle.blobs.length, bytes: bundle.manifest.counts.blobBytes, sha256: bundle.manifest.sha256 };
@@ -270,7 +291,7 @@ export function normalizeImportedRow(row) {
   if (!record(data) || row.parent !== parts.slice(0, -1).join('/') || row.document_id !== parts.at(-1) || !Number.isSafeInteger(row.updated_at) || row.updated_at < 0) fail('ROW');
   validateRuntimeDocument(row.path, data);
   canonicalJson(data);
-  if (blob && (!record(blob) || !/^[a-f0-9]{64}$/.test(blob.sha256) || blob.key !== `payment-images/${blob.sha256}` || !['image/png', 'image/jpeg', 'image/webp'].includes(blob.contentType) || !Number.isSafeInteger(blob.byteLength) || blob.byteLength < 12 || blob.byteLength > 150 * 1024)) fail('ROW_BLOB');
+  if (blob !== null) validateBlobReference(blob, { path: row.path, data });
   return { path: row.path, parent: row.parent, document_id: row.document_id, data, updated_at: row.updated_at, blob };
 }
 
@@ -290,18 +311,19 @@ export function buildReversePlan({ baseline, rows, blobs, revision }) {
   validateSnapshot(baseline);
   if (!Number.isSafeInteger(revision) || revision < 0) fail('REVISION');
   const originals = new Map(baseline.documents.map((document) => [documentPath(document.name), document]));
-  const present = new Set(), byHash = new Map(blobs.map((blob) => [blob.sha256, blob]));
+  const present = new Set(), byKey = new Map(blobs.map((blob) => [blob.key, blob]));
+  if (byKey.size !== blobs.length) fail('BLOB_DUPLICATE');
   const upserts = rows.map(normalizeImportedRow).map((row) => {
     if (present.has(row.path)) fail('DUPLICATE_DOCUMENT');
     present.add(row.path);
     const data = { ...row.data }, original = originals.get(row.path);
     if (row.blob) {
-      const blob = byHash.get(row.blob.sha256);
-      if (!blob || !Buffer.isBuffer(blob.bytes) || sha256(blob.bytes) !== row.blob.sha256 || blob.bytes.length !== row.blob.byteLength) fail('RESTORE_BLOB_HASH');
+      const blob = byKey.get(row.blob.key), policy = imagePolicy(row.path);
+      if (!blob || !Buffer.isBuffer(blob.bytes) || sha256(blob.bytes) !== row.blob.sha256 || blob.bytes.length !== row.blob.byteLength || canonicalJson(imageReference(blob)) !== canonicalJson(row.blob)) fail('RESTORE_BLOB_HASH');
       const url = `data:${row.blob.contentType};base64,${blob.bytes.toString('base64')}`;
-      if (canonicalJson(imageReference(parseImage(url))) !== canonicalJson(row.blob)) fail('RESTORE_BLOB_HASH');
-      if (own(data, 'receiptDataUrl')) fail('RESTORE_BLOB_COLLISION');
-      data.receiptDataUrl = url;
+      if (canonicalJson(imageReference(parseImage(url, policy))) !== canonicalJson(row.blob)) fail('RESTORE_BLOB_HASH');
+      if (own(data, policy.field)) fail('RESTORE_BLOB_COLLISION');
+      data[policy.field] = url;
     }
     const fields = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encodeFirestoreValue(value, original?.fields?.[key])]));
     return { update: { name: `${DOCUMENT_PREFIX}${row.path}`, fields }, currentDocument: original ? { updateTime: original.updateTime } : { exists: false } };
@@ -344,7 +366,9 @@ export async function privateDirectory(directory, { create = false, workspaceRoo
     const encodedPath = Buffer.from(target, 'utf8').toString('base64');
     const command = `$ErrorActionPreference='Stop'; $backupTarget=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedPath}')); $backupDirectory=New-Object IO.DirectoryInfo($backupTarget); $backupAcl=$backupDirectory.GetAccessControl([Security.AccessControl.AccessControlSections]::Access); $backupAcl.SetAccessRuleProtection($true,$false); foreach($backupOldRule in @($backupAcl.GetAccessRules($true,$false,[Security.Principal.SecurityIdentifier]))){[void]$backupAcl.RemoveAccessRuleSpecific($backupOldRule)}; $backupUser=[Security.Principal.WindowsIdentity]::GetCurrent().User; $backupSystem=New-Object Security.Principal.SecurityIdentifier('S-1-5-18'); foreach($backupSid in @($backupUser,$backupSystem)){$backupRule=New-Object Security.AccessControl.FileSystemAccessRule($backupSid,'FullControl','ContainerInherit,ObjectInherit','None','Allow'); [void]$backupAcl.AddAccessRule($backupRule)}; $backupDirectory.SetAccessControl($backupAcl)`;
     try {
-      execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(command, 'utf16le').toString('base64')], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      // Pass one literal argv argument, without a shell. EncodedCommand can be
+      // rejected at process creation on Windows even for this same ACL policy.
+      execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch { fail('BACKUP_PERMISSIONS'); }
   } else await chmod(target, 0o700);
   return target;
@@ -388,7 +412,11 @@ export async function writePreparedBundle(directory, bundle) {
   const sql = buildImportSql(bundle);
   const blobDirectory = join(directory, 'blobs');
   await mkdir(blobDirectory, { mode: 0o700 });
-  for (const blob of bundle.blobs) await writePrivateFile(blobDirectory, blob.sha256, blob.bytes);
+  const written = new Set();
+  for (const blob of bundle.blobs) {
+    if (!written.has(blob.sha256)) await writePrivateFile(blobDirectory, blob.sha256, blob.bytes);
+    written.add(blob.sha256);
+  }
   await writePrivateFile(directory, 'documents.json', canonicalJson(bundle.rows));
   await writePrivateFile(directory, 'migration-manifest.json', canonicalJson(bundle.manifest));
   await writePrivateFile(directory, 'import.sql', sql);
