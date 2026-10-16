@@ -505,7 +505,7 @@ function Configuration() {
                 return (
                   <div
                     key={day}
-                    className="grid gap-x-4 py-2 @min-[32rem]:grid-cols-[8rem_minmax(0,1fr)]"
+                    className="grid gap-x-3 py-1 @min-[32rem]:grid-cols-[7rem_minmax(0,1fr)]"
                   >
                     <label className="flex min-h-11 items-center gap-2 self-start text-sm">
                       <input
@@ -530,68 +530,70 @@ function Configuration() {
                       </span>
                     </label>
                     {config.isOpen && (
-                      <div className="min-w-0 space-y-1">
-                        {config.intervals.map((interval, intervalIndex) => (
-                          <div
-                            key={intervalIndex}
-                            className="grid grid-cols-[minmax(0,1fr)_44px] items-center gap-1.5 @min-[24rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_44px]"
-                          >
-                            <input
-                              aria-label={`${day} apertura ${intervalIndex + 1}`}
-                              className={fieldClass + " px-2!"}
-                              type="time"
-                              required
-                              value={interval.start}
-                              onChange={(event) =>
-                                updateDay(index, {
-                                  ...config,
-                                  intervals: config.intervals.map((item, i) =>
-                                    i === intervalIndex
-                                      ? { ...item, start: event.target.value }
-                                      : item,
-                                  ),
-                                })
-                              }
-                            />
-                            <span className="hidden text-xs text-sarin-muted @min-[24rem]:inline">a</span>
-                            <input
-                              aria-label={`${day} cierre ${intervalIndex + 1}`}
-                              className={fieldClass + " px-2!"}
-                              type="time"
-                              required
-                              value={interval.end}
-                              onChange={(event) =>
-                                updateDay(index, {
-                                  ...config,
-                                  intervals: config.intervals.map((item, i) =>
-                                    i === intervalIndex
-                                      ? { ...item, end: event.target.value }
-                                      : item,
-                                  ),
-                                })
-                              }
-                            />
-                            <button
-                              aria-label="Eliminar intervalo"
-                              type="button"
-                              disabled={config.intervals.length === 1}
-                              className="col-start-2 row-span-2 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded-[10px] text-sarin-muted hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30 @min-[24rem]:col-start-4 @min-[24rem]:row-span-1"
-                              onClick={() =>
-                                updateDay(index, {
-                                  ...config,
-                                  intervals: config.intervals.filter(
-                                    (_, i) => i !== intervalIndex,
-                                  ),
-                                })
-                              }
+                      <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+                        <div className="min-w-0 space-y-1">
+                          {config.intervals.map((interval, intervalIndex) => (
+                            <div
+                              key={intervalIndex}
+                              className="grid w-fit max-w-full grid-cols-[minmax(0,140px)_44px] items-center gap-1.5 @min-[24rem]:grid-cols-[140px_auto_140px_44px]"
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
+                              <input
+                                aria-label={`${day} apertura ${intervalIndex + 1}`}
+                                className={fieldClass + " max-w-[140px] px-2! tabular-nums"}
+                                type="time"
+                                required
+                                value={interval.start}
+                                onChange={(event) =>
+                                  updateDay(index, {
+                                    ...config,
+                                    intervals: config.intervals.map((item, i) =>
+                                      i === intervalIndex
+                                        ? { ...item, start: event.target.value }
+                                        : item,
+                                    ),
+                                  })
+                                }
+                              />
+                              <span className="hidden text-xs text-sarin-muted @min-[24rem]:inline">a</span>
+                              <input
+                                aria-label={`${day} cierre ${intervalIndex + 1}`}
+                                className={fieldClass + " max-w-[140px] px-2! tabular-nums"}
+                                type="time"
+                                required
+                                value={interval.end}
+                                onChange={(event) =>
+                                  updateDay(index, {
+                                    ...config,
+                                    intervals: config.intervals.map((item, i) =>
+                                      i === intervalIndex
+                                        ? { ...item, end: event.target.value }
+                                        : item,
+                                    ),
+                                  })
+                                }
+                              />
+                              <button
+                                aria-label="Eliminar intervalo"
+                                type="button"
+                                disabled={config.intervals.length === 1}
+                                className="col-start-2 row-span-2 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded-[10px] text-sarin-muted hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30 @min-[24rem]:col-start-4 @min-[24rem]:row-span-1"
+                                onClick={() =>
+                                  updateDay(index, {
+                                    ...config,
+                                    intervals: config.intervals.filter(
+                                      (_, i) => i !== intervalIndex,
+                                    ),
+                                  })
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                         <button
                           type="button"
-                          className="min-h-11 text-xs text-sarin-blue"
+                          className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-[10px] px-1 text-xs text-sarin-blue transition hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"
                           onClick={() =>
                             updateDay(index, {
                               ...config,
@@ -602,6 +604,7 @@ function Configuration() {
                             })
                           }
                         >
+                          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
                           Añadir intervalo
                         </button>
                       </div>
@@ -630,6 +633,10 @@ function Configuration() {
               suggestions={[
                 { label: "Primera visita", value: "¿Es tu primera visita?" },
                 { label: "Preferencia de profesional", value: "¿Tienes alguna preferencia de profesional?" },
+                { label: "Servicio deseado", value: "¿Qué servicio te gustaría reservar?" },
+                { label: "Día preferido", value: "¿Qué día prefieres para tu cita?" },
+                { label: "Franja horaria", value: "¿Prefieres un horario de mañana o de tarde?" },
+                { label: "Dudas del servicio", value: "¿Quieres aclarar algún detalle del servicio antes de reservar?" },
               ]}
             />
           </section>
@@ -661,6 +668,10 @@ function Configuration() {
               suggestions={[
                 { label: "Confirmar detalles", value: "Confirma el servicio y el horario antes de reservar." },
                 { label: "Ayuda del negocio", value: "Si el cliente necesita ayuda adicional, indícale cómo contactar directamente al negocio." },
+                { label: "Ofrecer alternativas", value: "Si el horario solicitado no está disponible, ofrece otras opciones de la agenda." },
+                { label: "Precios claros", value: "Informa el precio configurado del servicio antes de confirmar la reserva." },
+                { label: "Completar información", value: "Si falta un dato para reservar, pregunta antes de continuar." },
+                { label: "Datos sin configurar", value: "Si un dato del negocio no está configurado, indícalo y ofrece contactar al negocio." },
               ]}
             />
           </section>

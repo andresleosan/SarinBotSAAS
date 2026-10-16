@@ -9,8 +9,9 @@ import type { AdminAiSettings as AiSettings, AiProvider, AiProviderSelection } f
 const providerLabels: Record<AiProvider, string> = {
   ollama: "IA local (Ollama)",
   deepseek: "DeepSeek",
+  gemini: "Gemini",
 };
-const providers: AiProvider[] = ["ollama", "deepseek"];
+const providers: AiProvider[] = ["ollama", "deepseek", "gemini"];
 
 export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
   const [data, setData] = useState<AiSettings | null>(null);
@@ -83,7 +84,7 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
           <p aria-label="IA activa" role="status" className="text-sm font-semibold text-sarin-ink">En uso: {providerLabels[data.provider]}</p>
           <fieldset disabled={busy}>
             <legend className="mb-2 text-sm font-medium">Seleccionar IA</legend>
-            <div className="grid items-start gap-3 md:grid-cols-2">
+            <div className="grid items-start gap-3 md:grid-cols-3">
               {providers.map(provider => {
                 const status = data.providers.find(item => item.provider === provider);
                 return (
@@ -98,6 +99,7 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
                     {status?.model && <span className="block break-words text-xs text-sarin-muted">Modelo: {status.model}</span>}
                     {status?.error && <span className="block text-sm text-amber-800">{status.error}</span>}
                     {provider === "deepseek" && <span className="block text-xs leading-6 text-sarin-muted">DeepSeek recibe los mensajes, el contexto del negocio y los resultados de las herramientas para generar respuestas. Su uso puede generar cargos en tu cuenta de DeepSeek.</span>}
+                    {provider === "gemini" && <span className="block text-xs leading-6 text-sarin-muted">Google recibe los mensajes, el contexto del negocio y los resultados de las herramientas. Gemini requiere una cuenta de API con pago verificado y su uso genera cargos.</span>}
                   </label>
                 );
               })}

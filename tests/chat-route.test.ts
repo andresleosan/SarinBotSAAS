@@ -33,10 +33,10 @@ function prepareWhatsApp(planId = 'whatsapp', endsAt = now + 86400000) {
 }
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 describe('authenticated tool orchestration', () => {
-  it('records every DeepSeek tool round under the business without repeating a booking after a failed explanation', async () => {
-    const { db, rows } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }); state.db = db;
+  it.each(['deepseek', 'gemini'] as const)('records every %s tool round under the business without repeating a booking after a failed explanation', async provider => {
+    const { db, rows } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider, updatedAt: now } }); state.db = db;
     const usage = { promptTokens: 10, cacheHitTokens: 0, cacheMissTokens: 10, completionTokens: 5, totalTokens: 15 };
-    const first = { callId: '00000000-0000-4000-8000-000000000001', provider: 'deepseek', model: 'deepseek-flash', startedAt: now, finishedAt: now + 1, success: true, usage };
+    const first = { callId: '00000000-0000-4000-8000-000000000001', provider, model: provider === 'gemini' ? 'gemini-3.5-flash-lite' : 'deepseek-flash', serviceTier: 'standard', startedAt: now, finishedAt: now + 1, success: true, usage };
     state.complete.mockImplementationOnce(async (_messages, _tools, options) => {
       await options.onUsage?.(first);
       return bookingCall();
@@ -47,20 +47,20 @@ describe('authenticated tool orchestration', () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect((await response.json()).reply).toContain('Tu cita está confirmada');
-    const recorded = await readAdminAiUsage('2030-01', db);
+    const recorded = await readAdminAiUsage('2030-01', db, provider);
     expect(recorded.totals).toMatchObject({ calls: 2, successfulCalls: 1, failedCalls: 1, missingUsageCalls: 1 });
     expect(recorded.businesses[0]).toMatchObject({ businessId: 'business', calls: 2 });
     expect([...rows.keys()].filter(key => key.startsWith('businesses/business/appointments/'))).toHaveLength(1);
     expect(JSON.stringify([...rows.entries()].filter(([key]) => key.startsWith('aiUsage')))).not.toMatch(/client@example|573001234567|Corte|Agenda corte/);
   });
-  it('attributes initial DeepSeek onboarding to the unassigned bucket and omits a meter for Ollama', async () => {
-    const { db } = memoryFirestore({ 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }); state.db = db;
+  it.each(['deepseek', 'gemini'] as const)('attributes initial %s onboarding to the unassigned bucket and omits a meter for Ollama', async provider => {
+    const { db } = memoryFirestore({ 'serverSettings/ai': { provider, updatedAt: now } }); state.db = db;
     state.complete.mockImplementationOnce(async (_messages, _tools, options) => {
-      await options.onUsage?.({ callId: '00000000-0000-4000-8000-000000000003', provider: 'deepseek', model: 'deepseek-flash', startedAt: now, finishedAt: now + 1, success: true, usage: null });
+      await options.onUsage?.({ callId: '00000000-0000-4000-8000-000000000003', provider, model: provider === 'gemini' ? 'gemini-3.5-flash-lite' : 'deepseek-flash', startedAt: now, finishedAt: now + 1, success: true, usage: null });
       return { role: 'assistant', content: 'Describe tu negocio.' };
     }).mockResolvedValue({ role: 'assistant', content: 'Describe tu negocio.' });
     expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '' }))).status).toBe(200);
-    expect((await readAdminAiUsage('2030-01', db)).businesses[0]).toMatchObject({ businessId: null, calls: 1 });
+    expect((await readAdminAiUsage('2030-01', db, provider)).businesses[0]).toMatchObject({ businessId: null, calls: 1 });
     await db.collection('serverSettings').doc('ai').set({ provider: 'ollama', updatedAt: now + 1 });
     expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '', requestId: 'next-local-turn' }))).status).toBe(200);
     expect(state.complete.mock.calls.at(-1)?.[2]?.onUsage).toBeUndefined();
@@ -84,15 +84,15 @@ describe('authenticated tool orchestration', () => {
     expect((await readAdminAiUsage('2030-01', db)).telemetryWriteFailures).toBe(failuresBefore + 1);
     expect([...rows.keys()].filter(key => key.startsWith('aiUsageCalls/'))).toHaveLength(0);
   });
-  it('keeps one provider across the tool loop while a later turn observes an admin switch', async () => {
-    const { db } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } });
+  it.each(['deepseek', 'gemini'] as const)('keeps %s across the tool loop while a later turn observes an admin switch', async provider => {
+    const { db } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider, updatedAt: now } });
     state.db = db;
     state.complete.mockImplementationOnce(async () => {
       await db.collection('serverSettings').doc('ai').set({ provider: 'ollama', updatedAt: now + 1 });
       return bookingCall();
     }).mockResolvedValue({ role: 'assistant', content: 'Consulta completada.' });
     expect((await POST(request())).status).toBe(200);
-    expect(state.complete.mock.calls.map(call => call[2]?.provider)).toEqual(['deepseek', 'deepseek']);
+    expect(state.complete.mock.calls.map(call => call[2]?.provider)).toEqual([provider, provider]);
     expect((await POST(request({ ...body, requestId: 'second-provider-turn' }))).status).toBe(200);
     expect(state.complete.mock.calls.at(-1)?.[2]?.provider).toBe('ollama');
   });

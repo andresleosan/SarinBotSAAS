@@ -22,6 +22,66 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe('administrator usage meter', () => {
+  const gemini = { ...observation, provider: 'gemini' as const, model: 'gemini-3.5-flash-lite', serviceTier: 'standard' as const, usage: { ...observation.usage!, completionTokens: 150, totalTokens: 1150 } };
+
+  it('isolates Gemini from historical DeepSeek paths and deduplicates the same call ID per provider', async () => {
+    const { db, rows } = memoryFirestore();
+    await recordAiUsage(observation, context, db);
+    await Promise.all([recordAiUsage(gemini, context, db), recordAiUsage(gemini, context, db)]);
+    const previous = await readAdminAiUsage('2030-01', db);
+    const result = await readAdminAiUsage('2030-01', db, 'gemini');
+    expect(previous).toMatchObject({ provider: 'deepseek', model: 'deepseek-flash', totals: { calls: 1, completionTokens: 100 } });
+    expect(result).toMatchObject({ provider: 'gemini', model: 'gemini-3.5-flash-lite', measurementStartedAt: now, totals: { calls: 1, promptTokens: 1000, completionTokens: 150 } });
+    expect(result.totals.estimatedCostUSD).toEqual({ min: 0.000459, max: 0.000459 });
+    expect(result.businesses).toEqual([{ businessId: 'business-a', ...result.totals }]);
+    expect(rows.has('aiUsageMonths/2030-01')).toBe(true);
+    expect(rows.has('aiUsageMonths/gemini_2030-01')).toBe(true);
+    expect(rows.has('aiUsageMeta/main')).toBe(true);
+    expect(rows.has('aiUsageMeta/gemini')).toBe(true);
+    expect([...rows.keys()].filter(key => key.startsWith('aiUsageCalls/'))).toHaveLength(2);
+    expect(rows.get(`aiUsageCalls/gemini_${gemini.callId}`)?.data).toMatchObject({ provider: 'gemini', serviceTier: 'standard', costNanoMin: 459000, costNanoMax: 459000 });
+  });
+
+  it.each([{ model: 'unknown-model', serviceTier: 'standard' }, { model: 'gemini-3.5-flash-lite', serviceTier: null }, { model: 'gemini-3.5-flash-lite', serviceTier: 'priority' }] as const)('keeps Gemini tokens and failed calls unpriced when tariff metadata is unknown: %j', async metadata => {
+    const { db } = memoryFirestore();
+    await recordAiUsage({ ...gemini, ...metadata, success: false }, context, db);
+    expect((await readAdminAiUsage('2030-01', db, 'gemini')).totals).toMatchObject({ calls: 1, failedCalls: 1, promptTokens: 1000, completionTokens: 150, costEstimatedCalls: 0, unknownCostCalls: 1, estimatedCostUSD: null });
+  });
+
+  it('prices reported Gemini usage on failed calls without discounting unverified account credits', async () => {
+    const { db } = memoryFirestore();
+    await recordAiUsage({ ...gemini, success: false }, context, db);
+    await recordAiUsage({ ...gemini, callId: '00000000-0000-4000-8000-000000000002', usage: null, success: false }, context, db);
+    expect((await readAdminAiUsage('2030-01', db, 'gemini')).totals).toMatchObject({ calls: 2, failedCalls: 2, usageReportedCalls: 1, missingUsageCalls: 1, costEstimatedCalls: 1, unknownCostCalls: 1, estimatedCostUSD: { min: 0.000459, max: 0.000459 } });
+  });
+
+  it('contains invalid Gemini usage and keeps telemetry uncertainty separate from DeepSeek', async () => {
+    const { db, rows } = memoryFirestore();
+    await recordAiUsage({ ...gemini, usage: { ...gemini.usage, totalTokens: 1100 } }, context, db);
+    expect(rows.size).toBe(0);
+    expect((await readAdminAiUsage('2030-01', db, 'gemini')).telemetryWriteFailures).toBe(1);
+    expect((await readAdminAiUsage('2030-01', db)).telemetryWriteFailures).toBe(0);
+  });
+
+  it('validates the usage provider after authorization without changing the active provider', async () => {
+    const { db, rows } = memoryFirestore({ 'serverSettings/ai': { provider: 'ollama', updatedAt: now } }); state.db = db;
+    await recordAiUsage(observation, context, db);
+    await recordAiUsage(gemini, context, db);
+    const selected = await GET(request('?provider=gemini'));
+    expect(selected.headers.get('cache-control')).toBe('no-store');
+    expect(await selected.json()).toMatchObject({ provider: 'gemini', totals: { calls: 1 } });
+    expect(await (await GET(request())).json()).toMatchObject({ provider: 'deepseek', totals: { calls: 1 } });
+    expect(rows.get('serverSettings/ai')?.data).toEqual({ provider: 'ollama', updatedAt: now });
+    state.db = { collection: () => { throw new Error('Must not reach storage'); } };
+    expect((await GET(request('?provider=ollama'))).status).toBe(400);
+    expect((await GET(request('?provider=openai'))).status).toBe(400);
+    expect((await GET(request('?provider=gemini&provider=deepseek'))).status).toBe(400);
+    expect((await GET(request('?provider=gemini&provider=gemini'))).status).toBe(400);
+    expect((await GET(request('?provider=bad', ''))).status).toBe(401);
+    expect((await GET(request('?provider=bad', 'ordinary-token'))).status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('distinguishes no measurement from a zero charge without writing on GET', async () => {
     const { db, rows } = memoryFirestore(); state.db = db;
     const response = await GET(request());

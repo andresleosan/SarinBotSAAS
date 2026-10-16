@@ -135,4 +135,33 @@ describe("monthly administrative AI usage", () => {
     expect(text(panel().findByType("h2"))).toBe("Consumo de DeepSeek");
     expect(state.api.mock.calls.every(([, init]) => !init?.method)).toBe(true);
   });
+
+  it("reads Gemini history without selecting the active AI or accepting a late DeepSeek refresh", async () => {
+    await mount();
+    const previous = deferred<AdminAiUsage>();
+    state.api.mockImplementationOnce(() => previous.promise);
+    await act(async () => { reload().props.onClick(); });
+    const selected = deferred<AdminAiUsage>();
+    state.api.mockImplementationOnce(() => selected.promise);
+    await act(async () => { panel().findByProps({ "aria-label": "Proveedor del consumo" }).props.onChange({ target: { value: "gemini" } }); });
+    expect(panel().findAllByType("dl")).toHaveLength(0);
+    expect(text(panel().findByType("h2"))).toBe("Consumo de Gemini");
+    expect(state.api.mock.calls.at(-1)?.[0]).toBe("/api/admin/ai/usage?month=2026-10&provider=gemini");
+    await act(async () => { selected.resolve({ ...usage, provider: "gemini", model: "gemini-3.5-flash-lite", pricingVersion: "gemini-3.5-flash-lite-standard-verified-2026-10-16", totals: { ...counted, calls: 7, estimatedCostUSD: { min: 0.000459, max: 0.000459 } } }); });
+    expect(summary()).toEqual(["7", "10.000 / 1.000", "USD 0,0005"]);
+    await act(async () => { previous.resolve({ ...usage, totals: { ...counted, calls: 99 } }); });
+    expect(summary()[0]).toBe("7");
+    expect(text(panel())).toContain("La salida incluye los tokens de razonamiento");
+    expect(text(panel())).toContain("sin descontar créditos ni beneficios de planes de Google");
+    expect(state.api.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  });
+
+  it("keeps Gemini without measurement separate from existing DeepSeek totals", async () => {
+    await mount();
+    state.api.mockResolvedValueOnce({ ...usage, provider: "gemini", model: "gemini-3.5-flash-lite", pricingVersion: "gemini-3.5-flash-lite-standard-verified-2026-10-16", measurementStartedAt: null, totals: empty });
+    await act(async () => { panel().findByProps({ "aria-label": "Proveedor del consumo" }).props.onChange({ target: { value: "gemini" } }); });
+    expect(text(panel())).toContain("Todavía no hay medición");
+    expect(panel().findAllByType("dl")).toHaveLength(0);
+    expect(text(panel())).not.toContain("USD 0");
+  });
 });

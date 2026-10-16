@@ -18,6 +18,9 @@ beforeEach(() => {
   vi.stubEnv('SARIN_CHAT_PROVIDER', 'deepseek');
   vi.stubEnv('DEEPSEEK_API_KEY', 'synthetic-deepseek-key');
   vi.stubEnv('DEEPSEEK_MODEL', 'deepseek-flash');
+  vi.stubEnv('GEMINI_API_KEY', 'AQ-synthetic-google-key');
+  vi.stubEnv('GEMINI_BILLING_VERIFIED', 'true');
+  vi.stubEnv('GEMINI_MODEL', 'gemini-3.5-flash-lite');
   vi.stubEnv('SARIN_TUNNEL_URL', 'https://ia-sarin.alsdevstudio.com/v1/chat/completions');
   vi.stubEnv('OLLAMA_MAIN_MODEL', 'qwen3:32b');
   vi.stubEnv('CF_ACCESS_CLIENT_ID', 'synthetic-cf-id');
@@ -47,10 +50,11 @@ describe('chat and Vault health', () => {
 
   it.each([
     { provider: 'deepseek', model: 'deepseek-flash', modelsUrl: 'https://api.deepseek.com/models' },
+    { provider: 'gemini', model: 'gemini-3.5-flash-lite', modelsUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite' },
   ])('keeps a successful $provider probe separate from a stopped local Vault and caches each', async ({ provider, model, modelsUrl }) => {
     vi.stubEnv('SARIN_CHAT_PROVIDER', provider);
     const fetcher = vi.fn(async (url: string) => url === modelsUrl
-      ? Response.json({ data: [{ id: model }] }) : new Response(null, { status: 503 }));
+      ? Response.json(provider === 'gemini' ? { name: `models/${model}`, supportedGenerationMethods: ['generateContent'] } : { data: [{ id: model }] }) : new Response(null, { status: 503 }));
     vi.stubGlobal('fetch', fetcher);
     const chat = await GET(new Request('http://localhost/api/sarin/health'));
     expect(chat.status).toBe(200);

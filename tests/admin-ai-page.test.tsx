@@ -35,13 +35,14 @@ describe("owner AI controls", () => {
   const button = (label: string) => renderer.root.findAllByType("button").find(item => text(item).includes(label))!;
   async function mount() { await act(async () => { renderer = create(createElement(AdminPage)); }); }
   async function chooseDeepSeek() {
-    expect(radios()).toHaveLength(2);
+    expect(radios()).toHaveLength(3);
     await act(async () => { radios().find(input => input.props.value === "deepseek")!.props.onChange(); });
   }
   beforeEach(() => {
     ai = { provider: "ollama", source: "environment", updatedAt: null, providers: [
       { provider: "ollama", configured: true, model: "local-model", online: true, checkedAt: 1800000000000 },
       { provider: "deepseek", configured: true, model: "deepseek-flash", online: true, checkedAt: 1800000000000 },
+      { provider: "gemini", configured: false, model: null, online: false, checkedAt: 1800000000000, error: "Gemini requiere facturación de pago verificada en el servidor." },
     ] };
     state.refresh.mockReset();
     state.api.mockReset().mockImplementation(async (path: string, init?: RequestInit) => {
@@ -70,6 +71,24 @@ describe("owner AI controls", () => {
     expect(state.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps Gemini disabled until the server verifies paid billing, then saves only an explicit manual choice", async () => {
+    await mount();
+    expect(radios().map(input => input.props.value)).toEqual(["ollama", "deepseek", "gemini"]);
+    expect(radios().find(input => input.props.value === "gemini")!.props.disabled).toBe(true);
+    expect(text(renderer.root)).toContain("facturación de pago verificada");
+    expect(text(renderer.root)).not.toContain("OpenAI");
+    ai = { ...ai, providers: ai.providers.map(item => item.provider === "gemini" ? { ...item, configured: true, online: true, model: "gemini-3.5-flash-lite", error: undefined } : item) };
+    await act(async () => { button("Actualizar estado de IA").props.onClick(); });
+    await act(async () => { radios().find(input => input.props.value === "gemini")!.props.onChange(); });
+    expect(patches()).toHaveLength(0);
+    expect(active()).toContain("Ollama");
+    state.api.mockResolvedValueOnce({ provider: "gemini", source: "admin", updatedAt: 1800000000001 });
+    ai = { ...ai, provider: "gemini", source: "admin", updatedAt: 1800000000001 };
+    await act(async () => { button("Guardar IA").props.onClick(); });
+    expect(JSON.parse(patches()[0][1].body)).toEqual({ provider: "gemini" });
+    expect(active()).toContain("Gemini");
+  });
+
   it("retains the actual active provider after a rejected change without automatic retries", async () => {
     await mount();
     await chooseDeepSeek();
@@ -85,7 +104,7 @@ describe("owner AI controls", () => {
   it("prevents selecting an unconfigured provider without asking for credentials", async () => {
     ai.providers[1] = { ...ai.providers[1], configured: false, online: false, model: null, error: "Configuración pendiente" };
     await mount();
-    expect(radios()).toHaveLength(2);
+    expect(radios()).toHaveLength(3);
     expect(radios().find(input => input.props.value === "deepseek")!.props.disabled).toBe(true);
     expect(button("Guardar IA").props.disabled).toBe(true);
     expect(renderer.root.findByProps({ "aria-labelledby": "admin-ai-title" }).findAllByType("input").every(input => input.props.type === "radio")).toBe(true);
@@ -113,7 +132,7 @@ describe("owner AI controls", () => {
     expect(radios()).toHaveLength(0);
     state.api.mockResolvedValueOnce(ai);
     await act(async () => { button("Actualizar estado de IA").props.onClick(); });
-    expect(radios()).toHaveLength(2);
+    expect(radios()).toHaveLength(3);
     expect(patches()).toHaveLength(0);
   });
 });

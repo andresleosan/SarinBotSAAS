@@ -53,4 +53,32 @@ describe('onboarding editable examples', () => {
     expect(payload.customRules).toBe('Indicaciones propias sin cambiar.\nConfirma el servicio y el horario antes de reservar.');
     expect(payload.phoneWhatsApp).toBe('573001234567');
   });
+
+  it('lets the owner combine all six suggestions per field without duplicate lines or automatic saves', async () => {
+    await mount();
+    for (const label of ['Ejemplos de preguntas para reservar', 'Ejemplos de indicaciones del negocio']) {
+      const group = () => renderer.root.findByProps({ 'aria-label': label });
+      const choices = group().findAllByType('button').map(button => button.props['aria-label']);
+      expect(choices).toHaveLength(6);
+      for (const choice of choices) {
+        await act(async () => group().findByProps({ 'aria-label': choice }).props.onClick());
+        expect(group().findByProps({ 'aria-label': choice }).props.disabled).toBe(true);
+        await act(async () => group().findByProps({ 'aria-label': choice }).props.onClick());
+      }
+    }
+    const [questions, instructions] = renderer.root.findAllByType('textarea').map(input => input.props.value as string);
+    expect(questions.split('\n')[0]).toBe('Pregunta propia');
+    expect(instructions.split('\n')[0]).toBe('Indicaciones propias sin cambiar.');
+    for (const value of [questions, instructions]) {
+      expect(value.split('\n')).toHaveLength(7);
+      expect(new Set(value.split('\n')).size).toBe(7);
+    }
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+    await act(async () => renderer.root.findAllByType('form')[1].props.onSubmit({ preventDefault() {} }));
+    const payload = JSON.parse(vi.mocked(apiFetch).mock.calls[0][1]!.body as string);
+    expect(payload.intakeFields.map((field: { label: string }) => field.label)).toEqual(questions.split('\n'));
+    expect(payload.intakeFields[0].key).toBe('original');
+    expect(payload.customRules).toBe(instructions);
+    expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(1);
+  });
 });

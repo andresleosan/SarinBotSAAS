@@ -1,5 +1,6 @@
-export const AI_PROVIDERS = ['ollama', 'deepseek'] as const;
+export const AI_PROVIDERS = ['ollama', 'deepseek', 'gemini'] as const;
 export type AiProvider = typeof AI_PROVIDERS[number];
+export type CloudAiProvider = Exclude<AiProvider, 'ollama'>;
 
 export interface AiProviderSelection {
   provider: AiProvider;
@@ -42,10 +43,10 @@ export interface AiBusinessUsage extends AiUsageTotals {
 export interface AdminAiUsage {
   month: string;
   timeZone: 'America/Bogota';
-  provider: 'deepseek';
+  provider: CloudAiProvider;
   /** Model covered by the published tariff, not a claim about unknown models. */
-  model: 'deepseek-flash';
-  pricingVersion: 'deepseek-flash-verified-2026-10-15';
+  model: 'deepseek-flash' | 'gemini-3.5-flash-lite';
+  pricingVersion: 'deepseek-flash-verified-2026-10-15' | 'gemini-3.5-flash-lite-standard-verified-2026-10-16';
   measurementStartedAt: number | null;
   coverage: 'best_effort';
   telemetryProcessStartedAt: number;

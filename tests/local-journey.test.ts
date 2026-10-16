@@ -33,7 +33,7 @@ describe('local journey isolation', () => {
   });
 
   it('rejects cloud inference credentials and provider overrides in the isolated journey', () => {
-    const unsafe = { SARIN_CHAT_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'synthetic-key', DEEPSEEK_MODEL: 'deepseek-flash' };
+    const unsafe = { SARIN_CHAT_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'synthetic-key', DEEPSEEK_MODEL: 'deepseek-flash', GEMINI_API_KEY: 'synthetic-gemini-key', GEMINI_MODEL: 'gemini-3.5-flash-lite', GEMINI_BILLING_VERIFIED: 'true' };
     const env = journeyEnvironment(unsafe, 3040, runId);
     for (const [key, value] of Object.entries(unsafe)) {
       expect(env[key]).toBeUndefined();
