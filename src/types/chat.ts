@@ -5,4 +5,4 @@ export interface ChatMessage { id: string; role: 'user' | 'assistant'; content: 
 export interface ChatToolResult { name: string; result: Record<string, unknown>; }
 export type ChatSelection = { serviceId?: string; resourceId?: string; dateKey?: string; startTimeStr?: string; proposalId?: string };
 export type ChatState = { version: number; selection: ChatSelection; updatedAt: number; expiresAt: number };
-export interface ChatResponse { reply: string; toolResults?: ChatToolResult[]; stateVersion?: number; }
+export interface ChatResponse { reply: string; toolResults?: ChatToolResult[]; stateVersion?: number; configurationDraft?: import('@/lib/server/schemas').BusinessConfig; }

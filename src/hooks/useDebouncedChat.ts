@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, errorMessage } from "@/lib/client/api";
-import type { ChatMessage, ChatToolResult } from "@/types/chat";
+import type { ChatMessage, ChatToolResult, ChatResponse } from "@/types/chat";
 
 interface ChatParams {
   mode: "sarin_onboarding" | "sarin_client" | "sarin_owner_copilot";
@@ -37,19 +37,6 @@ function takeBatch(buffer: string[]): Batch | null {
   return { texts, requestId: crypto.randomUUID() };
 }
 
-function contextFor(history: Turn[], userTurn: Turn): Turn[] {
-  const context = history.slice(-58);
-  while (
-    context.length &&
-    context.reduce(
-      (sum, turn) => sum + turn.content.length,
-      userTurn.content.length,
-    ) > 60000
-  )
-    context.splice(0, 2);
-  return [...context, userTurn];
-}
-
 export function useDebouncedChat({
   mode,
   tenantId,
@@ -62,7 +49,7 @@ export function useDebouncedChat({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
-  const history = useRef<Turn[]>([]);
+  const [configurationDraft, setConfigurationDraft] = useState<ChatResponse['configurationDraft']>();
   const stateVersion = useRef<number | undefined>(undefined);
   const pending = useRef<string[]>([]);
   const failed = useRef<Batch | null>(null);
@@ -80,7 +67,7 @@ export function useDebouncedChat({
     controller.current?.abort();
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    history.current = [];
+    setConfigurationDraft(undefined);
     stateVersion.current = undefined;
     pending.current = [];
     failed.current = null;
@@ -114,11 +101,7 @@ export function useDebouncedChat({
     setError(null);
     const userTurn: Turn = { role: "user", content: batch.texts.join("\n") };
     try {
-      const data = await apiFetch<{
-        reply: string;
-        toolResults?: ChatToolResult[];
-        stateVersion?: number;
-      }>("/api/sarin/chat", {
+      const data = await apiFetch<ChatResponse>("/api/sarin/chat", {
         method: "POST",
         signal: abort.signal,
         body: JSON.stringify({
@@ -132,10 +115,7 @@ export function useDebouncedChat({
       if (generation.current !== currentGeneration) return;
       setErrorCode(null);
       stateVersion.current = data.stateVersion;
-      history.current.push(userTurn, {
-        role: "assistant",
-        content: data.reply,
-      });
+      setConfigurationDraft(data.configurationDraft);
       setMessages((previous) => [
         ...previous,
         {
@@ -202,5 +182,5 @@ export function useDebouncedChat({
   const retry = useCallback(() => {
     if (!busy.current && failed.current) void flushRef.current();
   }, []);
-  return { messages, sendMessage, isWaitingBatch, isGenerating, error, retry, quotaExhausted: errorCode === "AI_QUOTA_EXHAUSTED", requestAlreadyCompleted: errorCode === "REQUEST_ALREADY_COMPLETED" };
+  return { messages, sendMessage, isWaitingBatch, isGenerating, error, retry, configurationDraft, quotaExhausted: errorCode === "AI_QUOTA_EXHAUSTED", requestAlreadyCompleted: errorCode === "REQUEST_ALREADY_COMPLETED" };
 }

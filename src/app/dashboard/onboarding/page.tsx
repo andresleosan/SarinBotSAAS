@@ -122,10 +122,15 @@ function Configuration() {
     actorUid: user?.uid,
     mode: "sarin_onboarding",
     tenantId: business?.id || "onboarding",
-    onToolExecuted: (toolName, result) => {
-      if (toolName === "guardar_estructura_negocio" && result.business) setSaved(true);
-    },
   });
+  function useConfigurationDraft() {
+    const draft = chat.configurationDraft;
+    if (!draft) return;
+    setName(draft.name); setSlug(business?.slug || draft.slug); setCategory(draft.category); setPhone(draft.phoneWhatsApp);
+    if (draft.socialLinks !== undefined) setSocialLinks(draft.socialLinks);
+    setTone(draft.tone); setRules(draft.customRules); setIntake(draft.intakeFields.map(field => field.label).join('\n'));
+    setResources(draft.resources); setServices(draft.services); setSchedule(draft.weeklySchedule); setSaved(false);
+  }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isSubscriptionAllowed(business)) return;
@@ -219,8 +224,8 @@ function Configuration() {
           >
             <p className="text-sm leading-relaxed text-sarin-muted">
               Describe el nombre de tu negocio, sus servicios, precios,
-              profesionales y horarios. Revisa los datos antes de pedirle a
-              Sarin que guarde la configuración.
+              profesionales y horarios. Sarin puede preparar una propuesta;
+              úsala en el formulario, revísala y guarda cuando esté correcta.
             </p>
             {chat.messages.map((message) => (
               <div
@@ -230,6 +235,7 @@ function Configuration() {
                 {message.content}
               </div>
             ))}
+            {chat.configurationDraft && <button type="button" className={buttonClass} disabled={chat.isGenerating} onClick={useConfigurationDraft}>Usar propuesta en el formulario</button>}
             {(chat.isGenerating || chat.isWaitingBatch) && (
               <p role="status" className="text-xs text-sarin-blue">
                 {chat.isGenerating
