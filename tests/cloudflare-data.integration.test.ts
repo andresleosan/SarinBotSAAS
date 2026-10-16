@@ -6,7 +6,7 @@ import type { Database } from '../src/lib/storage/types';
 import type { Business } from '../src/types/firestore';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { cancelAppointment, createAppointment, readAppointments } from '../src/lib/server/bookings';
-import { businessIdForOwner, createBusiness } from '../src/lib/server/businesses';
+import { businessIdForOwner, createBusiness, publicBusiness } from '../src/lib/server/businesses';
 import { readReceiptImage, readReceipts, reviewPayment, submitReceipt } from '../src/lib/server/billing';
 import { commitResponseQuota, getResponseQuota, releaseResponseQuota, reserveResponseQuota } from '../src/lib/server/response-quota';
 import { businessConfigSchema } from '../src/lib/server/schemas';
@@ -14,6 +14,7 @@ import { verifyInvitationLifecycle } from './invitation-contract';
 import { listInvitations } from '@/lib/server/invitations';
 import { normalizeBusinessLogo, readPublicBusinessLogo, saveBusinessLogo } from '@/lib/server/business-logos';
 import sharp from 'sharp';
+import { updateClientPolicy } from '@/lib/server/client-policy';
 
 const now = Date.now();
 const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now + 3 * 86400000);
@@ -38,6 +39,23 @@ describe('commercial invariants on Cloudflare data', () => {
     });
   }, 30_000);
   afterAll(async () => { await runtime?.dispose(); });
+  it('serializes client limits across independent D1 handles and keeps policies private', async () => {
+    const value = business('client-policy');
+    await db.collection('businesses').doc(value.id).set(value);
+    await db.collection('publicBusinesses').doc(value.slug).set(publicBusiness(value));
+    const secondDb = createCloudflareDatabase(async (command: DataCommand) => {
+      const response = await runtime.fetch(command), body = await response.json() as DataReadResult | DataCommitResult;
+      if (!response.ok) throw new StorageError(response.status, (body as unknown as { code: string }).code);
+      return body;
+    });
+    await updateClientPolicy({ uid: value.ownerUid }, value.id, { futureAppointmentLimit: 1, reason: 'Capacidad sintética' }, db);
+    const results = await Promise.allSettled([createAppointment({ uid: 'limited-client' }, value.id, input, 'policy-one', db), createAppointment({ uid: 'limited-client' }, value.id, { ...input, resourceId: 'two' }, 'policy-two', secondDb)]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find(result => result.status === 'rejected')).toMatchObject({ reason: { code: 'CLIENT_BOOKING_LIMIT' } });
+    expect(JSON.stringify((await db.collection('publicBusinesses').doc(value.slug).get()).data())).not.toContain('Capacidad sintética');
+    await updateClientPolicy({ uid: value.ownerUid }, value.id, { clientUid: 'limited-client', blocked: true, reason: 'Revisión sintética' }, db);
+    await expect(createAppointment({ uid: 'limited-client' }, value.id, input, 'policy-blocked', secondDb)).rejects.toMatchObject({ code: 'CLIENT_BLOCKED' });
+  });
   it('normalizes a business logo through D1/R2 and binds public reads to its current digest', async () => {
     const owner = { uid: 'logo-owner' }, id = businessIdForOwner(owner.uid);
     const value = { ...business(id), slug: 'logo-synthetic', ownerUid: owner.uid };

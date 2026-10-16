@@ -22,6 +22,7 @@ import { useApiPoll } from "@/lib/client/use-api-poll";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
 import { PaidTrialStatus } from "@/components/paid-trial-status";
+import { ClientPolicyControls } from "@/components/client-policy-controls";
 import type { Appointment } from "@/types/firestore";
 
 function today() {
@@ -213,6 +214,7 @@ function Agenda() {
         </Link>
       </div>
       <PaidTrialStatus subscription={sub} />
+      <ClientPolicyControls businessId={business.id} ownerUid={business.ownerUid} clients={[...new Map(appointments.filter(item => item.client?.uid).map(item => [item.client!.uid, { uid: item.client!.uid, name: item.client!.name }])).values()]} />
       {error && <Notice error>{error}</Notice>}
 
       <section

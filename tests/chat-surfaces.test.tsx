@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OnboardingPage from "@/app/dashboard/onboarding/page";
 import ClientPage from "@/app/b/[slug]/page";
 import DashboardPage from "@/app/dashboard/page";
+vi.mock('@/components/client-policy-controls', () => ({ ClientPolicyControls: () => null }));
 import { apiFetch } from "@/lib/client/api";
 import type { Business } from "@/types/firestore";
 

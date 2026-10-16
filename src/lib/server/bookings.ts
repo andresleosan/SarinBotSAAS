@@ -8,6 +8,7 @@ import { getBusinessAccess, isSubscriptionAllowed } from '@/lib/sarin/subscripti
 import { HttpError } from './http';
 import { assertOwner, getBusiness, publicBusiness, stableDocumentId } from './businesses';
 import { documentIdSchema, type BookingInput } from './schemas';
+import { assertClientCanBook, clientPolicyKey } from './client-policy';
 
 type BlockInput = { dateKey: string; startTimeStr: string; endTimeStr: string; resourceId: string; requestId: string; motivo?: string };
 function assertDate(dateKey: string) {
@@ -39,8 +40,9 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
   const id = stableDocumentId(user.uid, requestId, 'appointment');
   const appointmentReference = businessReference.collection('appointments').doc(id);
   const lockReference = businessReference.collection('bookingLocks').doc(`${input.dateKey}_${input.resourceId}`);
+  const clientLockReference = businessReference.collection('bookingLocks').doc(`client_${clientPolicyKey(user.uid)}`);
   return db.runTransaction(async (transaction) => {
-    const [businessDocument, existing, lock] = await Promise.all([transaction.get(businessReference), transaction.get(appointmentReference), transaction.get(lockReference)]);
+    const [businessDocument, existing, lock, clientLock] = await Promise.all([transaction.get(businessReference), transaction.get(appointmentReference), transaction.get(lockReference), transaction.get(clientLockReference)]);
     if (!businessDocument.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDocument.data() as Business;
     if (existing.exists) {
@@ -50,6 +52,7 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
     }
     if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar agendando.');
+    await assertClientCanBook(transaction, business, user.uid, Date.now(), db);
     const service = business.services.find((candidate) => candidate.id === input.serviceId);
     if (!service) throw new HttpError(400, 'El servicio no existe.');
     if (business.sarinConfig.intakeFields.some((field) => field.required && !input.intakeAnswers[field.key]?.trim())) throw new HttpError(400, 'Faltan respuestas obligatorias para agendar.');
@@ -70,6 +73,7 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
     // The shared per-resource/day document prevents empty-query phantom races.
     // Every mutation of that resource/date must participate in the same lock.
     transaction.set(lockReference, { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: Date.now() });
+    transaction.set(clientLockReference, { version: Number(clientLock.data()?.version ?? 0) + 1, updatedAt: Date.now() });
     if (getBusinessAccess(business) === 'paid_trial') {
       const trial = business.subscription.paidTrial!;
       const updated: Business = { ...business, subscription: { ...business.subscription, paidTrial: { ...trial, appointmentsUsed: trial.appointmentsUsed + 1 } } };
@@ -125,9 +129,12 @@ export async function cancelAppointment(user: ChatActor, businessId: string, app
     if (appointment.status !== 'confirmed') return appointment;
     const lockReference = businessReference.collection('bookingLocks').doc(`${appointment.dateKey}_${appointment.resourceId}`);
     const lock = await transaction.get(lockReference);
+    const clientLockReference = appointment.type === 'appointment' && appointment.client?.uid ? businessReference.collection('bookingLocks').doc(`client_${clientPolicyKey(appointment.client.uid)}`) : null;
+    const clientLock = clientLockReference ? await transaction.get(clientLockReference) : null;
     const cancelled: Appointment = { ...appointment, status: owner ? 'cancelled_by_owner' : 'cancelled_by_client' };
     transaction.set(reference, cancelled);
     transaction.set(lockReference, { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: Date.now() });
+    if (clientLockReference) transaction.set(clientLockReference, { version: Number(clientLock?.data()?.version ?? 0) + 1, updatedAt: Date.now() });
     return cancelled;
   });
 }

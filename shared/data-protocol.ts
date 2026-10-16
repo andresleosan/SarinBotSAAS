@@ -12,7 +12,7 @@ export type DataReadResult = { revision: number; documents: { path: string; data
 export type DataCommitResult = { revision: number };
 
 export const DATA_COLLECTIONS = ['users', 'businesses', 'businessSlugs', 'publicBusinesses', 'paymentReceipts', 'paymentImages', 'platformSettings', 'serverSettings', 'invitations', 'businessLogos', 'responseQuotaScopes', 'responseQuotaTurns', 'aiUsageCalls', 'aiUsageMonths', 'aiUsageMeta', 'whatsappNumbers', 'whatsappBusinesses', 'whatsappInbox', 'whatsappOutbox', 'whatsappConversations', 'whatsappMessageIds', 'whatsappUsage'] as const;
-export const DATA_CHILDREN: Record<string, readonly string[]> = { businesses: ['appointments', 'bookingLocks'], responseQuotaScopes: ['periods'], aiUsageMonths: ['businesses'], whatsappUsage: ['businesses'] };
+export const DATA_CHILDREN: Record<string, readonly string[]> = { businesses: ['appointments', 'bookingLocks', 'clientPolicies'], responseQuotaScopes: ['periods'], aiUsageMonths: ['businesses'], whatsappUsage: ['businesses'] };
 export function isDataPath(value: unknown, document: boolean): value is string {
   if (typeof value !== 'string' || value.length > 1024) return false;
   const parts = value.split('/');
