@@ -11,7 +11,7 @@ import { runInSarinQueue } from '@/lib/sarin/queue';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { buildSarinClientPrompt, buildSarinOnboardingPrompt, buildSarinOwnerCopilotPrompt } from '@/lib/sarin/prompts';
 import { escalationSchema, ownerBlockToolSchema, SARIN_CLIENT_TOOLS, SARIN_COPILOT_TOOLS, SARIN_ONBOARDING_TOOLS, summarySchema } from '@/lib/sarin/tools';
-import type { Business } from '@/types/firestore';
+import type { Appointment, Business } from '@/types/firestore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,9 +19,24 @@ export const maxDuration = 300;
 interface ToolResult { name: string; result: Record<string, unknown>; }
 const cleanReply = (value: string | null) => (value ?? '').replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<think>[\s\S]*$/gi, '').trim();
 
+function bookingReply(results: ToolResult[]): string | undefined {
+  const appointment = results.findLast((result) => result.name === 'crear_cita' && result.result.appointment)?.result.appointment as Appointment | undefined;
+  if (!appointment) return undefined;
+  const text = (value: string) => value.replace(/\s+/g, ' ');
+  const status = appointment.status === 'confirmed' ? 'Tu cita está confirmada.'
+    : ['cancelled_by_client', 'cancelled_by_owner'].includes(appointment.status) ? 'Esta cita está cancelada. No se creó una nueva reserva.'
+      : 'No se creó una nueva reserva. Consulta el estado de esta cita en la agenda.';
+  return [status,
+    appointment.serviceName ? `Servicio: ${text(appointment.serviceName)}` : null,
+    `Fecha: ${appointment.dateKey}. Hora: ${appointment.startTimeStr}–${appointment.endTimeStr} (Colombia).`,
+    appointment.client?.name ? `Cliente: ${text(appointment.client.name)}` : null,
+    ...(appointment.status === 'confirmed' ? ['Puedes consultar sus datos y descargar el recordatorio en la agenda.'] : []),
+  ].filter(Boolean).join('\n\n');
+}
+
 function verifiedReply(results: ToolResult[]): string {
-  const booking = results.find((result) => result.name === 'crear_cita' && result.result.appointment);
-  if (booking) return 'Tu cita quedó confirmada. Puedes consultar sus datos y descargar el recordatorio en la agenda.';
+  const booking = bookingReply(results);
+  if (booking) return booking;
   if (results.some((result) => result.name === 'guardar_estructura_negocio' && result.result.business)) return 'La configuración de tu negocio quedó guardada.';
   if (results.some((result) => result.name === 'bloquear_horario' && result.result.appointment)) return 'El horario quedó bloqueado en tu agenda.';
   return 'Revisa el resultado de la consulta. El motor no pudo generar una explicación adicional.';
@@ -56,7 +71,7 @@ export async function POST(request: Request) {
           if (toolResults.some((result) => result.result.appointment || result.result.business)) return { reply: verifiedReply(toolResults), toolResults };
           throw error;
         }
-        if (!assistant.tool_calls?.length) return { reply: cleanReply(assistant.content) || verifiedReply(toolResults), toolResults };
+        if (!assistant.tool_calls?.length) return { reply: bookingReply(toolResults) ?? (cleanReply(assistant.content) || verifiedReply(toolResults)), toolResults };
         messages.push(assistant);
         for (const call of assistant.tool_calls) {
           if (request.signal.aborted) throw new DOMException('Solicitud cancelada.', 'AbortError');
