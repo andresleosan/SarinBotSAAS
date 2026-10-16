@@ -193,6 +193,12 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       console.log('Fase 3 OK: reservas reales/idempotentes, carrera concurrente, cancelación, bloqueos y permisos.');
 
       for (let index = 0; index < 8; index++) {
+        // This journey exhausts the business trial across ten visits; the
+        // separate client-limit contract verifies the default of three.
+        if (index === 0) {
+          const policy = await api(`/api/businesses/${fixture.businessId}/client-policy`, owner.token, 'PATCH', { clientUid: client.decoded.uid, futureAppointmentLimit: 20, reason: 'Synthetic trial quota journey' });
+          check(policy.response.ok, 'El dueño no pudo autorizar la excepción del ensayo de diez citas.');
+        }
         const futureDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() + (index + 3) * 86400000));
         const lastInput = { ...booking, dateKey: futureDate, startTimeStr: '09:00' };
         const last = await createAppointment(client.decoded, fixture.businessId, lastInput, requestId(`quota-${index}`), db);

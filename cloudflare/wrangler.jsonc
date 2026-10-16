@@ -16,7 +16,8 @@
     "WHATSAPP_RETENTION_ENABLED": "false",
     "SARIN_DATA_BACKEND": "d1",
     "SARIN_PUBLIC_BOOKING_ORIGIN": "https://sarinbotsaas.pages.dev",
-    "SARIN_MAINTENANCE": "false"
+    "SARIN_MAINTENANCE": "false",
+    "PILOT_AI_BUDGET_ENFORCED": "false"
   },
   "observability": { "enabled": false, "logs": { "enabled": false }, "traces": { "enabled": false } },
   "triggers": { "crons": ["*/5 * * * *"] },

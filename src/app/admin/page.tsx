@@ -250,7 +250,7 @@ function Console() {
       <AdminAiSettings onSaved={() => void engine.refresh()} />
       <AdminAiUsage businesses={data.businesses} />
       <AdminWhatsApp businesses={data.businesses} />
-      <AdminInvitations />
+      <AdminInvitations onAccessChanged={refresh} />
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Comprobantes de pago</h2>
         {data.receipts.length === 0 ? (

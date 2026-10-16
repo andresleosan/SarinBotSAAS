@@ -118,10 +118,13 @@ export async function forwardToSingleton(request: Request, get: (name: string) =
   if (input.SARIN_MAINTENANCE === 'true') {
     const url = new URL(request.url);
     // The existing Next handler still verifies Firebase and the superadmin UID.
-    // Only its read-only local engine health/queue probe remains available for draining.
+    // Its engine queue probe and exact budget administration remain available;
+    // Next still authorizes the superadmin before either action.
     drainRead = request.method === 'GET' && url.pathname === '/api/sarin/health' && url.search === '?scope=engine' && !url.hash
       && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '');
-    if (!drainRead) return Response.json({ error: 'La aplicación está en mantenimiento.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
+    const budgetCursorRead = request.method === 'GET' && [...url.searchParams.keys()].every(key => key === 'cursor') && url.searchParams.getAll('cursor').length === 1 && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.searchParams.get('cursor') ?? '');
+    const budgetAdministration = ['GET', 'PATCH'].includes(request.method) && url.pathname === '/api/admin/abuse' && (!url.search || budgetCursorRead) && !url.hash && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '');
+    if (!drainRead && !budgetAdministration) return Response.json({ error: 'La aplicación está en mantenimiento.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
   }
   try {
     const requestHeaders = new Headers(request.headers);

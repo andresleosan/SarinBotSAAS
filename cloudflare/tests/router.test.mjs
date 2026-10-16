@@ -12,6 +12,17 @@ const workloadRuntime = {
   FIREBASE_WIF_AUDIENCE: '//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/sarin-cloudflare/providers/worker-oidc',
   FIREBASE_WIF_SERVICE_ACCOUNT_EMAIL: 'sarin-runtime@real-project.iam.gserviceaccount.com',
 };
+test('maintains a narrowly authenticated budget configuration route while chat stays closed', async () => {
+  const get = () => ({ fetch: async () => Response.json({ configured: true }) });
+  for (const method of ['GET', 'PATCH']) assert.equal((await forwardToSingleton(new Request('https://app.example.invalid/api/admin/abuse', { method, headers: { Authorization: 'Bearer synthetic' } }), get, { SARIN_MAINTENANCE: 'true' })).status, 200);
+  const cursorUrl = 'https://app.example.invalid/api/admin/abuse?cursor=00000000-0000-4000-8000-000000000001';
+  assert.equal((await forwardToSingleton(new Request(cursorUrl, { headers: { Authorization: 'Bearer synthetic' } }), get, { SARIN_MAINTENANCE: 'true' })).status, 200);
+  assert.equal((await forwardToSingleton(new Request(cursorUrl, { method: 'PATCH', headers: { Authorization: 'Bearer synthetic' } }), get, { SARIN_MAINTENANCE: 'true' })).status, 503);
+  for (const path of ['/api/admin/abuse?extra=1', '/api/admin/abuse/', '/api/sarin/chat', '/api/admin/invitations']) assert.equal((await forwardToSingleton(new Request(`https://app.example.invalid${path}`, { headers: { Authorization: 'Bearer synthetic' } }), get, { SARIN_MAINTENANCE: 'true' })).status, 503);
+  assert.equal((await forwardToSingleton(new Request('https://app.example.invalid/api/admin/abuse'), get, { SARIN_MAINTENANCE: 'true' })).status, 503);
+  assert.equal(runtimeEnvironment({ ...workloadRuntime, PILOT_AI_BUDGET_ENFORCED: 'true' }).PILOT_AI_BUDGET_ENFORCED, 'true');
+  assert.throws(() => runtimeEnvironment({ ...workloadRuntime, PILOT_AI_BUDGET_ENFORCED: 'yes' }));
+});
 
 test('all business, admin and local engine requests use one constant container', async () => {
   const names = [];

@@ -5,6 +5,7 @@ node_modules
 .env*
 !.env.local.example
 .git
+.superpowers
 # Only this workspace manifest is needed by the frozen, filtered app install.
 cloudflare/**
 !cloudflare/package.json

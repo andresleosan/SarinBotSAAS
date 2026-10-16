@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OnboardingPage from '@/app/dashboard/onboarding/page';
 import { apiFetch } from '@/lib/client/api';
 import type { Business } from '@/types/firestore';
+import type { BusinessConfig } from '@/lib/server/schemas';
+import { businessConfigSchema } from '@/lib/server/schemas';
 
 const business: Business = {
   id: 'fixture-business', ownerUid: 'fixture-owner', ownerEmail: 'owner@example.test',
@@ -14,10 +16,10 @@ const business: Business = {
   services: [{ id: 'principal', name: 'Servicio', durationMinutes: 30, bufferMinutes: 0, price: 20000, resourceIds: ['principal'] }],
   weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: false, intervals: [] }])), createdAt: 2000000000000,
 };
-const state = vi.hoisted(() => ({ business: null as Business | null, send: vi.fn() }));
+const state = vi.hoisted(() => ({ business: null as Business | null, send: vi.fn(), draft: undefined as BusinessConfig | undefined }));
 vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null, setBusiness: vi.fn() }) }));
 vi.mock('@/components/business-logo-field', () => ({ BusinessLogoField: () => null }));
-vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => ({ messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false, sendMessage: state.send }) }));
+vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => ({ messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false, sendMessage: state.send, configurationDraft: state.draft }) }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement('a', { href }, children) }));
 vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'fixture-owner' } }) }));
 vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, fieldClass: 'field', buttonClass: 'button' }));
@@ -26,9 +28,18 @@ vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), errorMessage: (error: Er
 
 describe('onboarding editable examples', () => {
   let renderer: ReactTestRenderer;
-  beforeEach(() => { state.business = structuredClone(business); state.send.mockReset(); vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockResolvedValue({ business }); });
+  beforeEach(() => { state.business = structuredClone(business); state.draft = undefined; state.send.mockReset(); vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockResolvedValue({ business }); });
   afterEach(async () => { await act(async () => renderer?.unmount()); });
   async function mount() { await act(async () => { renderer = create(createElement(OnboardingPage)); }); }
+  it('applies a proposed configuration only on explicit action and preserves optional intake metadata', async () => {
+    const draft = businessConfigSchema.parse({ name: 'Propuesta nueva', category: business.category, slug: business.slug, phoneWhatsApp: business.phoneWhatsApp, tone: 'Claro', customRules: '', services: business.services, resources: business.resources, weeklySchedule: business.weeklySchedule, intakeFields: [{ key: 'optional_note', label: 'Nota opcional', required: false }] }); state.draft = draft;
+    await mount(); expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+    await act(async () => renderer.root.findAllByType('button').find(button => button.children.join('') === 'Usar propuesta en el formulario')!.props.onClick());
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+    await act(async () => renderer.root.findAllByType('form')[1].props.onSubmit({ preventDefault() {} }));
+    const payload = JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body));
+    expect(payload.name).toBe('Propuesta nueva'); expect(payload.intakeFields).toEqual(draft.intakeFields);
+  });
 
   it('keeps existing questions and instructions on load without an automatic save', async () => {
     await mount();

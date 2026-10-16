@@ -20,7 +20,7 @@ export function renderChatReply({ intent, business, data }: { intent: ChatIntent
       reply = availability?.some(item => item.slots.length) ? `Disponibilidad para ${String(data.dateKey)} (Colombia):\n${availability.map(item => `${item.resourceName}: ${item.slots.join(', ') || 'Sin horas libres'}`).join('\n')}\nElige una hora para preparar la reserva.` : data.dateKey ? 'No hay horas libres para esa selección. Prueba otra fecha o profesional.' : 'Indica el servicio y la fecha que quieres consultar.';
       break;
     }
-    case 'booking': reply = 'Para preparar tu reserva necesito servicio, profesional, fecha y hora. La cita se agenda al revisar el resumen y pulsar Confirmar cita.'; break;
+    case 'booking': reply = data.proposal ? 'Preparé esta propuesta. Revisa el resumen y tus datos antes de pulsar Confirmar cita.' : 'Para preparar tu reserva necesito servicio, profesional, fecha y hora. La cita se agenda al revisar el resumen y pulsar Confirmar cita.'; break;
     case 'own_appointments': case 'owner_agenda': {
       const appointments = data.appointments as Appointment[] | undefined;
       reply = appointments?.length ? appointments.map(item => `${item.serviceName} · ${item.dateKey} ${item.startTimeStr}–${item.endTimeStr} · ${appointmentStatusLabel(item.status)}`).join('\n') : 'No hay citas para esta consulta. Puedes revisar próximas e historial en la agenda.';
@@ -29,7 +29,7 @@ export function renderChatReply({ intent, business, data }: { intent: ChatIntent
     case 'owner_usage': reply = typeof data.remainingResponses === 'number' ? `Respuestas de IA disponibles: ${data.remainingResponses}. Revisa Suscripción para ver tu consumo y vigencia.` : 'Consulta tu consumo y vigencia en Suscripción.'; break;
     case 'owner_block': reply = 'Para bloquear horarios o cancelar citas, utiliza los controles de Mi agenda. Revisa fecha, profesional y horario antes de guardar.'; break;
     case 'configure_business': reply = data.hasDraft ? 'Preparé una propuesta para el formulario. Pulsa Usar propuesta, revisa todos los datos y luego Guarda la configuración.' : 'Describe los datos completos de tu negocio o completa el formulario. Los cambios se guardan únicamente con Guardar configuración.'; break;
-    default: reply = '¿Quieres consultar servicios, precios, horarios o preparar una cita? Indica el servicio y la fecha si deseas reservar.';
+    default: reply = OUT_OF_SCOPE_REPLY;
   }
   return { reply };
 }

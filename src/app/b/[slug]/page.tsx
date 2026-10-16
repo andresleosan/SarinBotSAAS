@@ -25,6 +25,7 @@ function Island({ slug }: { slug: string }) {
   });
   const business = projection.value, loading = projection.loading, error = projection.error;
   const [input, setInput] = useState("");
+  const [appointmentVersion, setAppointmentVersion] = useState(0);
   const [now, setNow] = useState(Date.now());
   const end = useRef<HTMLDivElement>(null);
   const engine = useEngineHealth();
@@ -36,6 +37,7 @@ function Island({ slug }: { slug: string }) {
     mode: "sarin_client",
     tenantId: business?.id || "",
     actorUid: user?.uid,
+    onToolExecuted: name => { if (name === 'cita_confirmada') setAppointmentVersion(value => value + 1); },
   });
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "auto", block: "nearest" });
@@ -72,7 +74,8 @@ function Island({ slug }: { slug: string }) {
     );
   const allowed = isSubscriptionAllowed(business, now);
   const retryAllowed = allowed || getBusinessAccess(business, now) === "trial_exhausted";
-  const chatAllowed = allowed && !chat.quotaExhausted && !chat.confirming;
+  const chatAvailable = allowed && !chat.quotaExhausted;
+  const chatAllowed = chatAvailable && !chat.confirming;
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col border-x border-sarin-line bg-sarin-canvas">
       <header className="sticky top-0 z-20 border-b border-sarin-line bg-sarin-paper/95 p-4 backdrop-blur">
@@ -82,9 +85,9 @@ function Island({ slug }: { slug: string }) {
             <div className="min-w-0">
               <h1 className="line-clamp-2 break-words font-bold leading-5 [overflow-wrap:anywhere]">{business.name}</h1>
               <p
-                className={`mt-1 text-xs ${engine.health?.status === "online" && chatAllowed ? "text-sarin-blue" : "text-sarin-muted"}`}
+                className={`mt-1 text-xs ${engine.health?.status === "online" && chatAvailable ? "text-sarin-blue" : "text-sarin-muted"}`}
               >
-                {!chatAllowed
+                {!chatAvailable
                   ? "Atención de IA en pausa"
                   : engine.health
                     ? engine.health.status === "online"
@@ -117,7 +120,7 @@ function Island({ slug }: { slug: string }) {
           {(business.socialLinks ?? []).map(link => <a key={link.platform} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 max-w-full items-center break-all underline">{businessSocialPlatformLabels[link.platform]} · {businessSocialLabel(link)}</a>)}
         </nav>
         {error && <Notice error>{error}</Notice>}
-        {!chatAllowed && (
+        {!chatAvailable && (
           <Notice>
             La atención de IA está temporalmente en pausa. Contacta
             directamente al establecimiento para reservar.
@@ -212,7 +215,7 @@ function Island({ slug }: { slug: string }) {
           <div ref={end} />
           {chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming || chat.isGenerating || chat.isWaitingBatch} onConfirm={chat.confirmProposal} />}
         </div>
-        {user && <ClientAppointments key={`${business.id}:${user.uid}`} businessId={business.id} businessName={business.name} resources={business.resources} userId={user.uid} now={now} />}
+        {user && <ClientAppointments key={`${business.id}:${user.uid}:${appointmentVersion}`} businessId={business.id} businessName={business.name} resources={business.resources} userId={user.uid} now={now} />}
       </div>
       <form
         onSubmit={submit}

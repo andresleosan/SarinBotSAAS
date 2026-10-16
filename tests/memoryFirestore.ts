@@ -29,9 +29,12 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
         const data = rows.get(path)!.data;
         const nested = field.split('.').reduce<unknown>((current, key) => current && typeof current === 'object' ? (current as Data)[key] : undefined, data);
         if (operator === '==') return nested === value;
-        if (typeof nested !== 'number' || typeof value !== 'number') throw new Error('Unsupported fixture comparison');
-        if (operator === '<=') return nested <= value;
-        if (operator === '>') return nested > value;
+        const comparison = typeof nested === 'number' && typeof value === 'number' ? nested - value : typeof nested === 'string' && typeof value === 'string' ? nested.localeCompare(value) : null;
+        if (comparison === null) throw new Error('Unsupported fixture comparison');
+        if (operator === '<=') return comparison <= 0;
+        if (operator === '>') return comparison > 0;
+        if (operator === '<') return comparison < 0;
+        if (operator === '>=') return comparison >= 0;
         throw new Error('Unsupported fixture operator');
       }));
       if (this.ordering) {

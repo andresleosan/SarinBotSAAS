@@ -24,8 +24,9 @@ for (const link of anchors) {
   const url = new URL(link);
   assert.ok(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash, 'Public destinations require clean HTTPS URLs.');
   if (url.origin === appOrigin) {
-    assert.ok(/^\/dashboard(?:\/onboarding)?$/.test(url.pathname), 'Only approved application entry routes may be linked.');
-    applicationLinks.push(url.pathname);
+    const entry = /^\/dashboard(?:\/onboarding)?$/.test(url.pathname);
+    assert.ok(entry || ['/ayuda', '/privacidad'].includes(url.pathname), 'Only approved application entry and information routes may be linked.');
+    if (entry) applicationLinks.push(url.pathname);
   } else {
     assert.equal(url.href, 'https://www.alsdevstudio.com/', 'An unapproved external destination was exported.');
   }

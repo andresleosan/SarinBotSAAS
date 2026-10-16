@@ -40,4 +40,25 @@ Solo el propietario consulta su capacidad por `/api/billing`; `/api/admin` exige
 
 WhatsApp requiere conexión verificada y un período WhatsApp vigente antes de llamar al modelo. Estar preparado para contratar no equivale a haber comprado el plan. No se habilitan pruebas reales ni envíos con credenciales ausentes. Véase [operación WhatsApp](whatsapp-cloud-api.md).
 
-Mantener una única réplica Node. Volver a la imagen anterior conserva los documentos pero deja de aplicar las nuevas cuotas: usar la reversión solo como medida operativa y registrar cuándo ocurrió. No se borran períodos ni contadores al revertir.
+Mantener una única réplica Node. Una imagen anterior conserva documentos pero puede dejar de aplicar cuotas y contratos nuevos: mantener mantenimiento y nuevas reservas cerradas hasta comprobar compatibilidad. No se borran períodos ni contadores al revertir; la candidata del piloto añade las condiciones siguientes.
+
+## Piloto: capacidad comercial y presupuesto monetario
+
+Contrato de la versión local `003f5ab` y posteriores; no declara activación en producción. La prueba pagada o de cortesía conserva **diez citas y 700 respuestas totales**, sin caducidad por días. Cada cita nueva guardada consume una unidad; cancelarla no devuelve cupo. Los contadores comerciales y sus reglas de recuperación siguen independientes del gasto técnico.
+
+Una respuesta de Sarin puede requerir varias llamadas al modelo. La reserva comercial es por respuesta/turno; el presupuesto se reserva **por llamada pagada**, incluyendo las rondas posteriores de herramientas. Cada registro monetario conserva modelo, modalidad, tarifa versionada y coeficientes de esa llamada. La conciliación usa ese contexto, no una tarifa nueva aplicada retroactivamente.
+
+Los valores previstos son globalmente USD 0,50/día, USD 8/mes y 20/300 millones de tokens por día/mes; por negocio, USD 0,10/día, USD 2/mes y 2/30 millones de tokens. No son precio al cliente ni garantía de financiar toda su capacidad. El control necesita configuración privada versionada y `PILOT_AI_BUDGET_ENFORCED=true`; la candidata lo conserva en `false` por compatibilidad hasta su activación revisada bajo mantenimiento. Un flag ausente tampoco lo activa.
+
+Los estados inciertos no vencen por tiempo. Timeout, uso ausente o metadatos desconocidos retienen el máximo reservado; **no pausan globalmente por esa incertidumbre sola**. Pueden reducir el saldo disponible y bloquear otra llamada si no cabe. Un modelo/tier explícitamente inesperado o uso/costo por encima de la cota reservada sí produce pausa global, además de preservar la contabilidad. Repetir una inferencia o eliminar una reserva no constituye conciliación.
+
+La administración monetaria usa `GET/PATCH /api/admin/abuse`, exclusivos del superadministrador. GET pagina por cursor UUID, 50 registros con lectura de 51, orden ascendente por id; no debe mostrarse como «últimas llamadas». PATCH permite:
+
+- `configure`: `{ action: 'configure', expectedVersion, paused, limits, reason }`; `limits` contiene exactamente `globalDayUsd`, `globalMonthUsd`, `businessDayUsd`, `businessMonthUsd`, `globalDayTokens`, `globalMonthTokens`, `businessDayTokens`, `businessMonthTokens`. Usar la versión leída, sin sobrescribir cambios concurrentes.
+- `reconcile`: `{ action: 'reconcile', callId, resolution: 'keep_reserved' | 'confirmed_not_charged', reason, evidence }`. Conservar reserva por defecto; liberar solo cuando la evidencia acredita que no hubo cobro. No hay TTL automático ni reinicio del consumo comercial.
+
+Un 503 `AI_BUDGET_*` indica control operativo, distinto del 402 por capacidad/acceso comercial. No presentarlo como respuestas agotadas ni descontar una respuesta no entregada por ese rechazo. Si una cita ya quedó guardada, recuperar su confirmación mediante el contrato de reintento; no ejecutarla otra vez. La consulta y cancelación de agenda siguen disponibles conforme a sus permisos.
+
+La excepción de mantenimiento permite GET/PATCH exactos de `/api/admin/abuse`, con Bearer y delegando siempre en `requireSuperadmin` de Next. GET admite ausencia de query o únicamente `?cursor=<UUID válido>`, una sola vez, para paginar también durante mantenimiento; cursores inválidos y parámetros adicionales/repetidos quedan fuera de la excepción. PATCH sigue sin admitir query. Salud/cola conserva su excepción exacta anterior. Activación: backup D1/R2 y Auth/config, mantenimiento, cola vacía, candidata con gate apagado, configuración privada validada, gate encendido y comprobado antes de reabrir una sola instancia. Véase [operación del piloto](cloudflare-no-vps-runbook.md#piloto-presupuesto-y-operación-de-la-candidata-local).
+
+Rollback conserva propuestas, políticas, invitaciones y contadores, además de los períodos y reservas. No reabrir la herramienta antigua de reserva dependiente solo del prompt; una versión que no interprete los contratos nuevos permanece cerrada para reservas hasta resolver compatibilidad. No se activan flags, modifican límites reales ni ejecutan conciliaciones al actualizar este documento.

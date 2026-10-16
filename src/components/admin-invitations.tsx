@@ -6,13 +6,13 @@ import { Notice, buttonClass, fieldClass } from '@/components/app-shell';
 import { apiFetch, errorMessage } from '@/lib/client/api';
 import type { InvitationAdminCommand, InvitationCreationResult, InvitationCommandResult, InvitationPage, InvitationSummary } from '@/types/invitations';
 
-export function AdminInvitations() {
+export function AdminInvitations({ onAccessChanged }: { onAccessChanged?: () => void | Promise<void> }) {
   const { user, isSuperadmin } = useAuth();
-  return user && isSuperadmin ? <Invitations key={user.uid} /> : null;
+  return user && isSuperadmin ? <Invitations key={user.uid} onAccessChanged={onAccessChanged} /> : null;
 }
 const date = (value: number) => new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
 const states = { available: 'Disponible', expired: 'Vencido', revoked: 'Revocado', redeemed: 'Canjeado' };
-function Invitations() {
+function Invitations({ onAccessChanged }: { onAccessChanged?: () => void | Promise<void> }) {
   const [page, setPage] = useState<InvitationPage>({ invitations: [], nextCursor: null });
   const [email, setEmail] = useState('');
   const [days, setDays] = useState(7);
@@ -60,6 +60,7 @@ function Invitations() {
       const result = await apiFetch<InvitationCommandResult>('/api/admin/invitations', { method: 'PATCH', body: JSON.stringify(command) });
       if (!active.current) return;
       upsert(result.invitation); setCommand(null); setNotice('Control de cortesía actualizado. Se conserva el consumo.');
+      try { await onAccessChanged?.(); } catch { /* refreshing the parent cannot undo a confirmed command */ }
     } catch (cause) { if (active.current) setError(errorMessage(cause)); }
     finally { if (active.current) setBusy(false); }
   }

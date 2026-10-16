@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { memoryFirestore } from './memoryFirestore';
-import { DEFAULT_AI_BUDGET_LIMITS, saveAiBudgetSettings, reservePaidCallBudget, settlePaidCallBudget, reconcilePaidCallBudget } from '@/lib/server/ai-budget';
+import { DEFAULT_AI_BUDGET_LIMITS, saveAiBudgetSettings, reservePaidCallBudget, settlePaidCallBudget, reconcilePaidCallBudget, readAdminAiBudget } from '@/lib/server/ai-budget';
 import { quotePaidCall } from '@/lib/server/ai-pricing';
 const now = Date.parse('2030-02-01T04:59:00Z');
 const context = { businessId: 'business', actorUid: 'client', mode: 'sarin_client' as const, requestId: 'synthetic-request' };
@@ -9,6 +9,14 @@ const quote = quotePaidCall({ provider: 'deepseek', model: 'deepseek-flash', req
 const input = () => ({ ...context, ...quote, callId: randomUUID(), provider: 'deepseek' as const, model: 'deepseek-flash' });
 afterEach(() => vi.unstubAllEnvs());
 describe('pre-fetch paid inference budget', () => {
+  it('paginates all uncertain calls without losing a same-date call after the first fifty', async () => {
+    const { db } = memoryFirestore(); vi.stubEnv('SUPERADMIN_UID', 'admin');
+    await saveAiBudgetSettings({ uid: 'admin' }, { expectedVersion: 0, paused: false, limits: { ...DEFAULT_AI_BUDGET_LIMITS, globalDayUsd: 100, globalMonthUsd: 100, businessDayUsd: 100, businessMonthUsd: 100 }, reason: 'Synthetic pagination' }, db);
+    for (let index = 0; index < 51; index++) await reservePaidCallBudget(input(), db, now);
+    const first = await readAdminAiBudget({ uid: 'admin' }, db), second = await readAdminAiBudget({ uid: 'admin' }, db, first.nextCursor!);
+    expect(first.calls).toHaveLength(50); expect(second.calls).toHaveLength(1); expect(second.nextCursor).toBeNull();
+    expect(new Set([...first.calls, ...second.calls].map(call => call.callId)).size).toBe(51);
+  });
   it('fails closed without validated configuration and serializes the final budget slot', async () => {
     const { db } = memoryFirestore(); vi.stubEnv('SUPERADMIN_UID', 'admin');
     await expect(reservePaidCallBudget(input(), db, now)).rejects.toMatchObject({ code: 'AI_BUDGET_UNAVAILABLE', status: 503 });

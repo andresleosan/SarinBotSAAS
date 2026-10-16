@@ -15,6 +15,8 @@ import { syntheticWhatsAppEnv, inbound, phoneId, wabaId } from './whatsapp-fixtu
 import { verifyInvitationLifecycle } from './invitation-contract';
 import { readPublicBusinessLogo, saveBusinessLogo } from '@/lib/server/business-logos';
 import sharp from 'sharp';
+import { createBookingProposal, confirmBookingProposal } from '@/lib/server/booking-proposals';
+import { updateClientPolicy } from '@/lib/server/client-policy';
 
 function user(uid: string): DecodedIdToken { return { uid, sub:uid, aud:'demo-sarin-bot', auth_time:0, exp:9999999999, iat:0, iss:'https://securetoken.google.com/demo-sarin-bot', firebase:{identities:{},sign_in_provider:'google.com'}, email:`${uid}@example.test`, name:uid }; }
 
@@ -41,6 +43,18 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     return createBusiness(identity, chosenConfig, db);
   }
   afterAll(async () => { if (db) { await db.terminate(); const app = getApps().find(value => value.name === 'sarin-admin'); if (app) await deleteApp(app); } });
+  it('confirms proposals atomically with client policy and preserves replay on Firestore', async () => {
+    const identity = user(`proposal-${crypto.randomUUID()}`), client = user(`client-${crypto.randomUUID()}`);
+    const business = await paidBusiness(identity, { ...config, slug: `proposal-${crypto.randomUUID()}` });
+    const proposal = await createBookingProposal(client, business.id, { serviceId: 's', resourceId: 'r', dateKey, startTimeStr: '10:00' }, crypto.randomUUID(), db);
+    await updateClientPolicy(identity, business.id, { clientUid: client.uid, blocked: true, reason: 'Synthetic review' }, db);
+    await expect(confirmBookingProposal(client, business.id, proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }, db)).rejects.toMatchObject({ code: 'CLIENT_BLOCKED' });
+    await updateClientPolicy(identity, business.id, { clientUid: client.uid, blocked: false, reason: 'Synthetic release' }, db);
+    const results = await Promise.all([confirmBookingProposal(client, business.id, proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }, db), confirmBookingProposal(client, business.id, proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }, db)]);
+    expect(results[0].id).toBe(results[1].id);
+    await cancelAppointment(client, business.id, results[0].id, db);
+    expect(await confirmBookingProposal(client, business.id, proposal.id, {} as never, db)).toMatchObject({ status: 'cancelled_by_client' });
+  }, 60000);
   it('preserves invitation access, quota, suspension and concurrent payment invariants on Firestore', async () => {
     await verifyInvitationLifecycle(db, config, dateKey);
   }, 75000);

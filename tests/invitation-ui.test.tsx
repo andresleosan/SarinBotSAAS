@@ -84,4 +84,15 @@ describe('invitation interfaces', () => {
       await act(async () => renderer.unmount());
     }
   });
+  it('refreshes the administrative parent after access changes without undoing successful commands', async () => {
+    const redeemed = { ...invitation, state: 'redeemed', codeState: 'redeemed', usage: { appointmentsUsed: 1, responsesUsed: 3 }, access: { state: 'active' } };
+    state.api.mockResolvedValueOnce({ invitations: [redeemed], nextCursor: null });
+    const refresh = vi.fn().mockRejectedValue(new Error('Parent refresh unavailable'));
+    await act(async () => { renderer = create(createElement(AdminInvitations, { onAccessChanged: refresh })); });
+    await act(async () => button('Suspender cortesía').props.onClick());
+    await act(async () => renderer.root.findAllByType('input').find(input => input.props.maxLength === 300)!.props.onChange({ target: { value: 'Synthetic review' } }));
+    state.api.mockResolvedValueOnce({ invitation: { ...redeemed, access: { state: 'suspended' } }, replayed: false });
+    await act(async () => renderer.root.findAllByType('form')[1].props.onSubmit({ preventDefault() {} }));
+    expect(refresh).toHaveBeenCalledTimes(1); expect(text(renderer.root)).toContain('Control de cortesía actualizado'); expect(text(renderer.root)).toContain('Cortesía suspendida');
+  });
 });

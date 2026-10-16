@@ -37,8 +37,8 @@ function payload(index: number): Payload {
 describe("debounced authenticated chat lifecycle", () => {
   let renderer: ReactTestRenderer | undefined;
   let chat!: ReturnType<typeof useDebouncedChat>;
-  function Harness({ tenantId = "business-1" }: { tenantId?: string }) {
-    chat = useDebouncedChat({ mode: "sarin_client", tenantId });
+  function Harness({ tenantId = "business-1", actorUid = 'client' }: { tenantId?: string; actorUid?: string }) {
+    chat = useDebouncedChat({ mode: "sarin_client", tenantId, actorUid });
     return null;
   }
   async function mount() {
@@ -204,6 +204,35 @@ describe("debounced authenticated chat lifecycle", () => {
     await advance();
     expect(chat.error).toBe("Motor temporalmente ocupado");
     expect(chat.quotaExhausted).toBe(false);
+  });
+  it('discards a late reply when UID changes within the same business', async () => {
+    const first = deferred<ChatResponse>(); vi.mocked(apiFetch).mockReturnValueOnce(first.promise);
+    await mount(); act(() => chat.sendMessage('Private first account')); await advance();
+    await act(async () => renderer?.update(createElement(Harness, { actorUid: 'another-client' })));
+    await act(async () => first.resolve({ reply: 'Old private answer', stateVersion: 99 }));
+    expect(chat.messages).toEqual([]); expect(chat.proposal).toBeUndefined();
+  });
+  it('serializes explicit confirmation with chat and ignores confirmation from a previous UID', async () => {
+    const proposal = { id: 'proposal', businessId: 'business-1', serviceName: 'Corte', resourceName: 'Uno', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, expiresAt: Date.now() + 600000, intakeFields: [] };
+    const confirmation = deferred<{ appointment: object }>();
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Revisa el resumen', proposal, stateVersion: 1 }).mockReturnValueOnce(confirmation.promise);
+    await mount(); act(() => chat.sendMessage('Prepara cita')); await advance();
+    await act(async () => { void chat.confirmProposal(proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }); });
+    act(() => chat.sendMessage('Not admitted while confirming')); await advance();
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[1][1]?.body))).toEqual({ confirm: true, clientPhone: '573001234567', intakeAnswers: {} });
+    await act(async () => renderer?.update(createElement(Harness, { actorUid: 'another-client' })));
+    await act(async () => confirmation.resolve({ appointment: { tenantId: 'business-1', client: { uid: 'client' }, status: 'confirmed', serviceName: 'Corte', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30' } }));
+    expect(chat.messages).toEqual([]); expect(chat.confirming).toBe(false);
+  });
+  it('preserves a retry version and starts a fresh request after state conflict', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Elegido', stateVersion: 7 }).mockRejectedValueOnce(Object.assign(new Error('State changed'), { code: 'CHAT_STATE_CONFLICT' })).mockResolvedValueOnce({ reply: 'Actualizado', stateVersion: 9 });
+    await mount(); act(() => chat.sendMessage('Primer turno')); await advance();
+    act(() => chat.sendMessage('Segundo turno')); await advance();
+    expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[1][1]?.body)).stateVersion).toBe(7);
+    await act(async () => chat.retry());
+    expect(payload(2).requestId).not.toBe(payload(1).requestId);
+    expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[2][1]?.body)).stateVersion).toBeUndefined();
   });
 
   it("does not retry an already completed turn and permits a new request", async () => {

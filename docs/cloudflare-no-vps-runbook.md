@@ -158,8 +158,56 @@ La parada de `sarin-bot-app-1` y la desactivación del timer retiraron la depend
 
 ## Drenaje del singleton durante mantenimiento
 
-Con `SARIN_MAINTENANCE=true`, el Worker devuelve 503 antes de obtener el singleton para las rutas de aplicación. Mantiene discovery/JWKS y una única excepción de lectura: `GET /api/sarin/health?scope=engine`, con esa consulta exacta y un encabezado `Authorization: Bearer <token>` sin espacios en el token. Métodos distintos, parámetros adicionales o repetidos y otras rutas siguen bloqueados. El Worker conserva el Bearer y delega la petición al endpoint Next existente: este verifica Firebase y exige el UID superadministrador; la excepción no concede acceso por sí sola.
+Con `SARIN_MAINTENANCE=true`, el Worker devuelve 503 antes de obtener el singleton para las rutas de aplicación, salvo las excepciones operativas explícitas. Mantiene discovery/JWKS y `GET /api/sarin/health?scope=engine`, con esa consulta exacta. La candidata local del piloto (`003f5ab` y posteriores) añade `GET` y `PATCH` en la ruta exacta `/api/admin/abuse`: GET admite ausencia de query o únicamente `?cursor=<UUID válido>`, una sola vez; PATCH no admite query. Ambas excepciones requieren `Authorization: Bearer <token>` sin espacios en el token; el Worker conserva el Bearer y Next verifica Firebase y exige el UID superadministrador. El encabezado por sí solo no autoriza. Otros métodos, cursores inválidos, parámetros adicionales/repetidos y rutas siguen bloqueados; la excepción de salud conserva su comportamiento anterior. Esta descripción de la candidata no afirma que ya esté publicada.
 
 Con una sesión válida de superadministrador, consultar ese endpoint operativo para observar `queue.activeSlots` y `queue.queuedRequests` antes y después de activar mantenimiento. Esperar ambos contadores en cero antes de continuar con una operación que requiera drenar solicitudes. Esta consulta solo comprueba el catálogo del motor y la cola; no ejecuta inferencias ni escrituras. Las tareas programadas no arrancan el contenedor durante mantenimiento. La consulta de salud sí puede despertarlo o mantenerlo activo: detener el sondeo al terminar para permitir su suspensión tras dos minutos de inactividad. No hace falta una interfaz de chat personal para este diagnóstico.
 
 Si Ollama está fuera de línea, Next responde 503. Únicamente para esa consulta de mantenimiento, el Worker transforma una respuesta JSON con los cinco contadores de cola válidos en HTTP 200 y devuelve solo `status: 'offline'`, `online: false`, `provider: 'ollama'` y `queue`. Esto permite observar el drenaje a través de Pages; el 200 no indica que el motor esté disponible. No expone modelos, errores ni texto del upstream. Una cola ausente o inválida conserva un fallo genérico, y las respuestas 401/403 de autenticación no se transforman.
+
+## Piloto: presupuesto y operación de la candidata local
+
+Contrato de `003f5ab` y posteriores, todavía local. El presupuesto monetario es independiente de las respuestas compradas y de los avisos de Cloudflare. `PILOT_AI_BUDGET_ENFORCED=false` o ausente mantiene la compatibilidad anterior; no reserva dinero. Su activación para el piloto requiere mantenimiento, configuración privada válida y verificación explícita. La cola continúa en una sola instancia.
+
+### Administración privada
+
+`GET /api/admin/abuse` y `PATCH /api/admin/abuse` exigen superadministrador. GET presenta configuración, estado de la compuerta y llamadas; su listado admite cursor UUID, páginas de 50 leyendo 51 y orden ascendente por id. **No es un listado de las llamadas más recientes.** Se puede paginar durante mantenimiento mediante `GET /api/admin/abuse?cursor=<UUID válido>`: `cursor` es el único parámetro permitido y no puede repetirse. GET sin query obtiene la primera página; un cursor inválido o cualquier parámetro adicional queda fuera de la excepción. PATCH sigue sin admitir query. Esto no amplía el acceso del navegador a D1 ni sustituye la autorización de Next.
+
+Para configurar, enviar por PATCH un objeto de este contrato, usando la versión vigente leída; los valores siguientes son los previstos para el piloto, no una configuración real aplicada por este documento:
+
+```json
+{
+  "action": "configure",
+  "expectedVersion": 0,
+  "paused": false,
+  "limits": {
+    "globalDayUsd": 0.5,
+    "globalMonthUsd": 8,
+    "businessDayUsd": 0.1,
+    "businessMonthUsd": 2,
+    "globalDayTokens": 20000000,
+    "globalMonthTokens": 300000000,
+    "businessDayTokens": 2000000,
+    "businessMonthTokens": 30000000
+  },
+  "reason": "Configuración revisada del piloto"
+}
+```
+
+`expectedVersion: 0` corresponde únicamente a configuración inexistente; después debe usarse la versión actual. No reintentar sobrescribiendo una actualización concurrente. Los límites se revisan según financiación y consumo; USD 8 no garantiza cubrir todos los cupos vendidos.
+
+Para conciliar una llamada, PATCH recibe `{ action: 'reconcile', callId, resolution: 'keep_reserved' | 'confirmed_not_charged', reason, evidence }`. `callId` es UUID; motivo y evidencia deben justificar la decisión sin incluir secretos o conversaciones. `keep_reserved` conserva el importe retenido; `confirmed_not_charged` solo procede con evidencia de que el proveedor no cobró. No equivale a marcar una reserva incierta como consumo cero ni a reiniciar cuotas comerciales.
+
+Cada llamada conserva la tarifa versionada y los coeficientes usados para su estimación/conciliación; cambiar tarifas no revaloriza retroactivamente registros previos. Uso o metadatos desconocidos y timeouts retienen la reserva **sin TTL ni pausa global automática por ese solo motivo**. Un modelo/tier explícitamente inesperado o un exceso de la cota reservada sí pausa nuevas llamadas globalmente. No liberar una reserva por antigüedad ni repetir una operación para intentar resolver la incertidumbre.
+
+### Activación y reversión
+
+1. Identificar la candidata y sus checks. Verificar backup recuperable de D1/R2 y, por separado, Auth y configuración; D1/R2 no respalda por sí solo identidades o secretos.
+2. Activar `SARIN_MAINTENANCE=true` y observar cola con `activeSlots=0` y `queuedRequests=0`. Conservar una sola instancia y ambos flags WhatsApp desactivados.
+3. Publicar la candidata con la entrada pública cerrada y compuerta presupuestaria en `false`. Validar sesión administrativa y las dos excepciones exactas de mantenimiento; no reabrir aún.
+4. Leer y configurar `serverSettings/pilotAiBudget` mediante la API autorizada, comprobando versión, ocho límites y pausa. Revisar reservas inciertas; no purgarlas para conseguir saldo disponible.
+5. Activar explícitamente `PILOT_AI_BUDGET_ENFORCED=true` manteniendo mantenimiento. Confirmar mediante GET el estado efectivo de compuerta/configuración y repetir drenaje. Las pruebas de la candidata deben acreditar rechazo antes del fetch; un 503 genérico del Worker por mantenimiento no demuestra un corte `AI_BUDGET_*`.
+6. Reabrir únicamente después de esas comprobaciones, manteniendo una instancia. Registrar versión y resultados sin tokens; observar gasto, reservas retenidas y agenda.
+
+Un 503 `AI_BUDGET_*` representa una pausa/control operativo; no es el 402 de agotamiento de capacidad comercial. Un rechazo sin respuesta entregada no debe consumir una respuesta del plan. Si ya existe una operación confirmada, conservar su recuperación e impedir repetirla. La prueba mantiene diez citas y 700 respuestas independientes; cancelar no devuelve un cupo ya consumido.
+
+Al revertir, volver a mantenimiento y drenar. Conservar propuestas y políticas de reserva, invitaciones, períodos, reservas monetarias y contadores; no borrar datos para adaptar una imagen antigua. No reabrir una versión que permita reservar mediante la herramienta antigua confiando solo en el prompt y omita la confirmación de servidor. Si la imagen anterior no interpreta los nuevos contratos, mantener cerradas las nuevas reservas hasta disponer de una versión compatible; restaurar solo imagen/flags no acredita una reversión segura. Este procedimiento documental no ejecuta un despliegue.
