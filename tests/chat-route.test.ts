@@ -8,7 +8,7 @@ vi.mock('../src/lib/server/auth', async () => {
   const { HttpError } = await import('../src/lib/server/http');
   return { requireUser: async (request: Request) => { if (!request.headers.has('authorization')) throw new HttpError(401, 'Login'); return { uid: 'client', email: 'client@example.test', name: state.userName }; } };
 });
-vi.mock('../src/lib/sarin/engine', () => ({ completeChat: state.complete }));
+vi.mock('../src/lib/sarin/engine', async (importOriginal) => ({ ...await importOriginal<typeof import('../src/lib/sarin/engine')>(), completeChat: state.complete }));
 import { POST } from '../src/app/api/sarin/chat/route';
 import { cancelAppointment } from '../src/lib/server/bookings';
 import type { DecodedIdToken } from 'firebase-admin/auth';
@@ -18,9 +18,33 @@ const business: Business = { id: 'business', slug: 'real', ownerUid: 'owner', ow
 const body = { mode: 'sarin_client', tenantId: 'business', requestId: 'request-one', messages: [{ role: 'user', content: 'Agenda corte el lunes 7 a las 9.' }] };
 const request = (data: unknown = body, authenticated = true) => new Request('http://localhost/api/sarin/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: 'Bearer token' } : {}) }, body: JSON.stringify(data) });
 const bookingCall = () => ({ role: 'assistant', content: null, tool_calls: [{ id: 'call-book', type: 'function', function: { name: 'crear_cita', arguments: JSON.stringify({ dateKey: '2030-01-07', startTimeStr: '09:00', serviceId: 'cut', resourceId: 'chair', clientPhone: '573001234567', intakeAnswers: {} }) } }] });
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); state.db = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown> }).db; state.complete.mockReset(); state.userName = 'Cliente'; });
-afterEach(() => vi.useRealTimers());
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); vi.stubEnv('SARIN_CHAT_PROVIDER', 'ollama'); state.db = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown> }).db; state.complete.mockReset(); state.userName = 'Cliente'; });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 describe('authenticated tool orchestration', () => {
+  it('keeps one provider across the tool loop while a later turn observes an admin switch', async () => {
+    const { db } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } });
+    state.db = db;
+    state.complete.mockImplementationOnce(async () => {
+      await db.collection('serverSettings').doc('ai').set({ provider: 'ollama', updatedAt: now + 1 });
+      return bookingCall();
+    }).mockResolvedValue({ role: 'assistant', content: 'Consulta completada.' });
+    expect((await POST(request())).status).toBe(200);
+    expect(state.complete.mock.calls.map(call => call[2]?.provider)).toEqual(['deepseek', 'deepseek']);
+    expect((await POST(request({ ...body, requestId: 'second-provider-turn' }))).status).toBe(200);
+    expect(state.complete.mock.calls.at(-1)?.[2]?.provider).toBe('ollama');
+  });
+  it('uses the private selection for onboarding as well as booking chat', async () => {
+    state.db = memoryFirestore({ 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }).db;
+    state.complete.mockResolvedValue({ role: 'assistant', content: 'Describe tu negocio.' });
+    expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '' }))).status).toBe(200);
+    expect(state.complete.mock.calls[0][2]?.provider).toBe('deepseek');
+  });
+  it('refuses an invalid persisted provider before inference or tools run', async () => {
+    state.db = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'unsupported', updatedAt: now } }).db;
+    state.complete.mockResolvedValue(bookingCall());
+    expect((await POST(request())).status).toBe(503);
+    expect(state.complete).not.toHaveBeenCalled();
+  });
   it('rejects unauthenticated inference before calling the local engine', async () => {
     expect((await POST(request(body, false))).status).toBe(401);
     expect(state.complete).not.toHaveBeenCalled();

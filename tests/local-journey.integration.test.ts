@@ -102,6 +102,11 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
         const session = await api<{ isSuperadmin: boolean }>('/api/session', identity.token);
         check(session.response.ok && session.body.isSuperadmin === false, 'Una cuenta sintética recibió acceso administrativo.');
       }
+      for (const method of ['GET', 'PATCH']) {
+        const body = method === 'PATCH' ? { provider: 'deepseek' } : undefined;
+        check((await api('/api/admin/ai', undefined, method, body)).response.status === 401, 'El selector de IA admitió una solicitud sin sesión.');
+        check((await api('/api/admin/ai', owner.token, method, body)).response.status === 403, 'Una cuenta normal accedió al selector de IA.');
+      }
       console.log('Fase 1 OK: Auth oficial, roles y aislamiento del servidor demo.');
 
       const config = businessConfigSchema.parse({ name: 'Negocio sintético del ensayo', category: 'Ensayo sin clientes reales', slug: fixture.slug, phoneWhatsApp: '573001234567',

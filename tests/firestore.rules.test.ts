@@ -23,6 +23,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
         setDoc(doc(db, 'users', 'stale-admin'), { isSuperadmin: true, role:'superadmin' }),
         setDoc(doc(db, 'paymentReceipts', 'payment'), { ownerUid:'owner-one' }),
         setDoc(doc(db, 'paymentImages', 'payment'), { ownerUid:'owner-one', receiptDataUrl:'sensitive' }),
+        setDoc(doc(db, 'serverSettings', 'ai'), { provider:'ollama', updatedAt:1 }),
       ]);
     });
   });
@@ -59,5 +60,19 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
     const customer = environment.authenticatedContext('customer').firestore();
     await assertFails(updateDoc(doc(customer,'users','customer'),{isSuperadmin:true}));
     await assertFails(setDoc(doc(customer,'vault','secret'),{content:'never in Firestore'}));
+  });
+  it('keeps the global AI selection private and rejects direct browser changes, including forged admin claims', async () => {
+    const contexts = [
+      environment.unauthenticatedContext(),
+      environment.authenticatedContext('owner-one'),
+      environment.authenticatedContext('stale-admin', { role:'superadmin', isSuperadmin:true }),
+    ];
+    for (const context of contexts) {
+      const db = context.firestore();
+      await assertFails(getDoc(doc(db,'serverSettings','ai')));
+      await assertFails(getDocs(collection(db,'serverSettings')));
+      await assertFails(updateDoc(doc(db,'serverSettings','ai'),{provider:'deepseek'}));
+      await assertFails(setDoc(doc(db,'serverSettings','other'),{provider:'deepseek'}));
+    }
   });
 });

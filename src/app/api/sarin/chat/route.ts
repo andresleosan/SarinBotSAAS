@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/server/auth';
 import { apiError, HttpError, readJson } from '@/lib/server/http';
 import { runUserInference } from '@/lib/server/inference';
+import { getAiProviderSelection } from '@/lib/server/provider-settings';
 import { assertOwner, createBusiness, getBusiness, getOwnedBusiness, stableDocumentId } from '@/lib/server/businesses';
 import { createAppointment, createManualBlock, readAppointments, readAvailability } from '@/lib/server/bookings';
 import { availabilitySchema, bookingSchema, businessConfigSchema, chatSchema } from '@/lib/server/schemas';
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
     const system = body.mode === 'sarin_onboarding' ? buildSarinOnboardingPrompt() : body.mode === 'sarin_owner_copilot' ? buildSarinOwnerCopilotPrompt(business!) : buildSarinClientPrompt(business!);
     const messages: EngineMessage[] = [{ role: 'system', content: system }, ...body.messages];
     const toolResults: ToolResult[] = [];
+    const { provider } = await getAiProviderSelection();
 
     const response = await runUserInference(user.uid, () => runInSarinQueue(async () => {
       for (let round = 0; round < 4; round++) {
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
           if (body.mode === 'sarin_owner_copilot') assertOwner(business, user.uid);
         }
         let assistant;
-        try { assistant = await completeChat(messages, tools, { signal: request.signal }); }
+        try { assistant = await completeChat(messages, tools, { signal: request.signal, provider }); }
         catch (error) {
           // A model explanation can fail after a committed mutation. Return its
           // verified result so the browser never retries an already saved action.

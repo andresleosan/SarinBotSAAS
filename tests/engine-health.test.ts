@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { memoryFirestore } from './memoryFirestore';
 
 const auth = vi.hoisted(() => ({ requireUser: vi.fn(), isSuperadmin: vi.fn() }));
 vi.mock('@/lib/server/auth', () => auth);
+const database = vi.hoisted(() => ({ db: undefined as unknown }));
+vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => database.db }));
 import { GET } from '@/app/api/sarin/health/route';
 import { HttpError } from '@/lib/server/http';
 
 const state = globalThis as typeof globalThis & { __sarinProbe?: unknown; __sarinProbes?: unknown };
 beforeEach(() => {
+  database.db = memoryFirestore().db;
   delete state.__sarinProbe;
   delete state.__sarinProbes;
   auth.requireUser.mockReset().mockResolvedValue({ uid: 'admin' });
@@ -22,13 +26,29 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); delete state.__sarinProbes; delete state.__sarinProbe; });
 
 describe('chat and Vault health', () => {
+  it('follows persisted changes immediately while keeping separate provider health caches', async () => {
+    const { db } = memoryFirestore({ 'serverSettings/ai': { provider: 'deepseek', updatedAt: 123 } }); database.db = db;
+    vi.stubEnv('SARIN_CHAT_PROVIDER', 'ollama');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => Response.json({ data: [{ id: url.includes('api.deepseek.com') ? 'deepseek-flash' : 'qwen3:32b' }] })));
+    expect(await (await GET(new Request('http://localhost/api/sarin/health'))).json()).toMatchObject({ provider: 'deepseek', status: 'online' });
+    await db.collection('serverSettings').doc('ai').set({ provider: 'ollama', updatedAt: 124 });
+    expect(await (await GET(new Request('http://localhost/api/sarin/health'))).json()).toMatchObject({ provider: 'ollama', status: 'online' });
+  });
+
+  it('fails closed for invalid chat selection while Vault remains explicitly local', async () => {
+    database.db = memoryFirestore({ 'serverSettings/ai': { provider: 'unsupported', updatedAt: 123 } }).db;
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ id: 'qwen3:32b' }] })));
+    expect((await GET(new Request('http://localhost/api/sarin/health'))).status).toBe(503);
+    expect(fetch).not.toHaveBeenCalled();
+    const vault = await GET(new Request('http://localhost/api/sarin/health?scope=vault'));
+    expect(await vault.json()).toMatchObject({ provider: 'ollama', status: 'online' });
+    expect(vi.mocked(fetch).mock.calls.map(call => call[0])).toEqual(['https://ia-sarin.alsdevstudio.com/v1/models']);
+  });
+
   it.each([
     { provider: 'deepseek', model: 'deepseek-flash', modelsUrl: 'https://api.deepseek.com/models' },
-    { provider: 'gemini', model: 'gemini-3.5-flash-lite', modelsUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/models' },
   ])('keeps a successful $provider probe separate from a stopped local Vault and caches each', async ({ provider, model, modelsUrl }) => {
     vi.stubEnv('SARIN_CHAT_PROVIDER', provider);
-    vi.stubEnv('GEMINI_API_KEY', 'synthetic-google-key');
-    vi.stubEnv('GEMINI_MODEL', 'gemini-3.5-flash-lite');
     const fetcher = vi.fn(async (url: string) => url === modelsUrl
       ? Response.json({ data: [{ id: model }] }) : new Response(null, { status: 503 }));
     vi.stubGlobal('fetch', fetcher);

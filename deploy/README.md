@@ -67,11 +67,9 @@ Una reversión de imagen no revierte Firestore: la versión anterior puede mostr
 
 ### Opción B temporal de chat
 
-La [guía de DeepSeek](../docs/deepseek-option-b.md) describe activación y vuelta a Ollama. Después de desplegar una imagen que incluya ese soporte, selecciona `SARIN_CHAT_PROVIDER=deepseek` y guarda `DEEPSEEK_API_KEY` exclusivamente en el archivo runtime privado. Compose con `env_file` raw admite estas variables sin argumentos de build. Recrea únicamente `app`, conserva una sola réplica y comprueba el chat autenticado. Vault sigue ligado a Ollama; no cambies `SARIN_TUNNEL_URL` ni los secretos de Access. Para volver, selecciona `ollama` y recrea `app` tras verificar la Mac. `docker compose restart` por sí solo no carga un archivo de entorno modificado.
+La [guía de DeepSeek](../docs/deepseek-option-b.md) describe la selección entre IA local y DeepSeek desde `/admin`. Guarda `DEEPSEEK_API_KEY` exclusivamente en el runtime privado; instalar o cambiar una clave requiere recrear únicamente `app`, conservando una réplica. Una vez disponible la configuración, el selector guarda `serverSettings/ai` mediante una API exclusiva del superadministrador y valida el catálogo antes de aplicar el cambio. No requiere reiniciar para alternar proveedores: afecta nuevas solicitudes y conserva el proveedor de cada turno en curso.
 
-### Opción C manual con Gemini
-
-La [guía de Gemini](../docs/gemini-option-c.md) documenta `SARIN_CHAT_PROVIDER=gemini`, `GEMINI_MODEL=gemini-3.5-flash-lite` y `GEMINI_API_KEY` solo en runtime privado, con el mismo procedimiento de recreación y retorno. Pasaron catálogo y herramientas reales con datos sintéticos, pero Gemini no está activo para el chat: el proyecto Google permanece gratuito y no se ha autorizado ni habilitado su facturación. Ese nivel no debe recibir los datos personales que puede contener una reserva. Revisar la decisión de uso y privacidad en la guía antes de seleccionarlo para usuarios reales; Vault continúa exclusivamente en Ollama.
+`SARIN_CHAT_PROVIDER` define el valor inicial solo cuando no hay selección guardada. Cambiar ese env no sustituye el valor persistido. Vault sigue ligado a Ollama; conserva `SARIN_TUNNEL_URL` y los secretos de Access. Verifica la Mac antes de seleccionar IA local. Un rollback a una imagen anterior al selector vuelve a usar el env e ignora el documento privado: comprueba el proveedor efectivo antes de aceptar nuevos turnos. El acceso Google y Firebase no forman parte de la integración de IA retirada.
 
 ## Firebase Admin: identidad de producción
 

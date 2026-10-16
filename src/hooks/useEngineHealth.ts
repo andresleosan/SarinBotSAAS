@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, errorMessage } from "@/lib/client/api";
+import type { AiProvider } from "@/types/ai";
 
 interface EngineHealth {
   status: "online" | "offline";
+  provider?: AiProvider;
   queue?: {
     activeSlots: number;
     queuedRequests: number;

@@ -10,7 +10,7 @@ export function localDevelopmentEnvironment(input) {
   return {
     ...env, NODE_ENV:'development', NEXT_TELEMETRY_DISABLED:'1', CI:'1',
     // Explicit values also prevent Next's dotenv loading from enabling cloud inference.
-    SARIN_CHAT_PROVIDER:'ollama', DEEPSEEK_API_KEY:'', DEEPSEEK_MODEL:'', GEMINI_API_KEY:'', GEMINI_MODEL:'',
+    SARIN_CHAT_PROVIDER:'ollama', DEEPSEEK_API_KEY:'', DEEPSEEK_MODEL:'',
     NEXT_PUBLIC_FIREBASE_EMULATORS:'true',
     NEXT_PUBLIC_FIREBASE_API_KEY:'sarin-local-emulator-only',
     NEXT_PUBLIC_FIREBASE_APP_ID:'sarin-local-emulator-only',

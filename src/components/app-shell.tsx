@@ -15,7 +15,7 @@ const businessLinks: NavigationItem[] = [
   { href: "/dashboard/billing", label: "Suscripción", icon: CreditCard },
 ];
 const adminLinks: NavigationItem[] = [
-  { href: "/admin", label: "Negocios y pagos", icon: LayoutDashboard },
+  { href: "/admin", label: "Control de Sarin", icon: LayoutDashboard },
   { href: "/admin/vault", label: "Sarin Vault", icon: LockKeyhole },
   { href: "/dashboard", label: "Mi negocio", icon: CalendarDays },
 ];

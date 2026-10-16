@@ -1,17 +1,18 @@
 import 'server-only';
 import { z } from 'zod';
 import { HttpError } from '@/lib/server/http';
+import type { AiProvider } from '@/types/ai';
 
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
-export interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string }; extra_content?: { google?: { thought_signature?: string } }; }
+export interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string }; }
 export interface ToolDefinition { type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> }; }
 export interface EngineMessage { role: 'system' | 'user' | 'assistant' | 'tool'; content: string | null | ContentPart[]; tool_calls?: ToolCall[]; tool_call_id?: string; }
 export interface EngineAssistantMessage { role: 'assistant'; content: string | null; tool_calls?: ToolCall[]; }
-export type EngineProvider = 'ollama' | 'deepseek' | 'gemini';
+export type EngineProvider = AiProvider;
 export interface EngineHealth { provider: EngineProvider | null; online: boolean; checkedAt: number; visionAvailable: boolean; error?: string; }
 
 function validateProvider(provider: string): EngineProvider {
-  if (provider !== 'ollama' && provider !== 'deepseek' && provider !== 'gemini') throw new HttpError(503, 'El proveedor de conversaciones no es válido.');
+  if (provider !== 'ollama' && provider !== 'deepseek') throw new HttpError(503, 'El proveedor de conversaciones no es válido.');
   return provider;
 }
 
@@ -34,15 +35,6 @@ function engineConfig(vision = false, selectedProvider = getChatProvider()) {
     headers.Authorization = `Bearer ${key}`;
     return { provider, url: new URL('https://api.deepseek.com/chat/completions'), headers, model, timeoutMs };
   }
-  if (provider === 'gemini') {
-    if (vision) throw new HttpError(503, 'Las imágenes requieren el motor local de la Mac.');
-    const key = process.env.GEMINI_API_KEY;
-    if (!key || !/^[\x21-\x7e]+$/.test(key)) throw new HttpError(503, 'Configura una credencial válida de Gemini en el servidor.');
-    const model = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite';
-    if (model !== 'gemini-3.5-flash-lite') throw new HttpError(503, 'El modelo configurado de Gemini no está habilitado.');
-    headers.Authorization = `Bearer ${key}`;
-    return { provider, url: new URL('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'), headers, model, timeoutMs };
-  }
   let url: URL;
   try { url = new URL(process.env.SARIN_TUNNEL_URL ?? ''); } catch { throw new HttpError(503, 'El motor local no está configurado.'); }
   const local = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
@@ -62,10 +54,10 @@ function engineConfig(vision = false, selectedProvider = getChatProvider()) {
 
 function unavailableMessage(provider: EngineProvider, status?: number): string {
   if (provider === 'ollama') return 'El motor local no está disponible. Comprueba Ollama y el túnel.';
-  const name = provider === 'gemini' ? 'Gemini' : 'DeepSeek';
+  const name = 'DeepSeek';
   if (status === 401 || status === 403) return `${name} rechazó la credencial del servidor. Revisa su configuración.`;
   if (status === 402) return `${name} no tiene saldo disponible. Revisa la cuenta del proveedor.`;
-  if (status === 429) return provider === 'gemini' ? 'Gemini alcanzó su cuota de uso. Revisa el límite del proyecto e inténtalo más tarde.' : 'DeepSeek alcanzó su límite de solicitudes. Inténtalo de nuevo en un momento.';
+  if (status === 429) return 'DeepSeek alcanzó su límite de solicitudes. Inténtalo de nuevo en un momento.';
   return `Sarin no puede conectar con ${name}. Inténtalo de nuevo en un momento.`;
 }
 
@@ -88,9 +80,7 @@ async function responseJson(response: Response): Promise<unknown> {
 
 const assistantSchema = z.object({ choices: z.array(z.object({ message: z.object({
   content: z.string().max(512_000).nullable().optional(),
-  tool_calls: z.array(z.object({ id: z.string().min(1).max(200), type: z.literal('function'), function: z.object({ name: z.string().min(1).max(100), arguments: z.string().max(64_000) }),
-    extra_content: z.object({ google: z.object({ thought_signature: z.string().max(128_000).optional() }).optional() }).optional(),
-  })).max(8).optional(),
+  tool_calls: z.array(z.object({ id: z.string().min(1).max(200), type: z.literal('function'), function: z.object({ name: z.string().min(1).max(100), arguments: z.string().max(64_000) }) })).max(8).optional(),
 }) })).min(1).max(4) });
 
 export async function completeChat(messages: EngineMessage[], tools?: readonly ToolDefinition[], options: { vision?: boolean; signal?: AbortSignal; provider?: EngineProvider } = {}): Promise<EngineAssistantMessage> {
@@ -98,15 +88,15 @@ export async function completeChat(messages: EngineMessage[], tools?: readonly T
   if (config.provider !== 'ollama' && messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url'))) {
     throw new HttpError(503, 'Las imágenes requieren el motor local de la Mac.');
   }
-  // Thought signatures belong to Google. Preserve them for its tool loop only.
-  const requestMessages = config.provider === 'gemini' ? messages : messages.map(message => message.tool_calls ? {
+  // Only the supported function-call fields may leave the server.
+  const requestMessages = messages.map(message => message.tool_calls ? {
     ...message, tool_calls: message.tool_calls.map(call => ({ id: call.id, type: call.type, function: call.function })),
   } : message);
   try {
     const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(config.timeoutMs)]) : AbortSignal.timeout(config.timeoutMs);
     const response = await fetch(config.url.toString(), { method: 'POST', headers: config.headers, cache: 'no-store', redirect: 'error', signal,
       body: JSON.stringify({ model: config.model, messages: requestMessages, stream: false, max_tokens: 4096,
-        ...(config.provider === 'gemini' ? { reasoning_effort: 'minimal' } : { temperature: 0.2, ...(config.provider === 'deepseek' ? { thinking: { type: 'disabled' } } : { think: false }) }),
+        temperature: 0.2, ...(config.provider === 'deepseek' ? { thinking: { type: 'disabled' } } : { think: false }),
         ...(tools?.length ? { tools, tool_choice: 'auto' } : {}) }) });
     if (!response.ok) { await response.body?.cancel(); throw new HttpError(503, unavailableMessage(config.provider, response.status)); }
     const parsed = assistantSchema.safeParse(await responseJson(response));
@@ -121,6 +111,12 @@ export async function completeChat(messages: EngineMessage[], tools?: readonly T
   }
 }
 
+/** Safe configuration summary for the authenticated administrator; no endpoints or credentials. */
+export function getEngineConfiguration(provider: EngineProvider): { configured: boolean; model: string | null; error?: string } {
+  try { return { configured: true, model: engineConfig(false, provider).model }; }
+  catch (error) { return { configured: false, model: null, error: error instanceof HttpError ? error.message : 'La configuración del proveedor no es válida.' }; }
+}
+
 export async function probeEngine(selectedProvider?: EngineProvider): Promise<EngineHealth> {
   let provider: EngineProvider | null = null;
   try {
@@ -130,7 +126,7 @@ export async function probeEngine(selectedProvider?: EngineProvider): Promise<En
     const response = await fetch(modelsUrl.toString(), { headers: config.headers, method: 'GET', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(5000) });
     if (!response.ok) { await response.body?.cancel(); throw new HttpError(503, unavailableMessage(provider, response.status)); }
     const data = z.object({ data: z.array(z.object({ id: z.string() })) }).safeParse(await responseJson(response));
-    const ids = data.success ? data.data.data.map((entry) => provider === 'gemini' ? entry.id.replace(/^models\//, '') : entry.id) : [];
+    const ids = data.success ? data.data.data.map((entry) => entry.id) : [];
     const online = ids.includes(config.model);
     return { provider, online, checkedAt: Date.now(), visionAvailable: provider === 'ollama' && Boolean(process.env.OLLAMA_VISION_MODEL && ids.includes(process.env.OLLAMA_VISION_MODEL)),
       ...(!online ? { error: unavailableMessage(provider) } : {}) };

@@ -5,8 +5,6 @@ beforeEach(() => {
   vi.stubEnv('SARIN_CHAT_PROVIDER', undefined);
   vi.stubEnv('DEEPSEEK_API_KEY', undefined);
   vi.stubEnv('DEEPSEEK_MODEL', undefined);
-  vi.stubEnv('GEMINI_API_KEY', undefined);
-  vi.stubEnv('GEMINI_MODEL', undefined);
   vi.stubEnv('LLM_REQUEST_TIMEOUT_MS', '120000');
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Unexpected network boundary')));
 });
@@ -20,149 +18,6 @@ const completionResponse = () => Response.json({
   usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
 });
 
-const geminiResponse = (toolCalls?: unknown[]) => Response.json({
-  id: 'synthetic-gemini-completion', object: 'chat.completion', created: 1893456000, model: 'gemini-3.5-flash-lite',
-  choices: [{ index: 0, message: { role: 'assistant', content: toolCalls ? null : 'Consulta completada.', ...(toolCalls ? { tool_calls: toolCalls } : {}) }, finish_reason: toolCalls ? 'tool_calls' : 'stop' }],
-  usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
-});
-
-describe('explicit Gemini transport', () => {
-  beforeEach(() => {
-    vi.stubEnv('SARIN_CHAT_PROVIDER', 'gemini');
-    vi.stubEnv('GEMINI_API_KEY', 'AQ.synthetic-google-key');
-    vi.stubEnv('DEEPSEEK_API_KEY', 'synthetic-deepseek-key');
-    vi.stubEnv('SARIN_TUNNEL_URL', 'https://private.example.com/v1/chat/completions');
-    vi.stubEnv('CF_ACCESS_CLIENT_ID', 'synthetic-cf-id');
-    vi.stubEnv('CF_ACCESS_CLIENT_SECRET', 'synthetic-cf-secret');
-    vi.stubEnv('OLLAMA_MAIN_MODEL', 'qwen3:32b');
-  });
-
-  it('sends requests to the fixed Google endpoint with only its credential and supported generation settings', async () => {
-    const fetcher = vi.fn().mockResolvedValue(geminiResponse());
-    vi.stubGlobal('fetch', fetcher);
-    expect(await completeChat(textTurn)).toEqual({ role: 'assistant', content: 'Consulta completada.' });
-    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
-    expect(init).toMatchObject({ method: 'POST', cache: 'no-store', redirect: 'error' });
-    expect(Object.fromEntries(new Headers(init.headers))).toEqual({ accept: 'application/json', authorization: 'Bearer AQ.synthetic-google-key', 'content-type': 'application/json' });
-    expect(JSON.parse(String(init.body))).toEqual({ model: 'gemini-3.5-flash-lite', messages: textTurn, stream: false, max_tokens: 4096, reasoning_effort: 'minimal' });
-    expect(fetcher).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([
-    ['missing key', 'GEMINI_API_KEY', undefined],
-    ['whitespace key', 'GEMINI_API_KEY', 'AQ. key'],
-    ['control character key', 'GEMINI_API_KEY', 'AQ.key\r\nInjected: value'],
-    ['non-ASCII key', 'GEMINI_API_KEY', 'AQ.clavé'],
-    ['unsupported model', 'GEMINI_MODEL', 'gemini-other'],
-  ])('rejects %s before sending data', async (_name, key, value) => {
-    vi.stubEnv(key, value);
-    const fetcher = vi.fn().mockResolvedValue(geminiResponse());
-    vi.stubGlobal('fetch', fetcher);
-    await expect(completeChat(textTurn)).rejects.toMatchObject({ status: 503, message: expect.stringMatching(/Gemini/) });
-    expect(fetcher).not.toHaveBeenCalled();
-  });
-
-  it('preserves opaque signatures through two tool rounds including unsigned parallel calls', async () => {
-    const first = { ...toolCall, extra_content: { google: { thought_signature: '  opaque-A+/=\n' } } };
-    const parallel = { ...toolCall, id: 'parallel-call' };
-    const second = { ...toolCall, id: 'second-round', extra_content: { google: { thought_signature: 'opaque-B+/=' } } };
-    const fetcher = vi.fn().mockResolvedValueOnce(geminiResponse([first, parallel])).mockResolvedValueOnce(geminiResponse([second])).mockResolvedValueOnce(geminiResponse());
-    vi.stubGlobal('fetch', fetcher);
-    const tools = [{ type: 'function' as const, function: { name: 'consultar_disponibilidad', description: 'Consulta.', parameters: { type: 'object', properties: {} } } }];
-    const messages: EngineMessage[] = [...textTurn];
-    const answerOne = await completeChat(messages, tools);
-    expect(answerOne.tool_calls).toEqual([first, parallel]);
-    messages.push(answerOne, { role: 'tool', tool_call_id: first.id, content: '{}' }, { role: 'tool', tool_call_id: parallel.id, content: '{}' });
-    const answerTwo = await completeChat(messages, tools);
-    expect(answerTwo.tool_calls).toEqual([second]);
-    messages.push(answerTwo, { role: 'tool', tool_call_id: second.id, content: '{}' });
-    await completeChat(messages, tools);
-    const roundTwo = JSON.parse(String(fetcher.mock.calls[1][1].body));
-    const roundThree = JSON.parse(String(fetcher.mock.calls[2][1].body));
-    expect(roundTwo.messages[1].tool_calls).toEqual([first, parallel]);
-    expect(roundThree.messages[1].tool_calls).toEqual([first, parallel]);
-    expect(roundThree.messages[4].tool_calls).toEqual([second]);
-    expect(roundThree).toMatchObject({ tools, tool_choice: 'auto' });
-  });
-
-  it('retains only the documented Google metadata fields', async () => {
-    const signed = { ...toolCall, extra_content: { unknown: 'discard', google: { thought_signature: 'opaque', unknown: 'discard' } } };
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(geminiResponse([signed])));
-    expect((await completeChat(textTurn)).tool_calls).toEqual([{ ...toolCall, extra_content: { google: { thought_signature: 'opaque' } } }]);
-  });
-
-  it.each([
-    ['signature number', { google: { thought_signature: 12 } }],
-    ['signature object', { google: { thought_signature: { secret: true } } }],
-    ['oversized signature', { google: { thought_signature: 'a'.repeat(128_001) } }],
-    ['invalid Google metadata', { google: 'invalid' }],
-  ])('rejects %s without retrying', async (_name, metadata) => {
-    const fetcher = vi.fn().mockResolvedValue(geminiResponse([{ ...toolCall, extra_content: metadata }]));
-    vi.stubGlobal('fetch', fetcher);
-    await expect(completeChat(textTurn)).rejects.toMatchObject({ status: 502 });
-    expect(fetcher).toHaveBeenCalledTimes(1);
-  });
-
-  it.each(['ollama', 'deepseek'] as const)('removes Google metadata before sending a history to %s without mutating it', async provider => {
-    const signed = { ...toolCall, extra_content: { google: { thought_signature: 'opaque-do-not-export' } } };
-    const messages: EngineMessage[] = [...textTurn, { role: 'assistant', content: null, tool_calls: [signed] }, { role: 'tool', tool_call_id: signed.id, content: '{}' }];
-    const fetcher = vi.fn().mockResolvedValue(completionResponse());
-    vi.stubGlobal('fetch', fetcher);
-    await completeChat(messages, undefined, { provider });
-    const init = fetcher.mock.calls[0][1] as RequestInit;
-    expect(JSON.parse(String(init.body)).messages[1].tool_calls).toEqual([toolCall]);
-    expect(String(init.body)).not.toContain('opaque-do-not-export');
-    expect(messages[1].tool_calls?.[0].extra_content).toEqual({ google: { thought_signature: 'opaque-do-not-export' } });
-    expect(new Headers(init.headers).get('authorization')).toBe(provider === 'deepseek' ? 'Bearer synthetic-deepseek-key' : null);
-  });
-
-  it.each([false, true])('rejects cloud image processing before fetch with vision=%s', async vision => {
-    const fetcher = vi.fn().mockResolvedValue(geminiResponse());
-    vi.stubGlobal('fetch', fetcher);
-    await expect(completeChat(vision ? textTurn : [{ role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,c3ludGhldGlj' } }] }], undefined, { vision })).rejects.toMatchObject({ status: 503, message: expect.stringMatching(/local/) });
-    expect(fetcher).not.toHaveBeenCalled();
-  });
-
-  it.each(['generativelanguage.googleapis.com', 'nested.generativelanguage.googleapis.com', 'generativelanguage.googleapis.com.'])('refuses %s as a local tunnel', async hostname => {
-    vi.stubEnv('SARIN_TUNNEL_URL', `https://${hostname}/v1/chat/completions`);
-    const fetcher = vi.fn().mockResolvedValue(geminiResponse());
-    vi.stubGlobal('fetch', fetcher);
-    await expect(completeChat(textTurn, undefined, { provider: 'ollama' })).rejects.toMatchObject({ status: 503 });
-    expect(fetcher).not.toHaveBeenCalled();
-  });
-
-  it('probes the Google catalog with isolated credentials', async () => {
-    const fetcher = vi.fn().mockResolvedValue(Response.json({ object: 'list', data: [{ id: 'gemini-3.5-flash-lite', object: 'model', owned_by: 'google' }] }));
-    vi.stubGlobal('fetch', fetcher);
-    expect(await probeEngine()).toMatchObject({ provider: 'gemini', online: true, visionAvailable: false });
-    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/models');
-    expect(init).toMatchObject({ method: 'GET', cache: 'no-store', redirect: 'error' });
-    expect(Object.fromEntries(new Headers(init.headers))).toEqual({ accept: 'application/json', authorization: 'Bearer AQ.synthetic-google-key', 'content-type': 'application/json' });
-  });
-
-  it('recognizes a Gemini catalog ID with the models/ resource prefix', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ object: 'list', data: [{ id: 'models/gemini-3.5-flash-lite', object: 'model', owned_by: 'google' }] })));
-    expect(await probeEngine()).toMatchObject({ provider: 'gemini', online: true, visionAvailable: false });
-  });
-
-  it.each(['ollama', 'deepseek'] as const)('preserves exact catalog matching for %s', async provider => {
-    const id = provider === 'ollama' ? 'models/qwen3:32b' : 'models/deepseek-flash';
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ data: [{ id }] })));
-    expect(await probeEngine(provider)).toMatchObject({ provider, online: false });
-  });
-
-  it('reports exhausted Gemini quota without retrying or exposing upstream details', async () => {
-    const fetcher = vi.fn().mockImplementation(async () => new Response('synthetic-private-quota-details', { status: 429 }));
-    vi.stubGlobal('fetch', fetcher);
-    const failure = await completeChat(textTurn).catch(error => error);
-    expect(failure).toMatchObject({ status: 503, message: expect.stringMatching(/Gemini.*cuota/i) });
-    expect(failure.message).not.toContain('synthetic-private');
-    expect(await probeEngine()).toMatchObject({ provider: 'gemini', online: false, visionAvailable: false, error: expect.stringMatching(/Gemini.*cuota/i) });
-    expect(fetcher).toHaveBeenCalledTimes(2);
-  });
-});
 describe('local inference transport', () => {
   it('uses server CF credentials, rejects redirects, routes vision and disables caching', async () => {
     vi.stubEnv('SARIN_TUNNEL_URL','https://private.example.com/v1/chat/completions');
@@ -258,7 +113,7 @@ describe('explicit DeepSeek transport', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it.each(['api.deepseek.com', 'nested.api.deepseek.com', 'api.deepseek.com.'])('refuses %s as a local tunnel before exposing CF credentials', async host => {
+  it.each(['api.deepseek.com', 'nested.api.deepseek.com', 'api.deepseek.com.', 'generativelanguage.googleapis.com', 'nested.generativelanguage.googleapis.com', 'generativelanguage.googleapis.com.'])('refuses %s as a local tunnel before exposing CF credentials', async host => {
     vi.stubEnv('SARIN_TUNNEL_URL', `https://${host}/v1/chat/completions`);
     const fetcher = vi.fn().mockResolvedValue(completionResponse());
     vi.stubGlobal('fetch', fetcher);

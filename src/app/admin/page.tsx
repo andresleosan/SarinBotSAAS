@@ -21,6 +21,7 @@ import {
 } from "@/components/app-shell";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useEngineHealth } from "@/hooks/useEngineHealth";
+import { AdminAiSettings } from "@/components/admin-ai-settings";
 import { BILLING_PLANS, getBillingPlan } from "@/lib/billing-plans";
 import type {
   Business,
@@ -167,9 +168,9 @@ function Console() {
           <p className="text-xs uppercase tracking-widest text-sarin-blue">
             Administración
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Negocios y pagos</h1>
+          <h1 className="mt-2 text-3xl font-bold">Control de Sarin</h1>
           <p className="mt-2 text-sm text-sarin-muted">
-            Revisa comprobantes y supervisa el acceso de cada negocio.
+            Administra las suscripciones, revisa pagos y elige la IA de los negocios.
           </p>
         </div>
         <Link
@@ -186,7 +187,7 @@ function Console() {
         <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
           <p className="flex items-center gap-2 text-xs text-sarin-muted">
             <Cpu className="h-4 w-4" />
-            Motor local
+            IA del negocio
           </p>
           <p
             className={`mt-2 text-lg font-semibold ${engine.health?.status === "online" ? "text-sarin-blue" : "text-amber-800"}`}
@@ -196,6 +197,9 @@ function Console() {
                 ? "Disponible"
                 : "Sin conexión"
               : "Verificando…"}
+          </p>
+          <p className="mt-2 text-xs text-sarin-muted">
+            {engine.health?.provider === "deepseek" ? "DeepSeek" : engine.health?.provider === "ollama" ? "IA local (Ollama)" : "Proveedor sin confirmar"}
           </p>
           {engine.error && (
             <p className="mt-2 text-xs text-sarin-muted">{engine.error}</p>
@@ -237,6 +241,7 @@ function Console() {
           </button>
         </div>
       </section>
+      <AdminAiSettings onSaved={() => void engine.refresh()} />
       <section className="space-y-4">
         <h2 className="text-xl font-semibold">Comprobantes de pago</h2>
         {data.receipts.length === 0 ? (
@@ -361,7 +366,7 @@ function Console() {
         )}
       </section>
       <section className="space-y-4">
-        <h2 className="text-xl font-semibold">Islas registradas</h2>
+        <h2 className="text-xl font-semibold">Negocios y suscripciones</h2>
         {data.businesses.length === 0 ? (
           <Notice>Todavía no hay negocios registrados.</Notice>
         ) : (
@@ -400,11 +405,11 @@ function Console() {
                       })}
                     </td>
                     <td className="whitespace-nowrap p-4 text-sarin-muted">
-                      {new Date(
+                      {business.subscription.currentPeriodEndsAt > 0 ? new Date(
                         business.subscription.currentPeriodEndsAt,
                       ).toLocaleDateString("es-CO", {
                         timeZone: "America/Bogota",
-                      })}
+                      }) : "Sin pago aprobado"}
                     </td>
                   </tr>
                 ))}

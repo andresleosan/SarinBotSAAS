@@ -14,6 +14,7 @@ vi.mock("@/components/app-shell", () => ({
   buttonClass: "button", fieldClass: "field",
 }));
 vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => ({ health: null, checking: false, refresh: vi.fn() }) }));
+vi.mock("@/components/admin-ai-settings", () => ({ AdminAiSettings: () => null }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -149,5 +150,12 @@ describe("billing plan screens", () => {
     state.api.mockResolvedValueOnce({ receipt: { ...receipt, status: "approved", planId: "fortnightly", periodDays: 15 }, business });
     await act(async () => { button("Aprobar +15 días").props.onClick(); });
     expect(text(renderer.root)).toContain("suscripción extendida 15 días");
+  });
+
+  it("does not invent a payment expiry date for a business without an approved payment", async () => {
+    adminData.businesses = [{ ...business, subscription: { ...business.subscription, currentPeriodEndsAt: 0 } }];
+    await mount(AdminPage);
+    const cells = renderer.root.findByType("tbody").findAllByType("td");
+    expect(text(cells[3])).toBe("Sin pago aprobado");
   });
 });

@@ -1,12 +1,14 @@
-# QA: proveedores manuales DeepSeek y Gemini
+# QA histórica: proveedores manuales DeepSeek y Gemini
+
+Actualización posterior: se retiró la integración de IA de Gemini por decisión del propietario y se revocó su clave dedicada. El historial de pruebas de esta página se conserva como evidencia de aquella versión; no describe una opción disponible actualmente. Google Sign-In, Firebase y su clave de navegador se mantienen. La selección actual entre IA local y DeepSeek se documenta en la [guía operativa](../deepseek-option-b.md).
 
 ## Estado
 
-El propietario eligió DeepSeek como opción B manual y temporal desde el servidor y entregó una clave dedicada. Se desplegó y seleccionó `deepseek` en la instancia privada de la VPS el 15 de octubre de 2026. Después se verificó la conexión con la Mac y se devolvió el chat a **Ollama**, conservando la misma imagen y la clave DeepSeek para activación manual. El retorno y su prueba en pantalla están en la [QA de conexión local](2026-10-15-dns-cutover.md). Gemini está implementado como tercera opción y probado con datos ficticios, pero no está activo ni tiene clave en la VPS: la cuenta es de Colombia y continúa en nivel gratuito. No se autorizó ni habilitó facturación Google.
+El propietario eligió DeepSeek como opción B manual y temporal desde el servidor y entregó una clave dedicada. Se desplegó y seleccionó `deepseek` en la instancia privada de la VPS el 15 de octubre de 2026. Después se verificó la conexión con la Mac y se devolvió el chat a **Ollama**, conservando la misma imagen y la clave DeepSeek para activación manual. El retorno y su prueba en pantalla están en la [QA de conexión local](2026-10-15-dns-cutover.md). En aquella versión, Gemini se implementó como tercera opción y se probó con datos ficticios, pero no se activó ni se instaló su clave en la VPS; la cuenta permaneció en nivel gratuito. No se autorizó ni habilitó facturación Google.
 
 El valor predeterminado del código sigue siendo Ollama. Vault lo selecciona explícitamente en sus tres caminos (texto, transcripción y análisis), con salud independiente y almacenamiento local del navegador. No hay conmutación automática ni reintento con otro proveedor.
 
-## Verificación de código
+## Verificación de código de aquella versión
 
 - TDD del transporte: **56 pruebas del motor** pasan. Cubren cabeceras y opciones independientes, imágenes rechazadas en cloud, respuestas limitadas, cancelación, redirecciones, errores seguros y firmas de herramientas Gemini.
 - Salud: autorización antes del probe, Vault exclusivo de superadministrador y cachés independientes. Vault permanece en Ollama aunque el chat seleccione cualquiera de las APIs.
@@ -30,7 +32,7 @@ Registro sanitizado: `%LOCALAPPDATA%/SarinBot/deployment/sarin-deepseek-post-dep
 
 ## Despliegue y controles posteriores
 
-Imagen activa: `sarin-bot:option-b-20261015t231909z`, ID `sha256:f3a7e50352af01ce38e5a53e5aad2c15fe61b97483714781c6e46b39eef199db`. El paquete contiene 85 archivos de aplicación y configuración de build, SHA-256 `7c0158d4a8ef4e433a4a211f234b822df0e9f2d1cd489c59c84b25e422c4026c`. Se verificó su correspondencia con las fuentes finales. El contexto no incluye secretos, entornos privados, docs, work ni tests.
+Imagen de aquella activación: `sarin-bot:option-b-20261015t231909z`, ID `sha256:f3a7e50352af01ce38e5a53e5aad2c15fe61b97483714781c6e46b39eef199db`. El paquete contiene 85 archivos de aplicación y configuración de build, SHA-256 `7c0158d4a8ef4e433a4a211f234b822df0e9f2d1cd489c59c84b25e422c4026c`. Se verificó su correspondencia con las fuentes finales. El contexto no incluye secretos, entornos privados, docs, work ni tests.
 
 La clave DeepSeek se transfirió por stdin de SSH a un archivo privado root:root 0600, sin argumentos de proceso ni logs con el valor. El script revisado se ejecutó una sola vez y terminó con código 0. Actualizó únicamente la imagen y tres variables de DeepSeek. Todos los demás valores runtime, incluidos Ollama, Access y ADC, coinciden exactamente con el respaldo.
 
@@ -55,10 +57,10 @@ La instancia continúa privada y se accede temporalmente mediante SSH en `http:/
 
 ![Respuesta de Sarin con DeepSeek en el panel autenticado](sarin-deepseek-chat-verified.jpg)
 
-Gemini gratuito se limita a datos sintéticos por las condiciones aplicables a Colombia; su disponibilidad técnica no autoriza usar conversaciones personales de clientes. Ver [opción C y condiciones de Google](../gemini-option-c.md). No se trasladó su clave al servidor.
+La prueba histórica de Gemini se limitó a datos sintéticos; no se trasladó su clave al servidor ni se autorizó su uso con conversaciones de clientes. Esa integración y su guía de activación se retiraron posteriormente.
 
 La conexión completa con Ollama se verificó después: DNS nativo del contenedor, Access, catálogo y respuesta del chat autenticado en pantalla. El diagnóstico de Luis confirmó LaunchAgent activo y Ollama HTTP 200; no se reinició ni reinstaló la Mac. La [evidencia de conexión local](2026-10-15-dns-cutover.md) documenta la corrección DNS exclusiva del contenedor y el retorno a Ollama. La publicación web y el DS nuevo son trabajos separados pendientes.
 
 La revisión de solo lectura anterior al retorno mantuvo `ENOTFOUND` para el hostname del motor desde el contenedor. Tailscale mostró la Mac `Online=true`, con `LastSeen=2026-10-15T23:00:00.1Z`; ese estado por sí solo no demostraba funcionamiento del conector Cloudflare ni de Ollama. Las comprobaciones posteriores superaron ese límite.
 
-Guías operativas: [DeepSeek](../deepseek-option-b.md), [Gemini](../gemini-option-c.md).
+Guía operativa vigente: [IA local y DeepSeek](../deepseek-option-b.md).
