@@ -26,7 +26,7 @@ function Invitations() {
   useEffect(() => {
     active.current = true;
     const controller = new AbortController();
-    void apiFetch<InvitationPage>('/api/admin/invitations', { signal: controller.signal }).then(value => { if (active.current) setPage(value); }).catch(cause => { if (active.current) setError(errorMessage(cause)); }).finally(() => { if (active.current) setBusy(false); });
+    void apiFetch<InvitationPage>('/api/admin/invitations', { signal: controller.signal }).then(value => { if (active.current && !controller.signal.aborted) setPage(value); }).catch(cause => { if (active.current && !controller.signal.aborted) setError(errorMessage(cause)); }).finally(() => { if (active.current && !controller.signal.aborted) setBusy(false); });
     return () => { active.current = false; controller.abort(); };
   }, []);
   function upsert(invitation: InvitationSummary) { setPage(previous => ({ ...previous, invitations: [invitation, ...previous.invitations.filter(item => item.id !== invitation.id)] })); }

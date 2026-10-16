@@ -1,4 +1,4 @@
-import { act, createElement } from 'react';
+import { act, createElement, StrictMode } from 'react';
 import { create, type ReactTestRenderer, type ReactTestInstance } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ api: vi.fn(), user: { uid: 'admin' } as { uid: string } | null, admin: true }));
@@ -29,6 +29,13 @@ describe('invitation interfaces', () => {
     expect(text(renderer.root)).toContain(code);
     await act(async () => button('Descartar código').props.onClick());
     expect(text(renderer.root)).not.toContain(code);
+  });
+  it('does not display the cancelled first read during StrictMode effect recovery', async () => {
+    let reads = 0;
+    state.api.mockImplementation((_path: string, init: RequestInit) => ++reads === 1 ? new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(new Error('Aborted obsolete request')))) : Promise.resolve({ invitations: [], nextCursor: null }));
+    await act(async () => { renderer = create(createElement(StrictMode, null, createElement(AdminInvitations))); });
+    expect(reads).toBe(2);
+    expect(text(renderer.root)).not.toContain('Aborted obsolete request');
   });
   it('retains create request identity for retry but changes it when the recipient changes', async () => {
     await act(async () => { renderer = create(createElement(AdminInvitations)); });
