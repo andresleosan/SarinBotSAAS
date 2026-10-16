@@ -11,6 +11,7 @@ export function getBusinessAccess(business?: SubscriptionBusiness | null, now = 
   const paidHistory = Number.isSafeInteger(sub.currentPeriodEndsAt) && sub.currentPeriodEndsAt > 0;
   if (paidHistory && ((sub.status === 'active' && sub.currentPeriodEndsAt > now) ||
       ((sub.status === 'active' || sub.status === 'past_due') && (sub.graceEndsAt ?? 0) > now))) return 'subscription';
+  if (sub.paidTrial?.source === 'invitation' && sub.paidTrial.accessSuspended !== false) return 'suspended';
   if (sub.status === 'trial' && sub.paidTrial) return paidTrialRemaining(sub) > 0 ? 'paid_trial' : 'trial_exhausted';
   return sub.status === 'pending_payment' ? 'pending_payment' : 'expired';
 }

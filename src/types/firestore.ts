@@ -68,6 +68,16 @@ export interface DaySchedule {
   intervals: { start: string; end: string }[];
 }
 
+export interface IntroductoryTrialUsage {
+  activatedAt: number;
+  appointmentLimit: 10;
+  appointmentsUsed: number;
+}
+export type IntroductoryTrial = IntroductoryTrialUsage & (
+  { source?: 'payment'; paymentId: string; invitationId?: never; accessSuspended?: never } |
+  { source: 'invitation'; invitationId: string; accessSuspended: boolean; paymentId?: never }
+);
+
 export interface Business {
   id: string;
   slug: string;
@@ -84,12 +94,7 @@ export interface Business {
     graceEndsAt?: number;
     graceGrantedAt?: number;
     lastPaymentId?: string;
-    paidTrial?: {
-      paymentId: string;
-      activatedAt: number;
-      appointmentLimit: 10;
-      appointmentsUsed: number;
-    };
+    paidTrial?: IntroductoryTrial;
   };
   sarinConfig: {
     onboardingCompleted: boolean;
@@ -109,7 +114,7 @@ export interface Business {
 export type Tenant = Business;
 export type PublicBusiness = Omit<Business, 'ownerUid' | 'ownerEmail' | 'createdAt' | 'subscription'> & {
   subscription: Pick<Business['subscription'], 'status' | 'trialEndsAt' | 'currentPeriodEndsAt' | 'graceEndsAt'> & {
-    paidTrial?: Omit<NonNullable<Business['subscription']['paidTrial']>, 'paymentId'>;
+    paidTrial?: IntroductoryTrialUsage & { source?: 'payment' | 'invitation'; accessSuspended?: boolean };
   };
 };
 

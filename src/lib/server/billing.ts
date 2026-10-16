@@ -14,6 +14,7 @@ import type { z } from 'zod';
 import { receiptSchema, settingsSchema } from './schemas';
 import { initializeResponsePeriods, readResponsePeriodState, responsePeriodReference } from './response-periods';
 import { getWhatsAppBusinessStatus } from './whatsapp-config';
+import { activateIntroductoryTrial } from './introductory-access';
 
 function defaultSettings(): PlatformSettings {
   const configuredPrice = (value: string | undefined, fallback: number) => {
@@ -145,7 +146,7 @@ export async function reviewPayment(paymentId: string, action: 'approve' | 'reje
     const quota = action === 'approve' ? await readResponsePeriodState(business, db, transaction, now) : undefined;
     if (action === 'approve' && receipt.kind === 'paid_trial') {
       if (!canPurchasePaidTrial(subscription) || receipt.amountCOP !== PAID_TRIAL_PRICE_COP || receipt.appointmentAllowance !== PAID_TRIAL_APPOINTMENT_LIMIT || receipt.planId !== undefined || receipt.periodDays !== undefined || receipt.responseAllowance !== undefined || receipt.quotaPeriodId !== undefined) throw new HttpError(409, 'Los datos de la prueba pagada no son válidos.', 'PAID_TRIAL_UNAVAILABLE');
-      subscription = { status: 'trial', trialEndsAt: subscription.trialEndsAt, currentPeriodEndsAt: subscription.currentPeriodEndsAt, lastPaymentId: receipt.id, paidTrial: { paymentId: receipt.id, activatedAt: now, appointmentLimit: PAID_TRIAL_APPOINTMENT_LIMIT, appointmentsUsed: 0 } };
+      subscription = activateIntroductoryTrial(subscription, { source: 'payment', paymentId: receipt.id }, now);
       initializeResponsePeriods(transaction, db, { ...quota!, current: null });
       const periodId = `trial_${receipt.id}`;
       transaction.create(responsePeriodReference(db, quota!.scopeId, periodId), { id: periodId, source: 'trial', planId: null, startsAt: now, endsAt: PAID_TRIAL_PERIOD_END, includedResponses: PAID_TRIAL_INCLUDED_RESPONSES, extraResponses: 0, usedResponses: 0, reservedResponses: 0 });

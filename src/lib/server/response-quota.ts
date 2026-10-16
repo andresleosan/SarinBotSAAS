@@ -5,7 +5,7 @@ import type { Database as Firestore } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { Appointment, Business, ResponseAllowance } from '@/types/firestore';
 import type { ChatResponse } from '@/types/chat';
-import { isOwnerAiAllowed, isSubscriptionAllowed } from '@/lib/sarin/subscription';
+import { getBusinessAccess, isOwnerAiAllowed, isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { HttpError } from './http';
 import { documentIdSchema, requestIdSchema } from './schemas';
 import { stableDocumentId } from './businesses';
@@ -26,7 +26,7 @@ export async function getResponseQuota(businessId: string, db: Firestore = getAd
   const period = state.current && publicResponsePeriod(state.current);
   const allowed = isSubscriptionAllowed(business) && period && (period.endsAt > Date.now() || (business.subscription.graceEndsAt ?? 0) > Date.now());
   return { businessId, currentPeriod: period, nextPeriod: state.next && publicResponsePeriod(state.next), warningThresholdPercent: 80,
-    state: business.subscription.status === 'suspended' ? 'suspended' : !allowed ? 'expired' : period.remainingResponses === 0 ? 'exhausted' : period.usedResponses >= (period.includedResponses + period.extraResponses) * 0.8 ? 'warning' : 'active' };
+    state: getBusinessAccess(business) === 'suspended' ? 'suspended' : !allowed ? 'expired' : period.remainingResponses === 0 ? 'exhausted' : period.usedResponses >= (period.includedResponses + period.extraResponses) * 0.8 ? 'warning' : 'active' };
 }
 
 export async function reserveResponseQuota(input: ResponseQuotaInput, db: Firestore = getAdminDb()): Promise<ResponseQuotaResult> {
