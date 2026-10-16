@@ -11,11 +11,11 @@ export interface EngineMessage { role: 'system' | 'user' | 'assistant' | 'tool';
 export interface EngineAssistantMessage { role: 'assistant'; content: string | null; tool_calls?: ToolCall[]; }
 export type EngineProvider = AiProvider;
 export interface EngineHealth { provider: EngineProvider | null; online: boolean; checkedAt: number; visionAvailable: boolean; error?: string; }
-export interface EngineTokenUsage { promptTokens: number; cacheHitTokens: number; cacheMissTokens: number; completionTokens: number; totalTokens: number; }
-export interface EngineUsageObservation { callId: string; provider: 'deepseek'; model: string | null; startedAt: number; finishedAt: number; success: boolean; usage: EngineTokenUsage | null; }
+export interface EngineTokenUsage { promptTokens: number; cacheHitTokens: number; cacheMissTokens: number; cacheWriteTokens?: number | null; completionTokens: number; totalTokens: number; }
+export interface EngineUsageObservation { callId: string; provider: 'deepseek' | 'openai'; model: string | null; serviceTier?: string | null; startedAt: number; finishedAt: number; success: boolean; usage: EngineTokenUsage | null; }
 
 function validateProvider(provider: string): EngineProvider {
-  if (provider !== 'ollama' && provider !== 'deepseek') throw new HttpError(503, 'El proveedor de conversaciones no es válido.');
+  if (provider !== 'ollama' && provider !== 'deepseek' && provider !== 'openai') throw new HttpError(503, 'El proveedor de conversaciones no es válido.');
   return provider;
 }
 
@@ -28,6 +28,15 @@ function engineConfig(vision = false, selectedProvider = getChatProvider()) {
   const timeoutMs = Number(process.env.LLM_REQUEST_TIMEOUT_MS ?? 120_000);
   if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 300_000) throw new HttpError(503, 'Tiempo de espera del motor no válido.');
   const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
+  if (provider === 'openai') {
+    if (vision) throw new HttpError(503, 'Las imágenes requieren el motor local de la Mac.');
+    const key = process.env.OPENAI_API_KEY;
+    if (!key || /\s|[\x00-\x1f\x7f]/.test(key)) throw new HttpError(503, 'Configura una credencial válida de OpenAI en el servidor.');
+    const model = process.env.OPENAI_MODEL ?? 'gpt-6-luna';
+    if (model !== 'gpt-6-luna') throw new HttpError(503, 'El modelo configurado de OpenAI no está habilitado.');
+    headers.Authorization = `Bearer ${key}`;
+    return { provider, url: new URL('https://api.openai.com/v1/chat/completions'), headers, model, timeoutMs };
+  }
   if (provider === 'deepseek') {
     if (vision) throw new HttpError(503, 'Las imágenes requieren el motor local de la Mac.');
     const key = process.env.DEEPSEEK_API_KEY;
@@ -57,10 +66,10 @@ function engineConfig(vision = false, selectedProvider = getChatProvider()) {
 
 function unavailableMessage(provider: EngineProvider, status?: number): string {
   if (provider === 'ollama') return 'El motor local no está disponible. Comprueba Ollama y el túnel.';
-  const name = 'DeepSeek';
+  const name = provider === 'openai' ? 'OpenAI' : 'DeepSeek';
   if (status === 401 || status === 403) return `${name} rechazó la credencial del servidor. Revisa su configuración.`;
   if (status === 402) return `${name} no tiene saldo disponible. Revisa la cuenta del proveedor.`;
-  if (status === 429) return 'DeepSeek alcanzó su límite de solicitudes. Inténtalo de nuevo en un momento.';
+  if (status === 429) return `${name} alcanzó su límite de solicitudes o cuota. Revisa la cuenta o inténtalo más tarde.`;
   return `Sarin no puede conectar con ${name}. Inténtalo de nuevo en un momento.`;
 }
 
@@ -89,6 +98,9 @@ const assistantSchema = z.object({ choices: z.array(z.object({ message: z.object
 const tokenCount = z.number().int().min(0).max(2_000_000);
 const usageSchema = z.object({ prompt_tokens: tokenCount, prompt_cache_hit_tokens: tokenCount, prompt_cache_miss_tokens: tokenCount, completion_tokens: tokenCount, total_tokens: z.number().int().min(0).max(4_000_000) })
   .refine(value => value.prompt_tokens === value.prompt_cache_hit_tokens + value.prompt_cache_miss_tokens && value.total_tokens === value.prompt_tokens + value.completion_tokens);
+const openAiUsageSchema = z.object({ prompt_tokens: tokenCount, prompt_tokens_details: z.object({ cached_tokens: tokenCount, cache_write_tokens: tokenCount.nullable().optional() }), completion_tokens: tokenCount, total_tokens: z.number().int().min(0).max(4_000_000) })
+  .refine(value => value.prompt_tokens >= value.prompt_tokens_details.cached_tokens + (value.prompt_tokens_details.cache_write_tokens ?? 0) && value.total_tokens === value.prompt_tokens + value.completion_tokens);
+const openAiTierSchema = z.enum(['auto', 'default', 'flex', 'scale', 'priority', 'fast']);
 
 export async function completeChat(messages: EngineMessage[], tools?: readonly ToolDefinition[], options: { vision?: boolean; signal?: AbortSignal; provider?: EngineProvider; onUsage?: (observation: EngineUsageObservation) => void | Promise<void> } = {}): Promise<EngineAssistantMessage> {
   const config = engineConfig(options.vision, options.provider);
@@ -99,21 +111,35 @@ export async function completeChat(messages: EngineMessage[], tools?: readonly T
   const requestMessages = messages.map(message => message.tool_calls ? {
     ...message, tool_calls: message.tool_calls.map(call => ({ id: call.id, type: call.type, function: call.function })),
   } : message);
-  const observation: EngineUsageObservation | undefined = config.provider === 'deepseek' && options.onUsage
-    ? { callId: randomUUID(), provider: 'deepseek', model: config.model, startedAt: Date.now(), finishedAt: 0, success: false, usage: null } : undefined;
+  const observation: EngineUsageObservation | undefined = config.provider !== 'ollama' && options.onUsage
+    ? { callId: randomUUID(), provider: config.provider, model: config.provider === 'openai' ? null : config.model, ...(config.provider === 'openai' ? { serviceTier: null } : {}), startedAt: Date.now(), finishedAt: 0, success: false, usage: null } : undefined;
   try {
     const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(config.timeoutMs)]) : AbortSignal.timeout(config.timeoutMs);
     const response = await fetch(config.url.toString(), { method: 'POST', headers: config.headers, cache: 'no-store', redirect: 'error', signal,
-      body: JSON.stringify({ model: config.model, messages: requestMessages, stream: false, max_tokens: 4096,
-        temperature: 0.2, ...(config.provider === 'deepseek' ? { thinking: { type: 'disabled' } } : { think: false }),
+      body: JSON.stringify({ model: config.model, messages: requestMessages, stream: false,
+        ...(config.provider === 'openai' ? { max_completion_tokens: 4096, reasoning_effort: 'none', store: false, service_tier: 'default' }
+          : { max_tokens: 4096, temperature: 0.2, ...(config.provider === 'deepseek' ? { thinking: { type: 'disabled' } } : { think: false }) }),
         ...(tools?.length ? { tools, tool_choice: 'auto' } : {}) }) });
     if (!response.ok) { await response.body?.cancel(); throw new HttpError(503, unavailableMessage(config.provider, response.status)); }
     const data = await responseJson(response);
     if (observation && data && typeof data === 'object') {
       const metadata = data as Record<string, unknown>;
       if ('model' in metadata) observation.model = typeof metadata.model === 'string' && /^[A-Za-z0-9_.:-]{1,100}$/.test(metadata.model) ? metadata.model : null;
-      const usage = usageSchema.safeParse(metadata.usage);
-      if (usage.success) observation.usage = { promptTokens: usage.data.prompt_tokens, cacheHitTokens: usage.data.prompt_cache_hit_tokens, cacheMissTokens: usage.data.prompt_cache_miss_tokens, completionTokens: usage.data.completion_tokens, totalTokens: usage.data.total_tokens };
+      if (config.provider === 'openai') {
+        const tier = openAiTierSchema.safeParse(metadata.service_tier);
+        observation.serviceTier = tier.success ? tier.data : null;
+        const usage = openAiUsageSchema.safeParse(metadata.usage);
+        if (usage.success) observation.usage = {
+          promptTokens: usage.data.prompt_tokens, cacheHitTokens: usage.data.prompt_tokens_details.cached_tokens,
+          // Cache writes are a subset of uncached input, not additional prompt tokens.
+          cacheMissTokens: usage.data.prompt_tokens - usage.data.prompt_tokens_details.cached_tokens,
+          cacheWriteTokens: usage.data.prompt_tokens_details.cache_write_tokens ?? null,
+          completionTokens: usage.data.completion_tokens, totalTokens: usage.data.total_tokens,
+        };
+      } else {
+        const usage = usageSchema.safeParse(metadata.usage);
+        if (usage.success) observation.usage = { promptTokens: usage.data.prompt_tokens, cacheHitTokens: usage.data.prompt_cache_hit_tokens, cacheMissTokens: usage.data.prompt_cache_miss_tokens, completionTokens: usage.data.completion_tokens, totalTokens: usage.data.total_tokens };
+      }
     }
     const parsed = assistantSchema.safeParse(data);
     if (!parsed.success) throw new HttpError(502, 'Respuesta no válida del motor.');

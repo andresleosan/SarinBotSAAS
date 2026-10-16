@@ -33,6 +33,43 @@ function prepareWhatsApp(planId = 'whatsapp', endsAt = now + 86400000) {
 }
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 describe('authenticated tool orchestration', () => {
+  it('records each OpenAI tool round with its original provider and returns a persisted booking after a failed explanation', async () => {
+    const { db, rows } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'openai', updatedAt: now } }); state.db = db;
+    const observation = { callId: '00000000-0000-4000-8000-000000000091', provider: 'openai', model: 'gpt-6-luna', serviceTier: 'default', startedAt: now, finishedAt: now + 1, success: true, usage: { promptTokens: 10, cacheHitTokens: 2, cacheMissTokens: 8, cacheWriteTokens: 5, completionTokens: 5, totalTokens: 15 } };
+    state.complete.mockImplementationOnce(async (_messages, _tools, options) => {
+      await options.onUsage?.(observation);
+      await db.collection('serverSettings').doc('ai').set({ provider: 'ollama', updatedAt: now + 1 });
+      return bookingCall();
+    }).mockImplementationOnce(async (_messages, _tools, options) => {
+      await options.onUsage?.({ ...observation, callId: '00000000-0000-4000-8000-000000000092', success: false, usage: null });
+      throw new Error('synthetic provider failure after saved booking');
+    }).mockResolvedValue({ role: 'assistant', content: 'Consulta completada.' });
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect((await response.json()).reply).toContain('Tu cita está confirmada');
+    expect(state.complete.mock.calls.map(call => call[2]?.provider)).toEqual(['openai', 'openai']);
+    expect([...rows.keys()].filter(key => key.startsWith('businesses/business/appointments/'))).toHaveLength(1);
+    const ledger = [...rows.entries()].filter(([key]) => key.startsWith('aiUsageCalls/')).map(([, row]) => row.data);
+    expect(ledger).toHaveLength(2);
+    expect(ledger).toEqual(expect.arrayContaining([expect.objectContaining({ provider: 'openai', businessId: 'business', success: true }), expect.objectContaining({ provider: 'openai', businessId: 'business', success: false, usage: null })]));
+    expect(JSON.stringify(ledger)).not.toMatch(/client@example|573001234567|Corte|Agenda corte/);
+    expect((await POST(request({ ...body, requestId: 'next-local-turn' }))).status).toBe(200);
+    expect(state.complete.mock.calls.at(-1)?.[2]?.provider).toBe('ollama');
+    expect(state.complete.mock.calls.at(-1)?.[2]?.onUsage).toBeUndefined();
+  });
+  it.each([
+    { mode: 'sarin_onboarding' as const, uid: 'new-owner', tenantId: '', businessId: null },
+    { mode: 'sarin_owner_copilot' as const, uid: 'owner', tenantId: 'business', businessId: 'business' },
+  ])('records OpenAI $mode usage under its validated scope', async ({ mode, uid, tenantId, businessId }) => {
+    const { db, rows } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'openai', updatedAt: now } }); state.db = db;
+    state.complete.mockImplementationOnce(async (_messages, _tools, options) => {
+      await options.onUsage?.({ callId: '00000000-0000-4000-8000-000000000093', provider: 'openai', model: 'gpt-6-luna', serviceTier: 'default', startedAt: now, finishedAt: now + 1, success: true, usage: null });
+      return { role: 'assistant', content: 'Respuesta sintética.' };
+    });
+    expect((await runSarinChat({ user: { uid }, body: { ...body, mode, tenantId } })).reply).toBe('Respuesta sintética.');
+    const ledger = [...rows.entries()].filter(([key]) => key.startsWith('aiUsageCalls/')).map(([, row]) => row.data);
+    expect(ledger).toEqual([expect.objectContaining({ provider: 'openai', businessId, mode })]);
+  });
   it('records every DeepSeek tool round under the business without repeating a booking after a failed explanation', async () => {
     const { db, rows } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }); state.db = db;
     const usage = { promptTokens: 10, cacheHitTokens: 0, cacheMissTokens: 10, completionTokens: 5, totalTokens: 15 };

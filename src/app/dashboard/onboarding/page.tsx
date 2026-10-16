@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Plus, Send, Trash2 } from "lucide-react";
 import { SarinMark } from "@/components/sarin-brand";
 import { WhatsAppPhoneField } from "@/components/whatsapp-phone-field";
+import { TextSuggestions } from "@/components/text-suggestions";
 import { AuthGate } from "@/components/auth-provider";
 import {
   AppShell,
@@ -610,15 +611,28 @@ function Configuration() {
               })}
             </div>
           </section>
-          <label className="block text-xs text-sarin-muted">
-            Preguntas obligatorias para reservar (una por línea)
-            <textarea
-              className={fieldClass + " mt-1.5 min-h-20"}
+          <section className="space-y-2">
+            <label className="block text-xs text-sarin-muted">
+              Preguntas obligatorias para reservar (una por línea)
+              <textarea
+                className={fieldClass + " mt-1.5 min-h-20"}
+                value={intake}
+                maxLength={2000}
+                placeholder="Escribe las preguntas que debe responder el cliente antes de reservar."
+                onChange={(event) => setIntake(event.target.value)}
+              />
+            </label>
+            <TextSuggestions
+              label="Ejemplos de preguntas para reservar"
               value={intake}
               maxLength={2000}
-              onChange={(event) => setIntake(event.target.value)}
+              onChange={setIntake}
+              suggestions={[
+                { label: "Primera visita", value: "¿Es tu primera visita?" },
+                { label: "Preferencia de profesional", value: "¿Tienes alguna preferencia de profesional?" },
+              ]}
             />
-          </label>
+          </section>
           <label className="block text-xs text-sarin-muted">
             Tono del asistente
             <input
@@ -628,15 +642,28 @@ function Configuration() {
               onChange={(event) => setTone(event.target.value)}
             />
           </label>
-          <label className="block text-xs text-sarin-muted">
-            Indicaciones del negocio
-            <textarea
-              className={fieldClass + " mt-1.5 min-h-20"}
+          <section className="space-y-2">
+            <label className="block text-xs text-sarin-muted">
+              Indicaciones del negocio
+              <textarea
+                className={fieldClass + " mt-1.5 min-h-20"}
+                value={rules}
+                maxLength={3000}
+                placeholder="Explica cómo quieres que Sarin atienda a tus clientes."
+                onChange={(event) => setRules(event.target.value)}
+              />
+            </label>
+            <TextSuggestions
+              label="Ejemplos de indicaciones del negocio"
               value={rules}
               maxLength={3000}
-              onChange={(event) => setRules(event.target.value)}
+              onChange={setRules}
+              suggestions={[
+                { label: "Confirmar detalles", value: "Confirma el servicio y el horario antes de reservar." },
+                { label: "Ayuda del negocio", value: "Si el cliente necesita ayuda adicional, indícale cómo contactar directamente al negocio." },
+              ]}
             />
-          </label>
+          </section>
           <button className={buttonClass + " w-full"} disabled={saving}>
             {saving
               ? "Guardando…"

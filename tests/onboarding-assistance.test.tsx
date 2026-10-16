@@ -1,0 +1,56 @@
+import { act, createElement, type ReactNode } from 'react';
+import { create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import OnboardingPage from '@/app/dashboard/onboarding/page';
+import { apiFetch } from '@/lib/client/api';
+import type { Business } from '@/types/firestore';
+
+const business: Business = {
+  id: 'fixture-business', ownerUid: 'fixture-owner', ownerEmail: 'owner@example.test',
+  name: 'Negocio sintético', slug: 'negocio-sintetico', category: 'Servicios', phoneWhatsApp: '573001234567',
+  timezone: 'America/Bogota', subscription: { status: 'trial', trialEndsAt: 2200000000000, currentPeriodEndsAt: 0 },
+  sarinConfig: { onboardingCompleted: true, tone: 'Claro', customRules: 'Indicaciones propias sin cambiar.', intakeFields: [{ key: 'original', label: 'Pregunta propia', required: true }] },
+  resources: [{ id: 'principal', name: 'Profesional sintético', active: true }],
+  services: [{ id: 'principal', name: 'Servicio', durationMinutes: 30, bufferMinutes: 0, price: 20000, resourceIds: ['principal'] }],
+  weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: false, intervals: [] }])), createdAt: 2000000000000,
+};
+vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business, loading: false, error: null }) }));
+vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => ({ messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false }) }));
+vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children }));
+vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, fieldClass: 'field', buttonClass: 'button' }));
+vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), errorMessage: (error: Error) => error.message }));
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+describe('onboarding editable examples', () => {
+  let renderer: ReactTestRenderer;
+  beforeEach(() => { vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockResolvedValue({ business }); });
+  afterEach(async () => { await act(async () => renderer?.unmount()); });
+  async function mount() { await act(async () => { renderer = create(createElement(OnboardingPage)); }); }
+
+  it('keeps existing questions and instructions on load without an automatic save', async () => {
+    await mount();
+    expect(renderer.root.findAllByType('textarea').map(input => input.props.value)).toEqual(['Pregunta propia', 'Indicaciones propias sin cambiar.']);
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+  });
+
+  it('adds chosen examples independently and saves them only with the business form', async () => {
+    await mount();
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Añadir ejemplo: Primera visita' }).props.onClick());
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Añadir ejemplo: Confirmar detalles' }).props.onClick());
+    expect(renderer.root.findAllByType('textarea').map(input => input.props.value)).toEqual([
+      'Pregunta propia\n¿Es tu primera visita?',
+      'Indicaciones propias sin cambiar.\nConfirma el servicio y el horario antes de reservar.',
+    ]);
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+    await act(async () => renderer.root.findAllByType('form')[1].props.onSubmit({ preventDefault() {} }));
+    const [url, init] = vi.mocked(apiFetch).mock.calls[0];
+    expect(url).toBe('/api/businesses');
+    const payload = JSON.parse(init!.body as string);
+    expect(payload.intakeFields).toEqual([
+      { key: 'original', label: 'Pregunta propia', required: true },
+      { key: expect.any(String), label: '¿Es tu primera visita?', required: true },
+    ]);
+    expect(payload.customRules).toBe('Indicaciones propias sin cambiar.\nConfirma el servicio y el horario antes de reservar.');
+    expect(payload.phoneWhatsApp).toBe('573001234567');
+  });
+});

@@ -5,12 +5,13 @@ import { RefreshCw } from "lucide-react";
 import { Notice, buttonClass } from "@/components/app-shell";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import type { AdminAiSettings as AiSettings, AiProvider, AiProviderSelection } from "@/types/ai";
+import { AI_PROVIDERS } from "@/types/ai";
 
 const providerLabels: Record<AiProvider, string> = {
   ollama: "IA local (Ollama)",
   deepseek: "DeepSeek",
+  openai: "OpenAI",
 };
-const providers: AiProvider[] = ["ollama", "deepseek"];
 
 export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
   const [data, setData] = useState<AiSettings | null>(null);
@@ -83,8 +84,8 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
           <p aria-label="IA activa" role="status" className="text-sm font-semibold text-sarin-ink">En uso: {providerLabels[data.provider]}</p>
           <fieldset disabled={busy}>
             <legend className="mb-2 text-sm font-medium">Seleccionar IA</legend>
-            <div className="grid items-start gap-3 md:grid-cols-2">
-              {providers.map(provider => {
+            <div className="grid items-start gap-3 lg:grid-cols-3">
+              {AI_PROVIDERS.map(provider => {
                 const status = data.providers.find(item => item.provider === provider);
                 return (
                   <label key={provider} className={`block min-w-0 space-y-2 rounded-xl border p-3 ${selected === provider ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"}`}>
@@ -97,7 +98,7 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
                     </span>
                     {status?.model && <span className="block break-words text-xs text-sarin-muted">Modelo: {status.model}</span>}
                     {status?.error && <span className="block text-sm text-amber-800">{status.error}</span>}
-                    {provider === "deepseek" && <span className="block text-xs leading-6 text-sarin-muted">DeepSeek recibe los mensajes, el contexto del negocio y los resultados de las herramientas para generar respuestas. Su uso puede generar cargos en tu cuenta de DeepSeek.</span>}
+                    {provider !== "ollama" && <span className="block text-xs leading-6 text-sarin-muted">{providerLabels[provider]} recibe los mensajes, el contexto del negocio y los resultados de las herramientas para generar respuestas. Su uso puede generar cargos en tu cuenta de {providerLabels[provider]}.</span>}
                   </label>
                 );
               })}

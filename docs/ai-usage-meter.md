@@ -1,10 +1,10 @@
-# Consumo de DeepSeek en administración
+# Consumo de APIs de IA en administración
 
-El panel privado muestra las llamadas y tokens registrados por mes de `America/Bogota`, tanto en total como por negocio. El acceso requiere el UID superadministrador verificado en el servidor. No es una factura ni consulta el saldo de la cuenta DeepSeek. WhatsApp todavía no está conectado y su consumo no se incluye.
+El panel privado muestra las llamadas y tokens registrados por mes de `America/Bogota`, tanto en total como por negocio. El acceso requiere el UID superadministrador verificado en el servidor. No es una factura ni consulta el saldo de las cuentas de proveedores. WhatsApp todavía no está conectado y su consumo no se incluye.
 
 ## Qué se mide
 
-Cada intento de llamada a DeepSeek desde chat de cliente, copiloto u onboarding tiene un identificador aleatorio del servidor. Cada ronda de herramientas cuenta por separado. Ollama y Vault quedan fuera de esta medición de API de pago. Un intento que devuelve tokens válidos se registra aunque después falle la validación de la respuesta del asistente. Un fallo de conexión o respuesta sin `usage` se muestra como consumo desconocido, no como inferencia gratuita.
+Cada intento de llamada a DeepSeek u OpenAI desde chat de cliente, copiloto u onboarding tiene un identificador aleatorio del servidor. Cada ronda de herramientas cuenta por separado. Ollama y Vault quedan fuera de esta medición de API de pago. Un intento que devuelve tokens válidos se registra aunque después falle la validación de la respuesta del asistente. Un fallo de conexión o respuesta sin `usage` se muestra como consumo desconocido, no como inferencia gratuita.
 
 Se conservan solo metadatos numéricos, modelo, fecha, resultado y referencia de negocio; no mensajes, prompts, respuestas, nombres, teléfonos, correos, UID de clientes, argumentos de herramientas ni credenciales. Los nombres de negocios en pantalla provienen de la lista administrativa existente.
 
@@ -24,14 +24,19 @@ El panel muestra un rango aplicando ambas tarifas a los tokens registrados. No i
 
 Fuente: [precios oficiales de DeepSeek](https://api-docs.deepseek.com/quick_start/pricing/) y [campos de consumo de la respuesta](https://api-docs.deepseek.com/api/create-chat-completion/). La tarifa es una referencia versionada en código; debe revisarse cuando el proveedor anuncie cambios. El panel usa USD y no presupone una TRM actual. Los ejemplos en COP y la propuesta comercial están en [Premium WhatsApp](whatsapp-premium-proposal.md).
 
+## OpenAI
+
+El selector de proveedor muestra OpenAI y DeepSeek por separado, incluso si el otro está activo. OpenAI usa `gpt-6-luna`, tarifa estándar y metadatos reportados por llamada; consulta [tarifa, caché, contexto largo y límites](openai-provider.md). Un modelo o nivel de servicio desconocido no recibe una tarifa inventada. Los fallos de registro y el inicio de medición son independientes para cada proveedor.
+
 ## Persistencia y límites
 
 - `aiUsageCalls/{callId}`: registro idempotente de una llamada; el identificador se genera en el servidor, nunca se toma del cliente.
 - `aiUsageMonths/{YYYY-MM}`: acumulado mensual, actualizado en la misma transacción que el registro.
 - `aiUsageMonths/{YYYY-MM}/businesses/{id}`: acumulado por negocio, con una referencia separada para configuración inicial sin negocio.
-- `aiUsageMeta/main`: inicio de medición global.
+- `aiUsageMeta/main`: inicio de medición de DeepSeek.
+- OpenAI usa `aiUsageCalls/openai_{callId}`, `aiUsageMonths/openai_{YYYY-MM}` (y su subcolección `businesses`) y `aiUsageMeta/openai`, sin migrar ni sobrescribir los acumulados anteriores.
 
-Las reglas deniegan acceso directo desde Firebase cliente a todas estas rutas, incluso con claims de administrador. `GET /api/admin/ai/usage?month=YYYY-MM` usa autenticación de servidor, valida el mes y devuelve `no-store`. Lee acumulados, no escanea llamadas históricas. La lista por negocio se limita a 500 filas y avisa si hay más; el total mensual incluye todas.
+Las reglas deniegan acceso directo desde Firebase cliente a todas estas rutas, incluso con claims de administrador. `GET /api/admin/ai/usage?month=YYYY-MM&provider=deepseek` (o `openai`; omitir proveedor conserva DeepSeek) usa autenticación de servidor, valida el mes y devuelve `no-store`. Lee acumulados, no escanea llamadas históricas. La lista por negocio se limita a 500 filas y avisa si hay más; el total mensual incluye todas.
 
 Las transacciones evitan contar dos veces el mismo identificador. Una nueva llamada real, incluso si el usuario reintenta una solicitud, tiene otro identificador y puede generar nuevo consumo. Los fallos del registro no reintentan inferencias ni herramientas y no convierten una reserva ya confirmada en un error de chat.
 

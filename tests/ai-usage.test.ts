@@ -22,6 +22,66 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe('administrator usage meter', () => {
+  const openai = { ...observation, provider: 'openai' as const, model: 'gpt-6-luna', serviceTier: 'default', usage: { ...observation.usage!, cacheWriteTokens: 100 } };
+
+  it('isolates OpenAI from historical DeepSeek paths and deduplicates each provider independently', async () => {
+    const { db, rows } = memoryFirestore();
+    await recordAiUsage(observation, context, db);
+    await Promise.all([recordAiUsage(openai, context, db), recordAiUsage(openai, context, db)]);
+    const deepseek = await readAdminAiUsage('2030-01', db);
+    const result = await readAdminAiUsage('2030-01', db, 'openai');
+    expect(deepseek).toMatchObject({ provider: 'deepseek', model: 'deepseek-flash', totals: { calls: 1 } });
+    expect(result).toMatchObject({ provider: 'openai', model: 'gpt-6-luna', measurementStartedAt: now, totals: { calls: 1, cacheWriteTokens: 100, cacheWriteReportedCalls: 1 } });
+    expect(result.totals.estimatedCostUSD).toEqual({ min: 0.0000805, max: 0.0000805 });
+    expect(result.businesses).toEqual([{ businessId: 'business-a', ...result.totals }]);
+    expect(rows.has('aiUsageMonths/2030-01')).toBe(true);
+    expect(rows.has('aiUsageMonths/openai_2030-01')).toBe(true);
+    expect(rows.has('aiUsageMeta/main')).toBe(true);
+    expect(rows.has('aiUsageMeta/openai')).toBe(true);
+    expect([...rows.keys()].filter(key => key.startsWith('aiUsageCalls/'))).toHaveLength(2);
+  });
+
+  it('estimates a range when cache writes are unknown without claiming zero writes', async () => {
+    const { db } = memoryFirestore();
+    await recordAiUsage({ ...openai, usage: { ...openai.usage, cacheWriteTokens: null } }, context, db);
+    const result = await readAdminAiUsage('2030-01', db, 'openai');
+    expect(result.totals).toMatchObject({ costEstimatedCalls: 1, unknownCostCalls: 0, cacheWriteReportedCalls: 0 });
+    expect(result.totals.estimatedCostUSD).toEqual({ min: 0.000078, max: 0.000083 });
+  });
+
+  it.each([[272000, 0.02716], [272001, 0.0542952]])('prices the full request at the long-context boundary %s', async (promptTokens, price) => {
+    const { db } = memoryFirestore();
+    await recordAiUsage({ ...openai, usage: { promptTokens, cacheHitTokens: 1000, cacheMissTokens: promptTokens - 1000, cacheWriteTokens: 0, completionTokens: 100, totalTokens: promptTokens + 100 } }, context, db);
+    expect((await readAdminAiUsage('2030-01', db, 'openai')).totals.estimatedCostUSD).toEqual({ min: price, max: price });
+  });
+
+  it.each([{ model: 'unknown-model', serviceTier: 'default' }, { model: 'gpt-6-luna', serviceTier: 'priority' }, { model: 'gpt-6-luna', serviceTier: null }])('keeps token and failure counts but no invented tariff for %j', async metadata => {
+    const { db } = memoryFirestore();
+    await recordAiUsage({ ...openai, ...metadata, success: false }, context, db);
+    expect((await readAdminAiUsage('2030-01', db, 'openai')).totals).toMatchObject({ calls: 1, failedCalls: 1, promptTokens: 1000, costEstimatedCalls: 0, unknownCostCalls: 1, estimatedCostUSD: null });
+  });
+
+  it('contains inconsistent cache writes and separates telemetry uncertainty by provider', async () => {
+    const { db, rows } = memoryFirestore();
+    await recordAiUsage({ ...openai, usage: { ...openai.usage, cacheWriteTokens: 201 } }, context, db);
+    expect(rows.size).toBe(0);
+    expect((await readAdminAiUsage('2030-01', db, 'openai')).telemetryWriteFailures).toBe(1);
+    expect((await readAdminAiUsage('2030-01', db)).telemetryWriteFailures).toBe(0);
+  });
+
+  it('validates provider selection after authorization and returns only the requested provider', async () => {
+    await recordAiUsage(observation, context, state.db as Firestore);
+    await recordAiUsage(openai, context, state.db as Firestore);
+    expect(await (await GET(request('?provider=openai'))).json()).toMatchObject({ provider: 'openai', totals: { calls: 1 } });
+    expect(await (await GET(request())).json()).toMatchObject({ provider: 'deepseek', totals: { calls: 1 } });
+    state.db = { collection: () => { throw new Error('Must not reach storage'); } };
+    expect((await GET(request('?provider=ollama'))).status).toBe(400);
+    expect((await GET(request('?provider=openai&provider=deepseek'))).status).toBe(400);
+    expect((await GET(request('?provider=openai&provider=openai'))).status).toBe(400);
+    expect((await GET(request('?provider=bad', ''))).status).toBe(401);
+    expect((await GET(request('?provider=bad', 'ordinary-token'))).status).toBe(403);
+  });
+
   it('distinguishes no measurement from a zero charge without writing on GET', async () => {
     const { db, rows } = memoryFirestore(); state.db = db;
     const response = await GET(request());

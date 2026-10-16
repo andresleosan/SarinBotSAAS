@@ -6,6 +6,7 @@ import { ArrowUpRight, CalendarDays, ChevronRight, CreditCard, LayoutDashboard, 
 import { type ReactNode } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { SarinBrand } from "@/components/sarin-brand";
+import { UserAvatar } from "@/components/user-avatar";
 
 interface NavigationItem { href: string; label: string; icon: LucideIcon }
 const businessLinks: NavigationItem[] = [
@@ -52,7 +53,7 @@ export function AppShell({
       <div className="min-w-0">
         <header className="flex min-h-16 items-center justify-between gap-3 border-b border-sarin-line bg-sarin-paper px-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2 text-xs text-sarin-muted"><span className="hidden sm:inline">{admin ? "Administración" : "Mi espacio"}</span><ChevronRight aria-hidden="true" className="hidden h-3.5 w-3.5 sm:block" /><span className="truncate text-sarin-ink">{active?.label ?? "Sarin Bot"}</span></div>
-          <div className="flex shrink-0 items-center gap-3"><span aria-hidden className="grid h-8 w-8 place-items-center rounded-full bg-sarin-soft text-xs font-semibold text-sarin-blue">{name.charAt(0).toUpperCase()}</span><span className="hidden max-w-44 truncate text-xs text-sarin-muted sm:block">{name}</span><button onClick={() => void signOut()} aria-label="Cerrar sesión" title="Cerrar sesión" className="grid h-11 w-11 place-items-center rounded-[10px] text-sarin-muted hover:bg-sarin-soft hover:text-sarin-blue"><LogOut aria-hidden="true" className="h-4 w-4" /></button></div>
+          <div className="flex shrink-0 items-center gap-3"><UserAvatar name={name} photoURL={user?.photoURL} /><span className="hidden max-w-44 truncate text-xs text-sarin-muted sm:block">{name}</span><button onClick={() => void signOut()} aria-label="Cerrar sesión" title="Cerrar sesión" className="grid h-11 w-11 place-items-center rounded-[10px] text-sarin-muted hover:bg-sarin-soft hover:text-sarin-blue"><LogOut aria-hidden="true" className="h-4 w-4" /></button></div>
         </header>
         <main id="workspace-content" className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">{children}</main>
       </div>
