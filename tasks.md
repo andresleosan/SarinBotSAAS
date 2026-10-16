@@ -4,7 +4,7 @@
 
 - [x] Espaciado y agrupación en administración, suscripción, configuración del negocio y bloqueos de agenda. Horarios alineados según el ancho del formulario; controles de 44 px y estilo Agenda clara conservados.
 - [x] Revisión independiente de presentación y seguridad, TypeScript, 408 pruebas y QA visual en Chrome a 320/640/1280 px y escritorio. Recorte de AM/PM en móvil detectado y corregido. Evidencia: `docs/qa/2026-10-15-compact-forms.md`.
-- [ ] Publicar el commit y verificar la nueva imagen en la instancia privada.
+- [x] Push `ac478e4`, CI con tres jobs aprobados e imagen privada `compact-forms-20261016t025030z` activada con rollback. Panel real verificado; facturación pasó de 1.132 a 660 px de alto en el mismo viewport de escritorio.
 
 ## Estructura comercial — 2026-10-15
 
