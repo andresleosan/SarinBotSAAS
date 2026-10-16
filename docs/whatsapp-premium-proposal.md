@@ -1,6 +1,6 @@
 # Propuesta Premium WhatsApp — 15 de octubre de 2026
 
-Estado: propuesta comercial, sin integración ni tarifa Premium activada. Los planes vigentes de Sarin siguen siendo 7 días por $20.000 COP, 15 días por $35.000 COP y 30 días por $59.900 COP.
+Estado: referencia de costos que respalda la [estructura comercial aprobada](commercial-plans.md). El propietario aprobó Esencial con 700/1.500/3.000 respuestas por 7/15/30 días, WhatsApp con 4.500 por 30 días y ampliaciones de 1.000 respuestas por $20.000. Las cuotas, paquetes e integración WhatsApp aún no están activados. Los precios Esencial configurados siguen siendo $20.000, $35.000 y $59.900 COP, respectivamente.
 
 La propuesta de **$149.900 COP por 30 días + consumo de Meta** separa la suscripción de Sarin del costo de entregar mensajes por la plataforma oficial de WhatsApp Business. La aplicación móvil WhatsApp Business y la API de automatización son productos diferentes. Usar Ollama en la Mac no elimina la tarifa de entrega de Meta. DeepSeek, cuando el administrador lo elija, genera además costos de inferencia en la cuenta de ese proveedor.
 
@@ -35,7 +35,7 @@ Conversión ilustrativa con la TRM oficial del 15 de octubre de 2026, **$3.197,6
 
 Fórmulas: `Meta = max(0, salidas - 1.000) × 2,9455 COP`; `IA = salidas × 2 llamadas × (2.000 × tarifa_entrada + 500 × tarifa_salida) / 1.000.000`. Se trata de escenarios, no de mediciones reales de clientes. Los aciertos de caché podrían reducir la entrada a USD 0,003/0,006 por millón; no se presupone ese ahorro. El horario de pico es lunes a viernes UTC 01:00–04:00 y 06:00–10:00, excluyendo festivos oficiales chinos. La atención de día en Colombia normalmente corresponde a fuera de pico; un bot disponible todo el día también puede recibir mensajes en pico.
 
-Si la tarifa propuesta de **$149.900 + Meta incluye la IA**, el total al cliente sería aproximadamente **$154.907, $170.813 o $199.974 COP** en esos tres escenarios. DeepSeek sale del ingreso de Sarin, no se agrega dos veces a la factura. En el escenario alto, USD 43,20 equivalen a unos $138.138 COP de IA: deja poco margen dentro de $149.900 antes de alojamiento, soporte e impuestos. La cantidad incluida y el sobreconsumo todavía requieren una decisión comercial.
+Antes de definir cuotas, la propuesta de **$149.900 + Meta incluyendo IA** habría dado totales al cliente de **$154.907, $170.813 o $199.974 COP** en esos tres escenarios. Son ejemplos históricos de precio base más Meta, no cotizaciones de los planes aprobados: el escenario medio y alto superan las 4.500 respuestas ahora incluidas y requieren ampliación o cotización. DeepSeek sale del ingreso de Sarin, no se agrega dos veces a la factura. En el escenario alto, USD 43,20 equivalen a unos $138.138 COP de IA, lo que explica la necesidad de limitar el uso incluido antes de sumar alojamiento, soporte e impuestos.
 
 DeepSeek cobra tokens de cada llamada contra el saldo de la cuenta (saldo otorgado primero, cuando exista, y saldo recargado después); no es una mensualidad fija de chat. Una respuesta que consulta horarios o reserva puede requerir varias llamadas. El panel de Sarin calcula una estimación desde los tokens devueltos por la API; la liquidación definitiva sigue siendo la del proveedor.
 
@@ -43,4 +43,4 @@ Fuentes verificadas el 15 de octubre de 2026: [precios oficiales y hoja COP](htt
 
 ## Decisiones antes de ofrecerlo
 
-Recomendación pendiente de adopción: cada negocio conserva su cuenta/número y paga directamente a Meta; Sarin cobra su propia suscripción. Definir todavía límites incluidos de uso de IA, sobreconsumo, alta inicial y soporte. No ofrecer respuestas ilimitadas mientras esos límites no estén definidos. Esta propuesta no habilita cargos, métodos de pago ni envío de mensajes.
+Los precios, respuestas incluidas y ampliaciones ya están definidos en la estructura comercial aprobada, pendiente de implementación. Continúa como recomendación operativa por resolver que cada negocio conserve su cuenta/número y pague directamente a Meta, mientras Sarin cobra su suscripción. También falta concretar alta inicial y soporte antes de contratar WhatsApp. No se ofrece atención ilimitada. Este documento no habilita cargos, métodos de pago ni envío de mensajes.

@@ -1,5 +1,11 @@
 # Estado de implementación — 2026-10-14
 
+## Estructura comercial — 2026-10-15
+
+- [x] Estructura aprobada por el propietario: Esencial 7/15/30 días a $20.000/$35.000/$59.900 con 700/1.500/3.000 respuestas; WhatsApp 30 días a $149.900 + Meta con 4.500; ampliaciones de 1.000 por $20.000. Referencia: `docs/commercial-plans.md`.
+- [ ] Implementar y verificar cuotas por vigencia, paquetes, aviso al 80%, pausa de IA y visualización de capacidad antes de publicar esas condiciones. Los precios Esencial existentes se conservan.
+- [ ] Integrar WhatsApp y medir Meta antes de ofrecer la modalidad como disponible; cotizar atención de mayor volumen según consumo real.
+
 ## Consumo de IA — 2026-10-15
 
 - [x] Medición privada de llamadas y tokens DeepSeek por negocio y mes, rango estimado USD y avisos sobre cobertura incompleta; sin cuerpos de conversaciones ni cambios de proveedor.
