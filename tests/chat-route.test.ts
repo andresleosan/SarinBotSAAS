@@ -80,6 +80,16 @@ describe('authorized closed business chat', () => {
     expect(data.reply).toContain('09:00'); expect(data.reply).toContain('Silla'); expect(data.reply).not.toContain('Untrusted'); expect(data.stateVersion).toBe(1);
     expect(state.complete).toHaveBeenCalledTimes(1);
   });
+  it('prepares a durable proposal but a chat yes never creates an appointment', async () => {
+    const memory = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown> }); state.db = memory.db;
+    state.complete.mockResolvedValue(interpretation('booking', { serviceId: 'cut', resourceId: 'chair', dateKey: '2030-01-07', startTimeStr: '09:00' }));
+    const first = await (await POST(request({ ...body, messages: [{ role: 'user', content: 'Sí, confirma' }] }))).json();
+    expect(first.proposal).toMatchObject({ serviceName: business.services[0].name, priceCOP: 20000 });
+    expect([...memory.rows.keys()].some(path => path.includes('/appointments/'))).toBe(false);
+    vi.setSystemTime(now + 16 * 60000);
+    const replay = await (await POST(request({ ...body, messages: [{ role: 'user', content: 'Sí, confirma' }] }))).json();
+    expect(replay.proposal.id).toBe(first.proposal.id); expect(state.complete).toHaveBeenCalledTimes(1);
+  });
   it('replays memory, rejects altered IDs, and never re-infers durable completed plain turns after cache expiry', async () => {
     state.complete.mockResolvedValue(interpretation());
     const first = await (await POST(request())).json(); expect(await (await POST(request())).json()).toEqual(first);
@@ -94,7 +104,7 @@ describe('authorized closed business chat', () => {
     const quota = await reserveResponseQuota({ actorUid: 'client', businessId: 'business', mode: body.mode, channel: 'web', requestId: body.requestId, fingerprint });
     const appointment = await createAppointment({ uid: 'client' }, 'business', { dateKey: '2030-01-07', startTimeStr: '09:00', serviceId: 'cut', resourceId: 'chair', clientPhone: '573001234567', intakeAnswers: {} }, stableDocumentId(body.requestId, 'crear_cita'), memory.db);
     await commitResponseQuota(quota.reservation); await cancelAppointment({ uid: 'client' }, 'business', appointment.id, memory.db);
-    const response = await POST(request()); expect(response.status).toBe(200); expect((await response.json()).reply).toContain('cancelada'); expect(state.complete).not.toHaveBeenCalled();
+    const response = await POST(request()); expect(response.status).toBe(200); expect((await response.json()).reply).toMatch(/cancelada/i); expect(state.complete).not.toHaveBeenCalled();
     expect((await memory.db.collection('businesses').doc('business').get()).data()?.subscription.paidTrial.appointmentsUsed).toBe(10);
   });
   it('releases commercial response on engine failure and denies exhausted quota before the provider', async () => {

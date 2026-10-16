@@ -14,10 +14,11 @@ import { enforceInferenceAdmission } from './inference-rate-limit';
 import { readClientPolicy } from './client-policy';
 import { readChatState, saveChatState } from './chat-state';
 import { interpretChat } from './chat-intent';
-import { renderChatReply } from './chat-replies';
+import { renderChatReply, appointmentStatusLabel } from './chat-replies';
 import { assertOwner, getBusiness, getOwnedBusiness, stableDocumentId } from './businesses';
 import { readAppointments, readAvailability } from './bookings';
 import { chatSchema } from './schemas';
+import { createBookingProposal, recoverBookingProposal } from './booking-proposals';
 
 interface CachedResponse { fingerprint: string; response: ChatResponse; reservation: ResponseQuotaReservation; expiresAt: number; }
 const responses = new WeakMap<ReturnType<typeof getAdminDb>, Map<string, CachedResponse>>();
@@ -37,13 +38,15 @@ function rememberResponse(db: ReturnType<typeof getAdminDb>, key: string, value:
 // This path never creates another appointment and preserves its current status.
 async function recoverLegacyMutation(user: ChatActor, body: z.infer<typeof chatSchema>, business: Business): Promise<ChatResponse | null> {
   if (body.mode === 'sarin_onboarding') return null;
+  const recovered = await recoverBookingProposal(user, business.id, body.requestId);
+  if (recovered) return recovered.appointment ? { reply: `Cita: ${appointmentStatusLabel(recovered.appointment.status)}. Consulta los datos en Mis citas.`, toolResults: [{ name: 'cita_confirmada', result: { appointment: recovered.appointment } }] } : { reply: 'Revisa esta propuesta. La reserva requiere pulsar Confirmar cita.', proposal: recovered.proposal };
   const name = body.mode === 'sarin_owner_copilot' ? 'bloquear_horario' : 'crear_cita';
   const id = stableDocumentId(user.uid, stableDocumentId(body.requestId, name), name === 'crear_cita' ? 'appointment' : 'block');
   const document = await getAdminDb().collection('businesses').doc(business.id).collection('appointments').doc(id).get();
   if (!document.exists) return null;
   const appointment = document.data() as Appointment;
   if (appointment.tenantId !== business.id || (name === 'crear_cita' ? appointment.client?.uid !== user.uid : business.ownerUid !== user.uid)) throw new HttpError(403, 'No tienes acceso a esta operación.');
-  return { reply: `${appointment.status === 'confirmed' ? 'Tu cita está confirmada.' : 'Esta cita está cancelada. No se creó una nueva reserva.'}\n${appointment.serviceName} · ${appointment.dateKey} ${appointment.startTimeStr}–${appointment.endTimeStr} (Colombia).`, toolResults: [{ name, result: { appointment } }] };
+  return { reply: `${appointment.type === 'manual_block' ? 'Bloqueo' : 'Cita'}: ${appointmentStatusLabel(appointment.status)}. No se creó una nueva reserva.\n${appointment.serviceName} · ${appointment.dateKey} ${appointment.startTimeStr}–${appointment.endTimeStr} (Colombia).`, toolResults: [{ name, result: { appointment } }] };
 }
 export async function runSarinChat({ user, body: suppliedBody, signal, channel = 'web', onResponse }: {
   user: ChatActor; body: z.infer<typeof chatSchema>; signal?: AbortSignal; channel?: 'web' | 'whatsapp';
@@ -96,6 +99,9 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
       business = await getBusiness(business.id); await assertAccess();
       const selection = interpreted.selection, data: Record<string, unknown> = { ...selection };
       switch (interpreted.intent) {
+        case 'booking':
+          if (selection.serviceId && selection.resourceId && selection.dateKey && selection.startTimeStr && channel === 'web') data.proposal = await createBookingProposal(user, business.id, { serviceId: selection.serviceId, resourceId: selection.resourceId, dateKey: selection.dateKey, startTimeStr: selection.startTimeStr }, body.requestId);
+          break;
         case 'availability':
           if (selection.dateKey && selection.serviceId) data.availability = await readAvailability(business, selection.dateKey, selection.serviceId, selection.resourceId);
           break;
@@ -108,8 +114,10 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
         case 'configure_business': data.hasDraft = Boolean(interpreted.configurationDraft); break;
       }
       response = renderChatReply({ intent: interpreted.intent, business, data });
+      if (data.proposal) response.proposal = data.proposal as ChatResponse['proposal'];
       if (interpreted.configurationDraft) response.configurationDraft = interpreted.configurationDraft;
-      response.stateVersion = (await saveChatState(scope, state.version, selection, db)).version;
+      try { response.stateVersion = (await saveChatState(scope, state.version, selection, db)).version; }
+      catch (error) { if (!data.proposal) throw error; /* durable proposal remains recoverable without another model call */ }
     } catch (error) {
       try { await releaseResponseQuota(quota.reservation); } catch { /* cannot create free capacity */ }
       throw error;

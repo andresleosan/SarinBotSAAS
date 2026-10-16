@@ -62,6 +62,7 @@ function Configuration() {
   const [tone, setTone] = useState("Cercano y profesional");
   const [rules, setRules] = useState("");
   const [intake, setIntake] = useState("");
+  const proposedIntake = useRef<Business['sarinConfig']['intakeFields']>([]);
   const [resources, setResources] = useState<TenantResource[]>([
     { id: "principal", name: "", active: true },
   ]);
@@ -128,6 +129,7 @@ function Configuration() {
     if (!draft) return;
     setName(draft.name); setSlug(business?.slug || draft.slug); setCategory(draft.category); setPhone(draft.phoneWhatsApp);
     if (draft.socialLinks !== undefined) setSocialLinks(draft.socialLinks);
+    proposedIntake.current = draft.intakeFields;
     setTone(draft.tone); setRules(draft.customRules); setIntake(draft.intakeFields.map(field => field.label).join('\n'));
     setResources(draft.resources); setServices(draft.services); setSchedule(draft.weeklySchedule); setSaved(false);
   }
@@ -157,8 +159,8 @@ function Configuration() {
             .map((label) => label.trim())
             .filter(Boolean)
             .map(
-              (label) =>
-                business?.sarinConfig.intakeFields.find(
+              (label, index) =>
+                (proposedIntake.current[index]?.label === label ? proposedIntake.current[index] : undefined) ?? business?.sarinConfig.intakeFields.find(
                   (field) => field.label === label,
                 ) ?? {
                   key: `dato_${crypto.randomUUID()}`,

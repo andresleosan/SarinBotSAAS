@@ -1,6 +1,6 @@
 import 'server-only';
 import type { ChatActor } from '@/types/chat';
-import type { Database as Firestore } from '@/lib/storage/types';
+import type { Database as Firestore, Transaction } from '@/lib/storage/types';
 import type { Appointment, Business } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { getAvailableSlots, isDateKey, toColombiaTimestamp, toMinutes, toTimeStr } from '@/lib/sarin/availability';
@@ -37,14 +37,19 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
   assertDate(input.dateKey);
   if (!documentIdSchema.safeParse(businessId).success) throw new HttpError(400, 'Negocio inválido.');
   const businessReference = db.collection('businesses').doc(businessId);
+  return db.runTransaction(async transaction => {
+    const document = await transaction.get(businessReference);
+    if (!document.exists) throw new HttpError(404, 'El negocio no existe.');
+    return createAppointmentInTransaction(transaction, user, document.data() as Business, input, requestId, db, Date.now());
+  });
+}
+export async function createAppointmentInTransaction(transaction: Transaction, user: ChatActor, business: Business, input: BookingInput, requestId: string, db: Firestore, now: number): Promise<Appointment> {
+  const businessId = business.id, businessReference = db.collection('businesses').doc(businessId);
   const id = stableDocumentId(user.uid, requestId, 'appointment');
   const appointmentReference = businessReference.collection('appointments').doc(id);
   const lockReference = businessReference.collection('bookingLocks').doc(`${input.dateKey}_${input.resourceId}`);
   const clientLockReference = businessReference.collection('bookingLocks').doc(`client_${clientPolicyKey(user.uid)}`);
-  return db.runTransaction(async (transaction) => {
-    const [businessDocument, existing, lock, clientLock] = await Promise.all([transaction.get(businessReference), transaction.get(appointmentReference), transaction.get(lockReference), transaction.get(clientLockReference)]);
-    if (!businessDocument.exists) throw new HttpError(404, 'El negocio no existe.');
-    const business = businessDocument.data() as Business;
+    const [existing, lock, clientLock] = await Promise.all([transaction.get(appointmentReference), transaction.get(lockReference), transaction.get(clientLockReference)]);
     if (existing.exists) {
       const appointment = existing.data() as Appointment;
       if (appointment.client?.uid !== user.uid || appointment.startTimeStr !== input.startTimeStr || appointment.dateKey !== input.dateKey || appointment.resourceId !== input.resourceId || appointment.serviceId !== input.serviceId) throw new HttpError(409, 'Este identificador ya se utilizó para otra reserva.');
@@ -52,7 +57,8 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
     }
     if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar agendando.');
-    await assertClientCanBook(transaction, business, user.uid, Date.now(), db);
+    assertDate(input.dateKey);
+    await assertClientCanBook(transaction, business, user.uid, now, db);
     const service = business.services.find((candidate) => candidate.id === input.serviceId);
     if (!service) throw new HttpError(400, 'El servicio no existe.');
     if (business.sarinConfig.intakeFields.some((field) => field.required && !input.intakeAnswers[field.key]?.trim())) throw new HttpError(400, 'Faltan respuestas obligatorias para agendar.');
@@ -68,12 +74,12 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
       startTimeStr: input.startTimeStr, endTimeStr: toTimeStr(toMinutes(input.startTimeStr) + service.durationMinutes),
       type: 'appointment', resourceId: input.resourceId, serviceId: service.id, serviceName: service.name, price: service.price,
       client: { uid: user.uid, name: typeof user.name === 'string' ? user.name : user.email ?? 'Cliente', email: user.email ?? '', phone: input.clientPhone, intakeAnswers: input.intakeAnswers },
-      status: 'confirmed', createdBy: business.ownerUid === user.uid ? 'sarin_owner' : 'sarin_client', createdAt: Date.now(),
+      status: 'confirmed', createdBy: business.ownerUid === user.uid ? 'sarin_owner' : 'sarin_client', createdAt: now,
     };
     // The shared per-resource/day document prevents empty-query phantom races.
     // Every mutation of that resource/date must participate in the same lock.
-    transaction.set(lockReference, { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: Date.now() });
-    transaction.set(clientLockReference, { version: Number(clientLock.data()?.version ?? 0) + 1, updatedAt: Date.now() });
+    transaction.set(lockReference, { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: now });
+    transaction.set(clientLockReference, { version: Number(clientLock.data()?.version ?? 0) + 1, updatedAt: now });
     if (getBusinessAccess(business) === 'paid_trial') {
       const trial = business.subscription.paidTrial!;
       const updated: Business = { ...business, subscription: { ...business.subscription, paidTrial: { ...trial, appointmentsUsed: trial.appointmentsUsed + 1 } } };
@@ -84,7 +90,6 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
     }
     transaction.create(appointmentReference, appointment);
     return appointment;
-  });
 }
 
 export async function createManualBlock(user: ChatActor, businessId: string, input: BlockInput, db: Firestore = getAdminDb()): Promise<Appointment> {

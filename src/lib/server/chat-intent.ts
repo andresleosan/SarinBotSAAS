@@ -29,6 +29,7 @@ export async function interpretChat(input: { mode: ChatMode; message: string; bu
   const ownerOnly = ['configure_business', 'owner_agenda', 'owner_usage', 'owner_block'];
   if ((input.mode === 'sarin_client' && ownerOnly.includes(result.intent)) || (result.configurationDraft && input.mode !== 'sarin_onboarding')) throw new HttpError(403, 'Esta consulta requiere el modo autorizado del dueño.');
   if (result.intent === 'configure_business' && input.mode !== 'sarin_onboarding') throw new HttpError(403, 'Abre la configuración del negocio para preparar cambios.');
+  if (['owner_agenda', 'owner_usage', 'owner_block'].includes(result.intent) && input.mode !== 'sarin_owner_copilot') throw new HttpError(403, 'Esta consulta requiere el copiloto con una suscripción vigente.');
   const selection = { ...input.state.selection, ...result.selection };
   const service = input.business.services.find(item => item.id === selection.serviceId);
   const resource = input.business.resources.find(item => item.id === selection.resourceId && item.active);

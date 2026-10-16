@@ -25,4 +25,8 @@ describe('closed business intent interpreter', () => {
     state.complete.mockResolvedValue(call({ intent: 'out_of_scope', selection: {} }));
     expect(JSON.stringify(await interpretChat(input))).not.toContain('Untrusted free text');
   });
+  it.each(['owner_agenda', 'owner_usage', 'owner_block'])('does not expose copilot intent %s through onboarding', async intent => {
+    state.complete.mockResolvedValue(call({ intent, selection: {} }));
+    await expect(interpretChat({ ...input, mode: 'sarin_onboarding', actorUid: 'owner' })).rejects.toMatchObject({ status: 403 });
+  });
 });

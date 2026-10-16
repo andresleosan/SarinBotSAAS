@@ -4,6 +4,7 @@ import type { Appointment, Business } from '@/types/firestore';
 import type { ChatIntent } from './chat-intent';
 export const OUT_OF_SCOPE_REPLY = 'Puedo ayudarte con los servicios, horarios y citas de este negocio. ¿Qué necesitas reservar o consultar?';
 const money = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+export const appointmentStatusLabel = (status: Appointment['status']) => ({ confirmed: 'Activa', completed: 'Completada', no_show: 'No asistió', cancelled_by_client: 'Cancelada por el cliente', cancelled_by_owner: 'Cancelada por el negocio' })[status];
 export function renderChatReply({ intent, business, data }: { intent: ChatIntent; business: Business; data: Record<string, unknown> }): ChatResponse {
   const service = business.services.find(item => item.id === data.serviceId);
   let reply: string;
@@ -22,7 +23,7 @@ export function renderChatReply({ intent, business, data }: { intent: ChatIntent
     case 'booking': reply = 'Para preparar tu reserva necesito servicio, profesional, fecha y hora. La cita se agenda al revisar el resumen y pulsar Confirmar cita.'; break;
     case 'own_appointments': case 'owner_agenda': {
       const appointments = data.appointments as Appointment[] | undefined;
-      reply = appointments?.length ? appointments.map(item => `${item.serviceName} · ${item.dateKey} ${item.startTimeStr}–${item.endTimeStr} · ${item.status === 'confirmed' ? 'Activa' : 'Cancelada'}`).join('\n') : 'No hay citas para esta consulta. Puedes revisar próximas e historial en la agenda.';
+      reply = appointments?.length ? appointments.map(item => `${item.serviceName} · ${item.dateKey} ${item.startTimeStr}–${item.endTimeStr} · ${appointmentStatusLabel(item.status)}`).join('\n') : 'No hay citas para esta consulta. Puedes revisar próximas e historial en la agenda.';
       break;
     }
     case 'owner_usage': reply = typeof data.remainingResponses === 'number' ? `Respuestas de IA disponibles: ${data.remainingResponses}. Revisa Suscripción para ver tu consumo y vigencia.` : 'Consulta tu consumo y vigencia en Suscripción.'; break;

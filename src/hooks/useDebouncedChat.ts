@@ -50,6 +50,9 @@ export function useDebouncedChat({
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [configurationDraft, setConfigurationDraft] = useState<ChatResponse['configurationDraft']>();
+  const [proposal, setProposal] = useState<ChatResponse['proposal']>();
+  const [confirming, setConfirming] = useState(false);
+  const confirmation = useRef<AbortController | null>(null);
   const stateVersion = useRef<number | undefined>(undefined);
   const pending = useRef<string[]>([]);
   const failed = useRef<Batch | null>(null);
@@ -68,6 +71,7 @@ export function useDebouncedChat({
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     setConfigurationDraft(undefined);
+    setProposal(undefined); setConfirming(false); confirmation.current?.abort(); confirmation.current = null;
     stateVersion.current = undefined;
     pending.current = [];
     failed.current = null;
@@ -81,6 +85,7 @@ export function useDebouncedChat({
     return () => {
       generation.current++;
       controller.current?.abort();
+      confirmation.current?.abort();
       if (timer.current) clearTimeout(timer.current);
     };
   }, [mode, tenantId, actorUid]);
@@ -116,6 +121,7 @@ export function useDebouncedChat({
       setErrorCode(null);
       stateVersion.current = data.stateVersion;
       setConfigurationDraft(data.configurationDraft);
+      setProposal(data.proposal);
       setMessages((previous) => [
         ...previous,
         {
@@ -182,5 +188,20 @@ export function useDebouncedChat({
   const retry = useCallback(() => {
     if (!busy.current && failed.current) void flushRef.current();
   }, []);
-  return { messages, sendMessage, isWaitingBatch, isGenerating, error, retry, configurationDraft, quotaExhausted: errorCode === "AI_QUOTA_EXHAUSTED", requestAlreadyCompleted: errorCode === "REQUEST_ALREADY_COMPLETED" };
+  const confirmProposal = useCallback(async (proposalId: string, contact: Pick<import('@/lib/server/schemas').BookingInput, 'clientPhone' | 'intakeAnswers'>) => {
+    if (confirmation.current || proposal?.id !== proposalId || proposal.businessId !== tenantId) return;
+    const abort = confirmation.current = new AbortController(), current = generation.current;
+    setConfirming(true); setError(null);
+    try {
+      const result = await apiFetch<{ appointment: import('@/types/firestore').Appointment }>(`/api/businesses/${encodeURIComponent(tenantId)}/booking-proposals/${encodeURIComponent(proposalId)}/confirm`, { method: 'POST', signal: abort.signal, body: JSON.stringify({ confirm: true, clientPhone: contact.clientPhone, intakeAnswers: contact.intakeAnswers }) });
+      if (generation.current !== current || abort.signal.aborted) return;
+      const appointment = result.appointment;
+      if (appointment.tenantId !== tenantId || (actorUid && appointment.client?.uid !== actorUid)) throw new Error('No se pudo validar la cita recibida.');
+      setProposal(undefined);
+      setMessages(previous => [...previous, { id: crypto.randomUUID(), role: 'assistant', content: `${appointment.status === 'confirmed' ? 'Tu cita está confirmada.' : 'Esta cita ya fue atendida o cancelada. Revisa su estado en Mis citas.'}\n${appointment.serviceName} · ${appointment.dateKey} ${appointment.startTimeStr}–${appointment.endTimeStr} (Colombia).`, timestamp: Date.now() }]);
+      callback.current?.('cita_confirmada', { appointment });
+    } catch (cause) { if (generation.current === current && !abort.signal.aborted) setError(errorMessage(cause)); }
+    finally { if (generation.current === current && !abort.signal.aborted) setConfirming(false); if (confirmation.current === abort) confirmation.current = null; }
+  }, [proposal, tenantId, actorUid]);
+  return { messages, sendMessage, isWaitingBatch, isGenerating, error, retry, configurationDraft, proposal, confirming, confirmProposal, quotaExhausted: errorCode === "AI_QUOTA_EXHAUSTED", requestAlreadyCompleted: errorCode === "REQUEST_ALREADY_COMPLETED" };
 }

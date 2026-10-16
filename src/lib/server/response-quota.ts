@@ -48,6 +48,13 @@ export async function reserveResponseQuota(input: ResponseQuotaInput, db: Firest
         // quota acknowledgement. A matching authenticated turn can recover that
         // result while retaining and then settling the original reserved unit.
         if (request.mode === 'sarin_client') {
+          const proposalRequest = await transaction.get(db.collection('bookingProposals').doc(`request_${stableDocumentId('proposal-request', request.businessId!, request.actorUid, request.requestId)}`));
+          if (proposalRequest.exists) {
+            const mapping = proposalRequest.data()!;
+            if (mapping.actorUid !== request.actorUid || mapping.businessId !== request.businessId || !documentIdSchema.safeParse(mapping.proposalId).success) throw new HttpError(503, 'No se pudo validar la propuesta pendiente.');
+            const proposal = await transaction.get(db.collection('bookingProposals').doc(mapping.proposalId));
+            if (proposal.data()?.actorUid === request.actorUid && proposal.data()?.businessId === request.businessId) return { kind: 'replay', reservation, response: null };
+          }
           const id = stableDocumentId(request.actorUid, stableDocumentId(request.requestId, 'crear_cita'), 'appointment');
           const document = await transaction.get(db.collection('businesses').doc(request.businessId!).collection('appointments').doc(id));
           const appointment = document.data() as Appointment | undefined;

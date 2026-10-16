@@ -7,6 +7,7 @@ import { SarinMark } from "@/components/sarin-brand";
 import { AuthGate, useAuth } from "@/components/auth-provider";
 import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
 import { ClientAppointments } from "@/components/client-appointments";
+import { BookingProposal } from '@/components/booking-proposal';
 import { useDebouncedChat } from "@/hooks/useDebouncedChat";
 import { useEngineHealth } from "@/hooks/useEngineHealth";
 import { useApiPoll } from "@/lib/client/use-api-poll";
@@ -209,6 +210,7 @@ function Island({ slug }: { slug: string }) {
             </div>
           )}
           <div ref={end} />
+          {chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming} onConfirm={chat.confirmProposal} />}
         </div>
         {user && <ClientAppointments key={`${business.id}:${user.uid}`} businessId={business.id} businessName={business.name} resources={business.resources} userId={user.uid} now={now} />}
       </div>

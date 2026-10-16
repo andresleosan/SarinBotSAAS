@@ -1,0 +1,43 @@
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { createBookingProposal, confirmBookingProposal } from '@/lib/server/booking-proposals';
+import { cancelAppointment } from '@/lib/server/bookings';
+import { updateClientPolicy } from '@/lib/server/client-policy';
+import { privateBusinessDraft } from '@/lib/server/businesses';
+import { memoryFirestore } from './memoryFirestore';
+const now = Date.parse('2030-01-01T12:00:00Z');
+const business = { ...privateBusinessDraft({ uid: 'owner' }, now), id: 'proposal', slug: 'proposal', subscription: { status: 'trial' as const, trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: 'synthetic', activatedAt: now, appointmentLimit: 10, appointmentsUsed: 9 } }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [{ key: 'note', label: 'Preferencia', required: true }] }, resources: [{ id: 'one', name: 'Uno', active: true }], services: [{ id: 'cut', name: 'Corte', durationMinutes: 30, bufferMinutes: 0, price: 20000, resourceIds: ['one'] }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] } } };
+const selection = { serviceId: 'cut', resourceId: 'one', dateKey: '2030-01-07', startTimeStr: '09:00' };
+const contact = { clientPhone: '573001234567', intakeAnswers: { note: 'Sin perfume' } };
+describe('server-bound explicit booking confirmation', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
+  afterEach(() => vi.useRealTimers());
+  it('stores no contact before confirmation and consumes the final trial appointment once', async () => {
+    const { db, rows } = memoryFirestore({ 'businesses/proposal': business });
+    const proposal = await createBookingProposal({ uid: 'client' }, business.id, selection, 'proposal-request', db);
+    expect(proposal.id.length).toBeGreaterThanOrEqual(22); expect(proposal.priceCOP).toBe(20000);
+    expect(await createBookingProposal({ uid: 'client' }, business.id, selection, 'proposal-request', db)).toEqual(proposal);
+    expect(JSON.stringify([...rows].filter(([path]) => path.startsWith('bookingProposals/')))).not.toMatch(/clientPhone|intakeAnswers|573001234567|Sin perfume/);
+    const confirmed = await Promise.all([confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db), confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db)]);
+    expect(confirmed.map(item => item.id)).toEqual([confirmed[0].id, confirmed[0].id]);
+    expect(rows.get('businesses/proposal')?.data.subscription).toMatchObject({ paidTrial: { appointmentsUsed: 10 } });
+    await cancelAppointment({ uid: 'client' }, business.id, confirmed[0].id, db);
+    vi.setSystemTime(now + 86400000);
+    expect(await confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, {} as never, db)).toMatchObject({ id: confirmed[0].id, status: 'cancelled_by_client' });
+  });
+  it('rejects cross-account, expiration, changed catalogue, invalid contact and blocking without consuming', async () => {
+    const { db, rows } = memoryFirestore({ 'businesses/proposal': business });
+    const proposal = await createBookingProposal({ uid: 'client' }, business.id, selection, 'proposal-request', db);
+    await expect(confirmBookingProposal({ uid: 'other' }, business.id, proposal.id, contact, db)).rejects.toMatchObject({ status: 403 });
+    await expect(confirmBookingProposal({ uid: 'client' }, 'other', proposal.id, contact, db)).rejects.toMatchObject({ status: 404 });
+    await expect(confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, { ...contact, clientPhone: 'invalid' }, db)).rejects.toBeDefined();
+    await updateClientPolicy({ uid: 'owner' }, business.id, { clientUid: 'client', blocked: true, reason: 'Revisión' }, db);
+    await expect(confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db)).rejects.toMatchObject({ code: 'CLIENT_BLOCKED' });
+    await updateClientPolicy({ uid: 'owner' }, business.id, { clientUid: 'client', blocked: false, reason: 'Reactivado' }, db);
+    await db.collection('businesses').doc(business.id).set({ ...business, services: [{ ...business.services[0], price: 25000 }] });
+    await expect(confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db)).rejects.toMatchObject({ status: 409 });
+    await db.collection('businesses').doc(business.id).set(business);
+    vi.setSystemTime(now + 600000);
+    await expect(confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db)).rejects.toMatchObject({ code: 'BOOKING_PROPOSAL_EXPIRED' });
+    expect([...rows.keys()].filter(path => path.includes('/appointments/'))).toHaveLength(0);
+  });
+});
