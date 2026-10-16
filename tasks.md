@@ -4,7 +4,7 @@
 
 - [x] Selector global manual Ollama/DeepSeek para superadministrador, persistencia privada y Vault exclusivamente local. Gemini retirado y su clave dedicada revocada; OAuth/Firebase intactos.
 - [x] Verificación: tipos, 288 pruebas, 11 pruebas con Firestore Emulator, 72 comprobaciones del recorrido y acceso por roles en Chrome. Evidencia: `docs/qa/2026-10-15-admin-ai.md`.
-- [ ] Construir y activar la imagen actualizada en la instancia privada. El lanzamiento público y WhatsApp Premium siguen pendientes; precio y consumo propuestos en `docs/whatsapp-premium-proposal.md`.
+- [x] Imagen del commit `9a3e66f` construida y activada en la instancia privada; tres jobs CI y controles posteriores correctos. El lanzamiento público y WhatsApp Premium siguen pendientes; precio y consumo propuestos en `docs/whatsapp-premium-proposal.md`.
 
 ## Historial inicial
 
