@@ -4,7 +4,7 @@
 
 - [x] Medición privada de llamadas y tokens DeepSeek por negocio y mes, rango estimado USD y avisos sobre cobertura incompleta; sin cuerpos de conversaciones ni cambios de proveedor.
 - [x] Tipos, 314 pruebas, 13 pruebas Firestore y 75 comprobaciones del recorrido; idempotencia, permisos, fallos de telemetría y revisión visual a 320 px. Evidencia: `docs/qa/2026-10-15-ai-usage.md`.
-- [ ] Construcción y actualización de la instancia privada, con verificación autenticada del nuevo panel.
+- [x] Imagen de `59a716a` construida y activada en la instancia privada; contexto idéntico a `4c9dd26`, CI con tres jobs verdes, 22 controles posteriores y verificación autenticada del medidor. IA local conservada; lanzamiento público y WhatsApp pendientes.
 - [x] Proyección de barbería para 15–50 conversaciones diarias y 6–12 respuestas, sin notificaciones proactivas; costos de Meta/DeepSeek y precio al cliente separados en `docs/whatsapp-premium-proposal.md`.
 
 ## Control administrativo — 2026-10-15
