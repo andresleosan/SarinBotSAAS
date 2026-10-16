@@ -20,8 +20,10 @@
     "test:journey": "node scripts/journey-local.mjs"
   },
   "dependencies": {
+    "country-flag-icons": "1.6.20",
     "firebase": "13.0.0",
     "firebase-admin": "14.5.0",
+    "libphonenumber-js": "1.13.15",
     "lucide-react": "^0.454.0",
     "next": "16.4.0",
     "qrcode.react": "^4.1.0",

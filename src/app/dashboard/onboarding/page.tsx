@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Plus, Send, Trash2 } from "lucide-react";
 import { SarinMark } from "@/components/sarin-brand";
+import { WhatsAppPhoneField } from "@/components/whatsapp-phone-field";
 import { AuthGate } from "@/components/auth-provider";
 import {
   AppShell,
@@ -292,18 +293,7 @@ function Configuration() {
                 </span>
               )}
             </label>
-            <label className="text-xs text-sarin-muted">
-              WhatsApp (código de país y número)
-              <input
-                className={fieldClass + " mt-1.5"}
-                value={phone}
-                type="tel"
-                required
-                pattern="[+]?[1-9][0-9]{7,14}"
-                maxLength={20}
-                onChange={(event) => setPhone(event.target.value)}
-              />
-            </label>
+            <WhatsAppPhoneField value={phone} onChange={setPhone} />
           </div>
           <section className="space-y-2">
             <h3 className="font-semibold">Profesionales o estaciones</h3>

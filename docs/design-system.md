@@ -19,6 +19,10 @@ A petición del propietario, los formularios aprovechan mejor el ancho disponibl
 
 Referencia adicional inspeccionada con el MCP de Mobbin: [Square: edición de horarios](https://mobbin.com/screens/6b2d38fe-14c7-4c70-9982-fb8aafab787c), por sus filas de día, inicio y fin, separadas con líneas discretas.
 
+### País y número de WhatsApp (15 de octubre de 2026)
+
+El formulario del negocio separa el país y su indicativo del número nacional en una fila compacta. El selector muestra una bandera SVG y el indicativo, con nombres de países en español al abrir la lista. Colombia es el valor inicial para campos vacíos; los teléfonos existentes conservan su valor internacional. Se mantienen Agenda clara, DM Sans, foco azul y altura táctil de 44 px. Las banderas se incluyen en la aplicación y no dependen de servidores externos ni del soporte de emojis del dispositivo.
+
 ### Referencias iniciales
 
 La conexión oficial `https://api.mobbin.com/mcp` se autenticó mediante OAuth. Las búsquedas se ejecutaron con un host MCP CLI de solo lectura porque la sesión de trabajo ya abierta no incorpora herramientas nuevas dinámicamente.
