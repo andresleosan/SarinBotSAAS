@@ -7,6 +7,7 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly code?: string,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiError";
@@ -39,7 +40,8 @@ export async function apiFetch<T>(
           ? data.message
           : `No se pudo completar la solicitud (${response.status}).`;
     const code = data && typeof data === "object" && "code" in data && typeof data.code === "string" && /^[A-Z0-9_]{1,80}$/.test(data.code) ? data.code : undefined;
-    throw new ApiError(message, response.status, code);
+    const retry = Number(response.headers.get('Retry-After'));
+    throw new ApiError(message, response.status, code, Number.isSafeInteger(retry) && retry > 0 ? retry : undefined);
   }
   return data as T;
 }

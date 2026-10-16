@@ -8,7 +8,8 @@ import type { ChatActor, ChatResponse } from '@/types/chat';
 import { z } from 'zod';
 import { HttpError } from '@/lib/server/http';
 import { runUserInference } from '@/lib/server/inference';
-import { enforceClientInferenceRateLimit } from '@/lib/server/inference-rate-limit';
+import { enforceInferenceAdmission } from '@/lib/server/inference-rate-limit';
+import { readClientPolicy } from './client-policy';
 import { getAiProviderSelection } from '@/lib/server/provider-settings';
 import { recordAiUsage } from '@/lib/server/ai-usage';
 import { assertOwner, createBusiness, getBusiness, getOwnedBusiness, stableDocumentId } from '@/lib/server/businesses';
@@ -112,6 +113,11 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     const scope = body.mode === 'sarin_onboarding' ? 'onboarding' : business!.id;
     const cacheKey = stableDocumentId(scope, user.uid, body.mode, body.requestId, channel);
     const fingerprint = createHash('sha256').update(JSON.stringify({ mode: body.mode, tenantId: body.tenantId, messages: body.messages })).digest('hex');
+    const assertClientAccess = async () => {
+      if (body.mode === 'sarin_client' && (await readClientPolicy(business!.id, user.uid, db)).blocked) throw new HttpError(403, 'Este negocio ha pausado tus nuevas consultas. Puedes consultar y cancelar tus citas.', 'CLIENT_BLOCKED');
+    };
+    await assertClientAccess();
+    await enforceInferenceAdmission({ businessId: business!.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel }, db);
     const execute = async (): Promise<ChatResponse> => {
       const { provider } = await getAiProviderSelection();
       for (let round = 0; round < 4; round++) {
@@ -128,6 +134,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
           }
         }
         await assertWhatsAppAccess();
+        await assertClientAccess();
         let assistant;
         try {
           const usageContext = { businessId: business?.id ?? null, mode: body.mode };
@@ -215,7 +222,6 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
         try { await commitResponseQuota(cached.reservation); } catch { /* the reserved unit remains held */ }
         return response;
       }
-      if (body.mode === 'sarin_client') await enforceClientInferenceRateLimit({ businessId: business!.id, actorUid: user.uid, requestId: body.requestId, fingerprint, channel }, db);
       const quota = await reserveResponseQuota({ businessId: business?.id ?? null, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel });
       if (quota.kind === 'replay') {
         const recovered = await recoverMutation(user, body, business);

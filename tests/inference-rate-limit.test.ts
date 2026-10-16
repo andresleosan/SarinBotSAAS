@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { memoryFirestore } from './memoryFirestore';
 import type { Database } from '../src/lib/storage/types';
-import { enforceClientInferenceRateLimit } from '../src/lib/server/inference-rate-limit';
+import { enforceClientInferenceRateLimit, enforceInferenceAdmission } from '../src/lib/server/inference-rate-limit';
 import { createCloudflareDatabase, StorageError } from '../src/lib/storage/database';
 import { createDataTestRuntime } from '../cloudflare/tests/data-runtime.mjs';
 import type { DataCommand, DataCommitResult, DataReadResult } from '../shared/data-protocol';
@@ -172,14 +172,37 @@ describe('rate limits before commercial response reservation', () => {
     expect(rows.get(ratePath)?.data.events).toHaveLength(10);
   });
 
-  it.each(['sarin_onboarding', 'sarin_owner_copilot'] as const)('does not apply client frequency limits to %s', async mode => {
+  it.each(['sarin_onboarding', 'sarin_owner_copilot'] as const)('admits %s before queueing and keeps exact retry delay', async mode => {
     vi.useFakeTimers(); vi.setSystemTime(now); vi.stubEnv('SARIN_CHAT_PROVIDER', 'ollama');
     const { businessIdForOwner } = await import('../src/lib/server/businesses');
     const ownerId = businessIdForOwner('owner');
     const { database, rows } = adapter({ [`businesses/${ownerId}`]: { ...business, id: ownerId } }); state.db = database;
     state.complete.mockResolvedValue({ role: 'assistant', content: 'Respuesta sintética' });
-    for (let index = 0; index < 11; index++) await runSarinChat({ user: { uid: 'owner' }, body: { ...body(index), tenantId: ownerId, mode } });
-    expect(state.complete).toHaveBeenCalledTimes(11);
-    expect([...rows.keys()].some(path => path.startsWith('serverSettings/client_rate_'))).toBe(false);
+    for (let index = 0; index < 10; index++) await runSarinChat({ user: { uid: 'owner' }, body: { ...body(index), tenantId: ownerId, mode } });
+    const inference = await import('../src/lib/server/inference');
+    const queued = vi.spyOn(inference, 'runUserInference');
+    await expect(runSarinChat({ user: { uid: 'owner' }, body: { ...body(10), tenantId: ownerId, mode } })).rejects.toMatchObject({ status: 429, retryAfterSeconds: 60 });
+    expect(queued).not.toHaveBeenCalled(); queued.mockRestore();
+    expect(state.complete).toHaveBeenCalledTimes(10);
+    expect([...rows.keys()].some(path => path.startsWith('serverSettings/client_rate_'))).toBe(true);
+  });
+});
+
+describe('shared mode and tenant admission', () => {
+  it('limits one tenant across thirty UIDs and keeps another tenant independent', async () => {
+    const { database } = adapter();
+    for (let index = 0; index < 30; index++) await enforceInferenceAdmission({ ...input(index), actorUid: `actor-${index}`, mode: index % 2 ? 'sarin_client' : 'sarin_onboarding' }, database, now);
+    await expect(enforceInferenceAdmission({ ...input(30), mode: 'sarin_owner_copilot', actorUid: 'actor-30' }, database, now)).rejects.toMatchObject({ status: 429, retryAfterSeconds: 60 });
+    await enforceInferenceAdmission({ ...input(31), businessId: 'other-business', mode: 'sarin_client', actorUid: 'actor-30' }, database, now);
+  });
+  it('does not let a UID evade limits by changing mode or tenant; onboarding replay keeps legacy null identity', async () => {
+    const { database, rows } = adapter();
+    for (let index = 0; index < 10; index++) await enforceInferenceAdmission({ ...input(index), mode: index % 2 ? 'sarin_client' : 'sarin_onboarding' }, database, now);
+    await expect(enforceInferenceAdmission({ ...input(11), mode: 'sarin_owner_copilot', businessId: 'other-business' }, database, now)).rejects.toMatchObject({ status: 429 });
+    const legacy = input(12);
+    await database.collection('responseQuotaTurns').doc(hash(null, legacy.actorUid, 'sarin_onboarding', legacy.channel, legacy.requestId)).set({ status: 'completed', fingerprint: legacy.fingerprint });
+    const before = structuredClone([...rows]);
+    await enforceInferenceAdmission({ ...legacy, mode: 'sarin_onboarding' }, database, now);
+    expect([...rows]).toEqual(before);
   });
 });
