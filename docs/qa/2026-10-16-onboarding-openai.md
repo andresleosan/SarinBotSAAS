@@ -12,7 +12,7 @@ Ejemplos editables para preguntas de reserva e indicaciones; foto de Google con 
 - Revisión independiente de motor, medidor, API, selección, aislamiento local y scripts de release: sin bloqueadores.
 - Chrome sobre snapshot aislado: añadir ejemplos conserva el texto propio, deshabilita duplicados y no guarda automáticamente (recarga recupera los valores previos). Vista de 390 px sin desbordamiento horizontal del documento.
 - Administración emulada: tres opciones visibles; OpenAI sin clave aparece deshabilitado. Selector del medidor cambia entre OpenAI y DeepSeek sin cambiar la IA activa. Ausencia de medición se indica explícitamente.
-- Foto válida/ausente/error y cambio de URL cubiertos por pruebas de componente sin red. La foto real se comprobará tras la actualización privada.
+- Foto válida/ausente/error y cambio de URL cubiertos por pruebas de componente sin red. Tras la actualización privada se verificó también la foto de la sesión Google real.
 
 Capturas y manifiestos se conservan en la carpeta privada de despliegue, fuera de Git. Las pruebas del motor usan respuestas simuladas, no demuestran acceso, saldo, latencia ni calidad de la cuenta OpenAI. La API se factura por separado de ChatGPT. Prueba sintética de API y recorrido completo del negocio real permanecen pendientes.
 
@@ -32,4 +32,6 @@ El rollback restaura la imagen `sarin-bot:service-labels-20261016t031651z`. Si e
 - Copia privada de reversión verificada: `/opt/sarin-bot/runtime/rollbacks/onboarding-openai-image-update-20261016T033136Z-75851414`.
 - Se detuvieron los nueve procesos del entorno QA; túnel privado 3032 conservado.
 
-La comprobación visual posterior con la sesión Google real quedó pendiente: el control de Chrome exigió actualizar la extensión de ChatGPT. Se avisó al usuario. La revisión visual anterior en emuladores y las pruebas de foto/fallback sí se completaron; no se afirma haber visto aún la foto real cargada.
+Tras actualizar la extensión de ChatGPT se completó la comprobación visual con la sesión Google real: la imagen de perfil cargó desde `lh3.googleusercontent.com` (imagen completa y ancho natural mayor que cero), y las cuatro sugerencias aparecieron en el formulario de Sarin Pruebas. Se conservaron los campos vacíos y no se guardaron cambios del negocio. Evidencias privadas: `onboarding-photo-real.png` y `onboarding-suggestions-real.png`.
+
+La lectura final de configuración confirmó que no existe una selección persistida de proveedor: sigue efectivo Ollama por el entorno, sin clave OpenAI. Manifiesto privado `onboarding-openai-activated-baseline-20261016.json`, SHA-256 `f43767b317bd09320153f92626ef2f731c714d2ed99e4e3f9754a0f719d6eb13`.

@@ -4,6 +4,8 @@ El propietario puede elegir OpenAI, DeepSeek o IA local desde `/admin`. La selec
 
 ## Configuración privada
 
+La integración actual de Sarin usa una API key y facturación de API separada del plan de ChatGPT. [Sign in with ChatGPT y ChatGPT plan usage](https://developers.openai.com/siwc/token-sharing-open-source) ofrecen otra vía: una aplicación elegible puede solicitar autorización para consumir los límites o créditos permitidos del plan del usuario mediante solicitudes compatibles. Sarin es una aplicación comercial alojada remotamente, por lo que debe [solicitar acceso al programa](https://developers.openai.com/siwc/request-client-id); no tiene aprobación ni esta integración implementada. La suscripción personal del propietario no se debe asumir como una bolsa compartida que cubra a todos los clientes de Sarin.
+
 Configurar `OPENAI_API_KEY` únicamente en el entorno privado del servidor y `OPENAI_MODEL=gpt-6-luna`. Nunca usar variables `NEXT_PUBLIC`, incluir la clave en Git o pegarla en el panel. La aplicación admite este modelo explícito y el destino fijo `https://api.openai.com/v1/chat/completions`. Una clave ausente deja la opción visible como pendiente y deshabilitada.
 
 El panel comprueba el catálogo mediante `GET /v1/models` antes de aceptar una selección. Esta comprobación no genera texto y no demuestra saldo suficiente, cuota o calidad de las respuestas: después de configurar la clave se debe realizar una prueba sintética de conversación y reserva antes de utilizarlo con clientes.
