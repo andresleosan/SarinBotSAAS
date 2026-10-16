@@ -141,11 +141,15 @@ describe('manual paid Gemini native transport', () => {
     expect(onUsage.mock.calls[0][0].usage).toEqual({ promptTokens: 20, cacheHitTokens: 0, cacheMissTokens: 20, completionTokens: 5, thinkingTokens: 0, totalTokens: 25 });
   });
 
-  it.each([401, 403, 429, 503])('sanitizes HTTP %i and records one failed call without retry or fallback', async status => {
+  it.each([
+    [401, /credencial/], [403, /credencial/], [402, /no tiene saldo disponible/],
+    [429, /límite de solicitudes o cuota/], [503, /no puede conectar/],
+  ] as const)('sanitizes HTTP %i and records one failed call without retry or fallback', async (status, message) => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('synthetic-secret-from-upstream', { status }));
     const onUsage = vi.fn();
-    await expect(completeChat(input, undefined, { onUsage })).rejects.toMatchObject({ status: 503, message: expect.stringMatching(/Gemini/) });
-    expect(fetch).toHaveBeenCalledTimes(1); expect(onUsage.mock.calls[0][0]).toMatchObject({ success: false, model: null, usage: null });
+    await expect(completeChat(input, undefined, { onUsage })).rejects.toMatchObject({ status: 503, message: expect.stringMatching(message) });
+    expect(fetch).toHaveBeenCalledTimes(1); expect(onUsage).toHaveBeenCalledTimes(1);
+    expect(onUsage.mock.calls[0][0]).toMatchObject({ provider: 'gemini', success: false, model: null, usage: null });
     expect(JSON.stringify(onUsage.mock.calls)).not.toContain('synthetic-secret');
   });
 
