@@ -23,7 +23,7 @@ Chrome, copia aislada del commit con Firebase emulado en `127.0.0.1:3040`, admin
 
 Escritorio: viewport 1474 px, documento 1459 px. Móvil: viewport 390 px, documento 375 px, bloque de pruebas de 309 px y enlace de 44 px de altura; sin desbordamiento horizontal. Vista y controles legibles. Override de viewport restablecido; QA cerrada y puertos liberados, conservando el túnel privado 3032.
 
-Capturas privadas, fuera de Git, en `%LOCALAPPDATA%/SarinBot/deployment/`: `gemini-profiles-qa-desktop.png` y `gemini-profiles-qa-mobile.png`.
+Capturas privadas, fuera de Git, en `%LOCALAPPDATA%/SarinBot/deployment/`: `gemini-profiles-qa-desktop.png`, `gemini-profiles-qa-mobile.png` y `gemini-profiles-private-live.png`.
 
 ## Instancia privada
 
@@ -31,4 +31,6 @@ Código `90cf4ca89704916bf258b8da08ca930cf1a09d36`, imagen `sarin-bot:gemini-pro
 
 Activación privada aprobada: 28 comprobaciones de autorización, 34 HTTP, lecturas Firebase y catálogo de Ollama con modelo presente, antes y después. Entorno, administrador, proveedor base, DNS y réplica única conservados. No se publicó el backend público. Rollback preparado en `/opt/sarin-bot/runtime/rollbacks/gemini-profiles-image-update-20261016T054746Z-c4be5085`.
 
-La verificación visual autenticada del panel privado queda pendiente de completar el selector de Google del propietario. La UI descrita arriba fue verificada en el entorno aislado, no se presenta como una captura de la sesión real.
+Verificación visual autenticada del panel privado completada después de que el propietario terminó el acceso de Google: «Control de Sarin» disponible, IA local seleccionada y con conexión verificada, DeepSeek configurado con conexión verificada, Gemini · Clientes pendiente y Gemini · Pruebas sin configurar. Se guardó una captura de la sección de IA de la sesión real, sin modificar la selección ni generar conversaciones.
+
+Un intento previo mostró `auth/popup-closed-by-user` y avisos de COOP. El servidor respondió `/admin` 200 y `/api/session` anónimo 401, con `Cross-Origin-Opener-Policy: same-origin-allow-popups`. El acceso posterior funcionó sin cambios de código o cabeceras. La causa de ese intento fallido no quedó establecida; los avisos no demuestran por sí solos un bloqueo de la aplicación.
