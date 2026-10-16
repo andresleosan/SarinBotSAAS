@@ -67,6 +67,6 @@ export async function enforceInferenceAdmission(input: AdmissionInput, db: Datab
       return { scope, events };
     });
     if (retryAfter) throw new HttpError(429, `Llegaste al límite de consultas. Espera ${retryAfter} segundos antes de enviar otro mensaje.`, 'CLIENT_RATE_LIMITED', retryAfter);
-    for (const { scope, events } of updates) transaction.set(scope.ref, { version: 1, events: [...events, { at: now, request: requestHash, fingerprint }] });
+    for (const [index, { scope, events }] of updates.entries()) transaction.set(scope.ref, { version: 1, events: [...events, { at: now, request: index === 2 ? hash(request.actorUid, request.requestId) : requestHash, fingerprint }] });
   });
 }

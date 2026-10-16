@@ -189,6 +189,12 @@ describe('rate limits before commercial response reservation', () => {
 });
 
 describe('shared mode and tenant admission', () => {
+  it('does not corrupt tenant state when two UIDs use the same request identifier', async () => {
+    const { database } = adapter();
+    await enforceInferenceAdmission({ ...input(1), mode: 'sarin_client' }, database, now);
+    await enforceInferenceAdmission({ ...input(1), actorUid: 'another-uid', fingerprint: hash('other-body'), mode: 'sarin_client' }, database, now);
+    await enforceInferenceAdmission({ ...input(2), actorUid: 'third-uid', mode: 'sarin_client' }, database, now);
+  });
   it('limits one tenant across thirty UIDs and keeps another tenant independent', async () => {
     const { database } = adapter();
     for (let index = 0; index < 30; index++) await enforceInferenceAdmission({ ...input(index), actorUid: `actor-${index}`, mode: index % 2 ? 'sarin_client' : 'sarin_onboarding' }, database, now);
