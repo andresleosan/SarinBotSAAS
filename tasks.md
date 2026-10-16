@@ -1,5 +1,10 @@
 # Estado de implementación — 2026-10-14
 
+## País de WhatsApp — 2026-10-15
+
+- [x] Selector con bandera SVG, nombres de países en español y prefijo separado del número nacional. Teléfonos existentes conservados; pegado internacional y países con indicativos compartidos cubiertos.
+- [x] 438 pruebas, TypeScript, auditoría sin vulnerabilidades, revisión independiente y QA Chrome en escritorio/320 px aprobados. CI con tres jobs correctos y actualización privada `phone-country-20261016t030925z` verificada en Sarin Pruebas. Evidencia: `docs/qa/2026-10-15-whatsapp-country-selector.md`.
+
 ## Formularios compactos — 2026-10-15
 
 - [x] Espaciado y agrupación en administración, suscripción, configuración del negocio y bloqueos de agenda. Horarios alineados según el ancho del formulario; controles de 44 px y estilo Agenda clara conservados.
