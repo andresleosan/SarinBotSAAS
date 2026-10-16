@@ -4,6 +4,8 @@ El propietario aprobó esta estructura y después autorizó su implementación. 
 
 ## Modalidades y capacidad
 
+Los importes de la tabla son los valores iniciales aprobados. Las tarifas vigentes de suscripciones y ampliaciones se guardan en administración; facturación y GET público `/api/public/commercial-offer` leen esa misma fuente. La landing consulta esa proyección mínima sin sesión y la renueva cada 15 segundos mientras está visible. No expone bancos ni ajustes privados y oculta las tarifas si falla la consulta. El precio de prueba permanece fijo en $5.000 COP.
+
 | Modalidad | Vigencia | Precio COP | Respuestas de IA incluidas |
 | --- | ---: | ---: | ---: |
 | Prueba pagada: configuración y hasta 10 citas | Sin vencimiento por días | $5.000, una sola compra | 700 en total |

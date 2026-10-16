@@ -12,6 +12,8 @@ const appOrigin = 'https://sarinbotsaas.pages.dev';
 const applicationLinks = [];
 assert.ok(!/próximamente|aún no están disponibles/i.test(html), 'The product page must not retain the former launch notice.');
 assert.ok(ids.has('planes') && ids.has('empezar'), 'Plans and access sections must be present.');
+assert.ok(/data-offer-state="(?:loading|unavailable)"/.test(html), 'Variable prices require an accessible runtime offer state.');
+assert.ok(!/(?:Semanal|Quincenal|Mensual):\s*\$/.test(html), 'The export must not advertise build-time subscription tariffs as current.');
 for (const link of anchors) {
   if (link.startsWith('#')) {
     assert.ok(ids.has(link.slice(1)), `Navigation has no target: ${link}`);

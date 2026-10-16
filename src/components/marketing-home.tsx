@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowDown, ArrowRight, ArrowUpRight } from "lucide-react";
 import { AgendaPreview } from "./agenda-preview";
 import { SarinArrival } from "./sarin-arrival";
-import { BILLING_PLANS, RESPONSE_PACK } from "@/lib/billing-plans";
+import { MarketingPricing } from "./marketing-pricing";
 import { PAID_TRIAL_APPOINTMENT_LIMIT, PAID_TRIAL_INCLUDED_RESPONSES, PAID_TRIAL_PRICE_COP } from "@/lib/paid-trial";
 import { publicApplicationOrigin } from "@/lib/marketing-links";
 import "./marketing-home.css";
@@ -74,14 +74,8 @@ export function MarketingHome({ standalone = false, publicAppUrl }: { standalone
             <h2 id="plans-heading">Prueba con {PAID_TRIAL_APPOINTMENT_LIMIT} citas.<br />Continúa con Sarin Esencial.</h2>
             <p>La prueba cuesta ${price(PAID_TRIAL_PRICE_COP)} COP una sola vez e incluye la configuración y {PAID_TRIAL_INCLUDED_RESPONSES} respuestas de IA en total, sin vencimiento por días.</p>
           </div>
-          <ul className="agenda-steps">
-            {BILLING_PLANS.filter(plan => plan.id !== "whatsapp").map(plan => <li key={plan.id}>
-              <h3>{plan.label}: ${price(plan.defaultPriceCOP)} COP</h3>
-              <p>{plan.periodDays} días de acceso y {price(plan.includedResponses)} respuestas de IA. Agenda, reservas por conversación, enlace del negocio y QR.</p>
-            </li>)}
-          </ul>
           <p className="agenda-launch-note">Cada cita creada consume un cupo de la prueba; cancelarla no lo devuelve. Las {PAID_TRIAL_INCLUDED_RESPONSES} respuestas son un límite independiente y también incluyen la configuración. Al agotarse las citas o las respuestas, se necesita un plan para continuar con la atención de IA.</p>
-          <p className="agenda-launch-note">Los planes se pagan por transferencia y se activan tras revisar el comprobante. Una respuesta completa de Sarin cuenta una vez. Al agotar las respuestas, la IA se pausa; tu agenda y tus citas se conservan. Con un plan vigente puedes añadir {price(RESPONSE_PACK.responses)} respuestas por ${price(RESPONSE_PACK.defaultPriceCOP)} COP, válidas hasta que termine ese período. Sin cobros automáticos.</p>
+          <MarketingPricing endpoint={standalone ? publicOrigin ? `${publicOrigin}/api/public/commercial-offer` : null : "/api/public/commercial-offer"} />
         </section>
         <section id="empezar" className="agenda-launch agenda-container" aria-labelledby="launch-heading">
           <h2 id="launch-heading">Prepara la agenda<br /><span>de tu negocio.</span></h2>
