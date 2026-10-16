@@ -23,3 +23,13 @@ Estas pruebas usan exclusivamente datos sintéticos. No se han enviado ni aproba
 La actualización de la instancia privada requiere una imagen del commit revisado y un respaldo del documento `platformSettings/main`. Se cambian solo los tres campos de precio mediante transacción con precondición de versión y lectura posterior. El procedimiento está preparado fuera de Git; la publicación pública no forma parte de este cambio.
 
 La reversión de precios es independiente de la imagen y rechaza ediciones posteriores. Una imagen anterior solo conoce 30 días: no debe aprobar comprobantes nuevos de 7 o 15 días. Ver [procedimiento de despliegue](../../deploy/README.md#planes-de-suscripción-y-actualización-de-precios).
+
+## Resultado en la instancia privada
+
+El commit `7ad5b74f204caeaa52d51632b0d7c50cf7a4f0bb` pasó los tres trabajos de [CI](https://github.com/andresleosan/SarinBotSAAS/actions/runs/38831479637). Se construyó desde 86 archivos de ese commit y se activó la imagen `sarin-bot:billing-plans-20261016t004732z`, ID `sha256:5f7c17924335b84d0be3974b911fd086378f641cddb7893d5324fe4e7d283cbc`. Antes y después pasaron las 16 comprobaciones de autenticación, páginas/assets, lecturas Firebase y conexión privada a Ollama. El entorno, administrador, proveedor, DNS y montaje ADC permanecieron intactos.
+
+Con respaldo privado y precondición de versión se sustituyó el documento de un campo mensual por los tres precios aprobados; la lectura posterior confirmó exactamente esos valores. No se accedió a documentos de pagos ni negocios en esta operación. No se añadieron cuentas bancarias.
+
+La sesión normal de QA en `localhost:3032/dashboard/billing` mostró los tres precios correctos y la prueba gratuita intacta. Elegir Semanal cambió el total y resumen a 20.000 COP/7 días; Quincenal a 35.000 COP/15 días; Mensual a 59.900 COP/30 días. Sin cuentas receptoras, la carga y envío permanecen deshabilitados. El historial continúa vacío. Captura y evidencia de activación quedan fuera de Git: `%LOCALAPPDATA%/SarinBot/deployment/sarin-three-billing-plans-20261016.png` y `sarin-billing-plans-activation-20261016.json`.
+
+El servidor local con Turbopack presentó recargas continuas que interrumpían la herramienta del navegador; el recorrido HTTP con emuladores sí pasó. No se atribuyó ni corrigió ese comportamiento como parte de facturación. La comprobación visual final se realizó en la instancia privada compilada, donde la carga y selección funcionaron correctamente. No se abrió la aplicación al público ni se reinició la Mac.
