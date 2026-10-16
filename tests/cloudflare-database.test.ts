@@ -29,6 +29,11 @@ function storage() {
 }
 
 describe('Cloudflare data adapter', () => {
+  it('accepts private invitation documents through the storage protocol', async () => {
+    const store = storage(), db = createCloudflareDatabase(store.transport);
+    await db.collection('invitations').doc('a'.repeat(24)).set({ id: 'a'.repeat(24), state: 'issued' });
+    expect((await db.collection('invitations').doc('a'.repeat(24)).get()).exists).toBe(true);
+  });
   it('reads documents and passes scoped queries without translating them into client-side filters', async () => {
     const store = storage();
     store.externalWrite('businesses/shop', { name: 'Taller' });
