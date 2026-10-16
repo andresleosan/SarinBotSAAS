@@ -1,5 +1,25 @@
 # Estado de implementación — 2026-10-16
 
+## Seguimiento del nuevo piloto — implementación local, sin publicar
+
+Trabajo en `F:/Proyectos/SarinBot-worktrees/commercial-pilot`, separado del checkout principal. Candidata de runtime `ecec028`, con los cuatro incrementos y recuperación de logos. Imagen Linux reproducible construida y verificada. Las publicaciones descritas más abajo son históricas; esta sección no afirma cambios en producción.
+
+- [x] Implementar invitaciones de cortesía con canje sin comprobante, diez citas y 700 respuestas, trazabilidad y suspensión/reactivación sin reiniciar consumo. Verificado localmente **1/10 citas y 3/700 respuestas** después de cancelar y suspender/reactivar.
+- [x] Conectar la landing con la oferta administrada y conservar cotización/validación de importes. Landing sintética abierta: **65.000 → 68.000 COP sin recarga**; no son tarifas cambiadas en producción.
+- [x] Implementar logo/contactos y kit autogestionado **A / Agenda clara**, sin selector de estilos. PDF/PNG/SVG reales descargados; A6 y QR local verificados, kit/perfil a 320 px sin desbordamiento. B/C siguen como referencias; impresión física pendiente.
+- [x] Implementar política de cliente, límites persistentes antes de cola, estado autoritativo, plantillas de servidor, propuesta y confirmación explícita, y presupuesto operativo privado. El gate **`PILOT_AI_BUDGET_ENFORCED=false`** sigue sin activar; no equivale a un tope monetario ya operativo en producción.
+- [x] Verificar contratos D1 de prueba pagada/cortesía preservando cinco citas históricas; recorrido local de 97 comprobaciones y limpieza del runner; 23 pruebas Firestore. Chrome real con **motor fixture local**, separado del ensayo DeepSeek.
+- [x] Registrar ocho llamadas DeepSeek sintéticas con base en memoria: benchmark estricto **6/8**, dos `clarify` contenidos por plantillas. Regresión de `clarify`/`out_of_scope` corregida sin repetir la prueba pagada; no se declara 8/8 ni conversación DeepSeek integrada con el navegador.
+- [x] Cerrar checks: **783 pruebas de aplicación aprobadas/25 omitidas**, tipos, builds de aplicación/landing/Pages, **72 Worker**, **25 gateway** y auditoría con **0 vulnerabilidades**. Revisión independiente sin P1/P2.
+- [x] Verificar recuperación de logos y comprobantes: 21 pruebas; respaldo preliminar de producción solo lectura restaurado localmente, revisión 33, 48 documentos y un objeto R2. [Aceptación y manifiesto](docs/qa/2026-10-16-commercial-pilot-acceptance.md).
+- [x] Preparar candidata exacta, imagen Docker, límites propuestos y reversión compatible con datos nuevos.
+- [ ] Obtener confirmación concreta de producción y ejecutar mantenimiento/drenaje, respaldo final recuperable, publicación y configuración/activación del gate antes de reabrir. Conciliación bancaria real, retención/devoluciones y capacidad con negocios reales permanecen pendientes.
+- [ ] Validar impresión al 100 % en el acrílico y dominio estable antes de distribuir material comercial.
+
+**Fuera de este incremento:** protección por IP/red y Turnstile no están implementados; una IP compartida o nombre parecido no identifican fraude. Marketplace permanece deshabilitado: **diez negocios registrados reales habilitan una revisión manual**, nunca activación automática. WhatsApp sigue deshabilitado.
+
+Evidencia: [aceptación integrada](docs/qa/2026-10-16-commercial-pilot-acceptance.md), [protecciones y límites del ensayo DeepSeek](docs/qa/2026-10-16-pilot-abuse-controls.md), [branding y tarjeta A](docs/qa/2026-10-16-business-branding.md).
+
 ## Imagen de la cita — actualización publicada
 
 - [x] Sustituir ICS por **Guardar imagen de la cita**, PNG local con negocio, servicio, fecha/hora Colombia y profesional o estación disponible; sin contacto privado ni respuestas del formulario.

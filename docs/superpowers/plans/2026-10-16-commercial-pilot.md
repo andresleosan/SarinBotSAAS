@@ -1,6 +1,6 @@
 # Commercial pilot Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Preparar el piloto con invitaciones gratuitas, tarifas sincronizadas, logo y tarjetas autogestionados y protección de chat/reservas, manteniendo el marketplace aplazado.
 
@@ -9,6 +9,8 @@
 **Tech Stack:** Node 24, pnpm 11.23.0, Next.js/React/TypeScript existentes, Firebase Auth, Database D1/Firestore, Cloudflare R2, Vitest y tests Node del Worker/gateway.
 
 **Spec:** [Diseño aprobado del piloto](../../product/BRIEF.md). Respuesta del propietario «1 y 2»: piloto acompañado y logo/tarjeta autogestionados dentro de la app antes de abrirlo. Las elecciones técnicas y valores operativos de los planes siguientes se someten ahora a revisión; no se presentan como implementación publicada.
+
+**Seguimiento de ejecución:** los cuatro incrementos locales están verificados en la candidata `ecec028`, con imagen Linux reproducible y respaldo preliminar solo lectura restaurado localmente. [Aceptación y manifiesto](../../qa/2026-10-16-commercial-pilot-acceptance.md). Task 1 cerrada; Task 2 conserva pendiente la confirmación y ejecución del release bajo mantenimiento. Las casillas de los subplanes acreditan implementación y validación local, no los pasos condicionales de publicación.
 
 ## Global Constraints
 
@@ -51,13 +53,13 @@ No se incluye en este incremento el registro completo de Fresha, un editor gráf
 
 **Interfaces:** consume el checkout local que contiene las fuentes publicadas y los cuatro planes; produce una versión integrada verificable y commits enfocados de los incrementos.
 
-- [ ] **Step 1:** Después de la revisión del usuario y elección de ejecución, leer el workflow de aislamiento correspondiente. Inventariar cambios previos y preparar snapshot privado con manifiesto de las fuentes pertinentes, excluyendo secretos/exportaciones. No partir de un worktree basado solo en HEAD: todavía faltan allí muchas fuentes actualmente publicadas. No hacer `git reset`, limpieza ni commit masivo del checkout compartido.
-- [ ] **Step 2:** Comprobar Node/pnpm requeridos y ejecutar `pnpm run typecheck`, `pnpm test`, `node --test pages-gateway/tests/*.test.mjs` y `pnpm --filter sarin-cloudflare-host run check` sobre la base elegida. Registrar resultados como baseline, sin llamar PASS a integraciones omitidas. Si falla, diagnosticar y separar el fallo previo del incremento.
-- [ ] **Step 3:** Ejecutar el plan 1 con sus ciclos RED/GREEN y revisión de diff; solo tras resolver sus hallazgos pasar al plan 2.
-- [ ] **Step 4:** Ejecutar el plan 2 con sus ciclos RED/GREEN y revisar la compatibilidad de prueba pagada/cortesía; solo tras resolver hallazgos pasar al plan 3.
-- [ ] **Step 5:** Ejecutar el plan 3 y revisar permisos de imágenes, exportación y QR; solo tras resolver hallazgos pasar al plan 4.
-- [ ] **Step 6:** Ejecutar el plan 4 y verificar que contempla las estructuras finales de prueba y branding, sin aceptar datos del navegador como autoridad de tenant, cuota o confirmación.
-- [ ] **Step 7:** Revisar commits y manifiesto de la versión integrada. Nunca incluir cambios anteriores ajenos por haber añadido un archivo completo al staging: usar la base aislada acordada y paths/hunks revisados.
+- [x] **Step 1:** Después de la revisión del usuario y elección de ejecución, leer el workflow de aislamiento correspondiente. Inventariar cambios previos y preparar snapshot privado con manifiesto de las fuentes pertinentes, excluyendo secretos/exportaciones. No partir de un worktree basado solo en HEAD: todavía faltan allí muchas fuentes actualmente publicadas. No hacer `git reset`, limpieza ni commit masivo del checkout compartido.
+- [x] **Step 2:** Comprobar Node/pnpm requeridos y ejecutar `pnpm run typecheck`, `pnpm test`, `node --test pages-gateway/tests/*.test.mjs` y `pnpm --filter sarin-cloudflare-host run check` sobre la base elegida. Registrar resultados como baseline, sin llamar PASS a integraciones omitidas. Si falla, diagnosticar y separar el fallo previo del incremento.
+- [x] **Step 3:** Ejecutar el plan 1 con sus ciclos RED/GREEN y revisión de diff; solo tras resolver sus hallazgos pasar al plan 2.
+- [x] **Step 4:** Ejecutar el plan 2 con sus ciclos RED/GREEN y revisar la compatibilidad de prueba pagada/cortesía; solo tras resolver hallazgos pasar al plan 3.
+- [x] **Step 5:** Ejecutar el plan 3 y revisar permisos de imágenes, exportación y QR; solo tras resolver hallazgos pasar al plan 4.
+- [x] **Step 6:** Ejecutar el plan 4 y verificar que contempla las estructuras finales de prueba y branding, sin aceptar datos del navegador como autoridad de tenant, cuota o confirmación.
+- [x] **Step 7:** Revisar commits y manifiesto de la versión integrada. Nunca incluir cambios anteriores ajenos por haber añadido un archivo completo al staging: usar la base aislada acordada y paths/hunks revisados.
 
 ## Task 2: Aceptación comercial conjunta y preparación de release
 
@@ -65,17 +67,17 @@ No se incluye en este incremento el registro completo de Fresha, un editor gráf
 
 **Interfaces:** consume los cuatro incrementos; produce evidencia de la versión candidata, riesgos operativos y paquete de reversión. No genera ingresos, invitaciones reales ni cambios de producción durante QA local.
 
-- [ ] **Step 1:** Ejecutar secuencialmente el recorrido local sintético: emitir invitación vinculada al correo de dueño demo → canjear → configurar → cargar logo/contactos → exportar cada estilo → abrir la URL QR → consultar como cliente distinto → revisar propuesta → confirmar una reserva → consultar historial/cancelar. Comprobar contadores y que la siguiente reserva sí puede seguir después de cancelar aunque el cupo de prueba no se devuelve. No ejecutar `smoke` y `journey` simultáneamente sobre el mismo perfil sembrado.
-- [ ] **Step 2:** Cambiar una tarifa solo en el entorno sintético y verificar landing abierta a menos de un minuto y envío con cotización antigua; comprobar recuperación sin duplicados. Suspender la cortesía y comprobar que no borra citas; aprobar un plan sintético y comprobar precedencia pagada. Desafíos de permisos se prueban con otra cuenta real de emulador, sin impersonar usuarios de producción.
-- [ ] **Step 3:** Ejecutar `pnpm run typecheck`, `pnpm test`, `pnpm run test:rules`, `pnpm run test:local` y `pnpm run test:journey` según sus runners/puertos aislados; después `pnpm run build`, `pnpm run build:landing`, `pnpm run check:landing`, `pnpm run build:pages`, `node --test pages-gateway/tests/*.test.mjs` y `pnpm --filter sarin-cloudflare-host run check`. Revisar `.github/workflows/verify.yml` para paridad con CI. Todos los checks requeridos deben pasar; no es prueba de capacidad masiva.
-- [ ] **Step 4:** Aplicar self-critique-loop, revisión de seguridad y una revisión independiente de la versión integrada. Corregir bloqueantes; repetir solo las pruebas afectadas y los checks requeridos por las correcciones. Revisar móvil/escritorio, errores y accesibilidad de las acciones nuevas.
-- [ ] **Step 5:** Si hace falta probar el comportamiento del modelo, usar DeepSeek con un conjunto pequeño de datos sintéticos: consulta normal, tema fuera de alcance, inyección, intento de reserva sin confirmar y confirmación legítima. Registrar latencia/coste agregado y resultados de reglas, sin cuerpos ni datos de clientes en logs. Pasar tests deterministas no acredita por sí solo ese comportamiento del proveedor real.
+- [x] **Step 1:** Ejecutar secuencialmente el recorrido local sintético: emitir invitación vinculada al correo de dueño demo → canjear → configurar → cargar logo/contactos → exportar A en PDF/PNG/SVG → abrir la URL QR → consultar como cliente distinto → revisar propuesta → confirmar una reserva → consultar historial/cancelar. Comprobar contadores y que la siguiente reserva sí puede seguir después de cancelar aunque el cupo de prueba no se devuelve. No ejecutar `smoke` y `journey` simultáneamente sobre el mismo perfil sembrado.
+- [x] **Step 2:** Cambiar una tarifa solo en el entorno sintético y verificar landing abierta a menos de un minuto y envío con cotización antigua; comprobar recuperación sin duplicados. Suspender la cortesía y comprobar que no borra citas; aprobar un plan sintético y comprobar precedencia pagada. Desafíos de permisos se prueban con otra cuenta real de emulador, sin impersonar usuarios de producción.
+- [x] **Step 3:** Ejecutar `pnpm run typecheck`, `pnpm test`, `pnpm run test:rules`, `pnpm run test:local` y `pnpm run test:journey` según sus runners/puertos aislados; después `pnpm run build`, `pnpm run build:landing`, `pnpm run check:landing`, `pnpm run build:pages`, `node --test pages-gateway/tests/*.test.mjs` y `pnpm --filter sarin-cloudflare-host run check`. Revisar `.github/workflows/verify.yml` para paridad con CI. Todos los checks requeridos deben pasar; no es prueba de capacidad masiva.
+- [x] **Step 4:** Aplicar self-critique-loop, revisión de seguridad y una revisión independiente de la versión integrada. Corregir bloqueantes; repetir solo las pruebas afectadas y los checks requeridos por las correcciones. Revisar móvil/escritorio, errores y accesibilidad de las acciones nuevas.
+- [x] **Step 5:** Si hace falta probar el comportamiento del modelo, usar DeepSeek con un conjunto pequeño de datos sintéticos: consulta normal, tema fuera de alcance, inyección, intento de reserva sin confirmar y confirmación legítima. Registrar latencia/coste agregado y resultados de reglas, sin cuerpos ni datos de clientes en logs. Pasar tests deterministas no acredita por sí solo ese comportamiento del proveedor real.
 - [ ] **Step 6:** Preparar release mediante deploy-checklist: backup actual verificado, versión exacta, política de límites/presupuesto configurada, una sola instancia, mantenimiento y reversión compatible con cortesías/confirmación. Revisar la recuperación D1/R2 y configuración por separado de Auth. La publicación requiere su decisión concreta cuando la versión candidata esté preparada.
-- [ ] **Step 7:** Registrar por separado pendientes comerciales no sustituibles por QA: conciliación bancaria auténtica, condiciones de devolución/conservación, integración de fuentes y capacidad observada con los primeros negocios. No activar WhatsApp ni marketplace para cerrar esta lista.
+- [x] **Step 7:** Registrar por separado pendientes comerciales no sustituibles por QA: conciliación bancaria auténtica, condiciones de devolución/conservación, integración de fuentes y capacidad observada con los primeros negocios. No activar WhatsApp ni marketplace para cerrar esta lista.
 
 ## Self Review
 
-El alcance aprobado se divide en cuatro entregas que pueden comprobarse por separado. Los cambios de producto todavía no están ejecutados. El índice agrega integración/aceptación, sin duplicar las implementaciones de los subplanes. Conserva el contrato de prueba y la producción actual, identifica la base local distinta de HEAD y asigna pruebas a las cinco clases Review Focus.
+El alcance aprobado se divide en cuatro entregas comprobadas por separado. La implementación local está verificada; la publicación conserva su gate separado. El índice agrega integración/aceptación sin duplicar los subplanes, conserva el contrato de prueba, identifica la base local y asigna pruebas a las cinco clases Review Focus.
 
 ## Revisión y ejecución
 

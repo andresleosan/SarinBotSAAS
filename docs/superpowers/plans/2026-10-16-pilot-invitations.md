@@ -1,6 +1,6 @@
 # Pilot Invitations Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Regalar la prueba existente mediante invitaciones individuales, con emisión, trazabilidad y control administrativo sin ingresos ficticios.
 
@@ -75,7 +75,7 @@ Todas las rutas: nodejs, dinámicas, `Cache-Control: no-store`, `readJson`/`apiE
 
 **Interfaces:** produce unión, schemas `createInvitationSchema`, `redeemInvitationSchema`, `invitationCommandSchema`, `invitationCursorSchema` y `normalizeInvitationEmail(email: string): string` en `invitation-schemas.ts`; consume firmas existentes de acceso y proyección sin cambiarlas.
 
-- [ ] **RED:** Añadir casos nombrados `preserves legacy paid trial`, `suspends courtesy without changing usage`, `paid plan wins over courtesy suspension` y `strips private invitation references`. Afirmar:
+- [x] **RED:** Añadir casos nombrados `preserves legacy paid trial`, `suspends courtesy without changing usage`, `paid plan wins over courtesy suspension` y `strips private invitation references`. Afirmar:
 
 ```ts
 expect(paidTrialRemaining(courtesySuspendedWithTwoUsed)).toBe(8);
@@ -85,10 +85,10 @@ expect(JSON.stringify(publicBusiness(courtesyBusiness))).not.toContain('private-
 ```
 
 Construir esas variables desde `pending`, `paidTrial` y fixtures locales existentes, sin inventar exports. Probar correo `trim().toLowerCase()` sin modificar alias; días 1/30 válidos, 0/31 inválidos; campos extra y razón vacía rechazados.
-- [ ] **RED:** `pnpm test -- tests/paid-trial.test.ts tests/billing-paid-trial.test.ts tests/business-read-routes.test.ts`; observar fallo nuevo de comportamiento.
-- [ ] **GREEN:** Implementar activador común usado por aprobación pagada y futuro canje. Conservar `paymentId` real, elegibilidad y ausencia de gracia inicial. Suspensión de cortesía se comprueba después del plan vigente; suspensión global sigue prioritaria. `getResponseQuota` refleja acceso suspendido. Schemas estrictos: correo hasta 254 caracteres, requestId existente, razón 1–300, versión entera no negativa.
-- [ ] **GREEN:** Repetir comando y `pnpm run typecheck`, ambos correctos.
-- [ ] **Commit futuro:** `feat: support complimentary introductory access`, solo cambios propios.
+- [x] **RED:** `pnpm test -- tests/paid-trial.test.ts tests/billing-paid-trial.test.ts tests/business-read-routes.test.ts`; observar fallo nuevo de comportamiento.
+- [x] **GREEN:** Implementar activador común usado por aprobación pagada y futuro canje. Conservar `paymentId` real, elegibilidad y ausencia de gracia inicial. Suspensión de cortesía se comprueba después del plan vigente; suspensión global sigue prioritaria. `getResponseQuota` refleja acceso suspendido. Schemas estrictos: correo hasta 254 caracteres, requestId existente, razón 1–300, versión entera no negativa.
+- [x] **GREEN:** Repetir comando y `pnpm run typecheck`, ambos correctos.
+- [x] **Commit futuro:** `feat: support complimentary introductory access`, solo cambios propios.
 
 ## Task 2: Transactional lifecycle and historical usage
 
@@ -96,7 +96,7 @@ Construir esas variables desde `pending`, `paidTrial` y fixtures locales existen
 
 **Interfaces:** consume Task 1 y helpers existentes `privateBusinessDraft`, `businessIdForOwner`, `readResponsePeriodState`, `initializeResponsePeriods`, `responsePeriodReference`; produce cuatro servicios definidos arriba.
 
-- [ ] **RED:** Usar `memoryFirestore()` y tokens de `billing-paid-trial.test.ts`; `vi.stubEnv` para admin sintético, Google verificado y reloj restaurado por prueba. Tests `redeems once without financial records`, `two codes cannot reset one owner`, `replay cannot lift suspension`, `pending receipt blocks courtesy`, `historic quota survives upgrade`:
+- [x] **RED:** Usar `memoryFirestore()` y tokens de `billing-paid-trial.test.ts`; `vi.stubEnv` para admin sintético, Google verificado y reloj restaurado por prueba. Tests `redeems once without financial records`, `two codes cannot reset one owner`, `replay cannot lift suspension`, `pending receipt blocks courtesy`, `historic quota survives upgrade`:
 
 ```ts
 expect(result.business.subscription.paidTrial).toMatchObject({ source: 'invitation', appointmentLimit: 10, appointmentsUsed: 0 });
@@ -106,13 +106,13 @@ expect((await listInvitations(admin, undefined, db)).invitations[0].usage?.respo
 ```
 
 Añadir carreras de dos UIDs/mismo correo/un código, dos códigos/mismo UID; una concesión/período. Crear recibo mediante `submitReceipt`: pendiente bloquea `409 PAYMENT_PENDING`, rechazo explícito permite canje. Prueba anterior e historial pagado vencido bloquean. Repetición de creación no recupera secreto; almacenamiento no contiene código completo. Actualizar test del adapter para aceptar `invitations/{id}`.
-- [ ] **RED:** `pnpm test -- tests/invitations.test.ts tests/cloudflare-database.test.ts`; observar fallos nuevos.
-- [ ] **RED:** Añadir `limits redemption attempts without blocking recovery`: diez intentos nuevos por UID en 60 segundos son admitidos; el undécimo da 429 `INVITATION_RATE_LIMITED`, incluso si cambia de código. A los 60 segundos se admite otro. Recuperar el mismo canje ya confirmado no consume otro intento ni queda bloqueado. Dos llamadas concurrentes al último lugar admiten una sola. No guardar el código ni correo en el registro de frecuencia.
-- [ ] **GREEN:** Añadir `invitations` a `DATA_COLLECTIONS`; sin migración SQL. Transacción lee todo antes de escribir: invitación, negocio determinista, perfil, último comprobante y cuota. Activar borrador privado, guardar canje/incrementar versión, vincular perfil y crear exactamente un período `invitation_<id>`, 700 respuestas, final `PAID_TRIAL_PERIOD_END`; sin período `initial` adicional. Escritura común del negocio serializa códigos distintos.
-- [ ] **GREEN:** En `invitations.ts` producir `claimInvitationAttempt(uid: string, db: Database, now: number): Promise<void>`. Usar una transacción propia sobre `serverSettings/invitation_rate_<sha256(uid)>`, solo timestamps de la ventana y versión; descartar tiempos fuera de 60 segundos. Reclamar antes de validar un código nuevo después de autenticar/validar formato. La recuperación del mismo UID/requestId ya confirmado se detecta antes y no vuelve a escribir. Un registro corrupto falla cerrado; propagar 429 sin detalles privados. Esta defensa por cuenta no identifica a la persona detrás de varias cuentas.
-- [ ] **GREEN:** Revocar solo `issued`; suspender/reactivar solo `redeemed`, con motivo y versión actual. Cambiar `paidTrial.accessSuspended` y proyección pública, nunca estado global ni pagos. Idempotencia administrativa en `serverSettings/invitation_command_<stableDocumentId(admin.uid, requestId)>`: fingerprint/acción/fecha; replay devuelve estado actual sin repetir; payload distinto da conflicto. Orden nueva con versión vieja: `409 INVITATION_STATE_CHANGED`. No reactivar suspensión global.
-- [ ] **GREEN:** Resumen consulta período exacto del canje, aunque haya plan posterior; documento ausente produce consumo `null`, error de almacenamiento falla lectura. Listado paginado usa campo `id` ya autorizado por D1. Repetir suites y typecheck.
-- [ ] **Commit futuro:** `feat: add transactional complimentary invitations`.
+- [x] **RED:** `pnpm test -- tests/invitations.test.ts tests/cloudflare-database.test.ts`; observar fallos nuevos.
+- [x] **RED:** Añadir `limits redemption attempts without blocking recovery`: diez intentos nuevos por UID en 60 segundos son admitidos; el undécimo da 429 `INVITATION_RATE_LIMITED`, incluso si cambia de código. A los 60 segundos se admite otro. Recuperar el mismo canje ya confirmado no consume otro intento ni queda bloqueado. Dos llamadas concurrentes al último lugar admiten una sola. No guardar el código ni correo en el registro de frecuencia.
+- [x] **GREEN:** Añadir `invitations` a `DATA_COLLECTIONS`; sin migración SQL. Transacción lee todo antes de escribir: invitación, negocio determinista, perfil, último comprobante y cuota. Activar borrador privado, guardar canje/incrementar versión, vincular perfil y crear exactamente un período `invitation_<id>`, 700 respuestas, final `PAID_TRIAL_PERIOD_END`; sin período `initial` adicional. Escritura común del negocio serializa códigos distintos.
+- [x] **GREEN:** En `invitations.ts` producir `claimInvitationAttempt(uid: string, db: Database, now: number): Promise<void>`. Usar una transacción propia sobre `serverSettings/invitation_rate_<sha256(uid)>`, solo timestamps de la ventana y versión; descartar tiempos fuera de 60 segundos. Reclamar antes de validar un código nuevo después de autenticar/validar formato. La recuperación del mismo UID/requestId ya confirmado se detecta antes y no vuelve a escribir. Un registro corrupto falla cerrado; propagar 429 sin detalles privados. Esta defensa por cuenta no identifica a la persona detrás de varias cuentas.
+- [x] **GREEN:** Revocar solo `issued`; suspender/reactivar solo `redeemed`, con motivo y versión actual. Cambiar `paidTrial.accessSuspended` y proyección pública, nunca estado global ni pagos. Idempotencia administrativa en `serverSettings/invitation_command_<stableDocumentId(admin.uid, requestId)>`: fingerprint/acción/fecha; replay devuelve estado actual sin repetir; payload distinto da conflicto. Orden nueva con versión vieja: `409 INVITATION_STATE_CHANGED`. No reactivar suspensión global.
+- [x] **GREEN:** Resumen consulta período exacto del canje, aunque haya plan posterior; documento ausente produce consumo `null`, error de almacenamiento falla lectura. Listado paginado usa campo `id` ya autorizado por D1. Repetir suites y typecheck.
+- [x] **Commit futuro:** `feat: add transactional complimentary invitations`.
 
 ## Task 3: Authorized API and administration/redemption UI
 
@@ -120,12 +120,12 @@ Añadir carreras de dos UIDs/mismo correo/un código, dos códigos/mismo UID; un
 
 **Interfaces:** consume servicios/HTTP. Produce `AdminInvitations()` y `InvitationRedeem({ onRedeemed }: { onRedeemed: (result: InvitationRedemptionResult) => void })`; padre actualiza negocio inmediatamente, sin comprobante ficticio.
 
-- [ ] **RED:** Seguir mocks de `business-read-routes.test.ts`/`http-auth.test.ts`: 401/403, flags falsos, proveedor/correo inválidos, errores uniformes, tamaños/campos/query inválidos y no-store. Afirmar `expect(response.status).toBe(401)` y `expect(JSON.stringify(await response.json())).not.toMatch(/recipientEmail|codeHash/)` sin sesión. GET/PATCH nunca contienen hash ni secreto.
-- [ ] **RED:** react-test-renderer/`act` y promesas diferidas como `billing-pages.test.tsx`: código visible/copiable solo al crear; error de copiar no lo pierde; retry conserva requestId, editar entrada lo cambia; acciones bloqueadas mientras carga. Billing sin bancos puede canjear; éxito muestra **Prueba de cortesía: diez citas y 700 respuestas; sin cobro**, actualización del negocio y continuación. Pendiente exige resolverlo; suspensión conserva consulta de agenda. Datos ausentes muestran «No disponible»; historial de pagos no añade cortesía.
-- [ ] **RED:** `pnpm test -- tests/invitation-routes.test.ts tests/invitation-ui.test.tsx tests/billing-pages.test.tsx`.
-- [ ] **GREEN:** Implementar HTTP fijado. Tabla: destinatario, estado/expiración código, canjeador/negocio, activación, acceso y consumo; botón cargar más. Código completo solo en memoria hasta descartarlo; nunca localStorage. Separar controles Revocar código/Suspender cortesía/Reactivar cortesía, con motivo y confirmación. No enviar invitaciones automáticamente.
-- [ ] **GREEN:** Integrar «Tengo un código de invitación» en billing y etiquetas de cortesía en dashboard/onboarding/status. Mockear componentes nuevos en suite previa; probarlos en suite nueva. Repetir comando/typecheck; revisar móvil 320 px/escritorio sintético.
-- [ ] **Commit futuro:** `feat: expose invitation management and redemption`.
+- [x] **RED:** Seguir mocks de `business-read-routes.test.ts`/`http-auth.test.ts`: 401/403, flags falsos, proveedor/correo inválidos, errores uniformes, tamaños/campos/query inválidos y no-store. Afirmar `expect(response.status).toBe(401)` y `expect(JSON.stringify(await response.json())).not.toMatch(/recipientEmail|codeHash/)` sin sesión. GET/PATCH nunca contienen hash ni secreto.
+- [x] **RED:** react-test-renderer/`act` y promesas diferidas como `billing-pages.test.tsx`: código visible/copiable solo al crear; error de copiar no lo pierde; retry conserva requestId, editar entrada lo cambia; acciones bloqueadas mientras carga. Billing sin bancos puede canjear; éxito muestra **Prueba de cortesía: diez citas y 700 respuestas; sin cobro**, actualización del negocio y continuación. Pendiente exige resolverlo; suspensión conserva consulta de agenda. Datos ausentes muestran «No disponible»; historial de pagos no añade cortesía.
+- [x] **RED:** `pnpm test -- tests/invitation-routes.test.ts tests/invitation-ui.test.tsx tests/billing-pages.test.tsx`.
+- [x] **GREEN:** Implementar HTTP fijado. Tabla: destinatario, estado/expiración código, canjeador/negocio, activación, acceso y consumo; botón cargar más. Código completo solo en memoria hasta descartarlo; nunca localStorage. Separar controles Revocar código/Suspender cortesía/Reactivar cortesía, con motivo y confirmación. No enviar invitaciones automáticamente.
+- [x] **GREEN:** Integrar «Tengo un código de invitación» en billing y etiquetas de cortesía en dashboard/onboarding/status. Mockear componentes nuevos en suite previa; probarlos en suite nueva. Repetir comando/typecheck; revisar móvil 320 px/escritorio sintético.
+- [x] **Commit futuro:** `feat: expose invitation management and redemption`.
 
 ## Task 4: D1/Firestore parity and feature evidence
 
@@ -133,12 +133,12 @@ Añadir carreras de dos UIDs/mismo correo/un código, dos códigos/mismo UID; un
 
 **Interfaces:** usar setup real `createDataTestRuntime`/`createCloudflareDatabase` del archivo D1 y `user()`, `config`, `db` locales del archivo Firestore; no presumir exports. Añadir correo verificado a tokens nuevos.
 
-- [ ] **RED:** Repetir carreras y replay de Task 2 en ambos backends. Flujo cortesía→configuración→consumo→suspensión→lectura/cancelación→reactivación→plan semanal: conserva consumo/fechas, pago prevalece. Probar carrera canje/subida de recibo. D1: sembrar 51 ids con igual fecha, páginas 50+1; afirmar `new Set([...first.invitations, ...second.invitations].map(x => x.id)).size === 51`. No ampliar el mock de memoria para fingir rangos string. Pérdida de respuesta usa patrón `loseNextResponse` de `cloudflare-database.test.ts`.
-- [ ] **RED:** Reglas: denegar get/list/set de invitaciones/órdenes y cambios de source/invitationId/accessSuspended desde navegador, incluso con perfil administrativo falso.
-- [ ] **RED/GREEN:** `pnpm test -- tests/cloudflare-data.integration.test.ts` y `pnpm run test:rules`, secuenciales. Corregir solo diferencias detectadas; si integraciones ya pasan, no fabricar fallos. Repetir suites dirigidas Tasks 1–3 y typecheck; suites omitidas no acreditan backend.
-- [ ] **GREEN:** Registrar resultados reales, capturas sintéticas y compatibilidad/rollback en contrato/QA: código vence, cortesía activada no; código anterior no entiende su suspensión. No publicar secretos ni afirmar producción verificada. Checks globales/release se ejecutan una sola vez mediante el índice.
-- [ ] **Commit futuro:** `test: verify invitation parity and lifecycle`.
+- [x] **RED:** Repetir carreras y replay de Task 2 en ambos backends. Flujo cortesía→configuración→consumo→suspensión→lectura/cancelación→reactivación→plan semanal: conserva consumo/fechas, pago prevalece. Probar carrera canje/subida de recibo. D1: sembrar 51 ids con igual fecha, páginas 50+1; afirmar `new Set([...first.invitations, ...second.invitations].map(x => x.id)).size === 51`. No ampliar el mock de memoria para fingir rangos string. Pérdida de respuesta usa patrón `loseNextResponse` de `cloudflare-database.test.ts`.
+- [x] **RED:** Reglas: denegar get/list/set de invitaciones/órdenes y cambios de source/invitationId/accessSuspended desde navegador, incluso con perfil administrativo falso.
+- [x] **RED/GREEN:** `pnpm test -- tests/cloudflare-data.integration.test.ts` y `pnpm run test:rules`, secuenciales. Corregir solo diferencias detectadas; si integraciones ya pasan, no fabricar fallos. Repetir suites dirigidas Tasks 1–3 y typecheck; suites omitidas no acreditan backend.
+- [x] **GREEN:** Registrar resultados reales, capturas sintéticas y compatibilidad/rollback en contrato/QA: código vence, cortesía activada no; código anterior no entiende su suspensión. No publicar secretos ni afirmar producción verificada. Checks globales/release se ejecutan una sola vez mediante el índice.
+- [x] **Commit futuro:** `test: verify invitation parity and lifecycle`.
 
 ## Self-review
 
-Revisados cobertura, pasos, firmas, proporción y cinco Review Focus: cuatro entregables, compatibilidad pagada y privacidad explícita. Sin implementación, pruebas ejecutadas, recursos ni commits durante esta redacción.
+Revisados cobertura, pasos, firmas, proporción y cinco Review Focus: cuatro entregables, compatibilidad pagada y privacidad explícita. Implementación local y pruebas acreditadas en la [aceptación integrada](../../qa/2026-10-16-commercial-pilot-acceptance.md); no se emitieron invitaciones reales ni se publicó este incremento.

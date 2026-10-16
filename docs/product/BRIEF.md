@@ -1,6 +1,6 @@
 # Piloto comercial de Sarin
 
-Diseño de producto del 16 de octubre de 2026. El propietario aprobó el piloto y la inclusión del logo y la tarjeta autogestionados antes de abrirlo mediante su respuesta «1 y 2» a las opciones presentadas. El objetivo es incorporar pronto a los primeros negocios interesados, controlar las pruebas regaladas y convertirlas en negocios que reciben citas y contratan un plan. Este documento describe cambios pendientes; no los presenta como funciones publicadas. Los planes de implementación requieren su revisión y elección del método de ejecución.
+Diseño de producto del 16 de octubre de 2026. El propietario aprobó el piloto y la inclusión del logo y la tarjeta autogestionados antes de abrirlo mediante su respuesta «1 y 2» a las opciones presentadas. El objetivo es incorporar pronto a los primeros negocios interesados, controlar las pruebas regaladas y convertirlas en negocios que reciben citas y contratan un plan. Las propuestas y la evidencia de diseño originales se conservan abajo; el seguimiento posterior distingue implementación local de funciones publicadas.
 
 ## Decisiones expresas del propietario
 
@@ -12,6 +12,23 @@ Diseño de producto del 16 de octubre de 2026. El propietario aprobó el piloto 
 - Sarin debe atender la operación del negocio, con protección frente a registros y conversaciones abusivos.
 - La idea de marketplace se conserva para cuando haya al menos diez negocios registrados. No se muestra ni activa en la producción actual.
 - La prioridad es empezar a operar y producir ingresos. DeepSeek está autorizado para pruebas cuando sean necesarias.
+
+## Seguimiento de implementación local — 16 de octubre de 2026
+
+La ejecución fue autorizada y se realiza en el worktree separado `commercial-pilot`. La candidata de runtime es `ecec028`, con los cuatro incrementos y recuperación de logos. **No se ha publicado este incremento ni cambiado datos, tarifas o configuración de producción.** Los apartados siguientes conservan el contexto de diseño inicial; su redacción en futuro no describe el estado local de esta sección.
+
+- **Invitaciones:** emisión/canje/trazabilidad y suspensión/reactivación implementados. El recorrido sintético concede diez citas y 700 respuestas sin comprobante; cancelar y reactivar conserva el consumo, observado en 1/10 citas y 3/700 respuestas.
+- **Tarifas:** oferta pública y validación de cotizaciones implementadas. Una landing local abierta pasó de 65.000 a 68.000 COP sin recarga; no es un cambio de precios reales.
+- **Identidad:** logo validado del propietario, contactos públicos y tarjeta autogestionada **A / Agenda clara** implementados. PDF/PNG/SVG descargados y QR local decodificado; revisión a 320 px sin desbordamiento. B/C son referencias y no hay selector. La impresión física queda pendiente.
+- **Protección de operación:** política de cliente y límite inicial de tres futuras activas con excepción del propietario, admisión persistente antes de cola, estado estructurado de servidor, respuestas por plantilla y confirmación explícita de propuestas implementados. Se conservan citas históricas y consumo. El presupuesto de tokens/costo también está implementado, pero **`PILOT_AI_BUDGET_ENFORCED=false`** permanece sin activar; activación/configuración se preparan juntas bajo mantenimiento en un release posterior.
+
+La evidencia incluye dos contratos D1 reales locales para prueba pagada/cortesía con cinco citas históricas preservadas, 97 comprobaciones del recorrido y limpieza del runner, y 23 pruebas Firestore. Chrome utilizó un motor fixture en loopback. Por separado, ocho llamadas DeepSeek sintéticas en memoria dieron **6/8 clasificaciones esperadas**; dos `clarify` quedaron dentro del contrato comercial. La respuesta fija de ambas ramas tiene regresión determinista, sin nueva repetición pagada ni afirmación de clasificador 8/8 perfecto.
+
+Verificados: **783 pruebas de aplicación aprobadas/25 omitidas**, tipos, builds de aplicación/landing/Pages, 72 Worker, 25 gateway, auditoría sin vulnerabilidades y 21 pruebas de recuperación. Imagen Linux construida desde la revisión exacta y smoke sin red correcto. El respaldo preliminar de producción solo lectura se restauró localmente: revisión 33, 48 documentos y un objeto R2. La [aceptación conjunta y manifiesto](../qa/2026-10-16-commercial-pilot-acceptance.md) registran los resultados y sus límites. Véanse también [protecciones](../qa/2026-10-16-pilot-abuse-controls.md) y [branding](../qa/2026-10-16-business-branding.md).
+
+**Límites del alcance:** IP/red y Turnstile no están implementados; se conserva la revisión humana ante multicuentas, sin equiparar una IP o nombre parecido con fraude. WhatsApp y marketplace siguen deshabilitados. Llegar a **diez negocios registrados reales** permite una **revisión manual del marketplace**, no una activación automática ni una capacidad simultánea acreditada.
+
+Producción queda pendiente de confirmación concreta y ejecución del respaldo final después del drenaje, configuración/activación del presupuesto y rollout verificado bajo mantenimiento. También permanecen pendientes el ensayo bancario auténtico, condiciones de devolución/conservación, impresión física y observación con negocios reales. La aceptación local no los sustituye.
 
 ## Base existente
 

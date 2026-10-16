@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-16",
+  "status": "local-candidate-not-deployed",
+  "branch": "codex/commercial-pilot-20261016",
+  "baseline": "b8624ff",
+  "runtimeRevision": "ecec02828feb474ffd0e6c46069a120697f9912c",
+  "image": {
+    "tag": "sarin-bot:pilot-ecec028",
+    "id": "sha256:480c255e9a89ed879315287511c833328912b62184427025953953ce7dd97eae",
+    "sizeBytes": 79578251,
+    "sourceArchiveSha256": "cc7dfb56dced99fd29ef3dc07d52c036328e199c8cc9568cd7194f25ef0bb561",
+    "linuxSmoke": {
+      "network": "none",
+      "nativeSharp": true,
+      "unauthenticatedSession": 401
+    }
+  },
+  "checks": {
+    "application": {
+      "passed": 783,
+      "skipped": 25
+    },
+    "firestore": {
+      "passed": 23,
+      "skipped": 0
+    },
+    "journey": {
+      "passed": 1,
+      "assertions": 97,
+      "cleanup": true
+    },
+    "worker": 72,
+    "gateway": 25,
+    "migration": 21,
+    "knownDependencyVulnerabilities": 0,
+    "typecheck": true,
+    "applicationBuild": true,
+    "landingBuildAndCheck": true,
+    "pagesBuild": true
+  },
+  "deepseek": {
+    "calls": 8,
+    "strictClassificationPassed": 6,
+    "safeClarifications": 2,
+    "paidRerun": false
+  },
+  "preflight": {
+    "readOnly": true,
+    "revision": 33,
+    "documents": 48,
+    "sqlBytes": 42291,
+    "sqlSha256": "8657862be804b6edbb42a8837bb37034b2d092eefaa95dea20f182619487357a",
+    "r2Objects": 1,
+    "r2Bytes": 23434,
+    "localRecoveryVerified": true,
+    "finalDrainedBackupPending": true
+  },
+  "production": {
+    "deployed": false,
+    "aiBudgetGateActivated": false,
+    "marketplaceEnabled": false,
+    "whatsappEnabled": false
+  },
+  "scope": [
+    "free-trial-invitations",
+    "runtime-pricing",
+    "business-logo-and-card-A",
+    "server-enforced-chat-and-booking-controls"
+  ]
+}

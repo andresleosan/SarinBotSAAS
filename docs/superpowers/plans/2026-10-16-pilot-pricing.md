@@ -1,6 +1,6 @@
 # Public commercial pricing Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Mostrar en la landing las tarifas guardadas en administración y evitar que un formulario nuevo envíe un comprobante con un precio que cambió mientras estaba abierto.
 
@@ -56,7 +56,7 @@
 - Produce `publicCommercialOfferSchema`, `buildPublicCommercialOffer(settings: PlatformSettings): PublicCommercialOffer` y `commercialPriceCOP(settings: PlatformSettings, kind: 'subscription' | 'response_pack' | 'paid_trial', planId?: SubscriptionPlanId): number` en `src/lib/commercial-offer.ts`.
 - Produce `readPublicCommercialOffer(db?: Database): Promise<PublicCommercialOffer>` y GET `/api/public/commercial-offer`. El precio de WhatsApp solo se calcula internamente para conservar facturación; no aparece en `plans`.
 
-- [ ] **Step 1:** En `commercial-offer.test.ts`, usar `memoryFirestore` y los fixtures de ajustes de `billing.test.ts`: guardar mensual 65000 y ampliación 23000, exigir esos importes; exigir prueba 5000/10/700; comprobar que no hay bancos/túnel y que leer no escribe filas. Parametrizar mensual `0`, `-1`, `1.5`, `NaN` y `100000001`: el cálculo rechaza el dato.
+- [x] **Step 1:** En `commercial-offer.test.ts`, usar `memoryFirestore` y los fixtures de ajustes de `billing.test.ts`: guardar mensual 65000 y ampliación 23000, exigir esos importes; exigir prueba 5000/10/700; comprobar que no hay bancos/túnel y que leer no escribe filas. Parametrizar mensual `0`, `-1`, `1.5`, `NaN` y `100000001`: el cálculo rechaza el dato.
 
   Assertions centrales, con `settings` obtenido mediante `getSettings(memoryFirestore().db)` en el setup del test:
   ```ts
@@ -67,11 +67,11 @@
   expect(offer).not.toHaveProperty('bankAccounts');
   expect(() => buildPublicCommercialOffer({ ...settings, monthlyPriceCOP: 0 })).toThrow();
   ```
-- [ ] **Step 2:** Añadir en `public-commercial-offer-route.test.ts` mocks de DB siguiendo `tests/business-read-routes.test.ts`; GET sin credenciales devuelve 200 y exactamente el contrato permitido, `Cache-Control: no-store`. Error de DB devuelve 503 sin contenido interno. `POST` no está exportado.
-- [ ] **Step 3:** Ejecutar `pnpm test tests/commercial-offer.test.ts tests/public-commercial-offer-route.test.ts`; esperar RED por módulos ausentes o assertions de contrato, nunca por credenciales externas.
-- [ ] **Step 4:** Implementar las interfaces. Validar precios enteros seguros en `[1,100000000]`. La ruta usa `runtime = 'nodejs'`, `dynamic = 'force-dynamic'`; el error público no revela valores/stack. `submitReceipt` usa `commercialPriceCOP` con sus ajustes leídos en la misma transacción; conservar la rama de WhatsApp verificado existente y el orden de recuperación idempotente.
-- [ ] **Step 5:** Ejecutar los dos tests nuevos y `pnpm test tests/billing.test.ts tests/billing-paid-trial.test.ts`; esperar todo PASS, incluidos importes históricos e idempotencia.
-- [ ] **Step 6:** Revisar diff y crear un commit enfocado `feat: expose current public commercial pricing`, incluyendo solo los archivos de esta tarea y su documentación asociada. No incorporar cambios previos ajenos.
+- [x] **Step 2:** Añadir en `public-commercial-offer-route.test.ts` mocks de DB siguiendo `tests/business-read-routes.test.ts`; GET sin credenciales devuelve 200 y exactamente el contrato permitido, `Cache-Control: no-store`. Error de DB devuelve 503 sin contenido interno. `POST` no está exportado.
+- [x] **Step 3:** Ejecutar `pnpm test tests/commercial-offer.test.ts tests/public-commercial-offer-route.test.ts`; esperar RED por módulos ausentes o assertions de contrato, nunca por credenciales externas.
+- [x] **Step 4:** Implementar las interfaces. Validar precios enteros seguros en `[1,100000000]`. La ruta usa `runtime = 'nodejs'`, `dynamic = 'force-dynamic'`; el error público no revela valores/stack. `submitReceipt` usa `commercialPriceCOP` con sus ajustes leídos en la misma transacción; conservar la rama de WhatsApp verificado existente y el orden de recuperación idempotente.
+- [x] **Step 5:** Ejecutar los dos tests nuevos y `pnpm test tests/billing.test.ts tests/billing-paid-trial.test.ts`; esperar todo PASS, incluidos importes históricos e idempotencia.
+- [x] **Step 6:** Revisar diff y crear un commit enfocado `feat: expose current public commercial pricing`, incluyendo solo los archivos de esta tarea y su documentación asociada. No incorporar cambios previos ajenos.
 
 ### Task 2: Lectura de tarifas en la landing estática
 
@@ -82,8 +82,8 @@
 - Produce `usePublicCommercialOffer(endpoint: string | null): { offer: PublicCommercialOffer | null; loading: boolean; error: string | null; refresh: () => void }`.
 - Produce `MarketingPricing({ endpoint }: { endpoint: string | null })`; en app completa endpoint relativo `/api/public/commercial-offer`; en standalone con origen aprobado, origen más ruta. Sin origen aprobado, no consultar una URL alternativa y mostrar «Consulta el precio vigente».
 
-- [ ] **Step 1:** Crear `marketing-pricing.test.tsx` con React Test Renderer, `act`, fake timers y `fetch` mock. Primer fetch mensual 65000 muestra `$65.000 COP`, nunca 59900; renovación visible a 15 segundos muestra 68000. Verificar petición sin `Authorization` con `cache: 'no-store'` y `credentials: 'omit'`.
-- [ ] **Step 2:** Añadir casos: primera carga sin importe variable; respuesta inválida y error después de éxito ocultan importes anteriores; «Reintentar» recupera; desmontar o cambiar endpoint descarta respuesta tardía; pestaña oculta pausa las consultas usando el polling existente. Preservar las acciones/enlaces de prueba fija 5000 en `marketing-home.test.tsx`.
+- [x] **Step 1:** Crear `marketing-pricing.test.tsx` con React Test Renderer, `act`, fake timers y `fetch` mock. Primer fetch mensual 65000 muestra `$65.000 COP`, nunca 59900; renovación visible a 15 segundos muestra 68000. Verificar petición sin `Authorization` con `cache: 'no-store'` y `credentials: 'omit'`.
+- [x] **Step 2:** Añadir casos: primera carga sin importe variable; respuesta inválida y error después de éxito ocultan importes anteriores; «Reintentar» recupera; desmontar o cambiar endpoint descarta respuesta tardía; pestaña oculta pausa las consultas usando el polling existente. Preservar las acciones/enlaces de prueba fija 5000 en `marketing-home.test.tsx`.
 
   Usar el helper `text(node)` y montaje con `act` de los tests de pantallas existentes. Después de una lectura mensual 65000 y después del error de red, respectivamente:
   ```ts
@@ -92,11 +92,11 @@
   expect(text(renderer.root)).not.toContain('$65.000 COP');
   expect(text(renderer.root)).toContain('Reintentar');
   ```
-- [ ] **Step 3:** Ejecutar `pnpm test tests/marketing-pricing.test.tsx tests/marketing-home.test.tsx`; esperar RED por la ausencia del componente/hook o por los valores fijos previos.
-- [ ] **Step 4:** Implementar hook con `startApiPolling` y `fetch` directo. No importar `apiFetch`, `useApiPoll` o `auth-provider`: arrastran Firebase al artefacto estático. Validar el JSON completo con el esquema de tarea 1; en error poner `offer: null`. MarketingHome conserva el HTML principal/CTA y mueve únicamente planes y precio variable de ampliación a `MarketingPricing`; eliminar los precios variables hardcoded, incluidos los de textos de ampliación.
-- [ ] **Step 5:** Actualizar el verificador estático para exigir una sección de precio con estado accesible, ausencia de importes de planes renderizados como vigentes en el HTML y ausencia de Firebase/secretos en bundles. No alterar el allowlist de dominios. Actualizar README para indicar lectura runtime y revalidación visible de 15 segundos.
-- [ ] **Step 6:** Ejecutar los dos tests, `pnpm run build:landing` y `pnpm run check:landing`; esperar PASS y exportación válida sin servidor de precios embebido. En navegador, simular la oferta sintética y el error a 320 px y escritorio; comprobar navegación, estados y ausencia de desbordamiento. Guardar evidencia con datos sintéticos.
-- [ ] **Step 7:** Revisar diff y crear commit `feat: load live commercial prices on the landing` solo con los archivos de la tarea.
+- [x] **Step 3:** Ejecutar `pnpm test tests/marketing-pricing.test.tsx tests/marketing-home.test.tsx`; esperar RED por la ausencia del componente/hook o por los valores fijos previos.
+- [x] **Step 4:** Implementar hook con `startApiPolling` y `fetch` directo. No importar `apiFetch`, `useApiPoll` o `auth-provider`: arrastran Firebase al artefacto estático. Validar el JSON completo con el esquema de tarea 1; en error poner `offer: null`. MarketingHome conserva el HTML principal/CTA y mueve únicamente planes y precio variable de ampliación a `MarketingPricing`; eliminar los precios variables hardcoded, incluidos los de textos de ampliación.
+- [x] **Step 5:** Actualizar el verificador estático para exigir una sección de precio con estado accesible, ausencia de importes de planes renderizados como vigentes en el HTML y ausencia de Firebase/secretos en bundles. No alterar el allowlist de dominios. Actualizar README para indicar lectura runtime y revalidación visible de 15 segundos.
+- [x] **Step 6:** Ejecutar los dos tests, `pnpm run build:landing` y `pnpm run check:landing`; esperar PASS y exportación válida sin servidor de precios embebido. En navegador, simular la oferta sintética y el error a 320 px y escritorio; comprobar navegación, estados y ausencia de desbordamiento. Guardar evidencia con datos sintéticos.
+- [x] **Step 7:** Revisar diff y crear commit `feat: load live commercial prices on the landing` solo con los archivos de la tarea.
 
 ### Task 3: Cotización obsoleta durante el envío del comprobante
 
@@ -107,7 +107,7 @@
 - Produce campo opcional `quotedPriceCOP?: number` en `receiptSchema` con entero `[1,100000000]`; clientes nuevos lo envían siempre para suscripción y ampliación. La prueba fija no requiere cotización variable. La opcionalidad conserva clientes anteriores; omitirlo nunca permite elegir el importe del recibo, que calcula el servidor.
 - Produce `HttpError(409, 'El precio cambió. Revisa el importe actualizado antes de enviar.', 'OFFER_PRICE_CHANGED')` cuando la cotización recibida difiere del importe actual. Recuperar un `requestId` ya aceptado prevalece sobre esta comprobación.
 
-- [ ] **Step 1:** Añadir tests de servidor: mensual cotizado 59900 y actual 65000 devuelve conflicto y no crea filas de recibo/imagen/borrador; reintento de recibo aceptado a 59900 devuelve el mismo tras cambiar a 65000; un cliente anterior sin cotización obtiene 65000 calculado por servidor; ampliación tiene la misma protección y prueba sigue a 5000. Añadir validación de cotizaciones inválidas en schemas.
+- [x] **Step 1:** Añadir tests de servidor: mensual cotizado 59900 y actual 65000 devuelve conflicto y no crea filas de recibo/imagen/borrador; reintento de recibo aceptado a 59900 devuelve el mismo tras cambiar a 65000; un cliente anterior sin cotización obtiene 65000 calculado por servidor; ampliación tiene la misma protección y prueba sigue a 5000. Añadir validación de cotizaciones inválidas en schemas.
 
   Sobre el fixture `submissionDatabase()`/`upload` de `billing.test.ts`, guardar mensual 65000 antes de ejecutar:
   ```ts
@@ -116,11 +116,11 @@
   expect([...rows.keys()].filter(path => path.startsWith('paymentReceipts/'))).toHaveLength(0);
   expect([...rows.keys()].filter(path => path.startsWith('paymentImages/'))).toHaveLength(0);
   ```
-- [ ] **Step 2:** Añadir test de pantalla usando fixtures existentes de `billing-pages.test.tsx`: primer POST incluye `quotedPriceCOP: 59900`; responder `ApiError` 409 con código; GET refresca mensual a 65000, conserva la imagen local y muestra aviso; no se reenvía automáticamente. Segundo clic explícito envía 65000. Comprobante pendiente sigue bloqueando otro envío.
-- [ ] **Step 3:** Ejecutar `pnpm test tests/billing.test.ts tests/billing-pages.test.tsx tests/schemas.test.ts`; esperar RED en cotización/error, con los casos existentes sin regresión.
-- [ ] **Step 4:** Implementar chequeo dentro de la transacción después de recuperar petición existente y antes de cualquier escritura. No guardar `quotedPriceCOP` como fuente de precio ni modificar recibos pasados. En UI, refrescar ajustes al recibir el código, mantener imagen/banco y esperar otro envío explícito; distinguir fallo de refresco de fallo de subida.
-- [ ] **Step 5:** Ejecutar tests afectados, `pnpm run typecheck` y `pnpm test`; esperar PASS. Ejecutar `pnpm run build`, `pnpm run build:landing`, `pnpm run check:landing` y `node --test pages-gateway/tests/*.test.mjs`; esperar salidas sin fallos. El gateway actual ya reenvía `/api/`; no necesita abrir otro origen/CORS.
-- [ ] **Step 6:** Registrar aceptación sintética de cambio de tarifa entre lectura y POST en entorno local; documentar que no se cambiaron tarifas reales. Revisar diff y commit `fix: require review when a quoted plan price changes` con paths explícitos.
+- [x] **Step 2:** Añadir test de pantalla usando fixtures existentes de `billing-pages.test.tsx`: primer POST incluye `quotedPriceCOP: 59900`; responder `ApiError` 409 con código; GET refresca mensual a 65000, conserva la imagen local y muestra aviso; no se reenvía automáticamente. Segundo clic explícito envía 65000. Comprobante pendiente sigue bloqueando otro envío.
+- [x] **Step 3:** Ejecutar `pnpm test tests/billing.test.ts tests/billing-pages.test.tsx tests/schemas.test.ts`; esperar RED en cotización/error, con los casos existentes sin regresión.
+- [x] **Step 4:** Implementar chequeo dentro de la transacción después de recuperar petición existente y antes de cualquier escritura. No guardar `quotedPriceCOP` como fuente de precio ni modificar recibos pasados. En UI, refrescar ajustes al recibir el código, mantener imagen/banco y esperar otro envío explícito; distinguir fallo de refresco de fallo de subida.
+- [x] **Step 5:** Ejecutar tests afectados, `pnpm run typecheck` y `pnpm test`; esperar PASS. Ejecutar `pnpm run build`, `pnpm run build:landing`, `pnpm run check:landing` y `node --test pages-gateway/tests/*.test.mjs`; esperar salidas sin fallos. El gateway actual ya reenvía `/api/`; no necesita abrir otro origen/CORS.
+- [x] **Step 6:** Registrar aceptación sintética de cambio de tarifa entre lectura y POST en entorno local; documentar que no se cambiaron tarifas reales. Revisar diff y commit `fix: require review when a quoted plan price changes` con paths explícitos.
 
 ## Self Review
 
