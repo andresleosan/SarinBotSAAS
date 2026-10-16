@@ -227,7 +227,7 @@ function Billing() {
           </p>
           <h1 className="mt-1 text-3xl font-bold">Mantén tu agenda abierta</h1>
           <p className="mt-1 text-sm text-sarin-muted">
-            {data.business?.sarinConfig?.onboardingCompleted ? data.business.name + " · " : ""}Estado: {data.business ? subscriptionLabels[data.business.subscription.status] : "Pendiente de pago aprobado"}
+            {data.business?.sarinConfig?.onboardingCompleted ? data.business.name + " · " : ""}Estado: {data.business ? data.business.subscription.status === 'trial' && data.business.subscription.paidTrial?.source === 'invitation' ? data.business.subscription.paidTrial.accessSuspended ? 'Cortesía suspendida' : 'Prueba de cortesía' : subscriptionLabels[data.business.subscription.status] : "Pendiente de pago aprobado"}
           </p>
         </div>
         <div className="flex flex-col items-start sm:items-end">

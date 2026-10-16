@@ -405,7 +405,7 @@ function Console() {
                       </span>
                     </td>
                     <td className="p-4 text-sarin-ink">
-                      {subscriptionLabels[business.subscription.status]}
+                      {business.subscription.status === 'trial' && business.subscription.paidTrial?.source === 'invitation' ? business.subscription.paidTrial.accessSuspended ? 'Cortesía suspendida' : 'Prueba de cortesía' : subscriptionLabels[business.subscription.status]}
                     </td>
                     <td className="whitespace-nowrap p-4 text-sarin-muted">
                       {business.subscription.paidTrial ? `${business.subscription.paidTrial.appointmentsUsed} de ${business.subscription.paidTrial.appointmentLimit} utilizadas · ${paidTrialRemaining(business.subscription)} disponibles` : "Sin prueba pagada"}

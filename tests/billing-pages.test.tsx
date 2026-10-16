@@ -201,6 +201,16 @@ describe("billing plan screens", () => {
     const cells = renderer.root.findByType("tbody").findAllByType("td");
     expect(text(cells[3])).toBe("Sin pago aprobado");
   });
+  it("labels complimentary trial status in both owner and administrator screens", async () => {
+    const courtesy = { ...business, subscription: { status: 'trial', trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { source: 'invitation', invitationId: 'synthetic', accessSuspended: false, activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 0 } } };
+    billingData.business = courtesy;
+    await mount();
+    expect(text(renderer.root)).toContain('Estado: Prueba de cortesía');
+    await act(async () => renderer.unmount());
+    adminData.businesses = [courtesy];
+    await mount(AdminPage);
+    expect(text(renderer.root.findByType('tbody').findAllByType('td')[1])).toBe('Prueba de cortesía');
+  });
 
   it("labels an approved private draft and its receipt without inventing a subscription expiry", async () => {
     adminData.businesses = [{ ...business, name: "", slug: "", subscription: { status: "trial", trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: "intro", activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 0 } } }];
