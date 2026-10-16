@@ -1,6 +1,7 @@
 import { act, createElement, type ReactNode } from "react";
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock('@/components/admin-invitations', () => ({ AdminInvitations: () => null }));
 import AdminPage from "@/app/admin/page";
 import type { AdminAiSettings } from "@/types/ai";
 
