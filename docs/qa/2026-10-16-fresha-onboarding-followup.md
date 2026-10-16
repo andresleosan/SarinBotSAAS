@@ -37,3 +37,7 @@ Lectura anónima del 16 de octubre, 16:52:25 Colombia, mediante GET, sin inferen
 | `/api/session` | 401 | no-store |
 
 Confirma accesibilidad y rechazo anónimo de la API de sesión. No reemplaza el [recorrido comercial autenticado previo](2026-10-16-commercial-e2e.md) ni mide capacidad. El lector web remoto no pudo acceder al dominio; los resultados de la tabla proceden de solicitudes directas desde el entorno local.
+
+## Continuación posterior
+
+En una sesión posterior del mismo día sí se completó el alta con datos ficticios y se revisaron calendario, servicios y publicación. El [seguimiento del workspace](2026-10-16-fresha-workspace-review.md) registra esa continuación, sus capturas y el bloqueo del enlace completo hasta publicar el perfil. Se conserva arriba el resultado histórico de esta primera revisión, que no finalizó el alta.
