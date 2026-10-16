@@ -3,6 +3,7 @@ import { z } from 'zod';
 export type BusinessSocialPlatform = 'instagram' | 'facebook' | 'tiktok' | 'website';
 export interface BusinessSocialLink { platform: BusinessSocialPlatform; url: string; }
 export interface BusinessLogo { sha256: string; }
+export const businessSocialPlatformLabels: Record<BusinessSocialPlatform, string> = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', website: 'Sitio web' };
 const linksSchema = z.array(z.object({ platform: z.enum(['instagram', 'facebook', 'tiktok', 'website']), url: z.string().min(1).max(512) }).strict()).max(3);
 const hosts = { instagram: 'instagram.com', facebook: 'facebook.com', tiktok: 'tiktok.com' };
 export const businessSocialLinksSchema = linksSchema.superRefine((value, context) => {

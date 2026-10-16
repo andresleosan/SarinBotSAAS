@@ -1,116 +1,79 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { QRCodeSVG } from "qrcode.react";
-import { Copy, Download, ExternalLink } from "lucide-react";
-import { AuthGate } from "@/components/auth-provider";
-import { AppShell, Notice, buttonClass } from "@/components/app-shell";
-import { useBusiness } from "@/hooks/useBusiness";
-import { errorMessage } from "@/lib/client/api";
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
+import { AuthGate, useAuth } from '@/components/auth-provider';
+import { AppShell, Notice, buttonClass } from '@/components/app-shell';
+import { BookingCardPreview } from '@/components/booking-card-preview';
+import { apiFetch, errorMessage } from '@/lib/client/api';
+import { useApiPoll } from '@/lib/client/use-api-poll';
+import { buildBookingCardAssets } from '@/lib/client/booking-card-assets';
+import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
+import type { BookingCardDetails } from '@/lib/booking-card';
+import type { Business } from '@/types/firestore';
 
-function QRKit() {
-  const { business, loading, error } = useBusiness();
-  const [origin, setOrigin] = useState("");
+type Kit = { business: Business; bookingUrl: string };
+type Assets = Awaited<ReturnType<typeof buildBookingCardAssets>>;
+function QRKit({ uid }: { uid: string }) {
+  const result = useApiPoll<Kit>(uid, async signal => {
+    const value = await apiFetch<Kit>('/api/businesses/qr-kit', { signal });
+    if (value.business.ownerUid !== uid) throw new Error('No tienes acceso a este negocio.');
+    return value;
+  });
+  const kit = result.value;
+  const details: BookingCardDetails | null = kit ? { businessId: kit.business.id, slug: kit.business.slug, businessName: kit.business.name, phoneWhatsApp: kit.business.phoneWhatsApp, socialLinks: kit.business.socialLinks ?? [], logoSha256: kit.business.logo?.sha256 ?? null, bookingUrl: kit.bookingUrl } : null;
+  const snapshotKey = details && !result.error ? JSON.stringify(details) : '';
+  const [prepared, setPrepared] = useState<{ key: string; assets: Assets } | null>(null);
+  const [building, setBuilding] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const currentKey = useRef(snapshotKey); currentKey.current = snapshotKey;
+  const controller = useRef<AbortController | null>(null);
   const qr = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-  if (loading) return <Notice>Cargando tu isla…</Notice>;
-  if (error) return <Notice error>{error}</Notice>;
-  if (!business?.slug || !business.sarinConfig.onboardingCompleted)
-    return (
-      <Notice>
-        Configura primero tu negocio en{" "}
-        <Link
-          href="/dashboard/onboarding"
-          className="text-sarin-blue underline"
-        >
-          Configuración
-        </Link>
-        .
-      </Notice>
-    );
-  const url = `${origin}/b/${business.slug}`;
-  async function copy() {
+    generation.current++; controller.current?.abort(); setPrepared(null); setBuilding(false); setError(null);
+  }, [snapshotKey]);
+  useEffect(() => () => { generation.current++; controller.current?.abort(); }, []);
+  async function prepare() {
+    if (!details || !snapshotKey || building) return;
+    const svg = qr.current?.querySelector('svg');
+    if (!svg || svg.getAttribute('data-booking-url') !== details.bookingUrl) { setError('No pudimos preparar el QR. Actualiza y reintenta.'); return; }
+    controller.current?.abort();
+    const request = controller.current = new AbortController();
+    const version = ++generation.current, key = snapshotKey;
+    const snapshot = structuredClone(details);
+    setBuilding(true); setError(null); setPrepared(null);
     try {
-      await navigator.clipboard.writeText(url);
-      setNotice("Enlace copiado.");
-    } catch (cause) {
-      setNotice(errorMessage(cause));
-    }
+      const assets = await buildBookingCardAssets({ details: snapshot, qrSvg: new XMLSerializer().serializeToString(svg), signal: request.signal });
+      if (!request.signal.aborted && version === generation.current && currentKey.current === key) setPrepared({ key, assets });
+    } catch (cause) { if (!request.signal.aborted && version === generation.current) setError(errorMessage(cause)); }
+    finally { if (!request.signal.aborted && version === generation.current) setBuilding(false); }
   }
-  function download() {
-    const svg = qr.current?.querySelector("svg");
-    if (!svg) return;
-    const image = new Blob([new XMLSerializer().serializeToString(svg)], {
-      type: "image/svg+xml;charset=utf-8",
-    });
-    const objectUrl = URL.createObjectURL(image);
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = `sarin-qr-${business!.slug}.svg`;
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  async function copy() {
+    if (!kit) return;
+    const key = snapshotKey;
+    try { await navigator.clipboard.writeText(kit.bookingUrl); if (key === currentKey.current) setNotice('Enlace copiado.'); }
+    catch { if (key === currentKey.current) setNotice('No pudimos copiarlo. Selecciona el enlace y cópialo manualmente.'); }
   }
-  return (
-    <section className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 text-center sm:p-10">
-      <p className="text-xs uppercase tracking-widest text-sarin-blue">
-        Enlace de tu negocio
-      </p>
-      <h1 className="break-words text-3xl font-semibold tracking-tight">{business.name}</h1>
-      <p className="mx-auto max-w-md text-sm leading-relaxed text-sarin-muted">
-        Descarga el QR para imprimirlo en tu local o comparte el enlace para que
-        tus clientes reserven contigo.
-      </p>
-      {origin && (
-        <div className="mx-auto w-full max-w-[272px] rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-6" ref={qr}>
-          <QRCodeSVG
-            value={url}
-            size={224}
-            className="h-auto w-full"
-            level="M"
-            marginSize={2}
-            title={`Agenda de ${business.name}`}
-          />
-        </div>
-      )}
-      <p className="break-all tabular-nums text-sm text-sarin-ink">{url}</p>
-      <div className="flex flex-wrap justify-center gap-3">
-        <button
-          className={buttonClass + " flex items-center gap-2"}
-          disabled={!origin}
-          onClick={download}
-        >
-          <Download className="h-4 w-4" />
-          Descargar QR
-        </button>
-        <button
-          className="flex min-h-11 items-center gap-2 rounded-[10px] border border-sarin-line px-4 py-2.5 text-sm text-sarin-ink hover:bg-sarin-soft"
-          onClick={() => void copy()}
-        >
-          <Copy className="h-4 w-4" />
-          Copiar enlace
-        </button>
-        <Link
-          className="flex min-h-11 items-center gap-2 rounded-[10px] border border-sarin-line px-4 py-2.5 text-sm text-sarin-ink hover:bg-sarin-soft"
-          href={`/b/${business.slug}`}
-        >
-          <ExternalLink className="h-4 w-4" />
-          Abrir página del negocio
-        </Link>
-      </div>
-      {notice && <Notice>{notice}</Notice>}
-    </section>
-  );
+  if (result.loading) return <Notice>Cargando tarjeta de tu negocio…</Notice>;
+  if (result.error || !details || !kit) return <section className="space-y-3"><Notice error>{result.error ?? 'Completa primero los datos de tu negocio.'}</Notice><button type="button" onClick={result.refresh} className={buttonClass}>Actualizar tarjeta</button><Link href="/dashboard/onboarding" className="ml-4 inline-flex min-h-11 items-center text-sarin-blue underline">Configurar negocio</Link></section>;
+  const assets = prepared?.key === snapshotKey ? prepared.assets : null;
+  return <section className="mx-auto max-w-3xl space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-8">
+    <h1 className="break-words text-3xl font-semibold">Tarjeta de {details.businessName}</h1>
+    <p className="text-sm text-sarin-muted">Agenda clara · formato A6, 105 × 148 mm. Se prepara con el logo, teléfono y enlaces que guardaste en la configuración.</p>
+    <p className="text-sm text-sarin-muted">Revisa el enlace antes de imprimir y prueba el QR con tu teléfono. Imprime el PDF al 100%, sin ajustar a página y sin recortar el margen blanco del QR.</p>
+    <div className="mx-auto w-full max-w-64 border border-sarin-line bg-white p-3" ref={qr}><QRCodeSVG value={details.bookingUrl} size={591} level="M" marginSize={4} bgColor="#ffffff" fgColor="#000000" data-booking-url={details.bookingUrl} title={`Agenda de ${details.businessName}`} className="h-auto w-full" /></div>
+    <p className="break-all text-sm">{details.bookingUrl}</p>
+    <div className="flex flex-wrap gap-4"><button type="button" className={buttonClass} disabled={building} onClick={() => void prepare()}>{building ? 'Preparando tarjeta…' : 'Preparar tarjeta'}</button><button type="button" onClick={() => void copy()} className="min-h-11 font-semibold text-sarin-blue">Copiar enlace</button><a href={details.bookingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold text-sarin-blue underline">Abrir reservas</a><button type="button" onClick={result.refresh} disabled={building} className="min-h-11 text-sm text-sarin-blue">Actualizar datos</button></div>
+    {notice && <Notice>{notice}</Notice>}{error && <Notice error>{error}</Notice>}
+    <BookingCardPreview assets={assets} businessName={details.businessName} filenameStem={`tarjeta-${details.slug}`} qrFilename={`qr-${details.slug}.svg`} />
+    {details.socialLinks.length > 0 && <nav aria-label="Contactos incluidos en la tarjeta" className="flex flex-wrap gap-x-4">{details.socialLinks.map(link => <a key={link.platform} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 max-w-full items-center break-all text-sm text-sarin-blue underline">{businessSocialPlatformLabels[link.platform]} · {businessSocialLabel(link)}</a>)}</nav>}
+    <Link href="/dashboard/onboarding" className="inline-flex min-h-11 items-center text-sm font-semibold text-sarin-blue underline">Editar logo y contactos</Link>
+  </section>;
 }
 export default function QRKitPage() {
-  return (
-    <AuthGate>
-      <AppShell>
-        <QRKit />
-      </AppShell>
-    </AuthGate>
-  );
+  const { user } = useAuth();
+  return <AuthGate><AppShell>{user && <QRKit key={user.uid} uid={user.uid} />}</AppShell></AuthGate>;
 }

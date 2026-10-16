@@ -13,6 +13,9 @@ describe('isolated local development launcher', () => {
     expect(env.FIREBASE_AUTH_EMULATOR_HOST).toBe('127.0.0.1:9099'); expect(env.FIRESTORE_EMULATOR_HOST).toBe('127.0.0.1:8080');
     expect(env.NEXT_PUBLIC_FIREBASE_EMULATORS).toBe('true'); expect(env.SUPERADMIN_UID).toBe('sarin-local-admin'); expect(env.PATH).toBe('runtime-path');
   });
+  it('cannot inherit a production data backend or printed booking origin', () => {
+    expect(localDevelopmentEnvironment({ SARIN_DATA_BACKEND: 'd1', SARIN_MAINTENANCE: 'true', SARIN_PUBLIC_BOOKING_ORIGIN: 'https://sarinbotsaas.pages.dev' })).toMatchObject({ SARIN_DATA_BACKEND: 'firestore', SARIN_MAINTENANCE: 'false', SARIN_PUBLIC_BOOKING_ORIGIN: '' });
+  });
   it.each([
     { SARIN_CHAT_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'synthetic-deepseek-key', DEEPSEEK_MODEL: 'deepseek-flash' },
     { SARIN_CHAT_PROVIDER: 'gemini', GEMINI_API_KEY: 'synthetic-gemini-key', GEMINI_MODEL: 'gemini-3.5-flash-lite', GEMINI_BILLING_VERIFIED: 'true' },

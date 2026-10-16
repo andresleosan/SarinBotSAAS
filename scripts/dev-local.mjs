@@ -69,6 +69,7 @@ try {
   if(manager.status!==0 || manager.stdout?.trim()!=='11.23.0')throw new Error('El launcher requiere la CLI real de pnpm 11.23.0.');
   for(const port of [options.port,8080,9099,4400,4500])if(await occupied(port))throw new Error(`El puerto local ${port} está ocupado. Detén el servicio correspondiente antes de iniciar Sarin local.`);
   const env=localDevelopmentEnvironment(process.env);const home=await javaHome();
+  env.SARIN_PUBLIC_BOOKING_ORIGIN=`http://127.0.0.1:${options.port}`;
   if(home) {
     env.JAVA_HOME=home;
     // Firebase CLI invokes "java" from PATH instead of consulting JAVA_HOME.

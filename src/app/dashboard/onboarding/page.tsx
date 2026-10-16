@@ -6,6 +6,9 @@ import Link from "next/link";
 import { SarinMark } from "@/components/sarin-brand";
 import { WhatsAppPhoneField } from "@/components/whatsapp-phone-field";
 import { TextSuggestions } from "@/components/text-suggestions";
+import { BusinessLogoField } from '@/components/business-logo-field';
+import { BusinessSocialFields } from '@/components/business-social-fields';
+import type { BusinessSocialLink } from '@/lib/business-branding';
 import { AuthGate } from "@/components/auth-provider";
 import {
   AppShell,
@@ -49,11 +52,12 @@ function initialSchedule(): Record<number, DaySchedule> {
 }
 
 function Configuration() {
-  const { business, loading, error: businessError } = useBusiness();
+  const { business, loading, error: businessError, setBusiness } = useBusiness();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [category, setCategory] = useState("");
   const [phone, setPhone] = useState("");
+  const [socialLinks, setSocialLinks] = useState<BusinessSocialLink[]>([]);
   const [tone, setTone] = useState("Cercano y profesional");
   const [rules, setRules] = useState("");
   const [intake, setIntake] = useState("");
@@ -76,6 +80,10 @@ function Configuration() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const loadedVersion = useRef("");
+  const loadedBusiness = useRef('');
+  const baseline = useRef('');
+  const latestSnapshot = useRef('');
+  latestSnapshot.current = JSON.stringify([name, slug, category, phone, tone, rules, intake, resources, services, schedule, socialLinks]);
   useEffect(() => {
     if (!business?.sarinConfig.onboardingCompleted) return;
     const version = JSON.stringify([
@@ -88,13 +96,18 @@ function Configuration() {
       business.resources,
       business.services,
       business.weeklySchedule,
+      business.socialLinks,
     ]);
     if (loadedVersion.current === version) return;
+    if (loadedBusiness.current === business.id && baseline.current && baseline.current !== latestSnapshot.current) return;
+    loadedBusiness.current = business.id;
+    baseline.current = JSON.stringify([business.name, business.slug, business.category, business.phoneWhatsApp, business.sarinConfig.tone, business.sarinConfig.customRules, business.sarinConfig.intakeFields.map(item => item.label).join('\n'), business.resources, business.services, business.weeklySchedule, business.socialLinks ?? []]);
     loadedVersion.current = version;
     setName(business.name);
     setSlug(business.slug);
     setCategory(business.category);
     setPhone(business.phoneWhatsApp);
+    setSocialLinks(business.socialLinks ?? []);
     setTone(business.sarinConfig.tone);
     setRules(business.sarinConfig.customRules);
     setIntake(
@@ -117,14 +130,16 @@ function Configuration() {
     setError(null);
     setSaved(false);
     setSaving(true);
+    const submittedSnapshot = latestSnapshot.current;
     try {
-      await apiFetch<{ business: Business }>("/api/businesses", {
+      const response = await apiFetch<{ business: Business }>("/api/businesses", {
         method: "POST",
         body: JSON.stringify({
           name,
           slug,
           category,
           phoneWhatsApp: phone,
+          socialLinks,
           tone,
           customRules: rules,
           resources,
@@ -146,6 +161,9 @@ function Configuration() {
             ),
         }),
       });
+      baseline.current = submittedSnapshot;
+      loadedVersion.current = '';
+      setBusiness(response.business);
       setSaved(true);
     } catch (cause) {
       setError(errorMessage(cause));
@@ -186,6 +204,7 @@ function Configuration() {
           panel.
         </Notice>
       )}
+      {business && business.sarinConfig.onboardingCompleted && <BusinessLogoField business={business} onSaved={setBusiness} />}
       <div className="grid items-start gap-5 xl:grid-cols-[18rem_minmax(0,1fr)]">
         <section className="flex min-w-0 flex-col rounded-2xl border border-sarin-line bg-sarin-paper xl:sticky xl:top-6">
           <h2 className="flex items-center gap-2 border-b border-sarin-line px-4 py-3 font-semibold">
@@ -307,6 +326,7 @@ function Configuration() {
             </label>
             <WhatsAppPhoneField value={phone} onChange={setPhone} />
           </div>
+          <BusinessSocialFields value={socialLinks} onChange={setSocialLinks} />
           <section className="space-y-2">
             <h3 className="font-semibold">Profesionales o estaciones</h3>
             {resources.map((resource, index) => (

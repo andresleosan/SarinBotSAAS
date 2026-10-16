@@ -12,5 +12,5 @@ export function useBusiness() {
     if (business && business.ownerUid !== user?.uid) throw new Error("No tienes acceso a este negocio.");
     return business;
   });
-  return { business: result.value, loading: result.loading, error: result.error };
+  return { business: result.value, loading: result.loading, error: result.error, refresh: result.refresh, setBusiness: result.setValue };
 }

@@ -1,0 +1,49 @@
+import { act, createElement, type ReactNode } from 'react';
+import { create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QRCodeSVG } from 'qrcode.react';
+const state = vi.hoisted(() => ({ api: vi.fn(), build: vi.fn(), uid: 'owner' }));
+vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: state.uid } }) }));
+vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, buttonClass: 'button' }));
+vi.mock('@/lib/client/api', () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
+vi.mock('@/lib/client/booking-card-assets', () => ({ buildBookingCardAssets: state.build }));
+vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => createElement('a', { href }, children) }));
+import QRKitPage from '@/app/dashboard/qr-kit/page';
+const data = { bookingUrl: 'https://sarinbotsaas.pages.dev/b/negocio-sintetico', business: { id: 'business', ownerUid: 'owner', slug: 'negocio-sintetico', name: 'Negocio sintético', phoneWhatsApp: '573001234567', socialLinks: [], sarinConfig: { onboardingCompleted: true } } };
+const assets = { png: new Blob(['png']), pdf: new Blob(['pdf']), qrSvg: new Blob(['svg']) };
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+describe('selected printable kit', () => {
+  let renderer: ReactTestRenderer;
+  const prepare = () => renderer.root.findAllByType('button').find(button => button.children.join('').includes('Preparar tarjeta'))!;
+  const downloads = () => renderer.root.findAllByType('a').filter(link => link.props.download);
+  async function mount() { await act(async () => { renderer = create(createElement(QRKitPage), { createNodeMock: () => ({ querySelector: () => ({ getAttribute: () => data.bookingUrl }) }) }); }); }
+  beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal('window', { location: { origin: 'https://spoofed.invalid' } }); state.uid = 'owner'; state.api.mockReset().mockResolvedValue(data); state.build.mockReset().mockResolvedValue(assets); vi.stubGlobal('XMLSerializer', class { serializeToString() { return '<svg />'; } }); vi.stubGlobal('URL', class extends URL { static createObjectURL() { return 'blob:synthetic'; } static revokeObjectURL = vi.fn(); }); });
+  afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); vi.useRealTimers(); });
+  it('kit_uses_selected_template_without_style_selector and exports only server-supplied details', async () => {
+    await mount();
+    expect(state.api.mock.calls[0][0]).toBe('/api/businesses/qr-kit');
+    expect(renderer.root.findAllByType('select')).toHaveLength(0);
+    expect(renderer.root.findByType(QRCodeSVG).props).toMatchObject({ value: data.bookingUrl, level: 'M', marginSize: 4, fgColor: '#000000', bgColor: '#ffffff' });
+    expect(downloads()).toHaveLength(0);
+    await act(async () => { prepare().props.onClick(); });
+    expect(state.build).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ bookingUrl: data.bookingUrl, businessName: data.business.name }) }));
+    expect(downloads().map(link => link.props.download)).toEqual(['tarjeta-negocio-sintetico.pdf', 'tarjeta-negocio-sintetico.png', 'qr-negocio-sintetico.svg']);
+  });
+  it('discards_old_account_or_branding_export, including a result completed after the poll changes', async () => {
+    await mount();
+    let resolve!: (value: unknown) => void;
+    state.build.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    await act(async () => { prepare().props.onClick(); });
+    const signal = state.build.mock.calls[0][0].signal;
+    state.api.mockResolvedValue({ ...data, business: { ...data.business, name: 'Nombre actualizado' } });
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    expect(signal.aborted).toBe(true);
+    await act(async () => resolve(assets));
+    expect(downloads()).toHaveLength(0);
+    await act(async () => { prepare().props.onClick(); });
+    expect(downloads()).toHaveLength(3);
+    state.uid = 'other'; state.api.mockResolvedValue({ ...data, business: { ...data.business, ownerUid: 'other', id: 'other-business' } });
+    await act(async () => renderer.update(createElement(QRKitPage)));
+    expect(downloads()).toHaveLength(0);
+  });
+});

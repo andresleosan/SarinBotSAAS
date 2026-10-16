@@ -1,4 +1,4 @@
-import { businessSocialLabel, normalizeBusinessSocialLinks, type BusinessSocialLink } from '@/lib/business-branding';
+import { businessSocialLabel, businessSocialPlatformLabels, normalizeBusinessSocialLinks, type BusinessSocialLink } from '@/lib/business-branding';
 
 export interface BookingCardDetails { businessId: string; slug: string; businessName: string; phoneWhatsApp: string; socialLinks: BusinessSocialLink[]; bookingUrl: string; logoSha256: string | null; }
 export interface CardBox { x: number; y: number; width: number; height: number; }
@@ -39,7 +39,7 @@ export function getBookingCardLayout(details: BookingCardDetails): BookingCardLa
   texts.push(textBox('Escanea y agenda tu cita', 724, 53, 70));
   if (details.phoneWhatsApp) texts.push(textBox(`+${details.phoneWhatsApp.replace(/^\+/, '')}`, 1475, 38, 48));
   links.forEach((link, index) => {
-    const label = businessSocialLabel(link);
+    const label = `${businessSocialPlatformLabels[link.platform]} · ${businessSocialLabel(link)}`;
     const parts = graphemes(label);
     texts.push(textBox(parts.length > 53 ? `${parts.slice(0, 52).join('')}…` : label, 1532 + index * 39, 31, 38, '#52617d'));
   });

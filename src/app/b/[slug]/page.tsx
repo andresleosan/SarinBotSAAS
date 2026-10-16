@@ -12,6 +12,7 @@ import { useEngineHealth } from "@/hooks/useEngineHealth";
 import { useApiPoll } from "@/lib/client/use-api-poll";
 import { getBusinessAccess, isSubscriptionAllowed } from "@/lib/sarin/subscription";
 import type { PublicBusiness } from "@/types/firestore";
+import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
 
 function Island({ slug }: { slug: string }) {
   const { user, signOut } = useAuth();
@@ -75,7 +76,7 @@ function Island({ slug }: { slug: string }) {
       <header className="sticky top-0 z-20 border-b border-sarin-line bg-sarin-paper/95 p-4 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <SarinMark className="h-11 w-11 shrink-0" />
+            {business.logo ? <img src={`/api/public/businesses/${business.slug}/logo/${business.logo.sha256}`} alt={`Logo de ${business.name}`} width={44} height={44} className="h-11 w-11 shrink-0 rounded-lg object-contain" /> : <SarinMark className="h-11 w-11 shrink-0" />}
             <div className="min-w-0">
               <h1 className="line-clamp-2 break-words font-bold leading-5 [overflow-wrap:anywhere]">{business.name}</h1>
               <p
@@ -109,6 +110,10 @@ function Island({ slug }: { slug: string }) {
         </nav>
       </header>
       <div className="flex-1 space-y-5 p-4 sm:p-6">
+        <nav aria-label="Contacto del negocio" className="flex flex-wrap gap-x-4 text-sm text-sarin-blue">
+          {business.phoneWhatsApp && <a href={`tel:+${business.phoneWhatsApp.replace(/\D/g, '')}`} className="inline-flex min-h-11 items-center underline">+{business.phoneWhatsApp.replace(/^\+/, '')}</a>}
+          {(business.socialLinks ?? []).map(link => <a key={link.platform} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 max-w-full items-center break-all underline">{businessSocialPlatformLabels[link.platform]} · {businessSocialLabel(link)}</a>)}
+        </nav>
         {error && <Notice error>{error}</Notice>}
         {!chatAllowed && (
           <Notice>

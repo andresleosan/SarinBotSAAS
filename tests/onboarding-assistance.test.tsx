@@ -15,7 +15,8 @@ const business: Business = {
   weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: false, intervals: [] }])), createdAt: 2000000000000,
 };
 const state = vi.hoisted(() => ({ business: null as Business | null, send: vi.fn() }));
-vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null }) }));
+vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null, setBusiness: vi.fn() }) }));
+vi.mock('@/components/business-logo-field', () => ({ BusinessLogoField: () => null }));
 vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => ({ messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false, sendMessage: state.send }) }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement('a', { href }, children) }));
 vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children }));
@@ -32,6 +33,15 @@ describe('onboarding editable examples', () => {
   it('keeps existing questions and instructions on load without an automatic save', async () => {
     await mount();
     expect(renderer.root.findAllByType('textarea').map(input => input.props.value)).toEqual(['Pregunta propia', 'Indicaciones propias sin cambiar.']);
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+  });
+  it('does_not_reset_dirty_form_after_logo_poll and saves socials only explicitly', async () => {
+    await mount();
+    const name = () => renderer.root.findAllByType('input').find(input => input.props.value === 'Negocio sintético' || input.props.value === 'Edición sin guardar')!;
+    await act(async () => name().props.onChange({ target: { value: 'Edición sin guardar' } }));
+    state.business = { ...business, logo: { sha256: 'a'.repeat(64) }, socialLinks: [{ platform: 'instagram', url: 'https://instagram.com/server-new' }] };
+    await act(async () => renderer.update(createElement(OnboardingPage)));
+    expect(name().props.value).toBe('Edición sin guardar');
     expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
   });
 

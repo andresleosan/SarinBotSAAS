@@ -10,6 +10,7 @@ vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), errorMessage: (error: Er
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let renderer: ReactTestRenderer;
 function Probe() { const result = useBusiness(); return createElement('output', null, JSON.stringify(result)); }
+function ControlProbe() { const result = useBusiness(); return createElement('button', { onClick: () => result.setBusiness(previous => previous ? { ...previous, name: 'Logo actualizado' } : previous), onDoubleClick: result.refresh }, JSON.stringify(result)); }
 const value = () => JSON.parse(renderer.root.findByType('output').children.join(''));
 beforeEach(() => { state.user = { uid: 'first' }; vi.mocked(apiFetch).mockReset(); });
 afterEach(async () => { await act(async () => renderer?.unmount()); });
@@ -36,4 +37,12 @@ it('rejects a different owner in a response and does not poll after sign-out', a
   await act(async () => renderer.update(createElement(Probe)));
   expect(value()).toMatchObject({ business: null, loading: false, error: null });
   expect(apiFetch).not.toHaveBeenCalled();
+});
+it('exposes mutation invalidation and explicit refresh from the existing poller', async () => {
+  vi.mocked(apiFetch).mockResolvedValue({ business: { id: 'business', ownerUid: 'first', name: 'Anterior' } });
+  await act(async () => { renderer = create(createElement(ControlProbe)); });
+  await act(async () => renderer.root.findByType('button').props.onClick());
+  expect(renderer.root.findByType('button').children.join('')).toContain('Logo actualizado');
+  await act(async () => renderer.root.findByType('button').props.onDoubleClick());
+  expect(renderer.root.findByType('button').children.join('')).toContain('Anterior');
 });

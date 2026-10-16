@@ -24,6 +24,7 @@ describe('selected Agenda clara card', () => {
       expect(lines.every(box => box.y + box.height <= 680)).toBe(true);
       expect(layout.qr).toEqual(getBookingCardLayout(details).qr);
       expect(layout.texts.filter(box => box.y >= 1520 && box.y < 1650)).toHaveLength(3);
+      expect(layout.texts.some(box => box.text.startsWith('Instagram · @negocio'))).toBe(true);
     }
   });
 });
