@@ -59,6 +59,10 @@ test('only allows explicit server runtime variables, with no development emulato
   assert.throws(() => runtimeEnvironment({ FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080' }));
   assert.throws(() => runtimeEnvironment({ NEXT_PUBLIC_FIREBASE_EMULATORS: 'true' }));
 });
+test('forwards the explicit canonical booking origin only to the server runtime', () => {
+  const input = { ...certificateRuntime, SARIN_PUBLIC_BOOKING_ORIGIN: 'https://sarinbotsaas.pages.dev' };
+  assert.equal(runtimeEnvironment(input).SARIN_PUBLIC_BOOKING_ORIGIN, input.SARIN_PUBLIC_BOOKING_ORIGIN);
+});
 test('accepts a runtime without a vision model while still requiring the main model', () => {
   const input = { ...workloadRuntime };
   delete input.OLLAMA_VISION_MODEL;

@@ -33,6 +33,8 @@ El [procedimiento de corte de datos](../docs/cloudflare-data-migration.md) exige
 
 ## Verificación local
 
+El kit de impresión usa `SARIN_PUBLIC_BOOKING_ORIGIN=https://sarinbotsaas.pages.dev`, explícito y solo del servidor. La configuración revisada lo reenvía al contenedor y los tipos se generan con Wrangler. La ruta del kit falla de forma controlada si falta o apunta a un origen inválido; no utiliza Host, Forwarded ni el dominio de preview. En emuladores `demo-*` se admite HTTP loopback para QA. Revisar la URL completa antes de imprimir; un cambio futuro de dominio exige conservar la redirección del enlace impreso. Este cambio local no configura recursos reales hasta desplegarlo.
+
 Usa Node 24 y pnpm 11.23.0 desde la raíz del repositorio, con el lockfile compartido:
 
 ```sh
