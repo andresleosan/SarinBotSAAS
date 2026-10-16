@@ -1,5 +1,7 @@
 # Sugerencias, perfil Google y OpenAI — revisión privada
 
+Registro histórico: a petición del propietario se retiró posteriormente la opción OpenAI. Se conservan las sugerencias y la foto de Google. Esta evidencia describe la revisión de aquel release y no las opciones actualmente disponibles.
+
 ## Alcance
 
 Ejemplos editables para preguntas de reserva e indicaciones; foto de Google con alternativa de inicial; tercer proveedor manual OpenAI con GPT-6 Luna; consumo separado por proveedor y mes. Se conserva la selección existente, Vault local, suscripciones y datos del negocio. Sin activación de OpenAI, inferencia real ni publicación del backend.

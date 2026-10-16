@@ -10,7 +10,7 @@ const request = (method: 'GET' | 'PATCH', body?: unknown, token = 'admin-token')
   method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   ...(method === 'PATCH' ? { body: JSON.stringify(body) } : {}),
 });
-const catalog = (url: string) => Response.json({ data: [{ id: url.includes('api.deepseek.com') ? 'deepseek-flash' : url.includes('api.openai.com') ? 'gpt-6-luna' : 'qwen3:32b' }] });
+const catalog = (url: string) => Response.json({ data: [{ id: url.includes('api.deepseek.com') ? 'deepseek-flash' : 'qwen3:32b' }] });
 beforeEach(() => {
   state.db = memoryFirestore().db;
   state.verify.mockReset().mockImplementation(async token => ({ uid: token === 'admin-token' ? 'admin' : 'ordinary', email: 'synthetic@example.test' }));
@@ -20,8 +20,6 @@ beforeEach(() => {
   vi.stubEnv('OLLAMA_MAIN_MODEL', 'qwen3:32b');
   vi.stubEnv('DEEPSEEK_MODEL', 'deepseek-flash');
   vi.stubEnv('DEEPSEEK_API_KEY', 'synthetic-deepseek-key');
-  vi.stubEnv('OPENAI_API_KEY', undefined);
-  vi.stubEnv('OPENAI_MODEL', 'gpt-6-luna');
   vi.stubEnv('CF_ACCESS_CLIENT_ID', 'synthetic-cf-id');
   vi.stubEnv('CF_ACCESS_CLIENT_SECRET', 'synthetic-cf-secret');
   vi.stubEnv('LLM_REQUEST_TIMEOUT_MS', '120000');
@@ -30,6 +28,15 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('private administrator AI selection', () => {
+  it('rejects the retired OpenAI choice before probing even if an old credential remains', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'synthetic-retired-key');
+    vi.stubEnv('OPENAI_MODEL', 'gpt-6-luna');
+    const original = { provider: 'ollama', updatedAt: 1234 };
+    const { db, rows } = memoryFirestore({ 'serverSettings/ai': original }); state.db = db;
+    expect((await PATCH(request('PATCH', { provider: 'openai' }))).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(rows.get('serverSettings/ai')!.data).toEqual(original);
+  });
   it.each(['GET', 'PATCH'] as const)('rejects unauthenticated and ordinary users for %s before inspecting providers', async method => {
     const { db, rows } = memoryFirestore(); state.db = db;
     const handler = method === 'GET' ? GET : PATCH;
@@ -48,7 +55,6 @@ describe('private administrator AI selection', () => {
     expect(data).toMatchObject({ provider: 'ollama', source: 'environment', updatedAt: null, providers: [
       { provider: 'ollama', configured: true, model: 'qwen3:32b', online: true },
       { provider: 'deepseek', configured: true, model: 'deepseek-flash', online: false, error: expect.stringMatching(/credencial/i) },
-      { provider: 'openai', configured: false, model: null, online: false, error: expect.stringMatching(/credencial/i) },
     ] });
     expect(JSON.stringify(data)).not.toMatch(/synthetic|Authorization|CF-Access|https:\/\//);
     expect(rows.size).toBe(0);
@@ -62,46 +68,18 @@ describe('private administrator AI selection', () => {
     expect(vi.mocked(fetch).mock.calls.map(call => call[0])).toEqual(['https://ia-sarin.alsdevstudio.com/v1/models']);
   });
 
-  it.each([
-    { provider: 'deepseek', modelUrl: 'https://api.deepseek.com/models' },
-    { provider: 'openai', modelUrl: 'https://api.openai.com/v1/models' },
-  ])('persists verified $provider manually and reads it after module reload instead of the environment', async ({ provider, modelUrl }) => {
-    vi.stubEnv('OPENAI_API_KEY', 'synthetic-openai-key');
+  it('persists only a verified manual choice and reads it after module reload instead of the environment', async () => {
     const { db, rows } = memoryFirestore(); state.db = db;
-    const response = await PATCH(request('PATCH', { provider }));
+    const response = await PATCH(request('PATCH', { provider: 'deepseek' }));
     expect(response.status).toBe(200);
     const saved = await response.json();
-    expect(saved).toEqual({ provider, source: 'admin', updatedAt: expect.any(Number) });
+    expect(saved).toEqual({ provider: 'deepseek', source: 'admin', updatedAt: expect.any(Number) });
     expect([...rows.keys()]).toEqual(['serverSettings/ai']);
-    expect(rows.get('serverSettings/ai')!.data).toEqual({ provider, updatedAt: saved.updatedAt });
-    expect(vi.mocked(fetch).mock.calls.map(call => [call[0], call[1]?.method])).toEqual([[modelUrl, 'GET']]);
+    expect(rows.get('serverSettings/ai')!.data).toEqual({ provider: 'deepseek', updatedAt: saved.updatedAt });
+    expect(vi.mocked(fetch).mock.calls.map(call => [call[0], call[1]?.method])).toEqual([['https://api.deepseek.com/models', 'GET']]);
     vi.resetModules();
     const restarted = await import('@/lib/server/provider-settings');
     expect(await restarted.getAiProviderSelection(db)).toEqual(saved);
-  });
-
-  it('shows independent safe OpenAI health without selecting it or returning its credential', async () => {
-    vi.stubEnv('OPENAI_API_KEY', 'synthetic-openai-key');
-    const { db, rows } = memoryFirestore(); state.db = db;
-    const response = await GET(request('GET'));
-    const data = await response.json();
-    expect(data).toMatchObject({ provider: 'ollama', providers: expect.arrayContaining([{ provider: 'openai', configured: true, model: 'gpt-6-luna', online: true, checkedAt: expect.any(Number) }]) });
-    expect(JSON.stringify(data)).not.toMatch(/synthetic|Authorization|https:\/\//);
-    expect(rows.size).toBe(0);
-  });
-
-  it.each(['missing-config', 'missing-model', 'denied', 'forbidden', 'quota', 'network'])('keeps the active provider when OpenAI validation fails: %s', async failure => {
-    vi.stubEnv('OPENAI_API_KEY', failure === 'missing-config' ? undefined : 'synthetic-openai-key');
-    const original = { provider: 'deepseek', updatedAt: 1234 };
-    const { db, rows } = memoryFirestore({ 'serverSettings/ai': original }); state.db = db;
-    if (failure === 'missing-model') vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ id: 'other-model' }] })));
-    if (['denied', 'forbidden', 'quota'].includes(failure)) vi.stubGlobal('fetch', vi.fn(async () => new Response('synthetic private error', { status: failure === 'denied' ? 401 : failure === 'forbidden' ? 403 : 429 })));
-    if (failure === 'network') vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('synthetic private transport error'); }));
-    const response = await PATCH(request('PATCH', { provider: 'openai' }));
-    expect(response.status).toBe(503);
-    expect(JSON.stringify(await response.json())).not.toMatch(/synthetic|CF-Access|Authorization/);
-    expect(rows.get('serverSettings/ai')!.data).toEqual(original);
-    expect(vi.mocked(fetch).mock.calls.every(call => call[0] === 'https://api.openai.com/v1/models')).toBe(true);
   });
 
   it.each(['missing-config', 'missing-model', 'offline', 'denied', 'network'])('does not replace the active choice when the candidate fails: %s', async failure => {
@@ -118,7 +96,7 @@ describe('private administrator AI selection', () => {
     expect(vi.mocked(fetch).mock.calls.every(call => call[0] === 'https://api.deepseek.com/models')).toBe(true);
   });
 
-  it.each([{ provider: 'unsupported' }, { provider: null }, { provider: 'deepseek', apiKey: 'synthetic-injected' }, { provider: 'openai', apiKey: 'synthetic-injected' }, { provider: 'ollama', endpoint: 'https://other.example.test' }])('rejects unsupported settings before probing or saving: %j', async body => {
+  it.each([{ provider: 'unsupported' }, { provider: null }, { provider: 'deepseek', apiKey: 'synthetic-injected' }, { provider: 'ollama', endpoint: 'https://other.example.test' }])('rejects unsupported settings before probing or saving: %j', async body => {
     const { db, rows } = memoryFirestore(); state.db = db;
     expect((await PATCH(request('PATCH', body))).status).toBe(400);
     expect(fetch).not.toHaveBeenCalled();

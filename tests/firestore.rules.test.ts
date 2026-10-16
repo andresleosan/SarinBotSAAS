@@ -87,13 +87,12 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
   it('keeps usage records and aggregates private even from the business owner and forged admin claims', async () => {
     for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('owner-one'), environment.authenticatedContext('stale-admin', { role:'superadmin', isSuperadmin:true })]) {
       const db = context.firestore();
-      for (const path of ['aiUsageCalls/synthetic-call', 'aiUsageMonths/2026-10', 'aiUsageMonths/2026-10/businesses/one', 'aiUsageMeta/main', 'aiUsageCalls/openai_synthetic-call', 'aiUsageMonths/openai_2026-10', 'aiUsageMonths/openai_2026-10/businesses/one', 'aiUsageMeta/openai']) {
+      for (const path of ['aiUsageCalls/synthetic-call', 'aiUsageMonths/2026-10', 'aiUsageMonths/2026-10/businesses/one', 'aiUsageMeta/main']) {
         await assertFails(getDoc(doc(db, path)));
         await assertFails(setDoc(doc(db, path), { calls:0 }));
       }
       await assertFails(getDocs(collection(db, 'aiUsageCalls')));
       await assertFails(getDocs(collection(db, 'aiUsageMonths/2026-10/businesses')));
-      await assertFails(getDocs(collection(db, 'aiUsageMonths/openai_2026-10/businesses')));
     }
   });
   it('denies direct quota and WhatsApp configuration access even to owners and forged administrators', async () => {

@@ -119,33 +119,20 @@ describe("monthly administrative AI usage", () => {
     expect(summary()[2]).toBe("< USD 0,0001");
   });
 
-  it("switches provider without showing the prior provider or accepting its late refresh", async () => {
+  it("keeps the latest DeepSeek refresh when an earlier request finishes late", async () => {
     await mount();
+    const refresh = reload().props.onClick;
     const previous = deferred<AdminAiUsage>();
     state.api.mockImplementationOnce(() => previous.promise);
-    await act(async () => { reload().props.onClick(); });
-    const selected = deferred<AdminAiUsage>();
-    state.api.mockImplementationOnce(() => selected.promise);
-    await act(async () => { panel().findByProps({ "aria-label": "Proveedor del consumo" }).props.onChange({ target: { value: "openai" } }); });
-    expect(panel().findAllByType("dl")).toHaveLength(0);
-    expect(text(panel().findByType("h2"))).toBe("Consumo de OpenAI");
-    expect(state.api.mock.calls.at(-1)?.[0]).toBe("/api/admin/ai/usage?month=2026-10&provider=openai");
-    await act(async () => { selected.resolve({ ...usage, provider: "openai", model: "gpt-6-luna", pricingVersion: "gpt-6-luna-standard-verified-2026-10-16", totals: { ...counted, calls: 7, cacheWriteTokens: 100, cacheWriteReportedCalls: 2 } }); });
+    await act(async () => { refresh(); });
+    const latest = deferred<AdminAiUsage>();
+    state.api.mockImplementationOnce(() => latest.promise);
+    await act(async () => { refresh(); });
+    await act(async () => { latest.resolve({ ...usage, totals: { ...counted, calls: 7 } }); });
     expect(summary()[0]).toBe("7");
-    await act(async () => { previous.resolve({ ...usage, totals: { ...counted, calls: 99 } }); });
+    await act(async () => { previous.resolve({ ...usage, totals: { ...counted, calls: 3 } }); });
     expect(summary()[0]).toBe("7");
-    expect(text(panel())).toContain("gpt-6-luna Standard");
-    expect(text(panel())).toContain("0,125");
-    expect(text(panel())).toContain("1 llamadas sin detalle de escritura de caché");
+    expect(text(panel().findByType("h2"))).toBe("Consumo de DeepSeek");
     expect(state.api.mock.calls.every(([, init]) => !init?.method)).toBe(true);
-  });
-
-  it("keeps OpenAI without measurement distinct from DeepSeek's historical total", async () => {
-    await mount();
-    state.api.mockResolvedValueOnce({ ...usage, provider: "openai", model: "gpt-6-luna", pricingVersion: "gpt-6-luna-standard-verified-2026-10-16", measurementStartedAt: null, totals: empty });
-    await act(async () => { panel().findByProps({ "aria-label": "Proveedor del consumo" }).props.onChange({ target: { value: "openai" } }); });
-    expect(text(panel())).toContain("Todavía no hay medición");
-    expect(panel().findAllByType("dl")).toHaveLength(0);
-    expect(text(panel())).not.toContain("USD 0");
   });
 });

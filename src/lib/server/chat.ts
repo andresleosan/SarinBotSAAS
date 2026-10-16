@@ -123,7 +123,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
           const usageContext = { businessId: business?.id ?? null, mode: body.mode };
           assistant = await completeChat(messages, tools, {
             signal: signal, provider,
-            ...(provider !== 'ollama' ? { onUsage: (observation) => recordAiUsage(observation, usageContext) } : {}),
+            ...(provider === 'deepseek' ? { onUsage: (observation) => recordAiUsage(observation, usageContext) } : {}),
           });
         }
         catch (error) {

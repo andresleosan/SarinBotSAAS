@@ -35,14 +35,13 @@ describe("owner AI controls", () => {
   const button = (label: string) => renderer.root.findAllByType("button").find(item => text(item).includes(label))!;
   async function mount() { await act(async () => { renderer = create(createElement(AdminPage)); }); }
   async function chooseDeepSeek() {
-    expect(radios()).toHaveLength(3);
+    expect(radios()).toHaveLength(2);
     await act(async () => { radios().find(input => input.props.value === "deepseek")!.props.onChange(); });
   }
   beforeEach(() => {
     ai = { provider: "ollama", source: "environment", updatedAt: null, providers: [
       { provider: "ollama", configured: true, model: "local-model", online: true, checkedAt: 1800000000000 },
       { provider: "deepseek", configured: true, model: "deepseek-flash", online: true, checkedAt: 1800000000000 },
-      { provider: "openai", configured: false, model: null, online: false, checkedAt: 1800000000000 },
     ] };
     state.refresh.mockReset();
     state.api.mockReset().mockImplementation(async (path: string, init?: RequestInit) => {
@@ -71,21 +70,6 @@ describe("owner AI controls", () => {
     expect(state.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("makes configured OpenAI available but sends no change until the owner saves", async () => {
-    ai.providers[2] = { ...ai.providers[2], configured: true, model: "gpt-6-luna", online: true };
-    await mount();
-    await act(async () => { radios().find(input => input.props.value === "openai")!.props.onChange(); });
-    expect(patches()).toHaveLength(0);
-    expect(active()).toContain("Ollama");
-    state.api.mockImplementationOnce(async () => {
-      ai = { ...ai, provider: "openai", source: "admin", updatedAt: 1800000000001 };
-      return { provider: "openai", source: "admin", updatedAt: 1800000000001 };
-    });
-    await act(async () => { button("Guardar IA").props.onClick(); });
-    expect(JSON.parse(patches()[0][1].body)).toEqual({ provider: "openai" });
-    expect(active()).toContain("OpenAI");
-  });
-
   it("retains the actual active provider after a rejected change without automatic retries", async () => {
     await mount();
     await chooseDeepSeek();
@@ -101,10 +85,9 @@ describe("owner AI controls", () => {
   it("prevents selecting an unconfigured provider without asking for credentials", async () => {
     ai.providers[1] = { ...ai.providers[1], configured: false, online: false, model: null, error: "Configuración pendiente" };
     await mount();
-    expect(radios()).toHaveLength(3);
+    expect(radios()).toHaveLength(2);
     expect(radios().find(input => input.props.value === "deepseek")!.props.disabled).toBe(true);
     expect(button("Guardar IA").props.disabled).toBe(true);
-    expect(radios().find(input => input.props.value === "openai")!.props.disabled).toBe(true);
     expect(renderer.root.findByProps({ "aria-labelledby": "admin-ai-title" }).findAllByType("input").every(input => input.props.type === "radio")).toBe(true);
     expect(patches()).toHaveLength(0);
   });
@@ -130,7 +113,7 @@ describe("owner AI controls", () => {
     expect(radios()).toHaveLength(0);
     state.api.mockResolvedValueOnce(ai);
     await act(async () => { button("Actualizar estado de IA").props.onClick(); });
-    expect(radios()).toHaveLength(3);
+    expect(radios()).toHaveLength(2);
     expect(patches()).toHaveLength(0);
   });
 });

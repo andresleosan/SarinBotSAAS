@@ -18,8 +18,6 @@ beforeEach(() => {
   vi.stubEnv('SARIN_CHAT_PROVIDER', 'deepseek');
   vi.stubEnv('DEEPSEEK_API_KEY', 'synthetic-deepseek-key');
   vi.stubEnv('DEEPSEEK_MODEL', 'deepseek-flash');
-  vi.stubEnv('OPENAI_API_KEY', 'synthetic-openai-key');
-  vi.stubEnv('OPENAI_MODEL', 'gpt-6-luna');
   vi.stubEnv('SARIN_TUNNEL_URL', 'https://ia-sarin.alsdevstudio.com/v1/chat/completions');
   vi.stubEnv('OLLAMA_MAIN_MODEL', 'qwen3:32b');
   vi.stubEnv('CF_ACCESS_CLIENT_ID', 'synthetic-cf-id');
@@ -49,7 +47,6 @@ describe('chat and Vault health', () => {
 
   it.each([
     { provider: 'deepseek', model: 'deepseek-flash', modelsUrl: 'https://api.deepseek.com/models' },
-    { provider: 'openai', model: 'gpt-6-luna', modelsUrl: 'https://api.openai.com/v1/models' },
   ])('keeps a successful $provider probe separate from a stopped local Vault and caches each', async ({ provider, model, modelsUrl }) => {
     vi.stubEnv('SARIN_CHAT_PROVIDER', provider);
     const fetcher = vi.fn(async (url: string) => url === modelsUrl
