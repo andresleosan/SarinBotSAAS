@@ -33,3 +33,11 @@ Con respaldo privado y precondición de versión se sustituyó el documento de u
 La sesión normal de QA en `localhost:3032/dashboard/billing` mostró los tres precios correctos y la prueba gratuita intacta. Elegir Semanal cambió el total y resumen a 20.000 COP/7 días; Quincenal a 35.000 COP/15 días; Mensual a 59.900 COP/30 días. Sin cuentas receptoras, la carga y envío permanecen deshabilitados. El historial continúa vacío. Captura y evidencia de activación quedan fuera de Git: `%LOCALAPPDATA%/SarinBot/deployment/sarin-three-billing-plans-20261016.png` y `sarin-billing-plans-activation-20261016.json`.
 
 El servidor local con Turbopack presentó recargas continuas que interrumpían la herramienta del navegador; el recorrido HTTP con emuladores sí pasó. No se atribuyó ni corrigió ese comportamiento como parte de facturación. La comprobación visual final se realizó en la instancia privada compilada, donde la carga y selección funcionaron correctamente. No se abrió la aplicación al público ni se reinició la Mac.
+
+## Cuentas receptoras configuradas
+
+Después de recibir los datos autorizados del propietario se configuraron Bancolombia Ahorros y Nequi en la instancia privada. Se añadió únicamente `bankAccounts`, con respaldo previo, precondición de versión, lectura exacta posterior y revisión independiente del procedimiento. Los tres precios permanecieron intactos. La operación no accedió a documentos de pagos ni negocios y no requirió otra imagen.
+
+La pantalla de suscripción mostró las dos cuentas con el titular y números proporcionados, permitió elegir Nequi y habilitó la selección de captura. Enviar comprobante sigue deshabilitado hasta adjuntar una imagen. El historial continúa vacío. No se realizó una transferencia ni se verificó la titularidad con las entidades financieras.
+
+Los datos bancarios completos, la captura, el respaldo y las instrucciones de reversión permanecen fuera de Git. Evidencia privada: `sarin-bank-accounts-configured-20261016.json`, `sarin-payment-accounts-20261016.png` y `sarin-bank-accounts-rollback-20261016.md`, en `%LOCALAPPDATA%/SarinBot/deployment`.
