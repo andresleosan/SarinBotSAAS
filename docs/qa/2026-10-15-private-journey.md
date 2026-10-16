@@ -56,6 +56,12 @@ Con las páginas recargadas se consultó y reservó nuevamente el 16 de octubre 
 
 Ambas solicitudes de chat devolvieron HTTP 200; tardaron aproximadamente 26,1 y 32,8 segundos hasta las cabeceras. La interfaz terminó con cero citas confirmadas y sin próximas citas del cliente. La lectura final, protegida por la comprobación del ID de la nueva imagen, encontró exactamente tres documentos: dos citas y un bloqueo, todos `cancelled_by_owner`; cero activos, cero comprobantes de pago e IDs únicos. El perfil normal, los vínculos del negocio y su prueba de siete días permanecieron intactos.
 
+## Precio del piloto y medios de pago pendientes
+
+El usuario aprobó 49.900 COP como mensualidad del piloto; la aplicación expresa ese período como 30 días. La lectura inicial encontró que `platformSettings/main` no existía y el precio provenía del valor predeterminado del runtime. Se creó únicamente `{monthlyPriceCOP:49900}` con precondición de ausencia, respaldo privado y comprobación posterior del documento y del runtime intacto. Los demás valores conservan los predeterminados existentes. La pantalla de suscripción de la cuenta QA muestra ese precio, la prueba gratuita y cero comprobantes enviados.
+
+El usuario eligió Bancolombia y Nequi y pidió completar los números posteriormente. Estos medios quedan previstos, sin publicar cuentas receptoras incompletas ni números de ejemplo. Faltan los datos del titular, los números y el tipo de cuenta correspondiente para configurar instrucciones de pago reales. No se enviaron ni aprobaron comprobantes para esta verificación.
+
 ## Evidencia y límites
 
 La evidencia con identidades, contactos, capturas y respaldos está fuera de Git, en `%LOCALAPPDATA%/SarinBot/deployment`. Los resúmenes incluyen `sarin-admin-assignment-verification-20261016.json`, `sarin-qa-account-after-login-20261016T001107Z.json`, `sarin-qa-business-persisted-20261016T001338Z.json`, `sarin-qa-final-cancelled-20261016T001828Z.json`, `sarin-qa-http-results-20261016.json`, `sarin-chat-confirmation-activation-20261016.json`, `sarin-qa-confirmation-fixed-http.json` y `sarin-qa-post-fix-final-20261016T002823Z.json`. Las capturas `sarin-qa-confirmation-fixed.jpg` y `sarin-qa-post-fix-cancelled-agenda.jpg` muestran la confirmación corregida y el estado final de la agenda.
