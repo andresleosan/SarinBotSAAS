@@ -4,6 +4,7 @@
 
 - [x] Selector con bandera SVG, nombres de países en español y prefijo separado del número nacional. Teléfonos existentes conservados; pegado internacional y países con indicativos compartidos cubiertos.
 - [x] 438 pruebas, TypeScript, auditoría sin vulnerabilidades, revisión independiente y QA Chrome en escritorio/320 px aprobados. CI con tres jobs correctos y actualización privada `phone-country-20261016t030925z` verificada en Sarin Pruebas. Evidencia: `docs/qa/2026-10-15-whatsapp-country-selector.md`.
+- [x] Etiqueta «Enlace» sin prefijo técnico; «Limpieza» aclarada como «Tiempo entre citas» con ayuda de margen posterior opcional. Revisión móvil, CI y actualización privada `service-labels-20261016t031651z` aprobados. Evidencia: `docs/qa/2026-10-15-business-form-labels.md`.
 
 ## Formularios compactos — 2026-10-15
 
