@@ -7,19 +7,12 @@ import {
   GoogleAuthProvider,
   type Auth,
 } from "firebase/auth";
-import {
-  connectFirestoreEmulator,
-  getFirestore,
-  type Firestore,
-} from "firebase/firestore";
 import { readClientEmulatorConfig } from "@/lib/firebase/emulator-config";
 
 interface ClientConnection {
   fingerprint: string;
   auth: Auth;
-  db: Firestore;
   authConnected: boolean;
-  firestoreConnected: boolean;
 }
 const state = globalThis as typeof globalThis & {
   __sarinFirebaseClientConnections?: WeakMap<FirebaseApp, ClientConnection>;
@@ -73,9 +66,7 @@ export function getFirebaseClient() {
     connection = {
       fingerprint,
       auth: getAuth(app),
-      db: getFirestore(app),
       authConnected: false,
-      firestoreConnected: false,
     };
     connections.set(app, connection);
   }
@@ -83,14 +74,6 @@ export function getFirebaseClient() {
     connectAuthEmulator(connection.auth, `http://${emulator.auth.authority}`);
     connection.authConnected = true;
   }
-  if (emulator && !connection.firestoreConnected) {
-    connectFirestoreEmulator(
-      connection.db,
-      emulator.firestore.host,
-      emulator.firestore.port,
-    );
-    connection.firestoreConnected = true;
-  }
-  return { auth: connection.auth, db: connection.db };
+  return { auth: connection.auth };
 }
 export const googleProvider = new GoogleAuthProvider();

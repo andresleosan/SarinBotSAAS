@@ -8,6 +8,7 @@ import type { ChatActor, ChatResponse } from '@/types/chat';
 import { z } from 'zod';
 import { HttpError } from '@/lib/server/http';
 import { runUserInference } from '@/lib/server/inference';
+import { enforceClientInferenceRateLimit } from '@/lib/server/inference-rate-limit';
 import { getAiProviderSelection } from '@/lib/server/provider-settings';
 import { recordAiUsage } from '@/lib/server/ai-usage';
 import { assertOwner, createBusiness, getBusiness, getOwnedBusiness, stableDocumentId } from '@/lib/server/businesses';
@@ -15,7 +16,7 @@ import { createAppointment, createManualBlock, readAppointments, readAvailabilit
 import { availabilitySchema, bookingSchema, businessConfigSchema, chatSchema } from '@/lib/server/schemas';
 import { completeChat, type EngineMessage } from '@/lib/sarin/engine';
 import { runInSarinQueue } from '@/lib/sarin/queue';
-import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
+import { getBusinessAccess, isOwnerAiAllowed, isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { buildSarinClientPrompt, buildSarinOnboardingPrompt, buildSarinOwnerCopilotPrompt } from '@/lib/sarin/prompts';
 import { escalationSchema, ownerBlockToolSchema, SARIN_CLIENT_TOOLS, SARIN_COPILOT_TOOLS, SARIN_ONBOARDING_TOOLS, summarySchema } from '@/lib/sarin/tools';
 import type { Appointment, Business } from '@/types/firestore';
@@ -97,25 +98,34 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     };
     await assertWhatsAppAccess();
     if (body.mode === 'sarin_owner_copilot') assertOwner(business!, user.uid);
-    if (business && !isSubscriptionAllowed(business)) throw new HttpError(402, 'La agenda automática está en pausa por renovación de la suscripción.');
+    if (body.mode === 'sarin_client' && (!business!.sarinConfig.onboardingCompleted || !business!.slug)) throw new HttpError(403, 'El negocio todavía no está configurado.');
+    if (body.mode === 'sarin_owner_copilot' && !isOwnerAiAllowed(business)) throw new HttpError(402, 'El copiloto requiere una suscripción vigente.', 'OWNER_AI_REQUIRES_SUBSCRIPTION');
+    // Exhaustion may follow a saved tenth booking. Allow only cache/quota replay
+    // to proceed; reserving a fresh turn still checks the current entitlement.
+    if (!isSubscriptionAllowed(business) && !(body.mode === 'sarin_client' && getBusinessAccess(business) === 'trial_exhausted')) throw new HttpError(402, 'Activa el acceso de pago para continuar.', 'PAYMENT_REQUIRED');
     const tools = body.mode === 'sarin_onboarding' ? SARIN_ONBOARDING_TOOLS : body.mode === 'sarin_owner_copilot' ? SARIN_COPILOT_TOOLS : SARIN_CLIENT_TOOLS;
     const system = body.mode === 'sarin_onboarding' ? buildSarinOnboardingPrompt() : body.mode === 'sarin_owner_copilot' ? buildSarinOwnerCopilotPrompt(business!) : buildSarinClientPrompt(business!);
     const messages: EngineMessage[] = [{ role: 'system', content: system }, ...body.messages];
     const toolResults: ToolResult[] = [];
-    const { provider } = await getAiProviderSelection();
 
     const db = getAdminDb();
     const scope = body.mode === 'sarin_onboarding' ? 'onboarding' : business!.id;
     const cacheKey = stableDocumentId(scope, user.uid, body.mode, body.requestId, channel);
     const fingerprint = createHash('sha256').update(JSON.stringify({ mode: body.mode, tenantId: body.tenantId, messages: body.messages })).digest('hex');
     const execute = async (): Promise<ChatResponse> => {
+      const { provider } = await getAiProviderSelection();
       for (let round = 0; round < 4; round++) {
         // A request can spend time queued: entitlement is checked again after
         // waiting and before each subsequent model/tool round.
         if (business) {
           business = await getBusiness(business.id);
+          if (getBusinessAccess(business) === 'trial_exhausted' && bookingReply(toolResults)) return { reply: verifiedReply(toolResults), toolResults };
           if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'La suscripción del negocio venció.');
-          if (body.mode === 'sarin_owner_copilot') assertOwner(business, user.uid);
+          if (body.mode === 'sarin_client' && (!business.sarinConfig.onboardingCompleted || !business.slug)) throw new HttpError(403, 'El negocio todavía no está configurado.');
+          if (body.mode === 'sarin_owner_copilot') {
+            assertOwner(business, user.uid);
+            if (!isOwnerAiAllowed(business)) throw new HttpError(402, 'El copiloto requiere una suscripción vigente.', 'OWNER_AI_REQUIRES_SUBSCRIPTION');
+          }
         }
         await assertWhatsAppAccess();
         let assistant;
@@ -148,6 +158,8 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
             if (business) {
               business = await getBusiness(business.id);
               if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'La suscripción del negocio venció.');
+              if (body.mode === 'sarin_client' && (!business.sarinConfig.onboardingCompleted || !business.slug)) throw new HttpError(403, 'El negocio todavía no está configurado.');
+              if (body.mode === 'sarin_owner_copilot' && !isOwnerAiAllowed(business)) throw new HttpError(402, 'El copiloto requiere una suscripción vigente.', 'OWNER_AI_REQUIRES_SUBSCRIPTION');
             }
             // A retry may produce different model arguments. Bind the mutation
             // to the authenticated turn, not model output, so it cannot create
@@ -203,10 +215,15 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
         try { await commitResponseQuota(cached.reservation); } catch { /* the reserved unit remains held */ }
         return response;
       }
+      if (body.mode === 'sarin_client') await enforceClientInferenceRateLimit({ businessId: business!.id, actorUid: user.uid, requestId: body.requestId, fingerprint, channel }, db);
       const quota = await reserveResponseQuota({ businessId: business?.id ?? null, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel });
       if (quota.kind === 'replay') {
         const recovered = await recoverMutation(user, body, business);
-        if (recovered) { await onResponse?.(recovered, quota.reservation); return recovered; }
+        if (recovered) {
+          await onResponse?.(recovered, quota.reservation);
+          try { await commitResponseQuota(quota.reservation); } catch { /* retain an unacknowledged unit for another retry */ }
+          return recovered;
+        }
         throw new HttpError(409, 'Esta solicitud ya fue atendida. Revisa la conversación y envía un mensaje nuevo si necesitas continuar.', 'REQUEST_ALREADY_COMPLETED');
       }
       let response: ChatResponse;

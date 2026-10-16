@@ -9,8 +9,11 @@ import {
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { readAdminEmulatorConfig } from "@/lib/firebase/emulator-config";
+import { createCloudflareDatabase } from "@/lib/storage/database";
+import type { Database } from "@/lib/storage/types";
 const state = globalThis as typeof globalThis & {
   __sarinAdminConnections?: WeakMap<App, string>;
+  __sarinCloudflareDatabase?: Database;
 };
 
 function getAdminApp() {
@@ -84,6 +87,15 @@ function getAdminApp() {
 export function getAdminAuth() {
   return getAuth(getAdminApp());
 }
-export function getAdminDb() {
-  return getFirestore(getAdminApp());
+export function getAdminDb(): Database {
+  const backend = process.env.SARIN_DATA_BACKEND || "firestore";
+  if (backend === "d1") {
+    if (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST)
+      throw new Error("El backend D1 no admite mezclar emuladores Firebase.");
+    return state.__sarinCloudflareDatabase ??= createCloudflareDatabase();
+  }
+  if (backend !== "firestore") throw new Error("El backend de datos no es válido.");
+  // The fallback exists only for local emulation and an explicit rollback. No
+  // D1 failure ever falls through to this separate source of truth.
+  return getFirestore(getAdminApp()) as unknown as Database;
 }

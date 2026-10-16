@@ -4,7 +4,7 @@ El panel privado muestra las llamadas y tokens registrados por mes de `America/B
 
 ## Qué se mide
 
-Cada intento de llamada a DeepSeek o Gemini desde chat de cliente, copiloto u onboarding tiene un identificador aleatorio del servidor. Cada ronda de herramientas cuenta por separado. Ollama y Vault quedan fuera de esta medición de API de pago. Un intento que devuelve tokens válidos se registra aunque después falle la validación de la respuesta del asistente. Un fallo de conexión o respuesta sin consumo válido se muestra como consumo desconocido, no como inferencia gratuita.
+Cada intento de llamada a DeepSeek o Gemini desde chat de cliente, copiloto u onboarding tiene un identificador aleatorio del servidor. Cada ronda de herramientas cuenta por separado. Ollama queda fuera de esta medición de API de pago. Un intento que devuelve tokens válidos se registra aunque después falle la validación de la respuesta del asistente. Un fallo de conexión o respuesta sin consumo válido se muestra como consumo desconocido, no como inferencia gratuita.
 
 Se conservan solo metadatos numéricos, modelo, fecha, resultado y referencia de negocio; no mensajes, prompts, respuestas, nombres, teléfonos, correos, UID de clientes, argumentos de herramientas ni credenciales. Los nombres de negocios en pantalla provienen de la lista administrativa existente.
 

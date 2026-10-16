@@ -45,6 +45,15 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
     await assertFails(updateDoc(doc(db,'businesses','one'),{'subscription.status':'active'}));
     await assertFails(setDoc(doc(db,'businesses','new'),{ownerUid:'owner-one'}));
   });
+  it('forbids owners and clients from activating introductory access, resetting its counter or approving a receipt', async () => {
+    for (const uid of ['owner-one', 'customer']) {
+      const db = environment.authenticatedContext(uid).firestore();
+      await assertFails(updateDoc(doc(db, 'businesses', 'one'), { 'subscription.paidTrial': { paymentId: 'forged', activatedAt: 1, appointmentLimit: 10, appointmentsUsed: 0 } }));
+      await assertFails(updateDoc(doc(db, 'businesses', 'one'), { 'subscription.paidTrial.appointmentsUsed': 0 }));
+      await assertFails(updateDoc(doc(db, 'publicBusinesses', 'private-island'), { 'subscription.paidTrial.appointmentsUsed': 0 }));
+      await assertFails(updateDoc(doc(db, 'paymentReceipts', 'payment'), { status: 'approved', amountCOP: 5000 }));
+    }
+  });
   it('permits a signed in island get while denying enumeration and anonymous reads', async () => {
     const db = environment.authenticatedContext('customer').firestore();
     await assertSucceeds(getDoc(doc(db,'publicBusinesses','private-island')));
@@ -68,7 +77,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
     await assertFails(getDoc(doc(stranger,'businesses','one')));
     const customer = environment.authenticatedContext('customer').firestore();
     await assertFails(updateDoc(doc(customer,'users','customer'),{isSuperadmin:true}));
-    await assertFails(setDoc(doc(customer,'vault','secret'),{content:'never in Firestore'}));
+    await assertFails(setDoc(doc(customer,'unknownPrivate','secret'),{content:'not accessible to clients'}));
   });
   it('keeps the global AI selection private and rejects direct browser changes, including forged admin claims', async () => {
     const contexts = [

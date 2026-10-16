@@ -1,6 +1,6 @@
 # Gemini como proveedor manual
 
-El administrador puede elegir **Gemini · Clientes**, IA local o DeepSeek para el chat, el copiloto y la configuración del negocio. El indicador «En uso para los negocios» muestra la selección guardada, independientemente del radio que se esté editando. Cada turno mantiene su proveedor y no hay cambio automático ante errores. Vault conserva exclusivamente Ollama y sus datos locales.
+El administrador puede elegir **Gemini · Clientes**, IA local o DeepSeek para el chat, el copiloto y la configuración del negocio. El indicador «En uso para los negocios» muestra la selección guardada, independientemente del radio que se esté editando. Cada turno mantiene su proveedor y no hay cambio automático ante errores. La integración se limita a los asistentes comerciales de Sarin.
 
 ## Perfil separado de pruebas
 

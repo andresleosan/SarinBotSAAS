@@ -5,7 +5,7 @@ import { memoryFirestore } from './memoryFirestore';
 
 const now = Date.parse('2030-01-01T12:00:00Z');
 const day = 86400000;
-const business: Business = { id: 'business', ownerUid: 'owner', ownerEmail: 'owner@example.test', name: 'Fixture', category: 'Services', phoneWhatsApp: '573001234567', timezone: 'America/Bogota', slug: 'fixture', subscription: { status: 'trial', trialEndsAt: now + 7 * day, currentPeriodEndsAt: 0 }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, resources: [], services: [], weeklySchedule: {}, createdAt: now };
+const business: Business = { id: 'business', ownerUid: 'owner', ownerEmail: 'owner@example.test', name: 'Fixture', category: 'Services', phoneWhatsApp: '573001234567', timezone: 'America/Bogota', slug: 'fixture', subscription: { status: 'trial', trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: 'approved', activatedAt: now, appointmentLimit: 10, appointmentsUsed: 0 } }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, resources: [], services: [], weeklySchedule: {}, createdAt: now };
 const input = { businessId: 'business', actorUid: 'client', mode: 'sarin_client' as const, channel: 'web' as const, requestId: 'request-one', fingerprint: 'a'.repeat(64) };
 const memory = () => memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown> });
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
@@ -37,28 +37,30 @@ describe('response quota reservations', () => {
     await commitResponseQuota(retry.reservation, undefined, db);
     expect((await getResponseQuota('business', db)).currentPeriod).toMatchObject({ usedResponses: 1, reservedResponses: 0 });
   });
-  it('allows only one concurrent caller to reserve the final response and shares the balance with the owner copilot', async () => {
+  it('allows only one concurrent caller to reserve the final introductory response', async () => {
     const { db } = memory();
     const first = await reserveResponseQuota(input, db);
     await releaseResponseQuota(first.reservation, db);
     await db.collection('responseQuotaScopes').doc(first.reservation.scopeId).collection('periods').doc(first.reservation.periodId).set({ ...(await db.collection('responseQuotaScopes').doc(first.reservation.scopeId).collection('periods').doc(first.reservation.periodId).get()).data(), usedResponses: 699 });
     const attempts = await Promise.allSettled([
       reserveResponseQuota({ ...input, requestId: 'last-client' }, db),
-      reserveResponseQuota({ ...input, actorUid: 'owner', mode: 'sarin_owner_copilot', requestId: 'last-owner' }, db),
+      reserveResponseQuota({ ...input, actorUid: 'another-client', requestId: 'last-other' }, db),
     ]);
     expect(attempts.filter(value => value.status === 'fulfilled')).toHaveLength(1);
     expect(attempts.find(value => value.status === 'rejected')).toMatchObject({ reason: { status: 402, code: 'AI_QUOTA_EXHAUSTED' } });
     expect((await getResponseQuota('business', db)).state).toBe('exhausted');
   });
-  it('offers thirty lifetime onboarding replies before a business without restarting the counter', async () => {
-    const { db } = memoryFirestore();
-    for (let index = 0; index < 30; index++) {
-      const next = await reserveResponseQuota({ ...input, businessId: null, actorUid: 'new-owner', mode: 'sarin_onboarding', requestId: `onboard-${index}` }, db);
-      await commitResponseQuota(next.reservation, undefined, db);
-    }
-    vi.setSystemTime(now + 90 * day);
-    await expect(reserveResponseQuota({ ...input, businessId: null, actorUid: 'new-owner', mode: 'sarin_onboarding', requestId: 'onboard-extra' }, db)).rejects.toMatchObject({ status: 402 });
+  it('rejects onboarding before a paid business exists without allocating a free response scope', async () => {
+    const { db, rows } = memoryFirestore();
+    await expect(reserveResponseQuota({ ...input, businessId: null, actorUid: 'new-owner', mode: 'sarin_onboarding' }, db)).rejects.toMatchObject({ status: 402 });
+    expect(rows.size).toBe(0);
     await expect(reserveResponseQuota({ ...input, businessId: null }, db)).rejects.toMatchObject({ status: 403 });
+  });
+  it('denies owner copilot and WhatsApp to the introductory offer', async () => {
+    const { db } = memoryFirestore();
+    await db.collection('businesses').doc('business').set(business as unknown as Record<string, unknown>);
+    await expect(reserveResponseQuota({ ...input, actorUid: 'owner', mode: 'sarin_owner_copilot' }, db)).rejects.toMatchObject({ status: 402, code: 'OWNER_AI_REQUIRES_SUBSCRIPTION' });
+    await expect(reserveResponseQuota({ ...input, channel: 'whatsapp' }, db)).rejects.toMatchObject({ status: 402, code: 'WHATSAPP_UNAVAILABLE' });
   });
   it('does not reset a trial through reads, grace, or an owner configuration change', async () => {
     const { db, rows } = memory();
@@ -73,14 +75,13 @@ describe('response quota reservations', () => {
     await commitResponseQuota(next.reservation, undefined, db);
     expect((await getResponseQuota('business', db)).currentPeriod?.usedResponses).toBe(2);
   });
-  it('replays an onboarding turn from its original scope after that turn creates the business', async () => {
-    const { db } = memoryFirestore();
-    const setup = { ...input, businessId: null, actorUid: 'owner', mode: 'sarin_onboarding' as const };
+  it('replays a paid onboarding turn against its original business allowance', async () => {
+    const { db } = memory();
+    const setup = { ...input, actorUid: 'owner', mode: 'sarin_onboarding' as const };
     const first = await reserveResponseQuota(setup, db);
-    await db.collection('businesses').doc('business').set(business as unknown as Record<string, unknown>);
     await commitResponseQuota(first.reservation, { reply: 'Guardado.' }, db);
     expect(await reserveResponseQuota({ ...setup, businessId: 'business' }, db)).toMatchObject({ kind: 'replay', reservation: first.reservation, response: null });
-    expect((await getResponseQuota('business', db)).currentPeriod?.usedResponses).toBe(0);
+    expect((await getResponseQuota('business', db)).currentPeriod?.usedResponses).toBe(1);
   });
   it('warns at eighty percent and never frees a pending response just because time passed', async () => {
     const { db } = memory();
@@ -109,18 +110,20 @@ describe('response quota reservations', () => {
     expect((await getResponseQuota('business', db)).currentPeriod).toMatchObject({ usedResponses: 1, reservedResponses: 1 });
     await expect(reserveResponseQuota({ ...input, actorUid: 'stranger', mode: 'sarin_owner_copilot' }, db)).rejects.toMatchObject({ status: 403 });
   });
-  it('cannot commit a released reservation but can settle an in-flight turn against its original expired period', async () => {
+  it('cannot commit a released reservation but can settle an in-flight turn after appointment exhaustion', async () => {
     const { db } = memory();
     const released = await reserveResponseQuota(input, db);
     await releaseResponseQuota(released.reservation, db);
     await expect(commitResponseQuota(released.reservation, undefined, db)).rejects.toMatchObject({ status: 409 });
     const inFlight = await reserveResponseQuota({ ...input, requestId: 'long-response' }, db);
     vi.setSystemTime(now + 8 * day);
+    await db.collection('businesses').doc('business').set({ ...business, subscription: { ...business.subscription, paidTrial: { ...business.subscription.paidTrial!, appointmentsUsed: 10 } } });
     await commitResponseQuota(inFlight.reservation, undefined, db);
     expect(await getResponseQuota('business', db)).toMatchObject({ state: 'expired', currentPeriod: { usedResponses: 1, reservedResponses: 0 } });
   });
   it('recognizes a legacy paid subscription even when its end equals the old trial end', async () => {
-    const { db } = memoryFirestore({ 'businesses/business': { ...business, subscription: { ...business.subscription, status: 'active', currentPeriodEndsAt: business.subscription.trialEndsAt } } });
-    expect((await getResponseQuota('business', db)).currentPeriod).toMatchObject({ source: 'legacy', includedResponses: 3000, endsAt: business.subscription.trialEndsAt });
+    const legacyEnd = now + 7 * day;
+    const { db } = memoryFirestore({ 'businesses/business': { ...business, subscription: { status: 'active', currentPeriodEndsAt: legacyEnd, trialEndsAt: legacyEnd } } });
+    expect((await getResponseQuota('business', db)).currentPeriod).toMatchObject({ source: 'legacy', includedResponses: 3000, endsAt: legacyEnd });
   });
 });

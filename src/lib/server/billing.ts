@@ -1,12 +1,13 @@
 import 'server-only';
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Database as Firestore } from '@/lib/storage/types';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Business, PaymentReceipt, PlatformSettings } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { BILLING_PLANS, getBillingPlan, RESPONSE_PACK } from '@/lib/billing-plans';
+import { canPurchasePaidTrial, PAID_TRIAL_APPOINTMENT_LIMIT, PAID_TRIAL_INCLUDED_RESPONSES, PAID_TRIAL_PERIOD_END, PAID_TRIAL_PRICE_COP } from '@/lib/paid-trial';
 import { isSuperadmin } from './auth';
 import { HttpError } from './http';
-import { businessIdForOwner, publicBusiness, stableDocumentId } from './businesses';
+import { businessIdForOwner, privateBusinessDraft, publicBusiness, stableDocumentId } from './businesses';
 import { approveSubscription, grantReceiptGrace } from './billing-policy';
 import type { z } from 'zod';
 import { receiptSchema, settingsSchema } from './schemas';
@@ -25,14 +26,15 @@ function defaultSettings(): PlatformSettings {
     monthlyPriceCOP: configuredPrice(process.env.MONTHLY_PRICE_COP, getBillingPlan('monthly').defaultPriceCOP),
     whatsappPriceCOP: getBillingPlan('whatsapp').defaultPriceCOP,
     responsePackPriceCOP: RESPONSE_PACK.defaultPriceCOP,
-    trialDaysDefault: 7, graceHoursOnUpload: 24, bankAccounts: [], tunnelStatus: { isOnline: false, lastPingAt: 0 },
+    graceHoursOnUpload: 24, bankAccounts: [], tunnelStatus: { isOnline: false, lastPingAt: 0 },
   };
 }
 
 export async function getSettings(db: Firestore = getAdminDb()): Promise<PlatformSettings> {
   const snapshot = await db.collection('platformSettings').doc('main').get();
   if (!snapshot.exists) return defaultSettings();
-  return { ...defaultSettings(), ...snapshot.data() } as PlatformSettings;
+  const { trialDaysDefault: _historicalFreeTrialDays, ...settings } = snapshot.data() ?? {};
+  return { ...defaultSettings(), ...settings } as PlatformSettings;
 }
 
 export async function saveSettings(input: z.infer<typeof settingsSchema>, db: Firestore = getAdminDb()): Promise<PlatformSettings> {
@@ -79,9 +81,12 @@ export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof 
   const settingsReference = db.collection('platformSettings').doc('main');
   return db.runTransaction(async (transaction) => {
     const [existing, businessDocument, settingsDocument] = await Promise.all([transaction.get(receiptReference), transaction.get(businessReference), transaction.get(settingsReference)]);
-    if (!businessDocument.exists || businessDocument.data()?.ownerUid !== user.uid) throw new HttpError(403, 'Primero configura tu negocio.');
-    const business = businessDocument.data() as Business;
+    if (businessDocument.exists && businessDocument.data()?.ownerUid !== user.uid) throw new HttpError(403, 'No tienes acceso a este negocio.');
+    if (!businessDocument.exists && parsed.kind === 'response_pack') throw new HttpError(409, 'La ampliación requiere un plan vigente.', 'RESPONSE_PACK_UNAVAILABLE');
+    const now = Date.now();
+    const business = businessDocument.exists ? businessDocument.data() as Business : privateBusinessDraft(user, now);
     if (existing.exists) return { receipt: existing.data() as PaymentReceipt, business };
+    if (parsed.kind === 'paid_trial' && !canPurchasePaidTrial(business.subscription)) throw new HttpError(409, 'La prueba pagada solo se puede comprar una vez.', 'PAID_TRIAL_UNAVAILABLE');
     if (plan?.id === 'whatsapp' && !(await getWhatsAppBusinessStatus(business.id)).ready) throw new HttpError(409, 'WhatsApp requiere una conexión verificada antes de contratar.', 'WHATSAPP_NOT_READY');
     const settings = { ...defaultSettings(), ...settingsDocument.data() } as PlatformSettings;
     const bank = settings.bankAccounts.find((account) => account.id === parsed.bankSelected || account.bankName === parsed.bankSelected);
@@ -92,17 +97,18 @@ export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof 
     }
     const quota = parsed.kind === 'response_pack' ? await readResponsePeriodState(business, db, transaction) : undefined;
     if (quota && (!quota.current || quota.current.source === 'trial' || quota.current.endsAt <= Date.now() || business.subscription.status !== 'active')) throw new HttpError(409, 'La ampliación requiere un período pagado vigente.', 'RESPONSE_PACK_UNAVAILABLE');
-    const now = Date.now();
     const receipt: PaymentReceipt = { id, tenantId: business.id, tenantName: business.name, ownerUid: user.uid, ownerEmail: user.email ?? '', kind: parsed.kind,
       ...(plan ? { planId: plan.id, periodDays: plan.periodDays, responseAllowance: plan.includedResponses, amountCOP: settings[plan.priceField] }
-        : { responseAllowance: RESPONSE_PACK.responses, quotaPeriodId: quota!.current!.id, amountCOP: settings.responsePackPriceCOP }),
+        : parsed.kind === 'paid_trial' ? { appointmentAllowance: PAID_TRIAL_APPOINTMENT_LIMIT, amountCOP: PAID_TRIAL_PRICE_COP }
+          : { responseAllowance: RESPONSE_PACK.responses, quotaPeriodId: quota!.current!.id, amountCOP: settings.responsePackPriceCOP }),
       bankSelected: bank.bankName, status: 'pending', submittedAt: now };
     const updatedBusiness: Business = { ...business, subscription: plan ? grantReceiptGrace(business.subscription, id, now) : { ...business.subscription, lastPaymentId: id } };
     if (quota) initializeResponsePeriods(transaction, db, quota);
     transaction.create(receiptReference, receipt);
     transaction.create(db.collection('paymentImages').doc(id), { ownerUid: user.uid, receiptDataUrl: parsed.receiptDataUrl, submittedAt: now });
     transaction.set(businessReference, updatedBusiness);
-    transaction.set(db.collection('publicBusinesses').doc(business.slug), publicBusiness(updatedBusiness));
+    if (business.slug) transaction.set(db.collection('publicBusinesses').doc(business.slug), publicBusiness(updatedBusiness));
+    if (!businessDocument.exists) transaction.set(db.collection('users').doc(user.uid), { ownedTenantId: business.id }, { merge: true });
     return { receipt, business: updatedBusiness };
   });
 }
@@ -131,9 +137,15 @@ export async function reviewPayment(paymentId: string, action: 'approve' | 'reje
     const now = Date.now();
     const reviewed: PaymentReceipt = { ...receipt, status, reviewedAt: now, ...(action === 'reject' && reason ? { rejectionReason: reason } : {}) };
     let subscription = business.subscription;
-    if (receipt.kind !== undefined && receipt.kind !== 'subscription' && receipt.kind !== 'response_pack') throw new HttpError(409, 'El tipo de comprobante no es válido.');
+    if (receipt.kind !== undefined && receipt.kind !== 'subscription' && receipt.kind !== 'response_pack' && receipt.kind !== 'paid_trial') throw new HttpError(409, 'El tipo de comprobante no es válido.');
     const quota = action === 'approve' ? await readResponsePeriodState(business, db, transaction, now) : undefined;
-    if (action === 'approve' && receipt.kind === 'response_pack') {
+    if (action === 'approve' && receipt.kind === 'paid_trial') {
+      if (!canPurchasePaidTrial(subscription) || receipt.amountCOP !== PAID_TRIAL_PRICE_COP || receipt.appointmentAllowance !== PAID_TRIAL_APPOINTMENT_LIMIT || receipt.planId !== undefined || receipt.periodDays !== undefined || receipt.responseAllowance !== undefined || receipt.quotaPeriodId !== undefined) throw new HttpError(409, 'Los datos de la prueba pagada no son válidos.', 'PAID_TRIAL_UNAVAILABLE');
+      subscription = { status: 'trial', trialEndsAt: subscription.trialEndsAt, currentPeriodEndsAt: subscription.currentPeriodEndsAt, lastPaymentId: receipt.id, paidTrial: { paymentId: receipt.id, activatedAt: now, appointmentLimit: PAID_TRIAL_APPOINTMENT_LIMIT, appointmentsUsed: 0 } };
+      initializeResponsePeriods(transaction, db, { ...quota!, current: null });
+      const periodId = `trial_${receipt.id}`;
+      transaction.create(responsePeriodReference(db, quota!.scopeId, periodId), { id: periodId, source: 'trial', planId: null, startsAt: now, endsAt: PAID_TRIAL_PERIOD_END, includedResponses: PAID_TRIAL_INCLUDED_RESPONSES, extraResponses: 0, usedResponses: 0, reservedResponses: 0 });
+    } else if (action === 'approve' && receipt.kind === 'response_pack') {
       if (receipt.responseAllowance !== RESPONSE_PACK.responses || receipt.planId !== undefined || receipt.periodDays !== undefined || !quota?.current || receipt.quotaPeriodId !== quota.current.id || quota.current.source === 'trial' || quota.current.endsAt <= now || subscription.status !== 'active') throw new HttpError(409, 'La vigencia de esta ampliación ya no está disponible. Revisa el comprobante.', 'RESPONSE_PACK_EXPIRED');
       initializeResponsePeriods(transaction, db, { ...quota, current: null });
       transaction.set(responsePeriodReference(db, quota.scopeId, quota.current.id), { ...quota.current, extraResponses: quota.current.extraResponses + receipt.responseAllowance });
@@ -143,7 +155,7 @@ export async function reviewPayment(paymentId: string, action: 'approve' | 'reje
       const plan = getBillingPlan(receipt.planId);
       const includedResponses = receipt.responseAllowance ?? plan.includedResponses;
       if (!Number.isSafeInteger(includedResponses) || includedResponses < 1 || includedResponses > 1_000_000) throw new HttpError(409, 'La capacidad del comprobante no es válida.');
-      const startsAt = Math.max(now, subscription.currentPeriodEndsAt, subscription.trialEndsAt);
+      const startsAt = Math.max(now, subscription.currentPeriodEndsAt);
       subscription = approveSubscription(subscription, receipt.id, now, periodDays);
       initializeResponsePeriods(transaction, db, quota!);
       const periodId = `payment_${receipt.id}`;
@@ -151,13 +163,12 @@ export async function reviewPayment(paymentId: string, action: 'approve' | 'reje
     } else if (receipt.kind !== 'response_pack' && subscription.lastPaymentId === receipt.id) {
       const { graceEndsAt: _graceEndsAt, ...withoutGrace } = subscription;
       const stillPaid = subscription.status === 'active' && subscription.currentPeriodEndsAt > now;
-      const stillTrial = subscription.status === 'trial' && subscription.trialEndsAt > now;
-      subscription = { ...withoutGrace, status: subscription.status === 'suspended' ? 'suspended' : stillPaid ? 'active' : stillTrial ? 'trial' : 'past_due' };
+      subscription = { ...withoutGrace, status: subscription.status === 'suspended' ? 'suspended' : stillPaid ? 'active' : subscription.currentPeriodEndsAt > 0 ? 'past_due' : subscription.paidTrial ? 'trial' : 'pending_payment' };
     }
     const updatedBusiness: Business = { ...business, subscription };
     transaction.set(reference, reviewed);
     transaction.set(businessReference, updatedBusiness);
-    transaction.set(db.collection('publicBusinesses').doc(business.slug), publicBusiness(updatedBusiness));
+    if (business.slug) transaction.set(db.collection('publicBusinesses').doc(business.slug), publicBusiness(updatedBusiness));
     return { receipt: reviewed, business: updatedBusiness };
   });
 }

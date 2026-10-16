@@ -93,7 +93,7 @@ try {
   const seed=spawn(process.execPath,['scripts/seed-local.mjs'],{cwd:root,env,stdio:'inherit',windowsHide:true});
   const seeded=await new Promise((resolve,reject)=>{seed.on('error',reject);seed.on('exit',resolve);});
   if(seeded!==0)throw new Error('No se pudieron preparar las cuentas de prueba.');
-  console.log(`\nSarin local: http://127.0.0.1:${options.port}\nSelecciona una cuenta en Google emulado; no uses credenciales reales.\nVault conserva su IndexedDB al detener los emuladores. Ctrl+C detiene los servicios de esta sesión.\n`);
+  console.log(`\nSarin local: http://127.0.0.1:${options.port}\nSelecciona una cuenta en Google emulado; no uses credenciales reales.\nCtrl+C detiene los servicios de esta sesión.\n`);
   launch(['node_modules/next/dist/bin/next','dev','--hostname','127.0.0.1','--port',String(options.port)],env);
   // Child services keep the launcher alive until Ctrl+C or a service failure.
 }catch(error){console.error(error instanceof Error?error.message:'No se pudo iniciar Sarin local.');await shutdown(1);}

@@ -28,17 +28,24 @@ try {
   assert(health.response.ok && health.data?.authEmulator?.ready===true,'Inicia pnpm run dev:local antes de esta prueba.');
   const admin=await login(LOCAL_TEST_ACCOUNTS.find(account=>account.role==='admin'));
   const client=await login(LOCAL_TEST_ACCOUNTS.find(account=>account.role==='client'));
-  const [session,consoleResult,forbiddenConsole,forbiddenVault,emptyVault]=await Promise.all([
-    request('/api/session',admin),request('/api/admin',admin),request('/api/admin',client),request('/api/sarin/vault',client,'POST',{}),request('/api/sarin/vault',admin,'POST',{}),
+  const [session,consoleResult,forbiddenConsole,forbiddenAdminAction,invalidReceipt]=await Promise.all([
+    request('/api/session',admin),request('/api/admin',admin),request('/api/admin',client),request('/api/admin',client,'PATCH',{}),request('/api/billing',admin,'POST',{}),
   ]);
   assert(session.response.ok && session.data?.isSuperadmin===true,'La sesión local no habilitó el UID administrador.');
   assert(consoleResult.response.ok && Array.isArray(consoleResult.data?.businesses),'La consola no pudo consultar Firestore local.');
-  assert(forbiddenConsole.response.status===403 && forbiddenVault.response.status===403,'El cliente accedió a una ruta reservada.');
-  assert(emptyVault.response.status===400,'La API Vault no validó el contenido después de autorizar al administrador.');
+  assert(forbiddenConsole.response.status===403 && forbiddenAdminAction.response.status===403,'El cliente accedió a una ruta administrativa reservada.');
+  assert(invalidReceipt.response.status===400,'La API de facturación no rechazó un comprobante vacío.');
   console.log('OK: autenticación emulada, UID administrador, Admin SDK/Firestore y rechazo 403 del cliente.');
+  const [retiredPage,retiredApi,retiredHealth,forbiddenEngine]=await Promise.all([
+    request('/admin/vault',admin),request('/api/sarin/vault',admin,'POST',{}),request('/api/sarin/health?scope=vault',admin),request('/api/sarin/health?scope=engine',client),
+  ]);
+  assert(retiredPage.response.status===404 && retiredApi.response.status===404,'Una ruta del módulo privado retirado continúa disponible.');
+  assert(retiredHealth.response.status===400,'La consulta de salud retirada continúa disponible.');
+  assert(forbiddenEngine.response.status===403,'El cliente accedió al diagnóstico reservado del motor local.');
+  console.log('OK: rutas privadas retiradas y diagnóstico local restringido sin ejecutar inferencia.');
   const [billing,business]=await Promise.all([request('/api/billing',admin),request('/api/businesses',admin)]);
   assert(billing.response.ok && Array.isArray(billing.data?.receipts) && Array.isArray(billing.data?.settings?.bankAccounts),'La facturación local no cargó su estado real.');
   assert(business.response.ok && 'business' in business.data,'La configuración de negocio no respondió.');
   console.log('OK: facturación y configuración sin datos bancarios ni negocio inventados.');
-  console.log('Prueba local completada. No se crearon negocios, pagos ni conversaciones y no se ejecutó inferencia.');
+  console.log('Prueba local completada. No se crearon negocios ni pagos y no se ejecutó inferencia.');
 }catch(error){console.error(error instanceof Error?error.message:'Falló la prueba local.');process.exitCode=1;}

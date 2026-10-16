@@ -26,10 +26,19 @@ function submissionDatabase() {
 describe('billing plan settings and receipt snapshots', () => {
   it('returns all default tariffs without creating settings and preserves a legacy monthly tariff', async () => {
     const memory = memoryFirestore();
-    expect(await getSettings(memory.db)).toMatchObject({ weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, trialDaysDefault: 7, graceHoursOnUpload: 24 });
+    expect(await getSettings(memory.db)).toMatchObject({ weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, graceHoursOnUpload: 24 });
+    expect(await getSettings(memory.db)).not.toHaveProperty('trialDaysDefault');
     expect(memory.rows.size).toBe(0);
     await memory.db.collection('platformSettings').doc('main').set({ monthlyPriceCOP: 49900 });
     expect(await getSettings(memory.db)).toMatchObject({ weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 49900 });
+  });
+  it('omits historical free-trial settings on reads and removes them only on an explicit settings save', async () => {
+    const { db, rows } = memoryFirestore({ 'platformSettings/main': { trialDaysDefault: 7, monthlyPriceCOP: 59900 } });
+    expect(await getSettings(db)).not.toHaveProperty('trialDaysDefault');
+    expect(rows.get('platformSettings/main')?.data.trialDaysDefault).toBe(7);
+    const settings = settingsSchema.parse({ companyName: 'Pruebas', monthlyPriceCOP: 59900, bankAccounts: [bank] });
+    expect(await saveSettings(settings, db)).not.toHaveProperty('trialDaysDefault');
+    expect(rows.get('platformSettings/main')?.data).not.toHaveProperty('trialDaysDefault');
   });
   it('uses validated environment overrides consistently for all tariffs', async () => {
     const { db } = memoryFirestore();
@@ -53,14 +62,15 @@ describe('billing plan settings and receipt snapshots', () => {
     const [first, retry] = await Promise.all([submitReceipt(owner, { ...upload, planId }, db), submitReceipt(owner, { ...upload, planId }, db)]);
     expect(first.receipt).toMatchObject({ planId, periodDays, amountCOP, status: 'pending' });
     expect(retry.receipt).toEqual(first.receipt);
-    expect(first.business.subscription).toMatchObject({ trialEndsAt: now + 7 * 86400000, graceEndsAt: now + 86400000 });
+    expect(first.business.subscription).toMatchObject({ trialEndsAt: now + 7 * 86400000 });
+    expect(first.business.subscription.graceEndsAt).toBeUndefined();
     expect([...rows.keys()].filter(path => path.startsWith('paymentReceipts/'))).toHaveLength(1);
     await db.collection('platformSettings').doc('main').set({ bankAccounts: [bank], weeklyPriceCOP: 25000, fortnightlyPriceCOP: 45000, monthlyPriceCOP: 70000 });
     const changedRetry = await submitReceipt(owner, { ...upload, planId: planId === 'weekly' ? 'monthly' : 'weekly' }, db);
     expect(changedRetry.receipt).toEqual(first.receipt);
     const [approved, repeated] = await Promise.all([reviewPayment(first.receipt.id, 'approve', undefined, db), reviewPayment(first.receipt.id, 'approve', undefined, db)]);
     expect(approved.receipt).toMatchObject({ planId, periodDays, amountCOP, status: 'approved' });
-    expect(approved.business.subscription.currentPeriodEndsAt).toBe(now + (7 + periodDays) * 86400000);
+    expect(approved.business.subscription.currentPeriodEndsAt).toBe(now + periodDays * 86400000);
     expect(repeated.business.subscription.currentPeriodEndsAt).toBe(approved.business.subscription.currentPeriodEndsAt);
     expect(approved.business.subscription.trialEndsAt).toBe(now + 7 * 86400000);
   });
@@ -70,18 +80,21 @@ describe('billing plan settings and receipt snapshots', () => {
   });
 });
 describe('commercial response periods and packs', () => {
-  it('queues paid periods after the trial and each other without resetting the current quota', async () => {
+  it('starts paid periods immediately and queues later renewals without resetting current quota', async () => {
     const { db } = submissionDatabase();
     const first = await submitReceipt(owner, { ...upload, planId: 'weekly' }, db);
     await reviewPayment(first.receipt.id, 'approve', undefined, db);
     let allowance = await getResponseQuota(first.business.id, db);
-    expect(allowance.currentPeriod).toMatchObject({ source: 'trial', includedResponses: 700, endsAt: now + 7 * 86400000 });
-    expect(allowance.nextPeriod).toMatchObject({ source: 'subscription', planId: 'weekly', includedResponses: 700, startsAt: now + 7 * 86400000, endsAt: now + 14 * 86400000 });
+    expect(allowance.currentPeriod).toMatchObject({ source: 'subscription', planId: 'weekly', includedResponses: 700, startsAt: now, endsAt: now + 7 * 86400000 });
+    expect(allowance.nextPeriod).toBeNull();
     const second = await submitReceipt(owner, { ...upload, requestId: 'second-period', planId: 'fortnightly' }, db);
     await reviewPayment(second.receipt.id, 'approve', undefined, db);
-    vi.setSystemTime(now + 14 * 86400000);
     allowance = await getResponseQuota(first.business.id, db);
-    expect(allowance.currentPeriod).toMatchObject({ planId: 'fortnightly', includedResponses: 1500, startsAt: now + 14 * 86400000, endsAt: now + 29 * 86400000, usedResponses: 0 });
+    expect(allowance.currentPeriod?.planId).toBe('weekly');
+    expect(allowance.nextPeriod).toMatchObject({ planId: 'fortnightly', startsAt: now + 7 * 86400000, endsAt: now + 22 * 86400000 });
+    vi.setSystemTime(now + 7 * 86400000);
+    allowance = await getResponseQuota(first.business.id, db);
+    expect(allowance.currentPeriod).toMatchObject({ planId: 'fortnightly', includedResponses: 1500, startsAt: now + 7 * 86400000, endsAt: now + 22 * 86400000, usedResponses: 0 });
   });
   it('snapshots a pack into the paid period and grants it once without extending time or grace', async () => {
     const { db } = submissionDatabase();

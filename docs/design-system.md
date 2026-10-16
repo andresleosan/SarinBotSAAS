@@ -8,7 +8,7 @@ La dirección vigente es **Agenda clara**, elegida por el propietario el 13 de o
 - Tinta `#162344` y secundario `#52617d`: contraste sobre blanco. Azul `#315ff3`: acción principal, foco y sección activa. Líneas `#e0e6f1` y fondo suave `#edf1ff`: organización discreta de datos.
 - DM Sans en títulos, cuerpo y formularios; horas e importes con cifras tabulares. Archivos WOFF2 latinos servidos desde este proyecto, con licencias OFL adjuntas; ninguna llamada a Google Fonts desde el navegador.
 - Navegación lateral en escritorio y desplazable en móvil. Encabezados claros, una acción principal por bloque, ayudas y estados con texto además de color.
-- Firma visual: rostro de Sarin en la marca, agenda ilustrativa y recorrido de vuelo de cinco mensajes en la portada. En agenda y Vault se reserva el espacio para datos y conversación. Las etiquetas e iconos decorativos retirados por el propietario se mantienen fuera de la portada.
+- Firma visual: rostro de Sarin en la marca, agenda ilustrativa y recorrido de vuelo de cinco mensajes en la portada. En la agenda y los asistentes comerciales se reserva el espacio para datos y conversación. Las etiquetas e iconos decorativos retirados por el propietario se mantienen fuera de la portada.
 - Foco azul visible, controles con área táctil suficiente, movimiento reducido y adaptación desde 320 px. Sin métricas o clientes inventados en el producto; los datos de aceptación son explícitamente sintéticos y exclusivos de emuladores.
 
 ## Referencias consultadas mediante el MCP oficial de Mobbin
@@ -37,3 +37,7 @@ La conexión oficial `https://api.mobbin.com/mcp` se autenticó mediante OAuth. 
 - [Calendly: presentación de reservas](https://mobbin.com/screens/5c90bdb0-4b1c-4c4c-adb3-1a63581d6ed1): explicar el producto con un recorrido de reserva junto al CTA.
 
 Se adaptan patrones de interacción. La paleta actual es Agenda clara y la mascota procede de la web del propietario; las capturas de terceros no se incorporan al producto ni al repositorio.
+
+## Imagen de la cita — 16 de octubre de 2026
+
+«Guardar imagen de la cita» sustituye la exportación `.ics` para reservas futuras confirmadas. La tarjeta PNG se genera en el navegador con Agenda clara —fondo `#f7f9ff`, papel blanco, tinta `#162344` y azul `#315ff3`— y DM Sans autoalojada. Prioriza negocio, servicio, fecha y hora en `America/Bogota`; añade el profesional o recurso asignado solo si está disponible. No incluye correo, teléfono ni respuestas del formulario del cliente. Es una copia estática, sin integración de calendario ni recordatorios automáticos: debe remitir a «Mis citas» para consultar cambios o cancelaciones.

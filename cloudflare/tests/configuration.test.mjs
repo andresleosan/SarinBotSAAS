@@ -17,6 +17,9 @@ test('configuration has one default container and no public route, logs, traces 
   assert.equal(config.observability.logs.enabled, false);
   assert.equal(config.observability.traces.enabled, false);
   assert.equal(config.containers[0].observability.enabled, false);
+  assert.deepEqual(config.triggers.crons, ['*/5 * * * *']);
+  assert.deepEqual(config.durable_objects.bindings.map(binding => [binding.name, binding.class_name]), [['SARIN_APP', 'SarinApp'], ['SARIN_IDENTITY', 'SarinIdentity']]);
+  assert.deepEqual(config.exports.SarinIdentity, { type: 'durable-object', storage: 'sqlite' });
 });
 
 test('build preparation writes only public build args to an isolated destination', () => {
@@ -32,4 +35,20 @@ test('build preparation writes only public build args to an isolated destination
   } finally {
     if (dirname(resolve(directory)) === resolve(tmpdir()) && basename(directory).startsWith('sarin-cloudflare-config-')) rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('launch uses workload identity and leaves background WhatsApp services disabled', () => {
+  const config = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  assert.equal(config.vars?.FIREBASE_ADMIN_CREDENTIAL_MODE, 'adc');
+  assert.equal(config.vars?.FIREBASE_ADMIN_PROJECT_ID, 'sarinbotsaas');
+  assert.equal(config.vars?.FIREBASE_WIF_AUDIENCE, '//iam.googleapis.com/projects/153690559048/locations/global/workloadIdentityPools/sarin-cloudflare/providers/worker-oidc');
+  assert.equal(config.vars?.FIREBASE_WIF_SERVICE_ACCOUNT_EMAIL, 'sarin-runtime@sarinbotsaas.iam.gserviceaccount.com');
+  assert.equal(config.vars?.WHATSAPP_ENABLED, 'false');
+  assert.equal(config.vars?.WHATSAPP_RETENTION_ENABLED, 'false');
+  assert.equal(config.vars?.FIREBASE_ADMIN_PRIVATE_KEY, undefined);
+  assert.equal(config.vars?.GOOGLE_APPLICATION_CREDENTIALS, undefined);
+  assert.equal(config.vars?.SARIN_DATA_BACKEND, 'd1');
+  assert.equal(config.vars?.SARIN_MAINTENANCE, 'false');
+  assert.equal(config.d1_databases?.[0].binding, 'SARIN_DB');
+  assert.equal(config.r2_buckets?.[0].binding, 'SARIN_FILES');
 });

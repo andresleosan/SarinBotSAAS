@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
 import {
   ArrowUpRight,
   Calendar,
@@ -11,7 +10,7 @@ import {
   Plus,
   QrCode,
 } from "lucide-react";
-import { AuthGate } from "@/components/auth-provider";
+import { AuthGate, useAuth } from "@/components/auth-provider";
 import {
   AppShell,
   Notice,
@@ -19,9 +18,10 @@ import {
   fieldClass,
 } from "@/components/app-shell";
 import { useBusiness } from "@/hooks/useBusiness";
-import { getFirebaseClient } from "@/lib/firebase/client";
+import { useApiPoll } from "@/lib/client/use-api-poll";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
+import { PaidTrialStatus } from "@/components/paid-trial-status";
 import type { Appointment } from "@/types/firestore";
 
 function today() {
@@ -35,59 +35,47 @@ function today() {
 
 function Agenda() {
   const { business, loading, error: businessError } = useBusiness();
+  const { user } = useAuth();
   const [date, setDate] = useState(today);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [agendaLoading, setAgendaLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const scope = `${user?.uid ?? ''}:${business?.id ?? ''}:${date}`;
+  const scopeRef = useRef({ key: scope });
+  if (scopeRef.current.key !== scope) scopeRef.current = { key: scope };
+  const actionScope = scopeRef.current;
+  const actionRequest = useRef<AbortController | null>(null);
+  const [actionError, setError] = useState<string | null>(null);
+  const agenda = useApiPoll<Appointment[]>(user && business && date ? `${user.uid}:${business.id}:${date}` : null, async signal => {
+    const response = await apiFetch<{ appointments: Appointment[] }>(`/api/businesses/${encodeURIComponent(business!.id)}/appointments?date=${encodeURIComponent(date)}`, { signal });
+    return response.appointments.filter(item => item.tenantId === business!.id && item.dateKey === date).sort((left, right) => left.startAt - right.startAt);
+  });
+  const appointments = agenda.value ?? [];
+  const agendaLoading = agenda.loading;
+  const error = actionError ?? agenda.error;
   const [saving, setSaving] = useState(false);
   const [blockStart, setBlockStart] = useState("");
   const [blockEnd, setBlockEnd] = useState("");
   const [resource, setResource] = useState("");
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
+    setError(null); setSaving(false); setBlockStart(''); setBlockEnd(''); setResource('');
+    return () => {
+      actionRequest.current?.abort(); actionRequest.current = null;
+      if (scopeRef.current === actionScope) scopeRef.current = { key: '' };
+    };
+  }, [scope]);
+  useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(id);
   }, []);
-  useEffect(() => {
-    setAppointments([]);
-    if (!business || !date) {
-      setAgendaLoading(false);
-      return;
-    }
-    setAgendaLoading(true);
-    setError(null);
-    return onSnapshot(
-      query(
-        collection(
-          getFirebaseClient().db,
-          "businesses",
-          business.id,
-          "appointments",
-        ),
-        where("dateKey", "==", date),
-      ),
-      (snapshot) => {
-        setAppointments(
-          snapshot.docs
-            .map((item) => ({ ...item.data(), id: item.id }) as Appointment)
-            .sort((a, b) => a.startAt - b.startAt),
-        );
-        setAgendaLoading(false);
-      },
-      (cause) => {
-        setError(errorMessage(cause));
-        setAgendaLoading(false);
-      },
-    );
-  }, [business, date]);
   async function block(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!business) return;
+    if (!business || actionRequest.current) return;
+    const controller = actionRequest.current = new AbortController();
     setSaving(true);
     setError(null);
     try {
       await apiFetch(`/api/businesses/${business.id}/appointments`, {
         method: "POST",
+        signal: controller.signal,
         body: JSON.stringify({
           dateKey: date,
           startTimeStr: blockStart,
@@ -97,32 +85,40 @@ function Agenda() {
           requestId: crypto.randomUUID(),
         }),
       });
+      if (scopeRef.current !== actionScope || controller.signal.aborted) return;
       setBlockStart("");
       setBlockEnd("");
+      agenda.refresh();
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (scopeRef.current === actionScope && !controller.signal.aborted) setError(errorMessage(cause));
     } finally {
-      setSaving(false);
+      if (scopeRef.current === actionScope) setSaving(false);
+      if (actionRequest.current === controller) actionRequest.current = null;
     }
   }
   async function cancel(appointmentId: string) {
-    if (!business) return;
+    if (!business || actionRequest.current) return;
+    const controller = actionRequest.current = new AbortController();
     setSaving(true);
     setError(null);
     try {
       await apiFetch(`/api/businesses/${business.id}/appointments`, {
         method: "PATCH",
+        signal: controller.signal,
         body: JSON.stringify({ appointmentId }),
       });
+      if (scopeRef.current !== actionScope || controller.signal.aborted) return;
+      agenda.refresh();
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (scopeRef.current === actionScope && !controller.signal.aborted) setError(errorMessage(cause));
     } finally {
-      setSaving(false);
+      if (scopeRef.current === actionScope) setSaving(false);
+      if (actionRequest.current === controller) actionRequest.current = null;
     }
   }
   if (loading) return <Notice>Cargando tu negocio…</Notice>;
   if (businessError) return <Notice error>{businessError}</Notice>;
-  if (!business)
+  if (!business || !business.sarinConfig.onboardingCompleted)
     return (
       <section className="sarin-paper relative overflow-hidden rounded-2xl border border-sarin-line bg-sarin-paper px-6 py-10 text-sarin-ink sm:px-10 sm:py-14">
         <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_180px]">
@@ -136,15 +132,15 @@ function Agenda() {
               empieza aquí.
             </h1>
             <p className="mt-4 max-w-md text-sm leading-7 text-sarin-muted">
-              Configura tus servicios, profesionales y horarios. Después,
-              comparte tu isla privada y deja que Sarin te ayude a organizar la
-              agenda.
+              Empieza con una prueba pagada de $5.000 COP para configurar tu
+              negocio y recibir hasta 10 citas, sin caducidad. Después, elige
+              un plan para continuar.
             </p>
             <Link
               className={buttonClass + " mt-6 inline-flex items-center gap-2"}
-              href="/dashboard/onboarding"
+              href={isSubscriptionAllowed(business, now) ? "/dashboard/onboarding" : "/dashboard/billing"}
             >
-              Configurar mi negocio <ArrowUpRight className="h-4 w-4" />
+              {isSubscriptionAllowed(business, now) ? "Configurar mi negocio" : "Ver pagos y planes"} <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
           <img
@@ -158,10 +154,7 @@ function Agenda() {
       </section>
     );
   const sub = business.subscription;
-  const end =
-    sub.status === "trial"
-      ? sub.trialEndsAt
-      : Math.max(sub.currentPeriodEndsAt, sub.graceEndsAt ?? 0);
+  const end = Math.max(sub.currentPeriodEndsAt, sub.graceEndsAt ?? 0);
   const selectedDate = date ? new Date(date + "T12:00:00-05:00") : null;
   const dateLabel =
     selectedDate && Number.isFinite(selectedDate.getTime())
@@ -206,7 +199,7 @@ function Agenda() {
             <Clock className="h-4 w-4 text-sarin-blue" />
           </span>
           {isSubscriptionAllowed(business, now)
-            ? (sub.status === "trial" ? "Prueba gratis" : "Suscripción") +
+            ? sub.status === "trial" ? "Prueba pagada · hasta 10 citas, sin caducidad" : "Suscripción" +
               " · " +
               Math.max(0, Math.ceil((end - now) / 86400000)) +
               " días de acceso"
@@ -219,6 +212,7 @@ function Agenda() {
           Ver suscripción <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </div>
+      <PaidTrialStatus subscription={sub} />
       {error && <Notice error>{error}</Notice>}
 
       <section
@@ -235,7 +229,7 @@ function Agenda() {
               {dateLabel}
             </p>
             <p className="mt-1 tabular-nums text-xs text-sarin-muted">
-              Hora de Colombia · Actualización en vivo
+              Hora de Colombia · Se actualiza automáticamente
             </p>
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">

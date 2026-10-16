@@ -1,0 +1,11 @@
+{
+  "name": "sarinbotsaas",
+  "pages_build_output_dir": "./landing/out",
+  "compatibility_date": "2026-10-13",
+  "vars": {
+    "SARIN_PUBLIC_ORIGIN": "https://sarinbotsaas.pages.dev"
+  },
+  "services": [
+    { "binding": "SARIN_APP_HOST", "service": "sarin-bot-app" }
+  ]
+}

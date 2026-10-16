@@ -1,0 +1,56 @@
+[
+  {
+    "pdf": "opcion-a-agenda-clara.pdf",
+    "preview": "opcion-a-agenda-clara.png",
+    "size_mm": [
+      105,
+      148
+    ],
+    "preview_dpi": 300,
+    "preview_pixels": [
+      1241,
+      1749
+    ],
+    "qr_size_mm_including_quiet_zone": 46,
+    "quiet_zone_modules": 4,
+    "qr_modules_including_quiet_zone": 37,
+    "qr_destination_decoded_from_preview": "https://example.com/reservar",
+    "text_and_accents_present": true
+  },
+  {
+    "pdf": "opcion-b-norte-nocturno.pdf",
+    "preview": "opcion-b-norte-nocturno.png",
+    "size_mm": [
+      105,
+      148
+    ],
+    "preview_dpi": 300,
+    "preview_pixels": [
+      1241,
+      1749
+    ],
+    "qr_size_mm_including_quiet_zone": 46,
+    "quiet_zone_modules": 4,
+    "qr_modules_including_quiet_zone": 37,
+    "qr_destination_decoded_from_preview": "https://example.com/reservar",
+    "text_and_accents_present": true
+  },
+  {
+    "pdf": "opcion-c-taller-calido.pdf",
+    "preview": "opcion-c-taller-calido.png",
+    "size_mm": [
+      105,
+      148
+    ],
+    "preview_dpi": 300,
+    "preview_pixels": [
+      1241,
+      1749
+    ],
+    "qr_size_mm_including_quiet_zone": 46,
+    "quiet_zone_modules": 4,
+    "qr_modules_including_quiet_zone": 37,
+    "qr_destination_decoded_from_preview": "https://example.com/reservar",
+    "text_and_accents_present": true
+  }
+]

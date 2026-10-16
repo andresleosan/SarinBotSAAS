@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Database as Firestore } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { AdminWhatsAppSettings, WhatsAppBindingStatus } from '@/types/whatsapp';
 import { documentIdSchema } from './schemas';

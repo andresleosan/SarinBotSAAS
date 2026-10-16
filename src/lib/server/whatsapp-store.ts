@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Database as Firestore } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { ChatResponse } from '@/types/chat';
 import type { WhatsAppUsage, WhatsAppUsageCounters } from '@/types/whatsapp';

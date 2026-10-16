@@ -12,7 +12,7 @@ function tool(name: string, description: string, schema: z.ZodType): ToolDefinit
 }
 
 export const SARIN_ONBOARDING_TOOLS: readonly ToolDefinition[] = [
-  tool('guardar_estructura_negocio', 'Guarda configuración completa con horarios, servicios, recursos, teléfono y enlace. La primera configuración inicia siete días de prueba; editar nunca reinicia la prueba.', businessConfigSchema),
+  tool('guardar_estructura_negocio', 'Guarda configuración completa con horarios, servicios, recursos, teléfono y enlace. Requiere pago aprobado; guardar o editar conserva la suscripción y las citas consumidas de la prueba pagada.', businessConfigSchema),
 ];
 export const SARIN_CLIENT_TOOLS: readonly ToolDefinition[] = [
   tool('consultar_disponibilidad', 'Consulta horarios reales disponibles para una fecha y servicio. Consulta antes de ofrecer o confirmar una hora.', availabilitySchema),

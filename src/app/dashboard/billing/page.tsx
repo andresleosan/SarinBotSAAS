@@ -14,6 +14,9 @@ import { apiFetch, errorMessage } from "@/lib/client/api";
 import { compressReceiptToWebP } from "@/lib/utils/imageCompression";
 import { BILLING_PLANS, RESPONSE_PACK, getBillingPlan, type SubscriptionPlanId } from "@/lib/billing-plans";
 import { ResponseQuota, quotaDate } from "@/components/response-quota";
+import { PaidTrialStatus } from "@/components/paid-trial-status";
+import { canPurchasePaidTrial, PAID_TRIAL_PRICE_COP, PAID_TRIAL_APPOINTMENT_LIMIT, PAID_TRIAL_INCLUDED_RESPONSES } from "@/lib/paid-trial";
+import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
 import type {
   Business,
   PaymentReceipt,
@@ -29,7 +32,8 @@ interface BillingData {
   whatsappAvailable: boolean;
 }
 const subscriptionLabels: Record<Business["subscription"]["status"], string> = {
-  trial: "Prueba gratis",
+  pending_payment: "Pendiente de pago aprobado",
+  trial: "Prueba pagada",
   active: "Activa",
   past_due: "Pago pendiente",
   suspended: "Suspendida",
@@ -59,18 +63,20 @@ function Billing() {
   const [refreshing, setRefreshing] = useState(false);
   const [requestId, setRequestId] = useState("");
   const [planId, setPlanId] = useState<SubscriptionPlanId>("monthly");
-  const [purchaseKind, setPurchaseKind] = useState<"subscription" | "response_pack">("subscription");
+  const [purchaseKind, setPurchaseKind] = useState<"paid_trial" | "subscription" | "response_pack">("subscription");
   const pendingReceipt = data?.receipts.find((receipt) => receipt.status === "pending");
-  const selectedKind = pendingReceipt ? pendingReceipt.kind ?? "subscription" : purchaseKind;
+  const canBuyTrial = canPurchasePaidTrial(data?.business?.subscription);
+  const selectedKind = pendingReceipt ? pendingReceipt.kind ?? "subscription" : purchaseKind === "paid_trial" && !canBuyTrial ? "subscription" : purchaseKind;
   const period = data?.allowance?.currentPeriod;
   const canBuyPack = Boolean(period && period.source !== "trial" && period.endsAt > Date.now() && data?.business?.subscription.status === "active" && data.allowance && ["active", "warning", "exhausted"].includes(data.allowance.state));
   const formLocked = saving || compressing || refreshing || Boolean(pendingReceipt);
-  const uploadDisabled = formLocked || !data?.settings.bankAccounts.length || (selectedKind === "response_pack" && !canBuyPack) || (selectedKind === "subscription" && planId === "whatsapp" && !data?.whatsappAvailable);
+  const uploadDisabled = formLocked || !data?.settings.bankAccounts.length || (selectedKind === "paid_trial" && !canBuyTrial) || (selectedKind === "response_pack" && !canBuyPack) || (selectedKind === "subscription" && planId === "whatsapp" && !data?.whatsappAvailable);
   useEffect(() => {
     const controller = new AbortController();
     void apiFetch<BillingData>("/api/billing", { signal: controller.signal })
       .then((response) => {
         setData(response);
+        if (canPurchasePaidTrial(response.business?.subscription)) setPurchaseKind("paid_trial");
         setBank(response.settings.bankAccounts[0]?.id || "");
       })
       .catch((cause: unknown) => {
@@ -87,8 +93,8 @@ function Billing() {
     setRequestId(crypto.randomUUID());
     setNotice(null);
   }
-  function selectPurchaseKind(kind: "subscription" | "response_pack") {
-    if (formLocked || kind === purchaseKind || (kind === "response_pack" && !canBuyPack)) return;
+  function selectPurchaseKind(kind: "paid_trial" | "subscription" | "response_pack") {
+    if (formLocked || kind === purchaseKind || (kind === "response_pack" && !canBuyPack) || (kind === "paid_trial" && !canBuyTrial)) return;
     setPurchaseKind(kind);
     setRequestId(crypto.randomUUID());
     setNotice(null);
@@ -189,24 +195,11 @@ function Billing() {
     return (
       <Notice error>{error || "No se pudo cargar la suscripción."}</Notice>
     );
-  if (!data.business)
-    return (
-      <Notice>
-        Configura primero tu negocio en{" "}
-        <Link
-          className="text-sarin-blue underline"
-          href="/dashboard/onboarding"
-        >
-          Configuración
-        </Link>
-        .
-      </Notice>
-    );
   const selectedPlan = getBillingPlan(pendingReceipt ? pendingReceipt.planId ?? "monthly" : planId);
   const selectedDays = pendingReceipt ? pendingReceipt.periodDays ?? 30 : selectedPlan.periodDays;
-  const selectedPrice = pendingReceipt?.amountCOP ?? (selectedKind === "response_pack" ? data.settings.responsePackPriceCOP : data.settings[selectedPlan.priceField]);
-  const selectedResponses = pendingReceipt?.responseAllowance ?? (selectedKind === "response_pack" ? RESPONSE_PACK.responses : selectedPlan.includedResponses);
-  const purchaseDescription = selectedKind === "response_pack" ? `Ampliación de ${selectedResponses.toLocaleString("es-CO")} respuestas` : `${selectedPlan.label} · ${selectedDays} días`;
+  const selectedPrice = pendingReceipt?.amountCOP ?? (selectedKind === "paid_trial" ? PAID_TRIAL_PRICE_COP : selectedKind === "response_pack" ? data.settings.responsePackPriceCOP : data.settings[selectedPlan.priceField]);
+  const selectedResponses = pendingReceipt?.responseAllowance ?? (selectedKind === "paid_trial" ? PAID_TRIAL_INCLUDED_RESPONSES : selectedKind === "response_pack" ? RESPONSE_PACK.responses : selectedPlan.includedResponses);
+  const purchaseDescription = selectedKind === "paid_trial" ? `Prueba pagada · configuración y ${pendingReceipt?.appointmentAllowance ?? PAID_TRIAL_APPOINTMENT_LIMIT} citas · sin caducidad` : selectedKind === "response_pack" ? `Ampliación de ${selectedResponses.toLocaleString("es-CO")} respuestas` : `${selectedPlan.label} · ${selectedDays} días`;
   const formatPrice = (price: number) => price.toLocaleString("es-CO", {
     style: "currency", currency: "COP", maximumFractionDigits: 0,
   });
@@ -219,14 +212,14 @@ function Billing() {
           </p>
           <h1 className="mt-1 text-3xl font-bold">Mantén tu agenda abierta</h1>
           <p className="mt-1 text-sm text-sarin-muted">
-            {data.business.name} · Estado: {subscriptionLabels[data.business.subscription.status]}
+            {data.business?.sarinConfig?.onboardingCompleted ? data.business.name + " · " : ""}Estado: {data.business ? subscriptionLabels[data.business.subscription.status] : "Pendiente de pago aprobado"}
           </p>
         </div>
         <div className="flex flex-col items-start sm:items-end">
           <p className="text-2xl font-bold text-sarin-blue">
             {formatPrice(selectedPrice)}
             <span className="block text-xs font-normal text-sarin-muted sm:text-right">
-              {selectedKind === "response_pack" ? "COP por ampliación" : `COP por ${selectedDays} días`}
+              {selectedKind === "paid_trial" ? "COP · pago único" : selectedKind === "response_pack" ? "COP por ampliación" : `COP por ${selectedDays} días`}
             </span>
           </p>
           <button type="button" className="min-h-11 text-left text-sm text-sarin-blue underline disabled:opacity-50 sm:text-right" disabled={saving || compressing || refreshing} onClick={() => void refreshBilling()}>{refreshing ? "Actualizando consumo…" : "Actualizar consumo y comprobantes"}</button>
@@ -234,6 +227,8 @@ function Billing() {
       </div>
       {error && <Notice error>{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
+      {data.business && <PaidTrialStatus subscription={data.business.subscription} />}
+      {data.business && !data.business.sarinConfig?.onboardingCompleted && isSubscriptionAllowed(data.business) && <Link href="/dashboard/onboarding" className="inline-flex min-h-11 items-center text-sm font-semibold text-sarin-blue underline">Continuar con la configuración</Link>}
       <ResponseQuota allowance={data.allowance} />
       <form
         onSubmit={(event) => void submit(event)}
@@ -242,10 +237,11 @@ function Billing() {
         <fieldset className="space-y-2" disabled={formLocked}>
           <legend className="font-semibold">¿Qué quieres pagar?</legend>
           <div className="flex flex-wrap gap-x-4 gap-y-0 text-sm">
-            <label className="flex min-h-11 items-center gap-2"><input type="radio" name="purchaseKind" value="subscription" checked={selectedKind === "subscription"} disabled={formLocked} onChange={() => selectPurchaseKind("subscription")} className="accent-sarin-blue" />Renovar suscripción</label>
+            {(canBuyTrial || selectedKind === "paid_trial") && <label className="flex min-h-11 items-center gap-2"><input type="radio" name="purchaseKind" value="paid_trial" checked={selectedKind === "paid_trial"} disabled={formLocked || !canBuyTrial} onChange={() => selectPurchaseKind("paid_trial")} className="accent-sarin-blue" />Prueba pagada · $5.000 COP</label>}
+            <label className="flex min-h-11 items-center gap-2"><input type="radio" name="purchaseKind" value="subscription" checked={selectedKind === "subscription"} disabled={formLocked} onChange={() => selectPurchaseKind("subscription")} className="accent-sarin-blue" />Elegir un plan</label>
             <label className="flex min-h-11 items-center gap-2"><input type="radio" name="purchaseKind" value="response_pack" checked={selectedKind === "response_pack"} disabled={formLocked || !canBuyPack} onChange={() => selectPurchaseKind("response_pack")} className="accent-sarin-blue" />Ampliar {RESPONSE_PACK.responses.toLocaleString("es-CO")} respuestas</label>
           </div>
-          {!canBuyPack && !pendingReceipt && <p className="text-xs text-sarin-muted">Las ampliaciones requieren una vigencia de pago activa; no se aplican a la prueba gratuita.</p>}
+          {!canBuyPack && !pendingReceipt && <p className="text-xs text-sarin-muted">Las ampliaciones requieren una suscripción activa; no se aplican a la prueba pagada.</p>}
         </fieldset>
         {selectedKind === "subscription" ? <fieldset className="space-y-2" disabled={formLocked}>
           <legend className="font-semibold">Elige tu período</legend>
@@ -279,9 +275,13 @@ function Billing() {
             ))}
           </div>
           <p className="text-xs text-sarin-muted">
-            La prueba gratuita inicial incluye 700 respuestas durante 7 días. Una renovación pagada comienza después de tu vigencia actual.
+            Una renovación comienza después de tu suscripción pagada actual. Al pasar de la prueba pagada a un plan, la suscripción empieza al aprobar el pago.
           </p>
-        </fieldset> : <div className="space-y-1 rounded-xl border border-sarin-line bg-sarin-canvas p-3">
+        </fieldset> : selectedKind === "paid_trial" ? <div className="space-y-2 rounded-xl border border-sarin-line bg-sarin-canvas p-3">
+          <h2 className="font-semibold">{purchaseDescription}</h2>
+          <p className="text-sm text-sarin-muted">Compra única. Se activa al aprobar el comprobante y termina al utilizar las 10 citas. Después, elige un plan para continuar.</p>
+          <p className="text-sm text-sarin-muted">Incluye {PAID_TRIAL_INCLUDED_RESPONSES} respuestas de IA en total como límite de uso, independiente de las citas. Las ampliaciones requieren un plan vigente.</p>
+        </div> : <div className="space-y-1 rounded-xl border border-sarin-line bg-sarin-canvas p-3">
           <h2 className="font-semibold">{purchaseDescription} · {formatPrice(selectedPrice)} COP</h2>
           <p className="text-sm text-sarin-muted">No extiende la vigencia. Se activa tras aprobar el comprobante{period && (!pendingReceipt || pendingReceipt.quotaPeriodId === period.id) ? ` y vence el ${quotaDate(period.endsAt)}` : " en el período indicado al enviar el pago"}. No hay cobros automáticos.</p>
         </div>}
@@ -352,7 +352,7 @@ function Billing() {
           </p>
           <p className="text-sm text-sarin-muted">
             La captura se optimiza antes de enviarla y se revisa manualmente.{" "}
-            {selectedKind === "subscription" ? "El acceso preventivo de 24 horas se aplica según el estado de tu suscripción." : "El paquete se habilita únicamente después de su aprobación."}
+            {selectedKind === "subscription" && (data.business?.subscription.currentPeriodEndsAt ?? 0) > 0 ? "El acceso preventivo de renovación se aplica según el estado de tu suscripción." : "El acceso se habilita únicamente después de aprobar el pago."}
           </p>
           <label className="grid cursor-pointer grid-cols-[24px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-xl border border-dashed border-sarin-line bg-sarin-canvas p-3 hover:border-sarin-blue sm:p-4">
             <UploadCloud className="h-6 w-6 text-sarin-blue" />
@@ -408,7 +408,7 @@ function Billing() {
                   })}
                 </p>
                 <p className="mt-1 text-sm text-sarin-muted">
-                  {receipt.kind === "response_pack" ? `Ampliación · ${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas` : `${getBillingPlan(receipt.planId ?? "monthly").label} · ${receipt.periodDays ?? 30} días`}
+                  {receipt.kind === "paid_trial" ? `Prueba pagada · ${receipt.appointmentAllowance ?? PAID_TRIAL_APPOINTMENT_LIMIT} citas · sin caducidad` : receipt.kind === "response_pack" ? `Ampliación · ${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas` : `${getBillingPlan(receipt.planId ?? "monthly").label} · ${receipt.periodDays ?? 30} días`}
                 </p>
                 <p className="mt-1 text-xs text-sarin-muted">
                   {new Date(receipt.submittedAt).toLocaleString("es-CO", {

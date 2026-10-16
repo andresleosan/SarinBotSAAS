@@ -1,8 +1,8 @@
 # Capacidad de respuestas por vigencia
 
-La capacidad comercial se aplica en el servidor a web, copiloto y WhatsApp. Es independiente del proveedor seleccionado y del medidor técnico de tokens DeepSeek. La prueba tiene 700 respuestas durante siete días; Esencial incluye 700/1.500/3.000 respuestas en 7/15/30 días. WhatsApp comparte 4.500 respuestas entre web y su canal oficial durante 30 días.
+La capacidad comercial se aplica en el servidor a web, copiloto y WhatsApp. Es independiente del proveedor seleccionado y del medidor técnico de tokens DeepSeek. La prueba pagada cuesta $5.000 COP, permite configuración y diez citas sin vencimiento por días y tiene un límite total separado de 700 respuestas. Esencial incluye 700/1.500/3.000 respuestas en 7/15/30 días. WhatsApp comparte 4.500 respuestas entre web y su canal oficial durante 30 días.
 
-Antes de crear el negocio, la configuración asistida tiene una bolsa separada de 30 respuestas por cuenta. Después, las consultas del propietario descuentan de la bolsa del negocio. El formulario manual de configuración sigue disponible.
+No hay bolsa gratuita de onboarding. Un primer comprobante válido crea un borrador privado del negocio; hasta aprobarlo no se habilitan la configuración manual ni la asistida. La prueba comparte sus respuestas entre configuración y atención al cliente; el copiloto requiere una suscripción.
 
 ## Reserva y reintento
 
@@ -16,13 +16,23 @@ Una caída durante una operación puede dejar capacidad reservada sin confirmaci
 
 ## Renovaciones y ampliaciones
 
-Cada comprobante conserva importe, duración y capacidad. Aprobar una renovación anticipada añade un período futuro, preservando la prueba o vigencia actual. No repone anticipadamente la bolsa agotada. El panel muestra el período actual y el siguiente.
+Cada comprobante conserva importe, duración y capacidad. Aprobar un plan durante o después de la prueba inicia la suscripción inmediatamente. Una renovación anticipada de una suscripción añade un período después de la vigencia pagada actual, sin reponer anticipadamente esa bolsa. Nunca se añade tiempo de la antigua prueba gratuita. El panel muestra el período actual y el siguiente.
 
 Una ampliación compra 1.000 respuestas por $20.000 COP para el período pagado vigente al subir el comprobante. No extiende fechas, no concede gracia y no se vende durante la prueba. Aprobarla dos veces no duplica capacidad. Si el período vence antes de aprobar, el servidor rechaza la aprobación para revisión del pago; no transfiere el paquete a otro período ni genera un reembolso ficticio.
 
-El aviso del 80% usa respuestas consumidas sobre capacidad total, incluidas ampliaciones. Las reservas reducen la disponibilidad inmediatamente. Al agotarse la bolsa, la IA se pausa y la agenda permanece accesible. No hay cargos automáticos ni un límite diario de conversaciones.
+El aviso del 80% usa respuestas consumidas sobre capacidad total, incluidas ampliaciones. Las reservas reducen la disponibilidad inmediatamente. Al agotarse la bolsa, la IA se pausa y la agenda permanece accesible. No hay cargos automáticos.
 
-Las suscripciones anteriores sin historial de períodos conservan su vencimiento y reciben una única bolsa legada de 3.000 respuestas. No se reconstruye consumo anterior ni se amplían fechas. Los negocios en prueba reciben sus 700 respuestas hasta el vencimiento original. La primera operación materializa esta información; consultar no escribe documentos.
+## Frecuencia por cliente
+
+El modo `sarin_client`, tanto web como WhatsApp, admite por UID global diez intentos capaces de iniciar inferencia en sesenta segundos, sesenta en una hora y ciento veinte en veinticuatro horas. Son ventanas deslizantes, independientes del negocio y del proveedor. No cambian el acceso ni las cuotas del propietario para configuración o copiloto. Un rechazo devuelve HTTP 429 y código `CLIENT_RATE_LIMITED`, con el tiempo de espera en el mensaje, antes de reservar capacidad o llamar al modelo. La lectura y cancelación de citas siguen disponibles.
+
+El documento privado `serverSettings/client_rate_<sha256 UID>` conserva como máximo ciento veinte marcas de tiempo y hashes de identificador/huella; no almacena IP, cuerpos, teléfonos ni respuestas. La transacción impide superar el último puesto mediante solicitudes concurrentes. Al siguiente uso admitido se descartan marcas de más de veinticuatro horas; el documento por UID permanece con tamaño acotado. Un estado corrupto impide admitir nuevas consultas en lugar de reiniciar el contador.
+
+La identidad queda ligada a contenido, negocio y canal; cambiar el contenido conservando el identificador produce HTTP 409 `AI_REQUEST_CONFLICT`. La caché exacta y los turnos duraderos completados o reservados se reconocen antes de la admisión para recuperar el resultado o informar su estado sin contar ni inferir de nuevo, incluso tras reiniciar o superar la ventana. Un turno liberado, o sin reserva duradera, sí puede volver a inferir: cada intento cuenta una admisión nueva aunque repita exactamente su identificador y contenido. Esto impide eludir el límite reintentando fallos del proveedor. Las marcas pueden repetir el hash de solicitud, manteniendo la misma huella y el máximo de ciento veinte marcas. La admisión también cuenta si después falla la cuota comercial; un 429 nunca crea ni retiene una reserva de respuestas.
+
+Este control no verifica la titularidad del teléfono, no impone un máximo de citas futuras activas y no impide que varias cuentas consuman la bolsa compartida de un negocio. No sustituye una prueba de capacidad ni un límite monetario de los proveedores.
+
+Las suscripciones pagadas anteriores sin historial de períodos conservan su vencimiento y reciben una única bolsa legada de 3.000 respuestas. No se reconstruye consumo anterior ni se amplían fechas. Las pruebas históricas gratuitas sin activación pagada no conceden acceso. Aprobar la nueva prueba crea su propio período de 700 respuestas sin caducidad por fecha; el límite de diez citas se impone por separado en la transacción de reserva. La primera operación materializa los períodos compatibles; consultar no escribe documentos.
 
 ## Autorización y operación
 

@@ -211,6 +211,10 @@ export function AuthGate({
               ? "Entrar con Google emulado"
               : "Continuar con Google"}
           </button>
+          <nav aria-label="Información del servicio" className="flex flex-wrap gap-x-5 text-xs text-sarin-blue">
+            <a href="/privacidad" className="inline-flex min-h-11 items-center underline underline-offset-4">Privacidad</a>
+            <a href="/ayuda" className="inline-flex min-h-11 items-center underline underline-offset-4">Ayuda</a>
+          </nav>
           <p className="border-t border-sarin-line pt-5 text-xs leading-6 text-sarin-muted">Tu agenda, tus servicios y tu forma de atender. Todo en un mismo espacio.</p>
         </section>
       </main>

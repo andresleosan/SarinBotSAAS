@@ -1,4 +1,72 @@
-# Estado de implementación — 2026-10-14
+# Estado de implementación — 2026-10-16
+
+## Imagen de la cita — actualización publicada
+
+- [x] Sustituir ICS por **Guardar imagen de la cita**, PNG local con negocio, servicio, fecha/hora Colombia y profesional o estación disponible; sin contacto privado ni respuestas del formulario.
+- [x] Bloquear acciones simultáneas y descartar exportaciones tardías tras cambios de cuenta, negocio, estado u horario. Aclarar que la imagen es estática y los cambios se consultan en Mis citas.
+- [x] Verificar 682 pruebas aprobadas/20 omitidas, tipos, build Docker congelado, landing y PNG reales en Chrome/escritorio y viewport móvil; revisión independiente sin bloqueantes.
+- [x] Publicar imagen `7fbae3dc…bf96f7`, Worker `82361d3f-2e3a-4830-8785-ecfc678bfc68`, versión Containers 5. D1, 13 secretos y DeepSeek conservados; mantenimiento desactivado, cero registros antiguos y textos/recursos publicados verificados. [Evidencia y reversión](docs/qa/2026-10-16-appointment-image.md).
+
+La aceptación comercial siguiente corresponde a la fase anterior; sus resultados de ICS son históricos y su imagen fue sustituida por esta entrega.
+
+## Entrega comercial vigente — piloto controlado
+
+La [aceptación comercial vigente](docs/qa/2026-10-16-commercial-e2e.md) prevalece sobre los dictámenes de fases anteriores. Resultado: candidata a un **piloto comercial controlado**, no una garantía de disponibilidad o costo para cualquier volumen. Los conteos y estados históricos de abajo corresponden a sus respectivas fases.
+
+- [x] Publicar imagen `sha256:3c416933dbc6ec618e71fd6d6199ae162a17889fb87ea24f58aab3c89ef44c01`, Worker `5beb7020-fb82-42b7-a618-ea0406e5803a` e instancia versión 4, conservando D1/R2 y Google Auth.
+- [x] Dejar **DeepSeek activo** por elección explícita del propietario, sin fallback automático. Ollama permanece como alternativa manual con conexión verificada.
+- [x] Completar el E2E público de Ollama con un cliente externo; completar en DeepSeek reserva, `.ics` y cancelación con la sesión del propietario. En esta última prueba, el UID compartido explica «cancelada por el negocio»; no se presenta como cliente distinto.
+- [x] Probar envío y aprobación manual de un comprobante sintético, con activación de 10 citas y 700 respuestas. **Sin transferencia bancaria ni dinero conciliado.**
+- [x] Publicar información factual de privacidad/ayuda y contacto `alsdevstudio@alsdevstudio.com`, Andrés Santiago. Revisión de pagos únicamente en bandeja administrativa; no hay avisos automáticos por correo.
+- [x] Verificar 679 pruebas de aplicación aprobadas con 20 integraciones omitidas, 68 del Worker y 25 del gateway. Recorrido local de 96 comprobaciones y E2E público documentados por separado.
+- [x] Activar alertas Cloudflare de USD 5/USD 8 y alerta DeepSeek de saldo de USD 2. No constituyen un tope automático garantizado de USD 15.
+- [x] Conservar copia privada de 123 archivos de las fuentes publicadas.
+- [x] Cancelar las dos citas nuevas y cerrar los siete días del negocio QA mediante la interfaz. Lectura independiente D1: cero confirmadas, dos canceladas y cita original del otro negocio intacta.
+- [ ] Integrar en Git el checkout mixto publicado; la copia privada no equivale a un commit o CI de esta revisión.
+- [ ] Decidir y documentar plazos formales de conservación/eliminación y condiciones de devolución.
+- [ ] Realizar y conciliar una transferencia bancaria real si se acuerda ese ensayo; el comprobante sintético no la sustituye.
+- [ ] Ampliar validación de capacidad/latencia y controles contra abuso según el tráfico del piloto; no se acreditó una capacidad comercial por número de negocios.
+- [ ] Antes de captación amplia, definir máximo de citas futuras activas por cliente y protección frente a varias cuentas; el límite actual por UID no verifica teléfonos ni cubre esos casos.
+- [x] Mantener WhatsApp deshabilitado y registrar el marketplace como análisis únicamente, sin implementación ni oferta activa.
+
+## Foco comercial y retiro de Vault — 2026-10-16
+
+- [x] Descartar el proyecto de chat personal y retirar pantalla, API, almacenamiento, finanzas, copias, accesos y dependencias exclusivas de Vault. No purgar datos de navegadores anteriores.
+- [x] Conservar diagnóstico administrativo del motor como `scope=engine`, sincronizado con el Worker y protegido por Firebase/superadmin; preservar cola y proveedores comerciales.
+- [x] Verificar 659 pruebas de aplicación, 68 del Worker, 23 del gateway, tipos, build, imagen, auditoría de dependencias y revisión independiente. Recorrido comercial local con 96 comprobaciones y smoke de rutas retiradas correcto.
+- [x] Publicar el retiro y verificar sesión, consola y cita existente en el origen público; página/API retiradas 404, Ollama online y una instancia comercial nueva activa. [Evidencia](docs/qa/2026-10-16-commercial-focus.md).
+
+## Datos en Cloudflare — 2026-10-16
+
+- [x] Migrar datos comerciales a D1 y preparar R2 privado para comprobantes; Firebase cliente y servidor conservan Auth Google. Sin fallback automático a Firestore. Vault permaneció local en esa fase y fue retirado después.
+- [x] Sustituir listeners del navegador por APIs autorizadas y refresco acotado de 15 segundos, suspendido con la pestaña oculta; mantener permisos y aislamiento de sesión/negocio.
+- [x] Copia final privada con hora del servidor, drenaje verificado y proceso anterior ausente; importar y verificar los 19 documentos por hash, con cero reservas pendientes. Firestore y backups se conservan.
+- [x] Retirar únicamente el permiso Firestore de la cuenta runtime tras la aceptación; conservar Auth/WIF y documentar la recuperación del permiso mínimo. Nueva sesión y citas verificadas después.
+- [x] Activar imagen nueva en una instancia Cloudflare y verificar sesión, administración, cita existente, historial, calendario e ICS. Aplicación: 675 pruebas pasan y 20 omitidas en ese comando; Worker 67; CLI 18; tipos y builds correctos. [Evidencia](docs/qa/2026-10-16-cloudflare-data-migration.md).
+- [x] Completar inferencia comercial real en la aceptación posterior: E2E Ollama con cliente externo y DeepSeek con sesión del propietario; WhatsApp permanece deshabilitado. [Evidencia vigente](docs/qa/2026-10-16-commercial-e2e.md).
+- [x] Configurar alertas de gasto Cloudflare y saldo DeepSeek; USD 15 no es un corte automático.
+- [ ] Integrar el checkout mixto en Git. La copia privada de fuentes y los respaldos de datos no sustituyen ese paso.
+
+## Preparación pública, landing y cliente — 2026-10-16
+
+- [x] Auditoría inicial con dictamen, hallazgos priorizados y evidencia repetida: `docs/qa/2026-10-16-production-readiness.md`. La entrega posterior se evalúa en el informe comercial vigente como candidata a piloto controlado.
+- [x] Landing de producto con funciones/precios/condiciones reales y metadatos sin «Próximamente»; CTA de aplicación habilitado solo con origen público aprobado.
+- [x] «Mis citas» dentro de cada negocio: próximas, histórico, consulta por fecha, cancelación confirmada y calendario .ics; permisos y estados independientes de cuota/motor.
+- [x] Fase previa: gateway Pages→VPS y artefacto optativo `build:pages`, fecha de compatibilidad explícita, pruebas y guía de activación/reversión. Sustituido por el binding privado de la migración Cloudflare publicada, descrita abajo.
+- [x] 605 pruebas generales, 17 del gateway, TypeScript, build Next y build Pages correctos; 19 de Firestore y 96 comprobaciones de integración ejecutadas durante la auditoría. QA Chrome de cliente/landing y móvil 320 px, descarga ICS real y smoke local Workerd. Revisión independiente sin bloqueantes en cambios nuevos.
+- [x] Publicar información factual de privacidad/ayuda y contacto; conservar respaldos y activar alertas iniciales.
+- [ ] Formalizar retención/devoluciones, conciliar un pago real y ampliar controles de abuso/capacidad según el tráfico. No se agrupan estos pendientes como si la publicación del aviso los resolviera.
+- [x] Completar inferencia y nueva reserva/cancelación públicas con cliente externo usando Ollama. Repetición DeepSeek con sesión del propietario documentada con su límite de identidad; `.ics` verificado.
+- [x] Verificar el flujo manual de aprobación y activación de la prueba con comprobante sintético, sin afirmar cobro real.
+- [ ] Conciliar transferencia bancaria real; WhatsApp sigue sin aceptación operativa.
+
+## Prueba pagada de diez citas — 2026-10-16
+
+- [x] Sustitución de la prueba gratuita por compra única de $5.000 COP, configuración y diez citas sin vencimiento por días; activación únicamente tras aprobar el comprobante.
+- [x] Contador transaccional compartido entre recursos y fechas, reintento de la décima cita, cancelación sin devolución y bloqueo de nuevas citas/configuración/IA al agotarse. Las citas existentes se conservan.
+- [x] Facturación antes de configurar el negocio, borrador privado, protección de campos de pago, prueba no renovable y planes que sustituyen la prueba inmediatamente.
+- [x] Portada, configuración, agenda, facturación, administración y estado público actualizados. Se conserva la bolsa total independiente de 700 respuestas; desaparece el onboarding gratuito. Vault administrativo se preservó en esa fase y fue retirado después.
+- [x] 578 pruebas unitarias, 19 pruebas en Firestore Emulator y recorrido local de 96 comprobaciones aprobados; TypeScript, compilación de producción, exportación de landing, auditoría y revisión independiente correctos. QA visual en escritorio y móvil de 320 px. Evidencia: `docs/qa/2026-10-16-paid-trial.md`; compatibilidad: `docs/paid-trial.md`. Esa fase fue local; la imagen publicada posteriormente en Cloudflare incluye estos cambios, sin probar cobros reales.
 
 ## País de WhatsApp — 2026-10-15
 
@@ -49,7 +117,7 @@
 - [x] Kit Cloudflare Containers con Worker, DO singleton, tipos generados, secretos de runtime separados, ocho pruebas y dry-run del Worker.
 - [x] Imagen Docker Linux construida, iniciada en loopback con filesystem de solo lectura y comprobada por HTTP; dry-run completo de Wrangler con imagen aprobado.
 - [x] Verificación de código: TypeScript, suite local, suite de emulador Firestore, npm audit y build. Resultados finales abajo.
-- [ ] Configurar proyecto Firebase real, Google OAuth, credenciales Admin, UID superadmin, bancos y túnel/modelos de la Mac.
+- [x] Configurar proyecto Firebase real, Google OAuth, credenciales Admin, UID superadmin, bancos y túnel/modelo principal de la Mac. Ver aceptación Cloudflare del 16 de octubre; visión sigue opcional y sin configurar.
 - [x] Portada temporal independiente para Pages: aviso de lanzamiento, exportación sin Firebase, 404, headers, revisión móvil y controles de artefacto. Evidencia: `docs/qa/2026-10-13-landing-temporal.md`.
 - [x] Publicar y verificar la portada temporal en `sarinbotsaas.pages.dev`: producción `1d4890a`, despliegue `7f2b08d0`, HTTP 200 y headers correctos; rutas privadas HTTP 404.
 - [x] Favicon propio de Sarin integrado y publicado: SVG, ICO 16/32/48, PNG 32 y Apple 180; producción `ccf5193`, despliegue `027d8f92`. Evidencia: `docs/qa/2026-10-13-favicon.md`.
@@ -64,9 +132,25 @@
 - [x] Agenda clara en pantallas internas: acceso, agenda, configuración, QR, facturación, administración, isla y Vault; revisión local desde 320 px. Evidencia: `docs/qa/2026-10-14-agenda-clara-interna-y-ci.md`.
 - [x] Ensayo local opt-in completo: 61 comprobaciones de reservas/pagos/permisos con Auth y Firestore oficiales, limpieza limitada y cero inferencia; ocho pruebas de aislamiento.
 - [x] CI real de GitHub: tres jobs verdes para tipos, pruebas, builds, reglas, recorrido local y dry-run del Worker. Commit `d761de4`, ejecución `38523876656`.
-- [ ] Pruebas de aceptación con Firebase/Ollama reales y despliegue de la aplicación completa. La portada temporal ya está publicada por separado en Pages.
+- [x] Desplegar la aplicación completa y verificar Firebase/Ollama reales mediante sesión, lecturas de datos y salud del motor. El recorrido comercial de escritura se completó después según [la aceptación vigente](docs/qa/2026-10-16-commercial-e2e.md).
 
-## Migración a pnpm verificada
+## Migración Cloudflare sin VPS — infraestructura operativa
+
+- [x] Preparar y revisar Pages → binding privado → Worker → Container único; ADC federado sin certificados de la VPS y Ollama por Tunnel/Access.
+- [x] Publicar la aplicación y landing real en `sarinbotsaas.pages.dev`; verificar metadata, rutas anónimas, suspensión y nuevo arranque.
+- [x] Configurar pool/proveedor Google WIF, grant mínimo de la cuenta runtime y dominio Firebase, conservando acceso anterior.
+- [x] Completar login público, lecturas Auth/Firestore y estado de Ollama desde Cloudflare con sesión real; repetir tras suspensión/reinicio y con el Node de la VPS detenido.
+- [x] Verificar cita existente, historial, calendario por fecha y descarga real `.ics` en el negocio de pruebas, sin modificar reservas de producción.
+- [x] Confirmar ruta Tunnel/Access directa a la Mac; detener solo el contenedor Sarin de la VPS, su timer de certificados y el forward 3032; conservar archivos, imagen y confianza Google para reversión.
+- [x] Completar inferencia, reserva y cancelación públicas con cliente externo en Ollama; DeepSeek con sesión del propietario verificado por separado. [Aceptación vigente](docs/qa/2026-10-16-commercial-e2e.md).
+- [x] Publicar privacidad/ayuda y activar alertas Cloudflare/DeepSeek; conservar respaldos. La aprobación sintética de comprobante valida el flujo, no el cobro.
+- [ ] Conciliar un pago bancario real y cerrar las decisiones formales de retención/devolución; ampliar abuso/capacidad según operación del piloto.
+- [ ] Integrar en Git las fuentes publicadas.
+- [ ] Observar renovación natural Google de una hora en el mismo proceso; no se marca resuelta por un nuevo despliegue.
+
+Evidencia: [migración del 16 de octubre](docs/qa/2026-10-16-cloudflare-migration.md).
+
+## Migración a pnpm — evidencia previa
 
 - [x] App y Cloudflare en pnpm 11.23.0 con lockfile único, overrides conservados y Node 24.
 - [x] Launcher, Docker, CI, Pages y documentación actualizados; ambos `package-lock.json` y sus metadatos internos de instalación npm retirados tras las verificaciones.

@@ -8,7 +8,7 @@ Antecedente del 15 de octubre de 2026: DeepSeek se activó temporalmente mientra
 
 Cuando se selecciona DeepSeek, la API recibe las instrucciones, el historial enviado en la solicitud, el contexto del negocio y los resultados de herramientas que necesite el chat. Esto puede incluir los datos de contacto y reserva que el usuario introduzca. No debe describirse este modo como inferencia local.
 
-Vault conserva su almacenamiento en el navegador y fuerza Ollama para texto, imágenes y análisis de transcripciones. Si la Mac falla, Vault muestra indisponibilidad; sus consultas no se redirigen a DeepSeek. Las credenciales Cloudflare Access se usan exclusivamente para el transporte Ollama. DeepSeek recibe solo su clave Bearer, nunca los headers de Access.
+Las credenciales Cloudflare Access se usan exclusivamente para el transporte Ollama. DeepSeek recibe solo su clave Bearer, nunca los headers de Access. El alcance de esta integración es el asistente comercial del negocio.
 
 ## Configuración de servidor
 
@@ -18,7 +18,7 @@ DEEPSEEK_MODEL=deepseek-flash
 DEEPSEEK_API_KEY=<clave privada fuera de Git>
 ```
 
-El único modelo admitido inicialmente es `deepseek-flash`. El destino está fijado a `https://api.deepseek.com/chat/completions`; no se permite configurar un destino externo arbitrario. Se usa `thinking: {type: "disabled"}`, herramientas compatibles con OpenAI y respuestas sin streaming. Esta integración acepta texto; la visión continúa exclusivamente en Vault/Ollama. [Modelos y tarifas](https://api-docs.deepseek.com/quick_start/pricing/), [modo de razonamiento](https://api-docs.deepseek.com/guides/thinking_mode/) y [herramientas](https://api-docs.deepseek.com/guides/tool_calls/).
+El único modelo admitido inicialmente es `deepseek-flash`. El destino está fijado a `https://api.deepseek.com/chat/completions`; no se permite configurar un destino externo arbitrario. Se usa `thinking: {type: "disabled"}`, herramientas compatibles con OpenAI y respuestas sin streaming. Esta integración acepta texto. [Modelos y tarifas](https://api-docs.deepseek.com/quick_start/pricing/), [modo de razonamiento](https://api-docs.deepseek.com/guides/thinking_mode/) y [herramientas](https://api-docs.deepseek.com/guides/tool_calls/).
 
 No añadir la clave a `NEXT_PUBLIC_*`, Docker ARG, comandos pegados en el historial, archivos del repositorio, logs ni capturas. Guardarla en el archivo runtime privado, con acceso solo del administrador del servidor. La imagen no contiene secretos. Instalar o rotar una credencial requiere recrear únicamente `app` para cargarla; el selector no admite ni devuelve claves.
 
@@ -30,10 +30,10 @@ La selección se guarda en `serverSettings/ai` mediante `GET/PATCH /api/admin/ai
 2. Verificar la configuración privada del destino, incluida la clave DeepSeek si se va a seleccionar. Mantener la configuración Ollama/Access intacta.
 3. Con una sesión de superadministrador, seleccionar el destino y guardar desde `/admin`. El servidor valida configuración y catálogo antes de persistir. El cambio no reinicia la aplicación: afecta nuevas solicitudes, y cada turno en curso conserva su proveedor hasta terminar las herramientas.
 4. Con una sesión válida, comprobar `/api/sarin/health`: proveedor elegido y estado online. La prueba de catálogo valida clave y modelo, pero no garantiza saldo ni capacidad de generar. Realizar después una única conversación sintética autorizada y comprobar una llamada de herramienta sin escrituras reales.
-5. Como superadministrador, comprobar `/api/sarin/health?scope=vault`: proveedor `ollama`, estado independiente. Nunca debe presentarse DeepSeek como salud de Vault.
+5. Si se va a utilizar IA local, comprobar como superadministrador `/api/sarin/health?scope=engine`: proveedor `ollama`, estado independiente del proveedor comercial seleccionado.
 6. Para volver a IA local, verificar modelo y respuesta de la Mac y seleccionar Ollama desde el mismo panel. El selector no modifica DNS, rutas Cloudflare, variables de entorno, facturación ni cuentas bancarias.
 
-`docker compose restart` no recarga las variables del archivo runtime. `doctor` diagnostica la configuración base de Ollama/Vault y no consulta la selección privada del panel; `--generate` utiliza Ollama y no prueba DeepSeek. Para conocer el proveedor efectivo del chat, utiliza las API autenticadas del panel o de salud.
+`docker compose restart` no recarga las variables del archivo runtime. `doctor` diagnostica la configuración base de Ollama y no consulta la selección privada del panel; `--generate` utiliza Ollama y no prueba DeepSeek. Para conocer el proveedor efectivo del chat, utiliza las API autenticadas del panel o de salud.
 
 Una reversión a una imagen anterior al selector vuelve al comportamiento basado en `SARIN_CHAT_PROVIDER` e ignora `serverSettings/ai`. Comprueba la salud y el proveedor efectivo después de ese rollback. Conserva el documento y sus cambios salvo que se autorice una reversión específica.
 

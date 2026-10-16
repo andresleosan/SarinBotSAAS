@@ -6,7 +6,6 @@ import {
   Check,
   Cpu,
   Eye,
-  LockKeyhole,
   Plus,
   RefreshCw,
   Trash2,
@@ -26,6 +25,7 @@ import { AdminAiUsage } from "@/components/admin-ai-usage";
 import { AdminWhatsApp } from "@/components/admin-whatsapp";
 import { BILLING_PLANS, getBillingPlan } from "@/lib/billing-plans";
 import { ResponseQuota } from "@/components/response-quota";
+import { paidTrialRemaining, PAID_TRIAL_APPOINTMENT_LIMIT } from "@/lib/paid-trial";
 import type {
   Business,
   PaymentReceipt,
@@ -40,7 +40,8 @@ interface AdminData {
   allowances: Record<string, ResponseAllowance>;
 }
 const subscriptionLabels: Record<Business["subscription"]["status"], string> = {
-  trial: "Prueba gratis",
+  pending_payment: "Pendiente de pago aprobado",
+  trial: "Prueba pagada",
   active: "Activa",
   past_due: "Pago pendiente",
   suspended: "Suspendida",
@@ -137,7 +138,9 @@ function Console() {
       );
       setNotice(
         action === "approve"
-          ? response.receipt.kind === "response_pack"
+          ? response.receipt.kind === "paid_trial"
+            ? `Pago aprobado: prueba pagada de ${response.receipt.appointmentAllowance ?? PAID_TRIAL_APPOINTMENT_LIMIT} citas activada, sin caducidad.`
+            : response.receipt.kind === "response_pack"
             ? `Pago aprobado: ampliación de ${(response.receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas en la vigencia actual.`
             : `Pago aprobado y suscripción extendida ${response.receipt.periodDays ?? 30} días.`
           : "Comprobante rechazado.",
@@ -182,13 +185,6 @@ function Console() {
             Administra las suscripciones, revisa pagos y elige la IA de los negocios.
           </p>
         </div>
-        <Link
-          href="/admin/vault"
-          className={buttonClass + " flex items-center gap-2"}
-        >
-          <LockKeyhole className="h-4 w-4" />
-          Abrir Sarin Vault
-        </Link>
       </header>
       {error && <Notice error>{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
@@ -232,7 +228,7 @@ function Console() {
           {engine.health?.queue && (
             <p className="mt-2 text-xs text-sarin-muted">
               {engine.health.queue.queuedRequests} en espera ·{" "}
-              {engine.health.queue.criticalQueued} de Vault
+              {engine.health.queue.criticalQueued} prioritarias
             </p>
           )}
         </div>
@@ -273,7 +269,7 @@ function Console() {
                 >
                   <div className="flex justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="break-words font-semibold">{receipt.tenantName}</h3>
+                      <h3 className="break-words font-semibold">{receipt.tenantName || "Pendiente de configurar"}</h3>
                       <p className="mt-1 break-all text-xs text-sarin-muted">
                         {receipt.ownerEmail}
                       </p>
@@ -297,7 +293,7 @@ function Console() {
                     · {receipt.bankSelected}
                   </p>
                   <p className="text-sm text-sarin-ink">
-                    {receipt.kind === "response_pack" ? `Ampliación · ${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas · sin extender vigencia` : `${getBillingPlan(receipt.planId ?? "monthly").label} · ${receipt.periodDays ?? 30} días${receipt.responseAllowance !== undefined ? ` · ${receipt.responseAllowance.toLocaleString("es-CO")} respuestas` : ""}`}
+                    {receipt.kind === "paid_trial" ? `Prueba pagada · configuración y ${receipt.appointmentAllowance ?? PAID_TRIAL_APPOINTMENT_LIMIT} citas · sin caducidad` : receipt.kind === "response_pack" ? `Ampliación · ${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas · sin extender vigencia` : `${getBillingPlan(receipt.planId ?? "monthly").label} · ${receipt.periodDays ?? 30} días${receipt.responseAllowance !== undefined ? ` · ${receipt.responseAllowance.toLocaleString("es-CO")} respuestas` : ""}`}
                   </p>
                   <p className="text-xs text-sarin-muted">
                     {new Date(receipt.submittedAt).toLocaleString("es-CO", {
@@ -315,7 +311,7 @@ function Console() {
                   {images[receipt.id] && (
                     <img
                       src={images[receipt.id]}
-                      alt={`Comprobante de ${receipt.tenantName}`}
+                      alt={`Comprobante de ${receipt.tenantName || "Pendiente de configurar"}`}
                       className="max-h-96 w-full rounded-xl object-contain"
                     />
                   )}
@@ -345,7 +341,7 @@ function Console() {
                           onClick={() => void review(receipt.id, "approve")}
                         >
                           <Check className="h-4 w-4" />
-                          {receipt.kind === "response_pack" ? `Aprobar +${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas` : `Aprobar +${receipt.periodDays ?? 30} días`}
+                          {receipt.kind === "paid_trial" ? `Aprobar prueba de ${receipt.appointmentAllowance ?? PAID_TRIAL_APPOINTMENT_LIMIT} citas` : receipt.kind === "response_pack" ? `Aprobar +${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas` : `Aprobar +${receipt.periodDays ?? 30} días`}
                         </button>
                         <button
                           className="flex min-h-11 items-center justify-center gap-1 rounded-[10px] border border-rose-200 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
@@ -387,7 +383,7 @@ function Console() {
                 <tr>
                   <th className="p-4">Negocio</th>
                   <th className="p-4">Estado</th>
-                  <th className="p-4">Fin de prueba</th>
+                  <th className="p-4">Citas de prueba</th>
                   <th className="p-4">Vigencia del pago</th>
                   <th className="p-4">Respuestas de IA</th>
                 </tr>
@@ -396,12 +392,12 @@ function Console() {
                 {data.businesses.map((business) => (
                   <tr key={business.id}>
                     <td className="p-4">
-                      <Link
+                      {business.slug ? <Link
                         href={`/b/${business.slug}`}
                         className="font-semibold text-sarin-blue hover:underline"
                       >
                         {business.name}
-                      </Link>
+                      </Link> : <span className="font-semibold">Pendiente de configurar</span>}
                       <span className="mt-1 block text-xs text-sarin-muted">
                         {business.ownerEmail}
                       </span>
@@ -410,18 +406,14 @@ function Console() {
                       {subscriptionLabels[business.subscription.status]}
                     </td>
                     <td className="whitespace-nowrap p-4 text-sarin-muted">
-                      {new Date(
-                        business.subscription.trialEndsAt,
-                      ).toLocaleDateString("es-CO", {
-                        timeZone: "America/Bogota",
-                      })}
+                      {business.subscription.paidTrial ? `${business.subscription.paidTrial.appointmentsUsed} de ${business.subscription.paidTrial.appointmentLimit} utilizadas · ${paidTrialRemaining(business.subscription)} disponibles` : "Sin prueba pagada"}
                     </td>
                     <td className="whitespace-nowrap p-4 text-sarin-muted">
                       {business.subscription.currentPeriodEndsAt > 0 ? new Date(
                         business.subscription.currentPeriodEndsAt,
                       ).toLocaleDateString("es-CO", {
                         timeZone: "America/Bogota",
-                      }) : "Sin pago aprobado"}
+                      }) : business.subscription.status === "trial" && business.subscription.paidTrial ? "Prueba pagada sin caducidad" : "Sin pago aprobado"}
                     </td>
                     <td className="p-4"><ResponseQuota compact allowance={data.allowances?.[business.id]} /></td>
                   </tr>

@@ -12,6 +12,7 @@ vi.mock('../src/lib/server/auth', async () => {
 vi.mock('../src/lib/sarin/engine', async (importOriginal) => ({ ...await importOriginal<typeof import('../src/lib/sarin/engine')>(), completeChat: state.complete }));
 import { POST } from '../src/app/api/sarin/chat/route';
 import { cancelAppointment } from '../src/lib/server/bookings';
+import { businessIdForOwner } from '../src/lib/server/businesses';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { readAdminAiUsage } from '../src/lib/server/ai-usage';
 import { runSarinChat } from '../src/lib/server/chat';
@@ -22,6 +23,7 @@ const business: Business = { id: 'business', slug: 'real', ownerUid: 'owner', ow
 const body = { mode: 'sarin_client', tenantId: 'business', requestId: 'request-one', messages: [{ role: 'user' as const, content: 'Agenda corte el lunes 7 a las 9.' }] };
 const request = (data: unknown = body, authenticated = true) => new Request('http://localhost/api/sarin/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: 'Bearer token' } : {}) }, body: JSON.stringify(data) });
 const bookingCall = () => ({ role: 'assistant', content: null, tool_calls: [{ id: 'call-book', type: 'function', function: { name: 'crear_cita', arguments: JSON.stringify({ dateKey: '2030-01-07', startTimeStr: '09:00', serviceId: 'cut', resourceId: 'chair', clientPhone: '573001234567', intakeAnswers: {} }) } }] });
+const paidTrial = (used = 0): Business => ({ ...business, subscription: { status: 'trial', trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: 'approved', activatedAt: now, appointmentLimit: 10, appointmentsUsed: used } } });
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); vi.stubEnv('SARIN_CHAT_PROVIDER', 'ollama'); state.db = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown> }).db; state.complete.mockReset(); state.userName = 'Cliente'; state.whatsappReady = false; });
 function prepareWhatsApp(planId = 'whatsapp', endsAt = now + 86400000) {
   state.whatsappReady = true;
@@ -33,6 +35,77 @@ function prepareWhatsApp(planId = 'whatsapp', endsAt = now + 86400000) {
 }
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 describe('authenticated tool orchestration', () => {
+  it('rejects unpaid onboarding before provider selection or inference', async () => {
+    state.db = memoryFirestore({ 'serverSettings/ai': { provider: 'unsupported', updatedAt: now } }).db;
+    const response = await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '' }));
+    expect(response.status).toBe(402);
+    expect(state.complete).not.toHaveBeenCalled();
+  });
+  it('permits paid draft onboarding while rejecting client inference against the unfinished draft', async () => {
+    const id = businessIdForOwner('client');
+    state.db = memoryFirestore({ [`businesses/${id}`]: { ...paidTrial(), id, ownerUid: 'client', slug: '', sarinConfig: { ...business.sarinConfig, onboardingCompleted: false } } }).db;
+    state.complete.mockResolvedValue({ role: 'assistant', content: 'Describe tu negocio.' });
+    expect((await POST(request({ ...body, tenantId: id }))).status).toBe(403);
+    expect(state.complete).not.toHaveBeenCalled();
+    expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '' }))).status).toBe(200);
+  });
+  it('denies owner copilot to introductory access before inference', async () => {
+    state.db = memoryFirestore({ 'businesses/business': paidTrial() as unknown as Record<string, unknown> }).db;
+    await expect(runSarinChat({ user: { uid: 'owner' }, body: { ...body, mode: 'sarin_owner_copilot' } })).rejects.toMatchObject({ status: 402 });
+    expect(state.complete).not.toHaveBeenCalled();
+  });
+  it('confirms and durably replays the tenth booking after access exhaustion without another provider call', async () => {
+    const memory = memoryFirestore({ 'businesses/business': paidTrial(9) as unknown as Record<string, unknown> });
+    state.db = memory.db;
+    state.complete.mockResolvedValueOnce(bookingCall()).mockRejectedValue(new Error('later explanation unavailable'));
+    const first = await POST(request());
+    expect(first.status).toBe(200);
+    const saved = await first.json();
+    expect(saved.reply).toContain('Tu cita está confirmada');
+    expect(memory.rows.get('businesses/business')?.data.subscription).toMatchObject({ paidTrial: { appointmentsUsed: 10 } });
+    expect(state.complete).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(now + 16 * 60000);
+    const replay = await POST(request());
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).toolResults[0].result.appointment.id).toBe(saved.toolResults[0].result.appointment.id);
+    expect(state.complete).toHaveBeenCalledTimes(1);
+    expect((await POST(request({ ...body, requestId: 'eleventh-request' }))).status).toBe(402);
+    const changed = await POST(request({ ...body, messages: [{ role: 'user', content: 'Different appointment' }] }));
+    expect(changed.status).toBe(409);
+    await cancelAppointment({ uid: 'client' }, 'business', saved.toolResults[0].result.appointment.id, memory.db);
+    expect((await (await POST(request())).json()).reply).toMatch(/cancelada/i);
+  });
+  it('recovers the saved tenth appointment after losing the response cache and an unacknowledged quota commit', async () => {
+    const memory = memoryFirestore({ 'businesses/business': paidTrial(9) as unknown as Record<string, unknown> });
+    state.db = memory.db;
+    const original = memory.db.runTransaction.bind(memory.db);
+    const outage = vi.spyOn(memory.db, 'runTransaction').mockImplementation(async (...args) => {
+      const [handler, options] = args;
+      return original(transaction => handler(new Proxy(transaction, { get(target, property) {
+        if (property !== 'set') return Reflect.get(target, property);
+        return (...write: unknown[]) => {
+          const [reference, data] = write as [{ path: string }, { status?: string }];
+          if (reference.path.startsWith('responseQuotaTurns/') && data.status === 'completed') throw new Error('quota acknowledgement unavailable');
+          return Reflect.apply(target.set, target, write);
+        };
+      } })), options);
+    });
+    state.complete.mockResolvedValueOnce(bookingCall());
+    const first = await POST(request());
+    expect(first.status).toBe(200);
+    const saved = await first.json();
+    expect((await getResponseQuota('business')).currentPeriod).toMatchObject({ usedResponses: 0, reservedResponses: 1 });
+    outage.mockRestore();
+    // A new DB handle simulates loss of the process-local response cache while
+    // retaining the same durable Firestore documents.
+    state.db = { ...memory.db };
+    const replay = await POST(request());
+    expect(replay.status).toBe(200);
+    expect((await replay.json()).toolResults[0].result.appointment.id).toBe(saved.toolResults[0].result.appointment.id);
+    expect((await getResponseQuota('business')).currentPeriod).toMatchObject({ usedResponses: 1, reservedResponses: 0 });
+    expect(state.complete).toHaveBeenCalledTimes(1);
+    expect([...memory.rows.keys()].filter(path => path.includes('/appointments/'))).toHaveLength(1);
+  });
   it.each(['deepseek', 'gemini'] as const)('records every %s tool round under the business without repeating a booking after a failed explanation', async provider => {
     const { db, rows } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider, updatedAt: now } }); state.db = db;
     const usage = { promptTokens: 10, cacheHitTokens: 0, cacheMissTokens: 10, completionTokens: 5, totalTokens: 15 };
@@ -53,14 +126,15 @@ describe('authenticated tool orchestration', () => {
     expect([...rows.keys()].filter(key => key.startsWith('businesses/business/appointments/'))).toHaveLength(1);
     expect(JSON.stringify([...rows.entries()].filter(([key]) => key.startsWith('aiUsage')))).not.toMatch(/client@example|573001234567|Corte|Agenda corte/);
   });
-  it.each(['deepseek', 'gemini'] as const)('attributes initial %s onboarding to the unassigned bucket and omits a meter for Ollama', async provider => {
-    const { db } = memoryFirestore({ 'serverSettings/ai': { provider, updatedAt: now } }); state.db = db;
+  it.each(['deepseek', 'gemini'] as const)('attributes paid %s onboarding to its business and omits a meter for Ollama', async provider => {
+    const id = businessIdForOwner('client');
+    const { db } = memoryFirestore({ [`businesses/${id}`]: { ...paidTrial(), id, ownerUid: 'client', slug: '', sarinConfig: { ...business.sarinConfig, onboardingCompleted: false } }, 'serverSettings/ai': { provider, updatedAt: now } }); state.db = db;
     state.complete.mockImplementationOnce(async (_messages, _tools, options) => {
       await options.onUsage?.({ callId: '00000000-0000-4000-8000-000000000003', provider, model: provider === 'gemini' ? 'gemini-3.5-flash-lite' : 'deepseek-flash', startedAt: now, finishedAt: now + 1, success: true, usage: null });
       return { role: 'assistant', content: 'Describe tu negocio.' };
     }).mockResolvedValue({ role: 'assistant', content: 'Describe tu negocio.' });
     expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '' }))).status).toBe(200);
-    expect((await readAdminAiUsage('2030-01', db, provider)).businesses[0]).toMatchObject({ businessId: null, calls: 1 });
+    expect((await readAdminAiUsage('2030-01', db, provider)).businesses[0]).toMatchObject({ businessId: id, calls: 1 });
     await db.collection('serverSettings').doc('ai').set({ provider: 'ollama', updatedAt: now + 1 });
     expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '', requestId: 'next-local-turn' }))).status).toBe(200);
     expect(state.complete.mock.calls.at(-1)?.[2]?.onUsage).toBeUndefined();
@@ -97,7 +171,8 @@ describe('authenticated tool orchestration', () => {
     expect(state.complete.mock.calls.at(-1)?.[2]?.provider).toBe('ollama');
   });
   it('uses the private selection for onboarding as well as booking chat', async () => {
-    state.db = memoryFirestore({ 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }).db;
+    const id = businessIdForOwner('client');
+    state.db = memoryFirestore({ [`businesses/${id}`]: { ...paidTrial(), id, ownerUid: 'client' }, 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }).db;
     state.complete.mockResolvedValue({ role: 'assistant', content: 'Describe tu negocio.' });
     expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '' }))).status).toBe(200);
     expect(state.complete.mock.calls[0][2]?.provider).toBe('deepseek');

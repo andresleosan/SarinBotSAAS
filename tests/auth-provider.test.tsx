@@ -73,6 +73,16 @@ describe("authentication provider access state", () => {
     renderer = undefined;
   });
 
+  it("offers public service information before Google sign-in without requesting a session", async () => {
+    await mount();
+    await act(async () => state.listener?.(null));
+    const destinations = renderer!.root.findAllByType("a").map(link => link.props.href);
+    expect(destinations).toContain("/privacidad");
+    expect(destinations).toContain("/ayuda");
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+    expect(JSON.stringify(renderer?.toJSON())).not.toContain("PRIVATE_ADMIN_CONTENT");
+  });
+
   it("keeps administrator content blocked when server session validation fails", async () => {
     vi.mocked(apiFetch).mockRejectedValue(new Error("Servicio no disponible"));
     await mount();

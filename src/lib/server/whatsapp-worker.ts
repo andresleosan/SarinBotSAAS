@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Database as Firestore } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { runSarinChat } from './chat';
 import { commitResponseQuota } from './response-quota';

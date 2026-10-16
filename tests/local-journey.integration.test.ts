@@ -5,7 +5,6 @@ import { deleteApp, getApps } from 'firebase-admin/app';
 import type { Firestore } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { createAppointment, readAvailability } from '@/lib/server/bookings';
-import { publicBusiness } from '@/lib/server/businesses';
 import { bookingSchema, businessConfigSchema } from '@/lib/server/schemas';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import type { Appointment, Business, PaymentReceipt, PlatformSettings, ResponseAllowance } from '@/types/firestore';
@@ -21,7 +20,8 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
     const port = Number(process.env.SARIN_JOURNEY_PORT);
     const base = `http://127.0.0.1:${port}`;
     const auth = getAdminAuth();
-    const db = getAdminDb();
+    // The emulator-only harness also uses raw fixture/cleanup operations.
+    const db = getAdminDb() as unknown as import('firebase-admin/firestore').Firestore;
     const createdAccounts: string[] = [];
     let claimedRun = false;
     let addedBank = false;
@@ -124,24 +124,46 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
         resources: [{ id: 'room', name: 'Recurso sintético', active: true }],
         services: [{ id: 'service', name: 'Consulta sintética', durationMinutes: 60, bufferMinutes: 15, price: 100, resourceIds: ['room'] }],
         weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: true, intervals: [{ start: '09:00', end: '18:00' }] }])) });
+      const bankSelected = await db.runTransaction(async transaction => {
+        const ref = db.doc('platformSettings/main'); const snapshot = await transaction.get(ref); const data = snapshot.data() ?? {};
+        if (data.bankAccounts !== undefined && !Array.isArray(data.bankAccounts)) throw new Error('La configuración bancaria local no es válida; se preservó.');
+        const accounts = data.bankAccounts ?? [];
+        if (accounts.length) { assert.ok(typeof accounts[0].id === 'string'); return accounts[0].id as string; }
+        transaction.set(ref, { bankAccounts: [fixture.bank] }, { merge: true });
+        createdSettings = !snapshot.exists; addedBank = true;
+        return fixture.bank.id;
+      });
+      const receiptDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jwL8AAAAASUVORK5CYII=';
+      check((await api('/api/businesses', owner.token, 'POST', config)).response.status === 402, 'La configuración se habilitó sin pagar.');
+      const introductoryInput = { kind: 'paid_trial', bankSelected, receiptDataUrl, requestId: requestId('introductory') };
+      check((await api('/api/billing', owner.token, 'POST', { ...introductoryInput, amountCOP: 1 })).response.status === 400, 'El cliente pudo alterar el precio de la prueba.');
+      const introductory = await api<{ receipt: PaymentReceipt; business: Business }>('/api/billing', owner.token, 'POST', introductoryInput);
+      check(introductory.response.status === 201 && introductory.body.receipt.amountCOP === 5000 && introductory.body.receipt.appointmentAllowance === 10, 'El pago inicial no conserva 5.000 COP y diez citas.');
+      check(introductory.body.business.subscription.status === 'pending_payment' && !introductory.body.business.subscription.graceEndsAt && !isSubscriptionAllowed(introductory.body.business), 'Subir un comprobante habilitó acceso gratuito.');
+      check(!(await db.doc(`publicBusinesses/${fixture.slug}`).get()).exists, 'Un borrador de pago se publicó antes de configurar.');
+      check((await api('/api/businesses', owner.token, 'POST', config)).response.status === 402, 'Un pago pendiente habilitó la configuración.');
+      check((await api('/api/admin', owner.token, 'PATCH', { action: 'approve', paymentId: introductory.body.receipt.id })).response.status === 403, 'El dueño aprobó su prueba.');
+      const introductoryApproval = await api<{ receipt: PaymentReceipt; business: Business }>('/api/admin', admin.token, 'PATCH', { action: 'approve', paymentId: introductory.body.receipt.id });
+      check(introductoryApproval.response.ok && introductoryApproval.body.business.subscription.status === 'trial' && isSubscriptionAllowed(introductoryApproval.body.business), 'La aprobación no habilitó la configuración pagada.');
       const created = await api<{ business: Business }>('/api/businesses', owner.token, 'POST', config);
       check(created.response.status === 201 && created.body.business.id === fixture.businessId && created.body.business.ownerUid === fixture.ownerUid, 'Onboarding no creó el negocio esperado.');
       const business = created.body.business;
-      check(business.subscription.status === 'trial' && business.subscription.trialEndsAt - business.createdAt === 7 * 86400000, 'La prueba no dura siete días.');
+      check(business.subscription.status === 'trial' && business.subscription.trialEndsAt === 0 && business.subscription.paidTrial?.appointmentLimit === 10 && business.subscription.paidTrial.appointmentsUsed === 0, 'La prueba pagada no conserva diez citas sin caducidad.');
       const trialBilling = await api<{ allowance: ResponseAllowance }>('/api/billing', owner.token);
       check(trialBilling.response.ok && trialBilling.body.allowance.currentPeriod?.includedResponses === 700 && trialBilling.body.allowance.currentPeriod.source === 'trial', 'La prueba no tiene su bolsa de 700 respuestas.');
       const repeated = await api<{ business: Business }>('/api/businesses', owner.token, 'POST', { ...config, name: 'Negocio sintético actualizado' });
-      check(repeated.response.status === 201 && repeated.body.business.subscription.trialEndsAt === business.subscription.trialEndsAt && repeated.body.business.name === 'Negocio sintético actualizado', 'Guardar configuración reinició la prueba o no aplicó cambios.');
+      check(repeated.response.status === 201 && isDeepStrictEqual(repeated.body.business.subscription.paidTrial, business.subscription.paidTrial) && repeated.body.business.name === 'Negocio sintético actualizado', 'Guardar configuración reinició la prueba o no aplicó cambios.');
       const collision = await api('/api/businesses', outsider.token, 'POST', config);
-      check(collision.response.status === 409, 'Un segundo dueño reutilizó un slug existente.');
+      check(collision.response.status === 402, 'Un segundo dueño sin pago pudo configurar un negocio.');
       const projection = await firestoreRead(`publicBusinesses/${fixture.slug}`, client.token);
       check(projection.response.ok && !projection.body.fields?.ownerUid && !projection.body.fields?.ownerEmail, 'La proyección pública filtró identidad del dueño.');
       const projected = (await db.doc(`publicBusinesses/${fixture.slug}`).get()).data();
+      check(!projected?.subscription?.paidTrial?.paymentId && projected?.subscription?.paidTrial?.appointmentLimit === 10, 'La proyección filtró el pago o perdió el límite de citas.');
       check(isDeepStrictEqual(projected?.weeklySchedule, config.weeklySchedule) && projected?.timezone === 'America/Bogota', 'El horario público no coincide con la configuración.');
       check((await firestoreRead(`businesses/${fixture.businessId}`, client.token)).response.status === 403, 'Un cliente accedió al documento privado del negocio.');
       const slots = await readAvailability(repeated.body.business, dateKey, 'service', 'room', db);
       check(slots[0]?.slots.includes('10:00') && slots[0]?.slots.includes('14:00'), 'No se calcularon horarios disponibles reales.');
-      console.log('Fase 2 OK: onboarding, prueba única, slug y proyección/horarios reales.');
+      console.log('Fase 2 OK: pago inicial aprobado, configuración, diez citas sin caducidad y proyección privada.');
 
       // No client booking API exists: execute the same validated implementation
       // used by tools, with an Auth-verified identity and real Admin transactions.
@@ -170,27 +192,24 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       check(race.filter(result => result.status === 'fulfilled').length === 1 && race.some(result => result.status === 'rejected' && result.reason?.status === 409), 'La reserva concurrente permitió double-booking.');
       console.log('Fase 3 OK: reservas reales/idempotentes, carrera concurrente, cancelación, bloqueos y permisos.');
 
-      const expired: Business = { ...repeated.body.business, subscription: { status: 'past_due', trialEndsAt: Date.now() - 1, currentPeriodEndsAt: 0 } };
-      await db.runTransaction(async transaction => { transaction.set(db.doc(`businesses/${fixture.businessId}`), expired); transaction.set(db.doc(`publicBusinesses/${fixture.slug}`), publicBusiness(expired)); });
-      check(!isSubscriptionAllowed(expired), 'La suscripción vencida sigue permitida.');
+      for (let index = 0; index < 8; index++) {
+        const futureDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() + (index + 3) * 86400000));
+        const lastInput = { ...booking, dateKey: futureDate, startTimeStr: '09:00' };
+        const last = await createAppointment(client.decoded, fixture.businessId, lastInput, requestId(`quota-${index}`), db);
+        if (index === 7) check((await createAppointment(client.decoded, fixture.businessId, lastInput, requestId(`quota-${index}`), db)).id === last.id, 'Reintentar la décima cita falló o consumió otro cupo.');
+      }
+      const expired = (await db.doc(`businesses/${fixture.businessId}`).get()).data() as Business;
+      check(expired.subscription.paidTrial?.appointmentsUsed === 10 && !isSubscriptionAllowed(expired), 'La décima cita no agotó la prueba.');
       await assert.rejects(createAppointment(client.decoded, fixture.businessId, { ...booking, startTimeStr: '09:00' }, requestId('expired'), db), { status: 402 }); checks++;
-      const bankSelected = await db.runTransaction(async transaction => {
-        const ref = db.doc('platformSettings/main'); const snapshot = await transaction.get(ref); const data = snapshot.data() ?? {};
-        if (data.bankAccounts !== undefined && !Array.isArray(data.bankAccounts)) throw new Error('La configuración bancaria local no es válida; se preservó.');
-        const accounts = data.bankAccounts ?? [];
-        if (accounts.length) { assert.ok(typeof accounts[0].id === 'string'); return accounts[0].id as string; }
-        transaction.set(ref, { bankAccounts: [fixture.bank] }, { merge: true });
-        createdSettings = !snapshot.exists; addedBank = true;
-        return fixture.bank.id;
-      });
-      const receiptDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jwL8AAAAASUVORK5CYII=';
+      check((await api('/api/billing', owner.token, 'POST', { ...introductoryInput, requestId: requestId('introductory-repeat') })).response.status === 409, 'Se pudo recomprar y reiniciar la prueba.');
       check(Buffer.from(receiptDataUrl.split(',')[1], 'base64').byteLength < 150 * 1024, 'La captura sintética supera el límite.');
       const uploadInput = { bankSelected, receiptDataUrl, planId: 'weekly', requestId: requestId('receipt') };
-      check((await api('/api/billing', client.token, 'POST', uploadInput)).response.status === 403, 'Un cliente subió pagos de un negocio ajeno.');
+      check((await api('/api/billing', client.token, 'POST', { ...uploadInput, tenantId: fixture.businessId })).response.status === 400, 'Un cliente pudo elegir un negocio ajeno al subir el pago.');
       check((await api('/api/billing', owner.token, 'POST', { ...uploadInput, planId: 'unlimited' })).response.status === 400, 'Se aceptó un plan inexistente.');
       check((await api('/api/billing', owner.token, 'POST', { ...uploadInput, amountCOP: 1, periodDays: 365 })).response.status === 400, 'El cliente pudo elegir un importe o duración arbitrarios.');
       const uploaded = await api<{ receipt: PaymentReceipt; business: Business }>('/api/billing', owner.token, 'POST', uploadInput);
       check(uploaded.response.status === 201 && uploaded.body.receipt.status === 'pending' && uploaded.body.receipt.ownerUid === fixture.ownerUid, 'La API no almacenó el comprobante pendiente.');
+      check(!uploaded.body.business.subscription.graceEndsAt && !isSubscriptionAllowed(uploaded.body.business), 'Subir un plan desbloqueó la prueba agotada antes de aprobar.');
       const receiptId = uploaded.body.receipt.id;
       const repeatedUpload = await api<{ receipt: PaymentReceipt; business: Business }>('/api/billing', owner.token, 'POST', uploadInput);
       check(repeatedUpload.response.status === 201 && repeatedUpload.body.receipt.id === receiptId && repeatedUpload.body.business.subscription.graceEndsAt === uploaded.body.business.subscription.graceEndsAt, 'Repetir el comprobante duplicó el pago o su gracia.');
@@ -204,8 +223,8 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       const clientBilling = await api<{ receipts: PaymentReceipt[] }>('/api/billing', client.token);
       check(clientBilling.response.ok && clientBilling.body.receipts.length === 0, 'Un cliente recibió pagos de otro dueño.');
       const publicWithPayment = (await db.doc(`publicBusinesses/${fixture.slug}`).get()).data();
-      check(!publicWithPayment?.subscription.lastPaymentId && !publicWithPayment?.subscription.graceGrantedAt, 'La proyección expuso metadatos privados de pago.');
-      console.log('Fase 4 OK: suscripción vencida, captura sintética, documento dedicado, gracia y pago privado.');
+      check(!publicWithPayment?.subscription.lastPaymentId && !publicWithPayment?.subscription.graceGrantedAt && !publicWithPayment?.subscription.paidTrial?.paymentId, 'La proyección expuso metadatos privados de pago.');
+      console.log('Fase 4 OK: diez citas consumidas, bloqueo sin gracia, comprobante e imagen privados.');
 
       check((await api('/api/admin', owner.token)).response.status === 403 && (await api('/api/admin', client.token)).response.status === 403, 'Se permitió acceso a consola sin UID administrador.');
       check((await api('/api/admin', owner.token, 'PATCH', { action: 'approve', paymentId: receiptId })).response.status === 403, 'El dueño aprobó su propio comprobante.');
@@ -260,7 +279,7 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
           assert.equal((await ownDocuments()).length, 0, 'La limpieza dejó documentos sintéticos.');
           for (const uid of createdAccounts) assert.ok(await missingUser(uid), 'La limpieza dejó una cuenta sintética.');
           if (addedBank) assert.ok(!(await db.doc('platformSettings/main').get()).data()?.bankAccounts?.some((account: { id: string }) => account.id === fixture.bank.id), 'La limpieza dejó la cuenta bancaria sintética.');
-          console.log('Limpieza OK: documentos, cuentas y banco sintéticos retirados; datos manuales, admin local y Vault preservados.');
+          console.log('Limpieza OK: documentos, cuentas y banco sintéticos retirados; datos manuales y admin local preservados.');
         }
       } catch (error) { cleanupFailure = error; }
       await closeAdmin(db);

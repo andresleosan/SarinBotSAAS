@@ -1,47 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/components/auth-provider";
-import { getFirebaseClient } from "@/lib/firebase/client";
-import { errorMessage } from "@/lib/client/api";
+import { apiFetch } from "@/lib/client/api";
+import { useApiPoll } from "@/lib/client/use-api-poll";
 import type { Business } from "@/types/firestore";
 
 export function useBusiness() {
   const { user } = useAuth();
-  const [business, setBusiness] = useState<Business | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    setBusiness(null);
-    setError(null);
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      return onSnapshot(
-        query(
-          collection(getFirebaseClient().db, "businesses"),
-          where("ownerUid", "==", user.uid),
-        ),
-        (snapshot) => {
-          const first = snapshot.docs[0];
-          setBusiness(
-            first ? ({ ...first.data(), id: first.id } as Business) : null,
-          );
-          setLoading(false);
-        },
-        (cause) => {
-          setError(errorMessage(cause));
-          setLoading(false);
-        },
-      );
-    } catch (cause) {
-      setError(errorMessage(cause));
-      setLoading(false);
-    }
-  }, [user]);
-  return { business, loading, error };
+  const result = useApiPoll(user?.uid ?? null, async signal => {
+    const { business } = await apiFetch<{ business: Business | null }>("/api/businesses", { signal });
+    if (business && business.ownerUid !== user?.uid) throw new Error("No tienes acceso a este negocio.");
+    return business;
+  });
+  return { business: result.value, loading: result.loading, error: result.error };
 }

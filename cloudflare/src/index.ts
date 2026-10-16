@@ -1,12 +1,18 @@
-import { Container, getContainer } from '@cloudflare/containers';
-import { forwardToSingleton, runtimeEnvironment } from './router.ts';
+import { Container, ContainerProxy, getContainer } from '@cloudflare/containers';
+import { handleIdentityOutbound, handlePublicIdentityRequest } from './identity.ts';
+import { handleDataOutbound } from './data.ts';
+import { backgroundWorkEnabled, forwardToSingleton, runtimeEnvironment, wakeBackgroundSingleton } from './router.ts';
+
+export { SarinIdentity } from './identity.ts';
+export { ContainerProxy };
 
 /** The DO stores SDK lifecycle metadata only; application bodies never enter DO storage. */
 export class SarinApp extends Container<CloudflareBindings> {
   override defaultPort = 3000;
-  override sleepAfter = '15m';
+  override sleepAfter = '2m';
   // Firebase Admin uses native TLS/gRPC. Avoid HTTPS interception and its CA/protocol changes.
   override enableInternet = true;
+  override interceptHttps = false;
 
   constructor(ctx: ConstructorParameters<typeof Container<CloudflareBindings>>[0], env: CloudflareBindings) {
     super(ctx, env);
@@ -19,12 +25,28 @@ export class SarinApp extends Container<CloudflareBindings> {
   }
 
   override async onActivityExpired(): Promise<void> {
+    // WhatsApp polling and retention run in Node after HTTP responses finish.
+    // Keep that process alive only when one of those explicit flags is enabled.
+    if (backgroundWorkEnabled(this.envVars ?? {})) {
+      this.renewActivityTimeout();
+      return;
+    }
     if (this.ctx.container?.running) await this.stop();
   }
 }
 
+// Invoke the SDK's inherited setter to populate ContainerProxy's dispatch registry.
+// A subclass static field would shadow that setter in the pinned SDK 0.3.7.
+SarinApp.outboundByHost = { 'sarin-google.internal': handleIdentityOutbound, 'sarin-data.internal': handleDataOutbound };
+
 export default {
-  fetch(request: Request, env: CloudflareBindings): Promise<Response> {
-    return forwardToSingleton(request, (name) => getContainer(env.SARIN_APP, name));
+  async fetch(request: Request, env: CloudflareBindings): Promise<Response> {
+    // Google must discover the signing keys even before application runtime is configured.
+    const identity = await handlePublicIdentityRequest(request, env);
+    if (identity) return identity;
+    return forwardToSingleton(request, (name) => getContainer(env.SARIN_APP, name), { ...env });
+  },
+  scheduled(_controller: ScheduledController, env: CloudflareBindings): Promise<void> {
+    return wakeBackgroundSingleton({ ...env }, (name) => getContainer(env.SARIN_APP, name));
   },
 } satisfies ExportedHandler<CloudflareBindings>;

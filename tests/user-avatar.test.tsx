@@ -52,4 +52,10 @@ describe('Google account avatar', () => {
     await act(async () => renderer.root.findByProps({ 'aria-label': 'Cerrar sesión' }).props.onClick());
     expect(state.signOut).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps administration navigation focused on the commercial workspace', async () => {
+    await act(async () => { renderer = create(createElement(AppShell, { admin: true, children: 'Contenido' })); });
+    const navigation = renderer.root.findByProps({ 'aria-label': 'Navegación de administración' });
+    expect(navigation.findAllByType('a').map(link => link.props.href)).toEqual(['/admin', '/dashboard']);
+  });
 });

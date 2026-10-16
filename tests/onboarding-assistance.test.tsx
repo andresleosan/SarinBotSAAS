@@ -1,5 +1,5 @@
 import { act, createElement, type ReactNode } from 'react';
-import { create, type ReactTestRenderer } from 'react-test-renderer';
+import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OnboardingPage from '@/app/dashboard/onboarding/page';
 import { apiFetch } from '@/lib/client/api';
@@ -8,14 +8,16 @@ import type { Business } from '@/types/firestore';
 const business: Business = {
   id: 'fixture-business', ownerUid: 'fixture-owner', ownerEmail: 'owner@example.test',
   name: 'Negocio sintético', slug: 'negocio-sintetico', category: 'Servicios', phoneWhatsApp: '573001234567',
-  timezone: 'America/Bogota', subscription: { status: 'trial', trialEndsAt: 2200000000000, currentPeriodEndsAt: 0 },
+  timezone: 'America/Bogota', subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 2200000000000 },
   sarinConfig: { onboardingCompleted: true, tone: 'Claro', customRules: 'Indicaciones propias sin cambiar.', intakeFields: [{ key: 'original', label: 'Pregunta propia', required: true }] },
   resources: [{ id: 'principal', name: 'Profesional sintético', active: true }],
   services: [{ id: 'principal', name: 'Servicio', durationMinutes: 30, bufferMinutes: 0, price: 20000, resourceIds: ['principal'] }],
   weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: false, intervals: [] }])), createdAt: 2000000000000,
 };
-vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business, loading: false, error: null }) }));
-vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => ({ messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false }) }));
+const state = vi.hoisted(() => ({ business: null as Business | null, send: vi.fn() }));
+vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null }) }));
+vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => ({ messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false, sendMessage: state.send }) }));
+vi.mock('next/link', () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement('a', { href }, children) }));
 vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children }));
 vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, fieldClass: 'field', buttonClass: 'button' }));
 vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), errorMessage: (error: Error) => error.message }));
@@ -23,7 +25,7 @@ vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), errorMessage: (error: Er
 
 describe('onboarding editable examples', () => {
   let renderer: ReactTestRenderer;
-  beforeEach(() => { vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockResolvedValue({ business }); });
+  beforeEach(() => { state.business = structuredClone(business); state.send.mockReset(); vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockResolvedValue({ business }); });
   afterEach(async () => { await act(async () => renderer?.unmount()); });
   async function mount() { await act(async () => { renderer = create(createElement(OnboardingPage)); }); }
 
@@ -88,5 +90,45 @@ describe('onboarding editable examples', () => {
     expect(payload.intakeFields[0].key).toBe('original');
     expect(payload.customRules).toBe(instructions);
     expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires an approved payment before showing configuration or sending onboarding messages', async () => {
+    state.business = null;
+    await mount();
+    expect(renderer.root.findAllByType('form')).toHaveLength(0);
+    expect(renderer.root.findAllByType('a').some(link => link.props.href === '/dashboard/billing')).toBe(true);
+    expect(state.send).not.toHaveBeenCalled();
+    await act(async () => renderer.unmount());
+    state.business = { ...business, slug: '', subscription: { status: 'pending_payment', currentPeriodEndsAt: 0, trialEndsAt: 0 } };
+    await mount();
+    expect(renderer.root.findAllByType('form')).toHaveLength(0);
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+  });
+
+  it('opens an approved private draft with blank editable business details and its first resource', async () => {
+    state.business = { ...business, name: 'Negocio pendiente de configurar', slug: '', category: '', resources: [], services: [], sarinConfig: { ...business.sarinConfig, onboardingCompleted: false }, subscription: { status: 'trial', trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: 'receipt', activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 0 } } };
+    await mount();
+    expect(renderer.root.findByType('h1').children.join('')).toBe('Configura el espacio de tu negocio');
+    const form = renderer.root.findAllByType('form')[1];
+    const labels = form.findAllByType('label');
+    const labelText = (node: ReactTestInstance | string): string => typeof node === 'string' ? node : node.children.map(labelText).join('');
+    const name = labels.find(label => labelText(label).trim() === 'Nombre')!.findByType('input');
+    expect(name.props.value).toBe('');
+    expect(form.findByProps({ 'aria-label': 'Nombre del recurso 1' }).props.value).toBe('');
+    expect(form.findByProps({ 'aria-label': 'Nombre del servicio 1' }).props.value).toBe('');
+    await act(async () => name.props.onChange({ target: { value: 'Mi nuevo negocio' } }));
+    const slug = labels.find(label => labelText(label).trim() === 'Enlace')!.findByType('input');
+    expect(slug.props.value).toBe('mi-nuevo-negocio');
+    expect(slug.props.readOnly).toBe(false);
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+  });
+
+  it('asks an exhausted introductory owner to choose a plan instead of buying the trial again', async () => {
+    state.business!.subscription = { status: 'trial', trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: 'receipt', activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 10 } };
+    await mount();
+    const content = JSON.stringify(renderer.toJSON());
+    expect(content).toContain('Elige un plan para continuar');
+    expect(content).not.toContain('$5.000');
+    expect(renderer.root.findAllByType('form')).toHaveLength(0);
   });
 });

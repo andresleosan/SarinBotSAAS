@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); delete state.__sarinProbes; delete state.__sarinProbe; });
 
-describe('chat and Vault health', () => {
+describe('chat and local engine health', () => {
   it('follows persisted changes immediately while keeping separate provider health caches', async () => {
     const { db } = memoryFirestore({ 'serverSettings/ai': { provider: 'deepseek', updatedAt: 123 } }); database.db = db;
     vi.stubEnv('SARIN_CHAT_PROVIDER', 'ollama');
@@ -38,20 +38,20 @@ describe('chat and Vault health', () => {
     expect(await (await GET(new Request('http://localhost/api/sarin/health'))).json()).toMatchObject({ provider: 'ollama', status: 'online' });
   });
 
-  it('fails closed for invalid chat selection while Vault remains explicitly local', async () => {
+  it('fails closed for invalid chat selection while the engine probe remains explicitly local', async () => {
     database.db = memoryFirestore({ 'serverSettings/ai': { provider: 'unsupported', updatedAt: 123 } }).db;
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ id: 'qwen3:32b' }] })));
     expect((await GET(new Request('http://localhost/api/sarin/health'))).status).toBe(503);
     expect(fetch).not.toHaveBeenCalled();
-    const vault = await GET(new Request('http://localhost/api/sarin/health?scope=vault'));
-    expect(await vault.json()).toMatchObject({ provider: 'ollama', status: 'online' });
+    const engine = await GET(new Request('http://localhost/api/sarin/health?scope=engine'));
+    expect(await engine.json()).toMatchObject({ provider: 'ollama', status: 'online' });
     expect(vi.mocked(fetch).mock.calls.map(call => call[0])).toEqual(['https://ia-sarin.alsdevstudio.com/v1/models']);
   });
 
   it.each([
     { provider: 'deepseek', model: 'deepseek-flash', modelsUrl: 'https://api.deepseek.com/models' },
     { provider: 'gemini', model: 'gemini-3.5-flash-lite', modelsUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite' },
-  ])('keeps a successful $provider probe separate from a stopped local Vault and caches each', async ({ provider, model, modelsUrl }) => {
+  ])('keeps a successful $provider probe separate from a stopped local engine and caches each', async ({ provider, model, modelsUrl }) => {
     vi.stubEnv('SARIN_CHAT_PROVIDER', provider);
     const fetcher = vi.fn(async (url: string) => url === modelsUrl
       ? Response.json(provider === 'gemini' ? { name: `models/${model}`, supportedGenerationMethods: ['generateContent'] } : { data: [{ id: model }] }) : new Response(null, { status: 503 }));
@@ -59,22 +59,28 @@ describe('chat and Vault health', () => {
     const chat = await GET(new Request('http://localhost/api/sarin/health'));
     expect(chat.status).toBe(200);
     expect(await chat.json()).toMatchObject({ status: 'online', provider, visionAvailable: false });
-    const vault = await GET(new Request('http://localhost/api/sarin/health?scope=vault'));
-    expect(vault.status).toBe(503);
-    expect(await vault.json()).toMatchObject({ status: 'offline', provider: 'ollama' });
+    const engine = await GET(new Request('http://localhost/api/sarin/health?scope=engine'));
+    expect(engine.status).toBe(503);
+    expect(await engine.json()).toMatchObject({ status: 'offline', provider: 'ollama' });
     await GET(new Request('http://localhost/api/sarin/health'));
-    await GET(new Request('http://localhost/api/sarin/health?scope=vault'));
+    await GET(new Request('http://localhost/api/sarin/health?scope=engine'));
     expect(fetcher.mock.calls.map(call => call[0])).toEqual([
       modelsUrl, 'https://ia-sarin.alsdevstudio.com/v1/models',
     ]);
     expect(chat.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('denies non-admin Vault probes and invalid scopes before contacting either provider', async () => {
+  it('denies non-admin engine probes and invalid scopes before contacting either provider', async () => {
     const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
     auth.isSuperadmin.mockReturnValue(false);
-    expect((await GET(new Request('http://localhost/api/sarin/health?scope=vault'))).status).toBe(403);
+    expect((await GET(new Request('http://localhost/api/sarin/health?scope=engine'))).status).toBe(403);
     expect((await GET(new Request('http://localhost/api/sarin/health?scope=external'))).status).toBe(400);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('rejects the retired private chat health scope without contacting any provider', async () => {
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+    expect((await GET(new Request('http://localhost/api/sarin/health?scope=vault'))).status).toBe(400);
     expect(fetcher).not.toHaveBeenCalled();
   });
 

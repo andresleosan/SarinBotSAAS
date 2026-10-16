@@ -19,7 +19,7 @@ function QRKit() {
   }, []);
   if (loading) return <Notice>Cargando tu isla…</Notice>;
   if (error) return <Notice error>{error}</Notice>;
-  if (!business)
+  if (!business?.slug || !business.sarinConfig.onboardingCompleted)
     return (
       <Notice>
         Configura primero tu negocio en{" "}
@@ -57,7 +57,7 @@ function QRKit() {
   return (
     <section className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 text-center sm:p-10">
       <p className="text-xs uppercase tracking-widest text-sarin-blue">
-        Kit de tu isla privada
+        Enlace de tu negocio
       </p>
       <h1 className="break-words text-3xl font-semibold tracking-tight">{business.name}</h1>
       <p className="mx-auto max-w-md text-sm leading-relaxed text-sarin-muted">
@@ -98,7 +98,7 @@ function QRKit() {
           href={`/b/${business.slug}`}
         >
           <ExternalLink className="h-4 w-4" />
-          Abrir isla
+          Abrir página del negocio
         </Link>
       </div>
       {notice && <Notice>{notice}</Notice>}

@@ -1,5 +1,7 @@
 # Auditoría Sarin Bot — 2026-10-13
 
+Registro histórico: describe la implementación y las comprobaciones de esa fecha. Vault y el chat personal se retiraron del alcance activo; sus menciones y cifras se conservan como evidencia, no como guía de uso. La arquitectura y la operación vigentes están en [STACK.md](STACK.md) y [README.md](README.md).
+
 ## Estado inicial
 
 Las rutas operativas existían como prototipos visuales. Ningún flujo UI persistía negocio, reserva o pago. El chat ignoraba `tenantId`, aceptaba `tenantOverride`, carecía de autenticación y retornaba simulaciones con HTTP 200 ante fallos. Firebase cliente usaba claves demo; Admin podía quedar en null. La cola no tenía prioridad ni protección ante configuración inválida. No existían reglas ni Sarin Vault.

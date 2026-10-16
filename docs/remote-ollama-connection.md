@@ -1,5 +1,7 @@
 # Conexión de Ollama en la Mac remota
 
+Registro histórico de la conexión desde la VPS. La aplicación comercial vigente usa Cloudflare y Vault queda retirado; este documento conserva la evidencia y los procedimientos anteriores. Para operar la conexión actual, consulta [el runbook Cloudflare](cloudflare-no-vps-runbook.md) y [la configuración del motor](../deploy/README.md#mac-preparar-ollama-existente).
+
 Estado al 2026-10-15, después de restaurar Ollama: el chat de la VPS usa **Ollama** y el panel autenticado devolvió una respuesta coherente en español a una consulta sintética nueva. Se corrigió la resolución únicamente para el servicio `app` de Compose, usando el secundario ya configurado `46.38.225.230`; el resolver del host permanece intacto. Pasaron DNS nativo del contenedor, catálogo 200 con el modelo esperado, `/api/tags` 404 y los 16 controles de autenticación, páginas, assets y Firebase antes y después. El túnel está `Healthy`; Access y su ruta restringida no cambiaron. DeepSeek queda como respaldo manual con su clave retenida. Las comprobaciones finales del motor, modelo instalado y generación del diagnóstico pasaron desde la VPS con DNS nativo. La aplicación sigue privada y su publicación pública pendiente; el reinicio de la Mac continúa pospuesto. Evidencia y límites en [QA del cambio DNS](qa/2026-10-15-dns-cutover.md).
 
 ## Destinos

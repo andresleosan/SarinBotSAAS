@@ -2,71 +2,30 @@
 
 import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
-import { CalendarCheck, Download, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { SarinMark } from "@/components/sarin-brand";
 import { AuthGate, useAuth } from "@/components/auth-provider";
 import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
+import { ClientAppointments } from "@/components/client-appointments";
 import { useDebouncedChat } from "@/hooks/useDebouncedChat";
 import { useEngineHealth } from "@/hooks/useEngineHealth";
-import { getFirebaseClient } from "@/lib/firebase/client";
-import { errorMessage } from "@/lib/client/api";
-import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
-import { generateICSFileContent } from "@/lib/utils/icsGenerator";
-import type { Appointment, PublicBusiness } from "@/types/firestore";
+import { useApiPoll } from "@/lib/client/use-api-poll";
+import { getBusinessAccess, isSubscriptionAllowed } from "@/lib/sarin/subscription";
+import type { PublicBusiness } from "@/types/firestore";
 
 function Island({ slug }: { slug: string }) {
   const { user, signOut } = useAuth();
-  const [business, setBusiness] = useState<PublicBusiness | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const projection = useApiPoll<PublicBusiness | null>(slug, async signal => {
+    const response = await fetch(`/api/public/businesses/${encodeURIComponent(slug)}`, { signal, cache: 'no-store' });
+    if (!response.ok) throw new Error('No pudimos consultar el negocio. Inténtalo de nuevo.');
+    const data = await response.json() as { business: PublicBusiness | null };
+    return data.business;
+  });
+  const business = projection.value, loading = projection.loading, error = projection.error;
   const [input, setInput] = useState("");
   const [now, setNow] = useState(Date.now());
   const end = useRef<HTMLDivElement>(null);
   const engine = useEngineHealth();
-  useEffect(() => {
-    setBusiness(null);
-    setLoading(true);
-    setError(null);
-    return onSnapshot(
-      doc(getFirebaseClient().db, "publicBusinesses", slug),
-      (snapshot) => {
-        setBusiness(
-          snapshot.exists() ? (snapshot.data() as PublicBusiness) : null,
-        );
-        setLoading(false);
-      },
-      (cause) => {
-        setError(errorMessage(cause));
-        setLoading(false);
-      },
-    );
-  }, [slug]);
-  useEffect(() => {
-    setAppointments([]);
-    if (!business || !user) return;
-    return onSnapshot(
-      query(
-        collection(
-          getFirebaseClient().db,
-          "businesses",
-          business.id,
-          "appointments",
-        ),
-        where("client.uid", "==", user.uid),
-      ),
-      (snapshot) => {
-        setAppointments(
-          snapshot.docs
-            .map((item) => ({ ...item.data(), id: item.id }) as Appointment)
-            .filter((item) => item.status === "confirmed")
-            .sort((a, b) => a.startAt - b.startAt),
-        );
-      },
-      (cause) => setError(errorMessage(cause)),
-    );
-  }, [business, user]);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(timer);
@@ -90,29 +49,6 @@ function Island({ slug }: { slug: string }) {
     chat.sendMessage(input);
     setInput("");
   }
-  function download(appointment: Appointment) {
-    if (!business) return;
-    const calendar = generateICSFileContent({
-      businessName: business.name,
-      serviceName: appointment.serviceName || "Cita",
-      dateKey: appointment.dateKey,
-      startTimeStr: appointment.startTimeStr,
-      durationMinutes: (appointment.endAt - appointment.startAt) / 60000,
-      notes: appointment.client
-        ? Object.entries(appointment.client.intakeAnswers)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join("\n")
-        : "",
-    });
-    const url = URL.createObjectURL(
-      new Blob([calendar], { type: "text/calendar;charset=utf-8" }),
-    );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `cita-${appointment.id}.ics`;
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
   if (loading)
     return (
       <div className="mx-auto max-w-lg p-6">
@@ -132,16 +68,16 @@ function Island({ slug }: { slug: string }) {
       </div>
     );
   const allowed = isSubscriptionAllowed(business, now);
+  const retryAllowed = allowed || getBusinessAccess(business, now) === "trial_exhausted";
   const chatAllowed = allowed && !chat.quotaExhausted;
-  const future = appointments.filter((item) => item.endAt > now);
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col border-x border-sarin-line bg-sarin-canvas">
       <header className="sticky top-0 z-20 border-b border-sarin-line bg-sarin-paper/95 p-4 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <SarinMark className="h-11 w-11" />
+            <SarinMark className="h-11 w-11 shrink-0" />
             <div className="min-w-0">
-              <h1 className="truncate font-bold">{business.name}</h1>
+              <h1 className="line-clamp-2 break-words font-bold leading-5 [overflow-wrap:anywhere]">{business.name}</h1>
               <p
                 className={`mt-1 text-xs ${engine.health?.status === "online" && chatAllowed ? "text-sarin-blue" : "text-sarin-muted"}`}
               >
@@ -163,6 +99,14 @@ function Island({ slug }: { slug: string }) {
             {user?.displayName?.split(" ")[0] || "Salir"} · Salir
           </button>
         </div>
+        <nav aria-label="Citas del cliente" className="mt-1 flex">
+          <a
+            href="#mis-citas"
+            className="flex min-h-11 items-center rounded-[10px] px-2 text-xs font-semibold text-sarin-blue hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"
+          >
+            Mis citas
+          </a>
+        </nav>
       </header>
       <div className="flex-1 space-y-5 p-4 sm:p-6">
         {error && <Notice error>{error}</Notice>}
@@ -225,6 +169,10 @@ function Island({ slug }: { slug: string }) {
               ))}
             </div>
           )}
+          <nav aria-label="Información del servicio" className="mt-3 flex flex-wrap gap-x-5 text-xs text-sarin-blue">
+            <Link href="/privacidad" className="inline-flex min-h-11 items-center underline underline-offset-4">Privacidad</Link>
+            <Link href="/ayuda" className="inline-flex min-h-11 items-center underline underline-offset-4">Ayuda</Link>
+          </nav>
         </section>
         <div aria-live="polite" className="space-y-4">
           {chat.messages.map((message) => (
@@ -248,7 +196,7 @@ function Island({ slug }: { slug: string }) {
               {!chat.requestAlreadyCompleted && <button
                 className="min-h-11 text-sm text-sarin-blue underline"
                 onClick={chat.retry}
-                disabled={chat.isGenerating || !allowed}
+                disabled={chat.isGenerating || !retryAllowed}
               >
                 {chat.quotaExhausted ? "Comprobar disponibilidad" : "Reintentar mensaje"}
               </button>}
@@ -256,33 +204,7 @@ function Island({ slug }: { slug: string }) {
           )}
           <div ref={end} />
         </div>
-        {future.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-sarin-blue">
-              <CalendarCheck className="h-4 w-4" />
-              Tus próximas citas
-            </h2>
-            {future.map((appointment) => (
-              <article
-                key={appointment.id}
-                className="space-y-3 rounded-2xl border border-sarin-blue/20 bg-sarin-soft p-4"
-              >
-                <h3 className="font-semibold">{appointment.serviceName}</h3>
-                <p className="text-sm text-sarin-ink">
-                  {appointment.dateKey} · {appointment.startTimeStr}–
-                  {appointment.endTimeStr} (Colombia)
-                </p>
-                <button
-                  className="flex min-h-11 items-center gap-2 text-sm font-semibold text-sarin-blue"
-                  onClick={() => download(appointment)}
-                >
-                  <Download className="h-4 w-4" />
-                  Guardar en mi calendario
-                </button>
-              </article>
-            ))}
-          </section>
-        )}
+        {user && <ClientAppointments key={`${business.id}:${user.uid}`} businessId={business.id} businessName={business.name} resources={business.resources} userId={user.uid} now={now} />}
       </div>
       <form
         onSubmit={submit}

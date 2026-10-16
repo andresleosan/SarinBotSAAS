@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PriorityFifoQueue } from '@/lib/sarin/queue';
 
-describe('reserved Vault queue admission', () => {
+describe('reserved priority queue admission', () => {
   it('admits one CRITICAL turn ahead of a full normal waiting queue', async () => {
     const queue = new PriorityFifoQueue(1, 1);
     let release!: () => void;
@@ -9,7 +9,7 @@ describe('reserved Vault queue admission', () => {
     const order: string[] = [];
     const active = queue.run(async () => { order.push('running'); await gate; });
     const normal = queue.run(async () => { order.push('normal'); });
-    const critical = queue.run(async () => { order.push('vault'); }, 'CRITICAL');
+    const critical = queue.run(async () => { order.push('priority'); }, 'CRITICAL');
     const secondCritical = queue.run(async () => { order.push('extra'); }, 'CRITICAL');
     const extraNormal = queue.run(async () => { order.push('extra-normal'); });
     // Attach rejection handlers before freeing the running task, so a failed
@@ -22,7 +22,7 @@ describe('reserved Vault queue admission', () => {
     expect(outcomes[3].status).toBe('rejected');
     expect(outcomes[4].status).toBe('rejected');
     expect(waiting.queuedRequests).toBe(2);
-    expect(order).toEqual(['running', 'vault', 'normal']);
+    expect(order).toEqual(['running', 'priority', 'normal']);
     expect(queue.stats().queuedRequests).toBe(0);
   });
 });

@@ -26,7 +26,9 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
+COPY --chown=node:node scripts/container-start.mjs ./container-start.mjs
+COPY --chown=node:node scripts/lib/cloudflare-credentials.mjs ./lib/cloudflare-credentials.mjs
 USER node
 EXPOSE 3000
 # Exactly one Node process: replicas/clustering would multiply inference slots.
-CMD ["node", "server.js"]
+CMD ["node", "container-start.mjs"]

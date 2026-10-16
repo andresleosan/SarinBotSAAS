@@ -20,7 +20,7 @@ vi.mock("@/components/admin-whatsapp", () => ({ AdminWhatsApp: () => null }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const settings = { companyName: "Sarin", weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, whatsappPriceCOP: 149900, responsePackPriceCOP: 20000, trialDaysDefault: 7, graceHoursOnUpload: 24, bankAccounts: [], tunnelStatus: { isOnline: false, lastPingAt: 0 } };
+const settings = { companyName: "Sarin", weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, whatsappPriceCOP: 149900, responsePackPriceCOP: 20000, graceHoursOnUpload: 24, bankAccounts: [], tunnelStatus: { isOnline: false, lastPingAt: 0 } };
 const business = { id: "business", name: "Negocio de prueba", slug: "prueba", ownerEmail: "owner@example.test", subscription: { status: "active", trialEndsAt: 1900000000000, currentPeriodEndsAt: 1900000000000 } };
 const account = { id: "bank-test", bankName: "Entidad de prueba", accountType: "Ahorros", accountNumber: "000000", holderName: "Titular sintético" };
 const receipt = { id: "receipt", tenantId: "business", tenantName: business.name, ownerUid: "owner", ownerEmail: business.ownerEmail, amountCOP: 20000, bankSelected: account.bankName, status: "pending", submittedAt: 1800000000000, planId: "weekly", periodDays: 7 };
@@ -142,6 +142,14 @@ describe("billing plan screens", () => {
     await act(async () => { renderer.root.findByType("form").props.onSubmit({ preventDefault }); });
     const payload = JSON.parse(state.api.mock.calls.find(([, init]) => init?.method === "PATCH")![1].body);
     expect(payload.settings).toMatchObject({ weeklyPriceCOP: 21000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, whatsappPriceCOP: 149900, responsePackPriceCOP: 20000, bankAccounts: [] });
+    expect(payload.settings).not.toHaveProperty("trialDaysDefault");
+  });
+
+  it("shows commercial administration without a personal chat entry point", async () => {
+    await mount(AdminPage);
+    expect(text(renderer.root)).toContain("Negocios y suscripciones");
+    expect(text(renderer.root)).toContain("Comprobantes de pago");
+    expect(renderer.root.findAllByType("a").some(link => link.props.href === "/admin/vault")).toBe(false);
   });
 
   it("reviews and confirms the duration from the saved receipt", async () => {
@@ -161,6 +169,18 @@ describe("billing plan screens", () => {
     await mount(AdminPage);
     const cells = renderer.root.findByType("tbody").findAllByType("td");
     expect(text(cells[3])).toBe("Sin pago aprobado");
+  });
+
+  it("labels an approved private draft and its receipt without inventing a subscription expiry", async () => {
+    adminData.businesses = [{ ...business, name: "", slug: "", subscription: { status: "trial", trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: "intro", activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 0 } } }];
+    adminData.receipts = [{ ...receipt, tenantName: "", kind: "paid_trial", amountCOP: 5000, appointmentAllowance: 10, status: "approved", planId: undefined, periodDays: undefined }];
+    await mount(AdminPage);
+    expect(text(renderer.root.findByType("h3"))).toBe("Pendiente de configurar");
+    const cells = renderer.root.findByType("tbody").findAllByType("td");
+    expect(text(cells[3])).toBe("Prueba pagada sin caducidad");
+    state.api.mockResolvedValueOnce({ receiptDataUrl: "data:image/webp;base64,c3ludGhldGlj" });
+    await act(async () => button("Ver captura").props.onClick());
+    expect(renderer.root.findByType("img").props.alt).toBe("Comprobante de Pendiente de configurar");
   });
 
   it("shows the current commercial period and a warning without exposing an unavailable WhatsApp purchase", async () => {
@@ -250,5 +270,63 @@ describe("billing plan screens", () => {
     billingData.allowance = { ...allowance, state: "active" };
     await mount();
     expect(inputs().find(input => input.props.value === "response_pack")?.props.disabled).toBe(true);
+  });
+
+  it("accepts the first introductory payment before a business is configured", async () => {
+    billingData.business = null;
+    billingData.settings = { ...settings, bankAccounts: [account] };
+    await mount();
+    expect(text(renderer.root)).toContain("5.000");
+    expect(text(renderer.root)).toContain("10 citas");
+    expect(text(renderer.root)).toContain("sin caducidad");
+    expect(inputs().find(input => input.props.value === "paid_trial")?.props.checked).toBe(true);
+    expect(inputs().find(input => input.props.type === "file")?.props.disabled).toBe(false);
+    await selectImage();
+    await act(async () => renderer.root.findByType("form").props.onSubmit({ preventDefault }));
+    expect(posts()[0]).toMatchObject({ kind: "paid_trial", bankSelected: account.id });
+    expect(posts()[0]).not.toHaveProperty("planId");
+    expect(posts()[0]).not.toHaveProperty("periodDays");
+    expect(posts()[0]).not.toHaveProperty("amountCOP");
+  });
+
+  it("keeps an introductory receipt pending without promising preventive access or thirty days", async () => {
+    billingData.business = { ...business, subscription: { status: "pending_payment", trialEndsAt: 0, currentPeriodEndsAt: 0 } };
+    billingData.receipts = [{ ...receipt, kind: "paid_trial", amountCOP: 5000, appointmentAllowance: 10, planId: undefined, periodDays: undefined }];
+    await mount();
+    expect(text(renderer.root)).toContain("pendiente de revisión");
+    expect(text(renderer.root)).not.toContain("por 30 días");
+    expect(text(renderer.root)).not.toContain("24 horas");
+    expect(button("Enviar comprobante").props.disabled).toBe(true);
+  });
+
+  it("shows consumed introductory appointments and requires a plan after ten without a repurchase", async () => {
+    billingData.business = { ...business, subscription: { status: "trial", trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: "intro", activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 10 } } };
+    billingData.allowance = { ...allowance, state: "expired", currentPeriod: { ...quotaPeriod, source: "trial", endsAt: 8640000000000000, includedResponses: 700, usedResponses: 0, remainingResponses: 700 } };
+    await mount();
+    expect(text(renderer.root)).toContain("10 de 10 citas utilizadas");
+    expect(text(renderer.root)).toContain("Elige un plan para continuar");
+    expect(inputs().find(input => input.props.value === "paid_trial")).toBeUndefined();
+    expect(inputs().find(input => input.props.value === "response_pack")?.props.disabled).toBe(true);
+    expect(text(renderer.root)).not.toContain("275760");
+    expect(text(renderer.root)).toContain("Prueba finalizada");
+    expect(text(renderer.root)).toContain("700 respuestas sin utilizar");
+    expect(text(renderer.root)).toContain("no amplían las 10 citas");
+    expect(text(renderer.root)).not.toContain("Vencida");
+    expect(text(renderer.root)).not.toContain("Esta vigencia terminó");
+    expect(text(renderer.root)).not.toContain("700 respuestas disponibles");
+  });
+
+  it("approves introductory receipts as ten appointments without extending a subscription", async () => {
+    const introductory = { ...receipt, kind: "paid_trial", amountCOP: 5000, appointmentAllowance: 10, planId: undefined, periodDays: undefined };
+    adminData.receipts = [introductory];
+    await mount(AdminPage);
+    expect(text(renderer.root.findByType("article"))).toContain("10 citas");
+    expect(button("Aprobar prueba de 10 citas")).toBeDefined();
+    state.api.mockResolvedValueOnce({ receiptDataUrl: "data:image/webp;base64,c3ludGhldGlj" });
+    await act(async () => button("Ver captura").props.onClick());
+    state.api.mockResolvedValueOnce({ receipt: { ...introductory, status: "approved" }, business });
+    await act(async () => button("Aprobar prueba de 10 citas").props.onClick());
+    expect(text(renderer.root)).toContain("prueba pagada de 10 citas activada");
+    expect(text(renderer.root)).not.toContain("suscripción extendida 30 días");
   });
 });

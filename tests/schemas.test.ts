@@ -34,6 +34,9 @@ describe('untrusted inputs', () => {
     expect(settingsSchema.parse(legacy).weeklyPriceCOP).toBeUndefined();
     expect(settingsSchema.parse(legacy).fortnightlyPriceCOP).toBeUndefined();
   });
+  it('does not accept a configurable free trial in current settings', () => {
+    expect(settingsSchema.safeParse({ companyName: 'Pruebas', monthlyPriceCOP: 59900, bankAccounts: [], trialDaysDefault: 7 }).success).toBe(false);
+  });
   it.each(['weeklyPriceCOP', 'fortnightlyPriceCOP', 'monthlyPriceCOP'])('rejects invalid admin prices for %s', (field) => {
     for (const value of [0, -1, 1.5, 100000001]) {
       expect(settingsSchema.safeParse({ companyName: 'Pruebas', monthlyPriceCOP: 59900, bankAccounts: [], [field]: value }).success).toBe(false);

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Plus, Send, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { SarinMark } from "@/components/sarin-brand";
 import { WhatsAppPhoneField } from "@/components/whatsapp-phone-field";
 import { TextSuggestions } from "@/components/text-suggestions";
@@ -15,6 +16,8 @@ import {
 import { useBusiness } from "@/hooks/useBusiness";
 import { useDebouncedChat } from "@/hooks/useDebouncedChat";
 import { apiFetch, errorMessage } from "@/lib/client/api";
+import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
+import { canPurchasePaidTrial } from "@/lib/paid-trial";
 import type {
   Business,
   DaySchedule,
@@ -74,7 +77,7 @@ function Configuration() {
   const [saved, setSaved] = useState(false);
   const loadedVersion = useRef("");
   useEffect(() => {
-    if (!business) return;
+    if (!business?.sarinConfig.onboardingCompleted) return;
     const version = JSON.stringify([
       business.id,
       business.name,
@@ -110,6 +113,7 @@ function Configuration() {
   });
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isSubscriptionAllowed(business)) return;
     setError(null);
     setSaved(false);
     setSaving(true);
@@ -154,6 +158,14 @@ function Configuration() {
   }
   if (loading) return <Notice>Cargando configuración…</Notice>;
   if (businessError) return <Notice error>{businessError}</Notice>;
+  if (!isSubscriptionAllowed(business)) return (
+    <section className="max-w-2xl space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
+      <h1 className="text-3xl font-bold">{canPurchasePaidTrial(business?.subscription) ? "Empieza con tu prueba pagada" : "Elige un plan para continuar"}</h1>
+      <p className="text-sm leading-6 text-sarin-muted">{canPurchasePaidTrial(business?.subscription) ? "Por $5.000 COP puedes configurar tu negocio y recibir hasta 10 citas, sin caducidad. Después, elige un plan para continuar." : "Revisa los planes y el estado de tus pagos para volver a configurar tu negocio y recibir nuevas citas. Tu agenda existente se conserva."}</p>
+      <Notice>{business?.subscription.status === "pending_payment" ? "La configuración y Sarin se habilitan después de aprobar tu comprobante. Si ya lo enviaste, espera su revisión." : "Necesitas un pago aprobado para configurar tu negocio y usar Sarin."}</Notice>
+      <Link href="/dashboard/billing" className={buttonClass + " inline-flex items-center"}>Ver pagos y planes</Link>
+    </section>
+  );
   return (
     <div className="max-w-[45rem] space-y-5 xl:max-w-5xl">
       <div>
@@ -161,11 +173,10 @@ function Configuration() {
           Configuración
         </p>
         <h1 className="mt-2 text-3xl font-bold">
-          {business ? "Así trabaja tu negocio" : "Abre tu isla privada"}
+          {business?.sarinConfig.onboardingCompleted ? "Así trabaja tu negocio" : "Configura el espacio de tu negocio"}
         </h1>
         <p className="mt-2 text-sm text-sarin-muted">
-          Cuéntaselo a Sarin o completa los datos. Los negocios nuevos reciben 7
-          días de prueba al guardar su configuración.
+          Cuéntaselo a Sarin o completa los datos.{business?.subscription.status === "trial" ? " Tu prueba pagada incluye la configuración y hasta 10 citas, sin caducidad." : ""}
         </p>
       </div>
       {error && <Notice error>{error}</Notice>}
@@ -222,7 +233,7 @@ function Configuration() {
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (input.trim() && !chat.quotaExhausted) {
+              if (input.trim() && !chat.quotaExhausted && isSubscriptionAllowed(business)) {
                 chat.sendMessage(input);
                 setInput("");
               }
@@ -262,7 +273,7 @@ function Configuration() {
                 maxLength={120}
                 onChange={(event) => {
                   setName(event.target.value);
-                  if (!business) setSlug(slugify(event.target.value));
+                  if (!business?.sarinConfig.onboardingCompleted) setSlug(slugify(event.target.value));
                 }}
               />
             </label>
@@ -281,14 +292,14 @@ function Configuration() {
               <input
                 className={fieldClass + " mt-1.5"}
                 value={slug}
-                readOnly={Boolean(business)}
+                readOnly={Boolean(business?.sarinConfig.onboardingCompleted)}
                 required
                 pattern="[a-z0-9]+(-[a-z0-9]+)*"
                 minLength={3}
                 maxLength={70}
                 onChange={(event) => setSlug(event.target.value)}
               />
-              {business && (
+              {business?.sarinConfig.onboardingCompleted && (
                 <span className="mt-1.5 block text-sarin-muted">
                   El enlace queda reservado a tu negocio.
                 </span>
@@ -678,9 +689,9 @@ function Configuration() {
           <button className={buttonClass + " w-full"} disabled={saving}>
             {saving
               ? "Guardando…"
-              : business
+              : business?.sarinConfig.onboardingCompleted
                 ? "Guardar configuración"
-                : "Guardar y activar mis 7 días"}
+                : "Guardar y abrir mi agenda"}
           </button>
         </form>
       </div>

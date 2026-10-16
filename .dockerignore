@@ -16,6 +16,8 @@ docs/qa
 *-debug*.log
 test-results
 coverage
+tests
+vitest.config.mts
 playwright-report
 *.vault.json
 sarin-vault-*.json

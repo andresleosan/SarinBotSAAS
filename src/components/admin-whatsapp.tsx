@@ -99,7 +99,7 @@ export function AdminWhatsApp({ businesses }: { businesses: Pick<Business, "id" 
         {businesses.length > 0 && <form onSubmit={event => void save(event)} className="space-y-3 border-t border-sarin-line pt-4">
           <div className="grid items-end gap-3 md:grid-cols-3">
             <label className="text-sm">Negocio<select name="whatsappBusiness" className={fieldClass + " mt-1"} value={businessId} disabled={busy} onChange={event => { setBusinessId(event.target.value); setNotice(null); setError(null); }}>
-              {businesses.map(business => <option key={business.id} value={business.id}>{business.name}</option>)}
+              {businesses.map(business => <option key={business.id} value={business.id}>{business.name || "Pendiente de configurar"}</option>)}
             </select></label>
             <label className="text-sm">Identificador del número en Meta<input name="phoneNumberId" required inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} className={fieldClass + " mt-1"} value={phoneNumberId} disabled={busy || Boolean(binding)} onChange={event => setPhoneNumberId(event.target.value)} /></label>
             <label className="text-sm">Identificador de la cuenta de WhatsApp Business<input name="wabaId" required inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} className={fieldClass + " mt-1"} value={wabaId} disabled={busy || Boolean(binding)} onChange={event => setWabaId(event.target.value)} /></label>

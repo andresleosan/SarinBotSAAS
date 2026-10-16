@@ -8,8 +8,8 @@ const plexMono = localFont({ src: "../../public/fonts/ibm-plex-mono-latin.woff2"
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://sarinbotsaas.pages.dev"),
-  title: "Sarin Bot — Menos mensajes. Más citas en orden. Próximamente",
-  description: "Conoce Sarin Bot, el asistente para organizar las citas de tu negocio. Estamos preparando el lanzamiento; registro, reservas y chats próximamente.",
+  title: "Sarin Bot — Reservas por conversación y agenda para tu negocio",
+  description: "Servicios, disponibilidad, citas confirmadas y agenda para tu negocio. Conoce la prueba de $5.000 COP con diez citas y los planes Sarin Esencial.",
   alternates: { canonical: "/" },
   icons: {
     icon: [
@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website", locale: "es_CO", siteName: "Sarin Bot",
-    title: "Sarin Bot — Próximamente",
-    description: "Menos mensajes por responder. Más tiempo para atender. Conoce el proyecto de ALS DevStudio.",
+    title: "Sarin Bot — Menos mensajes. Más citas en orden.",
+    description: "Reservas por conversación, enlace y QR para tus clientes, agenda e imagen de la cita descargable. Un producto de ALS DevStudio.",
     url: "/",
   },
 };

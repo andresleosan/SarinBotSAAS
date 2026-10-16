@@ -10,7 +10,7 @@ import { assertEmulatorInventory, assertJourneyUrl, journeyEnvironment } from '.
 try {
   const options = parseLocalArguments(process.argv.slice(2));
   if (options.help) {
-    console.log('Uso: pnpm run test:journey [--port 3030]\nRequiere dev:local activo: Next en loopback, Auth 9099, Firestore 8080 y hub 4400.\nNode 24 y dependencias instaladas. Usa el proyecto demo-sarin-bot; no necesita Firebase real ni Ollama.\nCrea cuentas/datos sintéticos por corrida y verifica su limpieza; conserva cuentas sembradas, datos manuales y Vault.');
+    console.log('Uso: pnpm run test:journey [--port 3030]\nRequiere dev:local activo: Next en loopback, Auth 9099, Firestore 8080 y hub 4400.\nNode 24 y dependencias instaladas. Usa el proyecto demo-sarin-bot; no necesita Firebase real ni Ollama.\nCrea cuentas/datos sintéticos por corrida y verifica su limpieza; conserva cuentas sembradas y datos manuales.');
   } else {
     if (Number(process.versions.node.split('.')[0]) !== 24) throw new Error('Este ensayo requiere Node.js 24.');
     const env = journeyEnvironment(process.env, options.port, randomUUID());

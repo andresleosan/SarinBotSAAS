@@ -1,4 +1,4 @@
-# Estructura comercial aprobada — 15 de octubre de 2026
+# Estructura comercial — actualizada el 16 de octubre de 2026
 
 El propietario aprobó esta estructura y después autorizó su implementación. Las cuotas, paquetes y pantallas se implementan según el [contrato de capacidad](response-quotas.md). WhatsApp permanece preparado en código y deshabilitado hasta enlazar y verificar el número que proporcionará el propietario.
 
@@ -6,6 +6,7 @@ El propietario aprobó esta estructura y después autorizó su implementación. 
 
 | Modalidad | Vigencia | Precio COP | Respuestas de IA incluidas |
 | --- | ---: | ---: | ---: |
+| Prueba pagada: configuración y hasta 10 citas | Sin vencimiento por días | $5.000, una sola compra | 700 en total |
 | Sarin Esencial semanal | 7 días | $20.000 | 700 |
 | Sarin Esencial quincenal | 15 días | $35.000 | 1.500 |
 | Sarin Esencial mensual | 30 días | $59.900 | 3.000 |
@@ -22,7 +23,9 @@ El administrador conserva la elección manual entre IA local y DeepSeek. La capa
 
 Una respuesta completa de Sarin al cliente cuenta una vez, aunque internamente utilice varias llamadas al modelo. Los mensajes enviados por el cliente no descuentan respuestas. Las llamadas técnicas y los tokens del medidor existente no equivalen a respuestas comerciales.
 
-La prueba gratuita incluye 700 respuestas durante siete días. El copiloto comparte la bolsa del negocio. La configuración asistida anterior a crear el negocio tiene un límite separado de 30 respuestas por cuenta. Ambas reglas fueron confirmadas por el propietario.
+El propietario sustituyó la prueba gratuita por una compra única de $5.000 COP: configuración y hasta diez citas, sin vencimiento por días. Se activa después de aprobar el comprobante. Mantiene un límite total de 700 respuestas de IA, independiente del número de citas; no hay respuestas iniciales gratuitas. La prueba no incluye copiloto, WhatsApp ni ampliaciones. El copiloto de los planes pagados comparte su bolsa de respuestas.
+
+Cada cita creada correctamente consume un cupo, aunque luego se cancele. Fallos, conflictos, bloqueos y reintentos de una misma cita no consumen cupos nuevos. Editar o pagar nuevamente la prueba no repone sus diez citas. Al agotarse, se necesita una suscripción; el propietario conserva acceso de lectura y cancelación a sus citas.
 
 Las conversaciones son una referencia orientativa, no un segundo límite. Suponiendo diez respuestas por conversación:
 

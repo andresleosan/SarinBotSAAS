@@ -4,7 +4,7 @@
 
 - `src/app/`: Next.js App Router pages and API routes.
 - `src/components/`, `src/hooks/`, `src/types/`: shared UI, hooks, and contracts.
-- `src/lib/`: Firebase integration, server business logic, Sarin inference/queue, and browser-local Vault.
+- `src/lib/`: Firebase Auth integration, commercial business logic, D1/R2 storage, and Sarin inference/queue.
 - `tests/`: application tests; `scripts/`: local development and validation runners.
 - `public/`: assets and fonts; `docs/`: design decisions and QA evidence.
 - `landing/`: separate static marketing site; `cloudflare/`: application hosting; `deploy/`: VPS, Caddy, and Mac/Ollama templates.
@@ -38,7 +38,7 @@ Follow existing English imperative subjects: `feat:`, `fix:`, `style:`, `chore:`
 
 ## Security & Architecture
 
-Keep secrets and Vault exports outside Git. Preserve Vault's browser-local storage and avoid logging conversation bodies. Run one application replica: the inference queue is process-local. Remote Ollama requires HTTPS and Cloudflare Access Service Auth.
+Keep secrets and private exports outside Git. Avoid logging conversation bodies. The active product is the commercial appointment service; personal chat and Vault are retired. Removing the module must not silently purge browser data from earlier versions. Run one application replica: the inference queue is process-local. Remote Ollama requires HTTPS and Cloudflare Access Service Auth.
 
 Use only `alsdevstudio.com` for Sarin's engine hostname. Never use `bptjersey.com`, including temporary tests.
 

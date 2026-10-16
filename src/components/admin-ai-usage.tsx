@@ -54,7 +54,7 @@ export function AdminAiUsage({ businesses }: { businesses: Pick<Business, "id" |
   const providerName = provider === "gemini" ? "Gemini · Clientes" : "DeepSeek";
   const beforeMeasurement = Boolean(reading?.measurementStartedAt && month < monthInColombia(reading.measurementStartedAt));
   const measured = reading && reading.measurementStartedAt !== null && !beforeMeasurement;
-  const names = new Map(businesses.map(business => [business.id, business.name]));
+  const names = new Map(businesses.map(business => [business.id, business.name || "Pendiente de configurar"]));
 
   return (
     <section aria-labelledby="admin-ai-usage-title" className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5">

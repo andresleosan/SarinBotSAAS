@@ -8,7 +8,6 @@ export interface PlatformSettings {
   monthlyPriceCOP: number;
   whatsappPriceCOP: number;
   responsePackPriceCOP: number;
-  trialDaysDefault: number;
   graceHoursOnUpload: number;
   bankAccounts: {
     id: string;
@@ -37,6 +36,7 @@ export interface UserProfile {
 }
 
 export type SubscriptionStatus =
+  | 'pending_payment'
   | 'trial'
   | 'active'
   | 'past_due'
@@ -84,6 +84,12 @@ export interface Business {
     graceEndsAt?: number;
     graceGrantedAt?: number;
     lastPaymentId?: string;
+    paidTrial?: {
+      paymentId: string;
+      activatedAt: number;
+      appointmentLimit: 10;
+      appointmentsUsed: number;
+    };
   };
   sarinConfig: {
     onboardingCompleted: boolean;
@@ -101,7 +107,11 @@ export interface Business {
 
 /** Existing module terminology; Business is the canonical persisted model. */
 export type Tenant = Business;
-export type PublicBusiness = Omit<Business, 'ownerUid' | 'ownerEmail' | 'createdAt'>;
+export type PublicBusiness = Omit<Business, 'ownerUid' | 'ownerEmail' | 'createdAt' | 'subscription'> & {
+  subscription: Pick<Business['subscription'], 'status' | 'trialEndsAt' | 'currentPeriodEndsAt' | 'graceEndsAt'> & {
+    paidTrial?: Omit<NonNullable<Business['subscription']['paidTrial']>, 'paymentId'>;
+  };
+};
 
 export interface TenantClientMemory {
   uid: string;
@@ -149,7 +159,8 @@ export interface PaymentReceipt {
   ownerUid: string;
   ownerEmail: string;
   amountCOP: number;
-  kind?: 'subscription' | 'response_pack';
+  kind?: 'subscription' | 'response_pack' | 'paid_trial';
+  appointmentAllowance?: number;
   responseAllowance?: number;
   quotaPeriodId?: string;
   /** Absent only on historical monthly receipts; new receipts snapshot both. */

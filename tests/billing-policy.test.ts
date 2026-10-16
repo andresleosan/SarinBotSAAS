@@ -7,6 +7,14 @@ const day = 86400000;
 const expired: Business['subscription'] = { status: 'trial', trialEndsAt: now - day, currentPeriodEndsAt: now - day };
 
 describe('subscription payment policy', () => {
+  it('does not grant grace to a legacy free trial or pending introductory payment', () => {
+    for (const status of ['trial', 'pending_payment'] as const) {
+      expect(grantReceiptGrace({ status, trialEndsAt: now + day, currentPeriodEndsAt: 0 }, 'r1', now).graceEndsAt).toBeUndefined();
+    }
+  });
+  it('does not extend subscription time with historical free trial time', () => {
+    expect(approveSubscription({ status: 'trial', trialEndsAt: now + 7 * day, currentPeriodEndsAt: 0 }, 'r1', now).currentPeriodEndsAt).toBe(now + 30 * day);
+  });
   it('grants one 24h preventive window to an expired business', () => {
     expect(grantReceiptGrace(expired, 'r1', now)).toMatchObject({ status: 'past_due', graceEndsAt: now + day, graceGrantedAt: now, lastPaymentId: 'r1' });
   });

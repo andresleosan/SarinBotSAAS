@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Database as Firestore } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { getChatProvider, getEngineConfiguration, probeEngine } from '@/lib/sarin/engine';
 import { AI_PROVIDERS, type AdminAiSettings, type AiProvider, type AiProviderSelection, type AiProviderStatus } from '@/types/ai';

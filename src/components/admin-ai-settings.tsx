@@ -107,7 +107,7 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
             </div>
           </fieldset>
           <div className="flex flex-col items-start gap-3 border-t border-sarin-line pt-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Sarin Vault conserva sus datos en este navegador y sigue usando la IA local. Las credenciales de los proveedores se administran en el servidor.</p>
+            <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Las credenciales de los proveedores se administran en el servidor.</p>
             <button type="button" className={buttonClass + " shrink-0"} disabled={busy || !selectedStatus?.configured || selected === data.provider} onClick={() => void save()}>{saving ? "Guardando IA…" : "Guardar IA"}</button>
           </div>
           <section aria-labelledby="admin-gemini-test-title" className="space-y-3 border-t border-sarin-line pt-4">

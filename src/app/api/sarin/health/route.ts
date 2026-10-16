@@ -12,9 +12,9 @@ export async function GET(request: Request) {
   try {
     const user = await requireUser(request);
     const scope = new URL(request.url).searchParams.get('scope') ?? 'chat';
-    if (!['chat', 'vault'].includes(scope)) throw new HttpError(400, 'Consulta de estado no válida.');
-    if (scope === 'vault' && !isSuperadmin(user.uid)) throw new HttpError(403, 'Forbidden');
-    const provider = scope === 'vault' ? 'ollama' : (await getAiProviderSelection()).provider;
+    if (!['chat', 'engine'].includes(scope)) throw new HttpError(400, 'Consulta de estado no válida.');
+    if (scope === 'engine' && !isSuperadmin(user.uid)) throw new HttpError(403, 'Forbidden');
+    const provider = scope === 'engine' ? 'ollama' : (await getAiProviderSelection()).provider;
     const probes = state.__sarinProbes ??= {};
     let probe = probes[provider];
     if (!probe || probe.expires < Date.now()) probe = probes[provider] = { expires: Date.now() + 10_000, value: probeEngine(provider) };

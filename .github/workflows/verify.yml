@@ -38,10 +38,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
       - run: pnpm test
+      - run: node --test pages-gateway/tests/*.test.mjs
       - run: pnpm audit --audit-level=high
       - run: pnpm run build
       - run: pnpm run build:landing
       - run: pnpm run check:landing
+      - run: pnpm run build:pages
 
   emulators:
     name: Firebase rules and local journey

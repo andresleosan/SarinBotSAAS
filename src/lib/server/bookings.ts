@@ -1,12 +1,12 @@
 import 'server-only';
 import type { ChatActor } from '@/types/chat';
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Database as Firestore } from '@/lib/storage/types';
 import type { Appointment, Business } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { getAvailableSlots, isDateKey, toColombiaTimestamp, toMinutes, toTimeStr } from '@/lib/sarin/availability';
-import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
+import { getBusinessAccess, isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { HttpError } from './http';
-import { assertOwner, getBusiness, stableDocumentId } from './businesses';
+import { assertOwner, getBusiness, publicBusiness, stableDocumentId } from './businesses';
 import { documentIdSchema, type BookingInput } from './schemas';
 
 type BlockInput = { dateKey: string; startTimeStr: string; endTimeStr: string; resourceId: string; requestId: string; motivo?: string };
@@ -26,6 +26,7 @@ export async function readAppointments(businessId: string, dateKey: string, user
 
 export async function readAvailability(business: Business, dateKey: string, serviceId: string, resourceId?: string, db: Firestore = getAdminDb()) {
   assertDate(dateKey);
+  if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
   if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'La suscripción del negocio está vencida.');
   const snapshot = await db.collection('businesses').doc(business.id).collection('appointments').where('dateKey', '==', dateKey).where('status', '==', 'confirmed').get();
   return getAvailableSlots({ tenant: business, dateKey, serviceId, resourceId, existingAppointments: snapshot.docs.map((document) => document.data() as Appointment) });
@@ -42,12 +43,13 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
     const [businessDocument, existing, lock] = await Promise.all([transaction.get(businessReference), transaction.get(appointmentReference), transaction.get(lockReference)]);
     if (!businessDocument.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDocument.data() as Business;
-    if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'La suscripción del negocio está vencida.');
     if (existing.exists) {
       const appointment = existing.data() as Appointment;
       if (appointment.client?.uid !== user.uid || appointment.startTimeStr !== input.startTimeStr || appointment.dateKey !== input.dateKey || appointment.resourceId !== input.resourceId || appointment.serviceId !== input.serviceId) throw new HttpError(409, 'Este identificador ya se utilizó para otra reserva.');
       return appointment;
     }
+    if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
+    if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar agendando.');
     const service = business.services.find((candidate) => candidate.id === input.serviceId);
     if (!service) throw new HttpError(400, 'El servicio no existe.');
     if (business.sarinConfig.intakeFields.some((field) => field.required && !input.intakeAnswers[field.key]?.trim())) throw new HttpError(400, 'Faltan respuestas obligatorias para agendar.');
@@ -68,6 +70,14 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
     // The shared per-resource/day document prevents empty-query phantom races.
     // Every mutation of that resource/date must participate in the same lock.
     transaction.set(lockReference, { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: Date.now() });
+    if (getBusinessAccess(business) === 'paid_trial') {
+      const trial = business.subscription.paidTrial!;
+      const updated: Business = { ...business, subscription: { ...business.subscription, paidTrial: { ...trial, appointmentsUsed: trial.appointmentsUsed + 1 } } };
+      // A business-wide write serializes the final unit across every resource
+      // and date, beyond the resource/day lock used for slot conflicts.
+      transaction.set(businessReference, updated);
+      transaction.set(db.collection('publicBusinesses').doc(business.slug), publicBusiness(updated));
+    }
     transaction.create(appointmentReference, appointment);
     return appointment;
   });

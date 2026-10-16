@@ -94,7 +94,7 @@ describe("Firebase singleton emulator connections", () => {
     vi.stubEnv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8080");
   }
 
-  it("connects client Auth and Firestore once, including a module reload", async () => {
+  it("connects client Auth once without initializing browser Firestore, including a module reload", async () => {
     enableLocal();
     const firstModule = await import("@/lib/firebase/client");
     const first = firstModule.getFirebaseClient();
@@ -107,11 +107,8 @@ describe("Firebase singleton emulator connections", () => {
       sdk.clientAuth,
       "http://127.0.0.1:9099",
     );
-    expect(sdk.connectFirestore).toHaveBeenCalledExactlyOnceWith(
-      sdk.clientDb,
-      "127.0.0.1",
-      8080,
-    );
+    expect(first).toEqual({ auth: sdk.clientAuth });
+    expect(sdk.connectFirestore).not.toHaveBeenCalled();
     expect(sdk.initializeClient.mock.calls[0][0]).toMatchObject({
       projectId: "demo-sarin-bot",
       apiKey: "demo-sarin-local-key",
