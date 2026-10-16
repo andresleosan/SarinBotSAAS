@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import sharp from 'sharp';
 import { executeDataCommand, handleDataOutbound } from '../src/data.ts';
 
 const require = createRequire(import.meta.url);
@@ -177,6 +178,34 @@ test('unbounded queries fail explicitly instead of silently dropping records', a
 });
 
 const receipt = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jwL8AAAAASUVORK5CYII=';
+test('separates public logo objects from private receipt policy and hydrates logos only by direct read', async context => {
+  const env = await fixture(context);
+  const bytes = await sharp({ create: { width: 512, height: 512, channels: 4, background: 'blue' } }).webp().toBuffer();
+  const sha256 = Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
+  const path = `businessLogos/b_one_${sha256}`;
+  const data = { businessId: 'b_one', ownerUid: 'one', sha256, logoDataUrl: `data:image/webp;base64,${bytes.toString('base64')}`, createdAt: 1 };
+  await executeDataCommand(commit(0, [set(path, data)]), env);
+  const stored = await env.SARIN_DB.prepare('SELECT data,blob FROM app_documents WHERE path=?').bind(path).first();
+  assert.equal(stored.data.includes('base64'), false);
+  const blob = JSON.parse(stored.blob);
+  assert.equal(blob.key, `business-logos/${sha256}`);
+  assert.deepEqual((await executeDataCommand(read(path), env)).documents[0].data, data);
+  assert.equal(Object.hasOwn((await executeDataCommand(query('businessLogos'), env)).documents[0].data, 'logoDataUrl'), false);
+  const revision = (await executeDataCommand(read(path), env)).revision;
+  const broken = { ...env, SARIN_FILES: { put: async () => { throw new Error('private-payload'); } } };
+  await assert.rejects(executeDataCommand(commit(revision, [set(path, data), set('businesses/b_one', { logo: { sha256 } })]), broken), isError('DATA_UNAVAILABLE'));
+  assert.equal((await executeDataCommand(read('businesses/b_one'), env)).documents.length, 0);
+  await env.SARIN_DB.prepare('UPDATE app_documents SET blob=? WHERE path=?').bind(JSON.stringify({ ...blob, key: `payment-images/${sha256}` }), path).run();
+  await assert.rejects(executeDataCommand(read(path), env), isError('DATA_UNAVAILABLE'));
+});
+
+test('rejects invalid logo signatures, oversized data and digest mismatch before storage', async () => {
+  const noAccess = new Proxy({}, { get() { assert.fail('Invalid logo accessed storage.'); } });
+  const sha256 = 'a'.repeat(64), path = `businessLogos/b_one_${sha256}`;
+  for (const logoDataUrl of [receipt, 'data:image/webp;base64,UklGRnh4eHhXRUJQZml4dHVyZQ==', `data:image/webp;base64,${Buffer.alloc(256 * 1024 + 1).toString('base64')}`]) {
+    await assert.rejects(executeDataCommand(commit(0, [set(path, { businessId: 'b_one', ownerUid: 'one', sha256, createdAt: 1, logoDataUrl })]), noAccess), isError('DATA_INVALID'));
+  }
+});
 test('receipt bytes live only in private R2, are read back exactly and survive document deletion', async context => {
   const env = await fixture(context);
   const data = { ownerUid: 'one', receiptDataUrl: receipt, submittedAt: 1 };

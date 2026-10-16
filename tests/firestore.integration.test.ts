@@ -13,6 +13,8 @@ import { reserveResponseQuota, commitResponseQuota, releaseResponseQuota, getRes
 import { ingestWhatsAppWebhook, persistWhatsAppReply, cleanupWhatsAppRetention, getWhatsAppUsage, whatsappHash } from '@/lib/server/whatsapp-store';
 import { syntheticWhatsAppEnv, inbound, phoneId, wabaId } from './whatsapp-fixtures';
 import { verifyInvitationLifecycle } from './invitation-contract';
+import { readPublicBusinessLogo, saveBusinessLogo } from '@/lib/server/business-logos';
+import sharp from 'sharp';
 
 function user(uid: string): DecodedIdToken { return { uid, sub:uid, aud:'demo-sarin-bot', auth_time:0, exp:9999999999, iat:0, iss:'https://securetoken.google.com/demo-sarin-bot', firebase:{identities:{},sign_in_provider:'google.com'}, email:`${uid}@example.test`, name:uid }; }
 
@@ -41,6 +43,17 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
   afterAll(async () => { if (db) { await db.terminate(); const app = getApps().find(value => value.name === 'sarin-admin'); if (app) await deleteApp(app); } });
   it('preserves invitation access, quota, suspension and concurrent payment invariants on Firestore', async () => {
     await verifyInvitationLifecycle(db, config, dateKey);
+  }, 75000);
+  it('keeps normalized business logos separate from profile photos and protects stale replacements on Firestore', async () => {
+    const identity = user(`logo-${crypto.randomUUID()}`);
+    const value = await paidBusiness(identity, { ...config, slug: `logo-${crypto.randomUUID()}` });
+    const png = await sharp({ create: { width: 120, height: 60, channels: 4, background: 'blue' } }).png().toBuffer();
+    const input = { logoDataUrl: `data:image/png;base64,${png.toString('base64')}`, expectedSha256: null };
+    const saved = await saveBusinessLogo(identity, input, db);
+    expect((await readPublicBusinessLogo(value.slug, saved.logo!.sha256, db)).length).toBeGreaterThan(12);
+    await expect(saveBusinessLogo(identity, { logoDataUrl: null, expectedSha256: null }, db)).rejects.toMatchObject({ code: 'BRANDING_CHANGED' });
+    await saveBusinessLogo(identity, { logoDataUrl: null, expectedSha256: saved.logo!.sha256 }, db);
+    await expect(readPublicBusinessLogo(value.slug, saved.logo!.sha256, db)).rejects.toMatchObject({ status: 404 });
   }, 75000);
   it('persists one encrypted WhatsApp turn and reconciles duplicate delivery and quota exactly once', async () => {
     syntheticWhatsAppEnv();

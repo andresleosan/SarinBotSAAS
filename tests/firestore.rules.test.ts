@@ -48,7 +48,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
   it('denies invitation reads, commands and courtesy entitlement changes even with forged admin flags', async () => {
     for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('owner-one'), environment.authenticatedContext('stale-admin', { role: 'superadmin', isSuperadmin: true })]) {
       const db = context.firestore();
-      for (const path of ['invitations/synthetic', 'serverSettings/invitation_command_synthetic']) {
+      for (const path of ['invitations/synthetic', 'serverSettings/invitation_command_synthetic', 'businessLogos/synthetic']) {
         await assertFails(getDoc(doc(db, path)));
         await assertFails(setDoc(doc(db, path), { state: 'redeemed' }));
       }

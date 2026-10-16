@@ -12,6 +12,8 @@ import { commitResponseQuota, getResponseQuota, releaseResponseQuota, reserveRes
 import { businessConfigSchema } from '../src/lib/server/schemas';
 import { verifyInvitationLifecycle } from './invitation-contract';
 import { listInvitations } from '@/lib/server/invitations';
+import { normalizeBusinessLogo, readPublicBusinessLogo, saveBusinessLogo } from '@/lib/server/business-logos';
+import sharp from 'sharp';
 
 const now = Date.now();
 const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now + 3 * 86400000);
@@ -36,6 +38,20 @@ describe('commercial invariants on Cloudflare data', () => {
     });
   }, 30_000);
   afterAll(async () => { await runtime?.dispose(); });
+  it('normalizes a business logo through D1/R2 and binds public reads to its current digest', async () => {
+    const owner = { uid: 'logo-owner' }, id = businessIdForOwner(owner.uid);
+    const value = { ...business(id), slug: 'logo-synthetic', ownerUid: owner.uid };
+    await db.collection('businesses').doc(id).set(value);
+    const png = await sharp({ create: { width: 120, height: 60, channels: 4, background: '#315ff3' } }).png().toBuffer();
+    const input = `data:image/png;base64,${png.toString('base64')}`;
+    const saved = await saveBusinessLogo(owner, { logoDataUrl: input, expectedSha256: null }, db);
+    const stored = await runtime.db.prepare('SELECT data,blob FROM app_documents WHERE path=?').bind(`businessLogos/${id}_${saved.logo!.sha256}`).first();
+    expect(stored!.data).not.toContain('base64');
+    expect(JSON.parse(stored!.blob as string).key).toBe(`business-logos/${saved.logo!.sha256}`);
+    expect(Buffer.from(await readPublicBusinessLogo(value.slug, saved.logo!.sha256, db)).toString('base64')).toBe((await normalizeBusinessLogo(input)).dataUrl.split(',')[1]);
+    await saveBusinessLogo(owner, { logoDataUrl: null, expectedSha256: saved.logo!.sha256 }, db);
+    await expect(readPublicBusinessLogo(value.slug, saved.logo!.sha256, db)).rejects.toMatchObject({ status: 404 });
+  });
 
   it('preserves invitation access, quota, suspension and concurrent payment invariants on actual D1', async () => {
     await db.collection('platformSettings').doc('main').set({ bankAccounts: [{ id: 'bank', bankName: 'Test', accountType: 'Ahorros', accountNumber: '000', holderName: 'Test' }] });

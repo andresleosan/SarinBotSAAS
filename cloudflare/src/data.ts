@@ -76,6 +76,10 @@ function validateCommand(command: unknown): asserts command is DataCommand {
     if (!object(write.data) || !isDataJson(write.data) || (write.merge !== undefined && typeof write.merge !== 'boolean')) throw invalid();
     if (encoder.encode(JSON.stringify(write.data)).length > MAX_DOCUMENT) throw limit();
     if (/^payment(?:Images|Receipts)\//.test(write.path) && Object.hasOwn(write.data, 'receiptDataUrl')) receipt(write.data.receiptDataUrl);
+    if (write.path.startsWith('businessLogos/')) {
+      if (typeof write.data.businessId !== 'string' || !/^[A-Za-z0-9_-]{1,60}$/.test(write.data.businessId) || typeof write.data.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(write.data.sha256) || write.path !== `businessLogos/${write.data.businessId}_${write.data.sha256}` || typeof write.data.ownerUid !== 'string' || !write.data.ownerUid || write.data.ownerUid.length > 256 || !Number.isSafeInteger(write.data.createdAt) || Number(write.data.createdAt) < 0) throw invalid();
+      logo(write.data.logoDataUrl);
+    }
   }
 }
 function validate(command: unknown): asserts command is DataCommand {
@@ -111,6 +115,20 @@ function receipt(value: unknown): { bytes: Uint8Array; contentType: string } {
   if (match[1] === 'webp' && !(raw.slice(0, 4) === 'RIFF' && raw.slice(8, 12) === 'WEBP')) throw invalid();
   return { bytes, contentType: `image/${match[1]}` };
 }
+function logo(value: unknown): { bytes: Uint8Array; contentType: string } {
+  if (typeof value !== 'string' || value.length > 349551) throw invalid();
+  const match = /^data:image\/webp;base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match || match[1].length % 4) throw invalid();
+  let raw: string;
+  try { raw = atob(match[1]); } catch { throw invalid(); }
+  if (raw.length < 12 || raw.length > 256 * 1024 || btoa(raw) !== match[1] || raw.slice(0, 4) !== 'RIFF' || raw.slice(8, 12) !== 'WEBP') throw invalid();
+  return { bytes: Uint8Array.from(raw, char => char.charCodeAt(0)), contentType: 'image/webp' };
+}
+function imagePolicy(path: string) {
+  if (/^payment(?:Images|Receipts)\//.test(path)) return { prefix: 'payment-images', field: 'receiptDataUrl', max: 150 * 1024, contentTypes: ['image/png', 'image/jpeg', 'image/webp'] };
+  if (path.startsWith('businessLogos/')) return { prefix: 'business-logos', field: 'logoDataUrl', max: 256 * 1024, contentTypes: ['image/webp'] };
+  return null;
+}
 function sqlRead(read: DataRead, db: D1Database): D1PreparedStatement {
   if (read.kind === 'document') return db.prepare('SELECT path,data,blob FROM app_documents WHERE path=?').bind(read.path);
   const clauses = ['parent=?'];
@@ -132,14 +150,16 @@ async function hydrate(row: StoredDocument, env: DataEnvironment, includeImage: 
   const data: DataRecord = JSON.parse(row.data);
   if (row.blob && includeImage) {
     const blob: BlobReference = JSON.parse(row.blob);
-    if (!/^payment-images\/[a-f0-9]{64}$/.test(blob.key) || blob.key !== `payment-images/${blob.sha256}` || !['image/png', 'image/jpeg', 'image/webp'].includes(blob.contentType) || !Number.isInteger(blob.byteLength) || blob.byteLength < 12 || blob.byteLength > 150 * 1024) throw unavailable();
+    const policy = imagePolicy(row.path);
+    if (!policy || !/^[a-f0-9]{64}$/.test(blob.sha256) || blob.key !== `${policy.prefix}/${blob.sha256}` || !policy.contentTypes.includes(blob.contentType) || !Number.isInteger(blob.byteLength) || blob.byteLength < 12 || blob.byteLength > policy.max) throw unavailable();
+    if (policy.field === 'logoDataUrl' && (data.sha256 !== blob.sha256 || row.path !== `businessLogos/${data.businessId}_${blob.sha256}`)) throw unavailable();
     const stored = await env.SARIN_FILES.get(blob.key);
     if (!stored || stored.size !== blob.byteLength) throw unavailable();
     const bytes = new Uint8Array(await stored.arrayBuffer());
     if (await digest(bytes) !== blob.sha256) throw unavailable();
     let raw = '';
     for (const byte of bytes) raw += String.fromCharCode(byte);
-    data.receiptDataUrl = `data:${blob.contentType};base64,${btoa(raw)}`;
+    data[policy.field] = `data:${blob.contentType};base64,${btoa(raw)}`;
   }
   return { path: row.path, data };
 }
@@ -193,15 +213,17 @@ async function commitCommand(command: Extract<DataCommand, { action: 'commit' }>
     const old = state.get(write.path);
     const data = write.op === 'set' && write.merge ? merge(old?.data ?? {}, write.data) : { ...write.data };
     let blob = write.op === 'set' && write.merge ? old?.blob ?? null : null;
-    if (/^payment(?:Images|Receipts)\//.test(write.path) && Object.hasOwn(data, 'receiptDataUrl')) {
-      const image = receipt(data.receiptDataUrl);
+    const policy = imagePolicy(write.path);
+    if (policy && Object.hasOwn(data, policy.field)) {
+      const image = policy.field === 'logoDataUrl' ? logo(data[policy.field]) : receipt(data[policy.field]);
       const sha256 = await digest(image.bytes);
-      const reference: BlobReference = { key: `payment-images/${sha256}`, sha256, contentType: image.contentType, byteLength: image.bytes.length };
+      if (policy.field === 'logoDataUrl' && data.sha256 !== sha256) throw invalid();
+      const reference: BlobReference = { key: `${policy.prefix}/${sha256}`, sha256, contentType: image.contentType, byteLength: image.bytes.length };
       // Upload before D1: failure cannot publish a dangling reference. CAS failure
       // may leave an immutable private orphan; do not delete rollback objects here.
       const uploaded = await env.SARIN_FILES.put(reference.key, image.bytes, { httpMetadata: { contentType: image.contentType }, sha256 });
       if (!uploaded) throw unavailable();
-      delete data.receiptDataUrl;
+      delete data[policy.field];
       blob = JSON.stringify(reference);
     }
     state.set(write.path, { data, blob });
@@ -225,6 +247,9 @@ async function commitCommand(command: Extract<DataCommand, { action: 'commit' }>
 
 export async function executeDataCommand(command: unknown, env: DataEnvironment): Promise<DataReadResult | DataCommitResult> {
   validate(command); // Entire command validated before even accessing a binding.
+  if (command.action === 'commit') for (const write of command.writes) {
+    if (write.op !== 'delete' && write.path.startsWith('businessLogos/') && await digest(logo(write.data.logoDataUrl).bytes) !== write.data.sha256) throw invalid();
+  }
   try { return command.action === 'read' ? await readCommand(command, env) : await commitCommand(command, env); }
   catch (error) { if (error instanceof DataError) throw error; throw unavailable(); }
 }
