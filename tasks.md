@@ -5,6 +5,7 @@
 - [x] Estructura aprobada por el propietario: Esencial 7/15/30 días a $20.000/$35.000/$59.900 con 700/1.500/3.000 respuestas; WhatsApp 30 días a $149.900 + Meta con 4.500; ampliaciones de 1.000 por $20.000. Referencia: `docs/commercial-plans.md`.
 - [x] Cuotas por vigencia, paquetes, aviso al 80%, pausa de IA y visualización de capacidad implementados y verificados. Trial de 700 respuestas y copiloto compartido confirmados por el propietario. Evidencia: `docs/qa/2026-10-15-commercial-quotas.md`.
 - [x] Código WhatsApp preparado: webhook firmado, colas cifradas, reintentos seguros, cuota compartida, estados y mantenimiento. Pruebas sintéticas y Firestore emulado; sin activar envíos. Operación: `docs/whatsapp-cloud-api.md`.
+- [x] Push `c509b26`, tres jobs CI aprobados y nueva imagen activada en la instancia privada con rollback. Panel real verificado, tarifas guardadas $20.000/$35.000/$59.900 y 700 respuestas de prueba; WhatsApp desactivado.
 - [ ] Enlazar el número Meta cuando el propietario lo tenga, validar recepción/entrega real y conciliación de consumo antes de ofrecer WhatsApp como disponible. Mayor volumen por cotización.
 
 ## Consumo de IA — 2026-10-15
