@@ -13,6 +13,7 @@ export function localDevelopmentEnvironment(input) {
     // Explicit values also prevent Next's dotenv loading from enabling cloud inference.
     SARIN_CHAT_PROVIDER:'ollama', DEEPSEEK_API_KEY:'', DEEPSEEK_MODEL:'',
     GEMINI_API_KEY:'', GEMINI_MODEL:'', GEMINI_BILLING_VERIFIED:'false',
+    GEMINI_TEST_API_KEY:'', GEMINI_TEST_MODEL:'',
     WHATSAPP_ENABLED:'false', WHATSAPP_RETENTION_ENABLED:'false', WHATSAPP_GRAPH_API_VERSION:'v25.0',
     WHATSAPP_APP_SECRET:'', WHATSAPP_VERIFY_TOKEN:'', WHATSAPP_CONTENT_KEY:'', WHATSAPP_PHONE_CREDENTIALS_JSON:'',
     NEXT_PUBLIC_FIREBASE_EMULATORS:'true',

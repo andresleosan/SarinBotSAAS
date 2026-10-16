@@ -5,6 +5,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { getChatProvider, getEngineConfiguration, probeEngine } from '@/lib/sarin/engine';
 import { AI_PROVIDERS, type AdminAiSettings, type AiProvider, type AiProviderSelection, type AiProviderStatus } from '@/types/ai';
 import { HttpError } from './http';
+import { getGeminiTestProfileStatus } from './gemini-test-settings';
 
 export const aiProviderUpdateSchema = z.object({ provider: z.enum(AI_PROVIDERS) }).strict();
 const storedSelectionSchema = aiProviderUpdateSchema.extend({ updatedAt: z.number().int().nonnegative() }).strict();
@@ -27,7 +28,7 @@ async function providerStatus(provider: AiProvider): Promise<AiProviderStatus> {
 
 export async function getAdminAiSettings(db: Firestore = getAdminDb()): Promise<AdminAiSettings> {
   const selection = await getAiProviderSelection(db);
-  return { ...selection, providers: await Promise.all(AI_PROVIDERS.map(providerStatus)) };
+  return { ...selection, providers: await Promise.all(AI_PROVIDERS.map(providerStatus)), geminiTest: getGeminiTestProfileStatus() };
 }
 
 export async function saveAiProvider(provider: AiProvider, db: Firestore = getAdminDb()): Promise<AiProviderSelection> {

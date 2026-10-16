@@ -145,7 +145,7 @@ describe("monthly administrative AI usage", () => {
     state.api.mockImplementationOnce(() => selected.promise);
     await act(async () => { panel().findByProps({ "aria-label": "Proveedor del consumo" }).props.onChange({ target: { value: "gemini" } }); });
     expect(panel().findAllByType("dl")).toHaveLength(0);
-    expect(text(panel().findByType("h2"))).toBe("Consumo de Gemini");
+    expect(text(panel().findByType("h2"))).toBe("Consumo de Gemini · Clientes");
     expect(state.api.mock.calls.at(-1)?.[0]).toBe("/api/admin/ai/usage?month=2026-10&provider=gemini");
     await act(async () => { selected.resolve({ ...usage, provider: "gemini", model: "gemini-3.5-flash-lite", pricingVersion: "gemini-3.5-flash-lite-standard-verified-2026-10-16", totals: { ...counted, calls: 7, estimatedCostUSD: { min: 0.000459, max: 0.000459 } } }); });
     expect(summary()).toEqual(["7", "10.000 / 1.000", "USD 0,0005"]);

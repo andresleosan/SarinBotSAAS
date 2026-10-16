@@ -9,7 +9,7 @@ import type { AdminAiSettings as AiSettings, AiProvider, AiProviderSelection } f
 const providerLabels: Record<AiProvider, string> = {
   ollama: "IA local (Ollama)",
   deepseek: "DeepSeek",
-  gemini: "Gemini",
+  gemini: "Gemini · Clientes",
 };
 const providers: AiProvider[] = ["ollama", "deepseek", "gemini"];
 
@@ -81,7 +81,7 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
       {notice && <Notice>{notice}</Notice>}
       {data && (
         <>
-          <p aria-label="IA activa" role="status" className="text-sm font-semibold text-sarin-ink">En uso: {providerLabels[data.provider]}</p>
+          <p aria-label="IA activa" role="status" className="rounded-xl bg-sarin-soft px-3 py-2 text-sm font-semibold text-sarin-ink">En uso para los negocios: {providerLabels[data.provider]}</p>
           <fieldset disabled={busy}>
             <legend className="mb-2 text-sm font-medium">Seleccionar IA</legend>
             <div className="grid items-start gap-3 md:grid-cols-3">
@@ -93,13 +93,14 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
                       <input type="radio" name="aiProvider" value={provider} checked={selected === provider} disabled={busy || !status?.configured} onChange={() => { if (!busy && status?.configured) { setSelected(provider); setNotice(null); setError(null); } }} className="h-4 w-4 accent-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" />
                       {providerLabels[provider]}
                     </span>
+                    {data.provider === provider && <span className="inline-flex rounded-full bg-sarin-soft px-2 py-1 text-xs font-semibold text-sarin-blue">En uso</span>}
                     <span className="block text-sm text-sarin-muted">
-                      {!status ? "Sin comprobar" : !status.configured ? "Configuración pendiente" : status.online ? "Configurada · Disponible" : "Configurada · Sin conexión"}
+                      {!status ? "Sin comprobar" : !status.configured ? "Configuración pendiente" : status.online ? "Configurada · Conexión verificada" : "Configurada · Sin conexión"}
                     </span>
                     {status?.model && <span className="block break-words text-xs text-sarin-muted">Modelo: {status.model}</span>}
                     {status?.error && <span className="block text-sm text-amber-800">{status.error}</span>}
                     {provider === "deepseek" && <span className="block text-xs leading-6 text-sarin-muted">DeepSeek recibe los mensajes, el contexto del negocio y los resultados de las herramientas para generar respuestas. Su uso puede generar cargos en tu cuenta de DeepSeek.</span>}
-                    {provider === "gemini" && <span className="block text-xs leading-6 text-sarin-muted">Google recibe los mensajes, el contexto del negocio y los resultados de las herramientas. Gemini requiere una cuenta de API con pago verificado y su uso genera cargos.</span>}
+                    {provider === "gemini" && <span className="block text-xs leading-6 text-sarin-muted">API de pago para conversaciones reales. Google recibe los mensajes y el contexto del negocio. Requiere facturación verificada; comprobar la conexión no confirma el saldo.</span>}
                   </label>
                 );
               })}
@@ -109,6 +110,25 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
             <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Sarin Vault conserva sus datos en este navegador y sigue usando la IA local. Las credenciales de los proveedores se administran en el servidor.</p>
             <button type="button" className={buttonClass + " shrink-0"} disabled={busy || !selectedStatus?.configured || selected === data.provider} onClick={() => void save()}>{saving ? "Guardando IA…" : "Guardar IA"}</button>
           </div>
+          <section aria-labelledby="admin-gemini-test-title" className="space-y-3 border-t border-sarin-line pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 id="admin-gemini-test-title" className="font-semibold">Gemini · Pruebas</h3>
+              <span className="rounded-full border border-sarin-line px-2 py-1 text-xs font-medium text-sarin-muted">Solo pruebas</span>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p aria-label="Estado de Gemini de pruebas" className="text-sm font-medium">
+                  {!data.geminiTest ? "Sin comprobar" : data.geminiTest.configured ? "Clave configurada" : "Sin configurar"}
+                </p>
+                {data.geminiTest?.configured && <p className="text-sm text-sarin-muted">Conexión sin comprobar</p>}
+                {data.geminiTest?.model && <p className="break-words text-xs text-sarin-muted">Modelo: {data.geminiTest.model}</p>}
+                {data.geminiTest?.error && <p className="text-sm text-amber-800">{data.geminiTest.error}</p>}
+              </div>
+              <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 shrink-0 items-center self-start rounded-lg px-2 text-sm text-sarin-blue hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue">Abrir AI Studio<span className="sr-only"> (nueva pestaña)</span></a>
+            </div>
+            <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Conexión separada para pruebas con datos ficticios. Para usar el nivel gratuito, utiliza un proyecto sin facturación y una clave propia. Sarin no comprueba su plan ni su cuota.</p>
+            <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Este perfil no atiende a los negocios. Actualizar su estado solo revisa la configuración guardada; no envía mensajes a Google.</p>
+          </section>
         </>
       )}
     </section>

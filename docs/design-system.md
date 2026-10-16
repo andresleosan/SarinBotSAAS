@@ -13,6 +13,10 @@ La dirección vigente es **Agenda clara**, elegida por el propietario el 13 de o
 
 ## Referencias consultadas mediante el MCP oficial de Mobbin
 
+### Estado de las conexiones de IA (16 de octubre de 2026)
+
+Administración conserva Agenda clara y DM Sans. Una franja suave y la etiqueta «En uso» distinguen la selección guardada del radio que se está editando. «Gemini · Clientes» permanece entre las tres opciones para negocios; «Gemini · Pruebas» se presenta debajo, separado por una línea, con estado de clave y conexión por separado. No se usa color como único indicador ni una cuarta opción de selección que pudiera enviar conversaciones reales al perfil de pruebas.
+
 ### Densidad de formularios (15 de octubre de 2026)
 
 A petición del propietario, los formularios aprovechan mejor el ancho disponible: 12 px entre campos relacionados, 16 px entre grupos y 24 px entre secciones. Se conserva Agenda clara, DM Sans, el azul de acción y controles de al menos 44 px. Las acciones secundarias comparten la cabecera cuando caben; los bloques se ajustan a su contenido, sin alturas vacías. Los horarios se alinean por día en escritorio y se apilan en móvil. La configuración del negocio prioriza el formulario frente al espacio vacío del asistente.

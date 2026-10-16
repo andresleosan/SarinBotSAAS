@@ -2,6 +2,7 @@ import { act, createElement, type ReactNode } from "react";
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AdminPage from "@/app/admin/page";
+import type { AdminAiSettings } from "@/types/ai";
 
 const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn() }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
@@ -28,7 +29,7 @@ function deferred<T>() {
 
 describe("owner AI controls", () => {
   let renderer: ReactTestRenderer;
-  let ai: { provider: string; source: string; updatedAt: number | null; providers: { provider: string; configured: boolean; model: string | null; online: boolean; checkedAt: number; error?: string }[] };
+  let ai: AdminAiSettings;
   const radios = () => renderer.root.findAllByType("input").filter(input => input.props.name === "aiProvider");
   const patches = () => state.api.mock.calls.filter(([path, init]) => path === "/api/admin/ai" && init?.method === "PATCH");
   const active = () => text(renderer.root.findByProps({ "aria-label": "IA activa" }));
@@ -43,7 +44,7 @@ describe("owner AI controls", () => {
       { provider: "ollama", configured: true, model: "local-model", online: true, checkedAt: 1800000000000 },
       { provider: "deepseek", configured: true, model: "deepseek-flash", online: true, checkedAt: 1800000000000 },
       { provider: "gemini", configured: false, model: null, online: false, checkedAt: 1800000000000, error: "Gemini requiere facturación de pago verificada en el servidor." },
-    ] };
+    ], geminiTest: { configured: false, model: null, connection: "not_checked" } };
     state.refresh.mockReset();
     state.api.mockReset().mockImplementation(async (path: string, init?: RequestInit) => {
       if (path === "/api/admin") return { businesses: [], receipts: [], settings };
@@ -69,6 +70,34 @@ describe("owner AI controls", () => {
     expect(active()).toContain("DeepSeek");
     expect(button("Guardar IA").props.disabled).toBe(true);
     expect(state.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("separates Gemini tests from the actual client provider without offering a test radio", async () => {
+    ai.geminiTest = { configured: true, model: "gemini-3.5-flash-lite", connection: "not_checked" };
+    await mount();
+    const testProfile = renderer.root.findByProps({ "aria-labelledby": "admin-gemini-test-title" });
+    expect(text(testProfile)).toContain("Gemini · Pruebas");
+    expect(text(testProfile)).toContain("Clave configurada");
+    expect(text(testProfile)).toContain("Conexión sin comprobar");
+    expect(text(testProfile)).toContain("datos ficticios");
+    expect(testProfile.findAllByType("input")).toHaveLength(0);
+    expect(text(renderer.root)).toContain("Gemini · Clientes");
+    expect(active()).toContain("Ollama");
+    expect(radios().map(input => input.props.value)).toEqual(["ollama", "deepseek", "gemini"]);
+    expect(radios().find(input => input.props.value === "gemini")!.props.disabled).toBe(true);
+    expect(patches()).toHaveLength(0);
+    expect(state.api.mock.calls.every(([path]) => path === "/api/admin" || path === "/api/admin/ai")).toBe(true);
+  });
+
+  it("shows a pending test key even when client Gemini is active", async () => {
+    ai.provider = "gemini";
+    ai.providers[2] = { ...ai.providers[2], configured: true, online: true, model: "gemini-3.5-flash-lite", error: undefined };
+    await mount();
+    expect(active()).toContain("Gemini · Clientes");
+    const testProfile = renderer.root.findByProps({ "aria-labelledby": "admin-gemini-test-title" });
+    expect(text(testProfile)).toContain("Sin configurar");
+    expect(text(testProfile)).not.toContain("Clave configurada");
+    expect(text(testProfile)).not.toContain("En uso");
   });
 
   it("keeps Gemini disabled until the server verifies paid billing, then saves only an explicit manual choice", async () => {

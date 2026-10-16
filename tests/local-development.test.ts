@@ -16,6 +16,7 @@ describe('isolated local development launcher', () => {
   it.each([
     { SARIN_CHAT_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'synthetic-deepseek-key', DEEPSEEK_MODEL: 'deepseek-flash' },
     { SARIN_CHAT_PROVIDER: 'gemini', GEMINI_API_KEY: 'synthetic-gemini-key', GEMINI_MODEL: 'gemini-3.5-flash-lite', GEMINI_BILLING_VERIFIED: 'true' },
+    { GEMINI_TEST_API_KEY: 'synthetic-gemini-test-key', GEMINI_TEST_MODEL: 'gemini-3.5-flash-lite' },
     { SARIN_CHAT_PROVIDER: 'unsupported-provider' },
     {},
   ])('pins local inference with explicit empty cloud settings before dotenv loading', (cloudSettings) => {
@@ -28,11 +29,12 @@ describe('isolated local development launcher', () => {
     expect(env).toMatchObject({
       SARIN_CHAT_PROVIDER: 'ollama', DEEPSEEK_API_KEY: '', DEEPSEEK_MODEL: '',
       GEMINI_API_KEY: '', GEMINI_MODEL: '', GEMINI_BILLING_VERIFIED: 'false',
+      GEMINI_TEST_API_KEY: '', GEMINI_TEST_MODEL: '',
       SARIN_TUNNEL_URL: 'https://ia-sarin.alsdevstudio.com/v1/chat/completions',
       OLLAMA_MAIN_MODEL: 'qwen3:32b', OLLAMA_VISION_MODEL: 'qwen3-vl:8b',
       CF_ACCESS_CLIENT_ID: 'synthetic-access-id', CF_ACCESS_CLIENT_SECRET: 'synthetic-access-secret',
     });
-    expect(Object.keys(env).filter(name => name.endsWith('_MODEL')).sort()).toEqual(['DEEPSEEK_MODEL', 'GEMINI_MODEL', 'OLLAMA_MAIN_MODEL', 'OLLAMA_VISION_MODEL']);
+    expect(Object.keys(env).filter(name => name.endsWith('_MODEL')).sort()).toEqual(['DEEPSEEK_MODEL', 'GEMINI_MODEL', 'GEMINI_TEST_MODEL', 'OLLAMA_MAIN_MODEL', 'OLLAMA_VISION_MODEL']);
   });
   it('accepts only explicit non privileged local ports and known flags', () => {
     expect(parseLocalArguments([])).toEqual({port:3030,help:false});

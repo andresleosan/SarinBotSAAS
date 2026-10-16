@@ -51,7 +51,7 @@ export function AdminAiUsage({ businesses }: { businesses: Pick<Business, "id" |
   }, [refresh]);
 
   const reading = data?.month === month && data.provider === provider ? data : null;
-  const providerName = provider === "gemini" ? "Gemini" : "DeepSeek";
+  const providerName = provider === "gemini" ? "Gemini · Clientes" : "DeepSeek";
   const beforeMeasurement = Boolean(reading?.measurementStartedAt && month < monthInColombia(reading.measurementStartedAt));
   const measured = reading && reading.measurementStartedAt !== null && !beforeMeasurement;
   const names = new Map(businesses.map(business => [business.id, business.name]));
@@ -68,7 +68,7 @@ export function AdminAiUsage({ businesses }: { businesses: Pick<Business, "id" |
             Historial de consumo
             <select aria-label="Proveedor del consumo" value={provider} className={fieldClass + " mt-1"} onChange={event => { if (event.target.value === "deepseek" || event.target.value === "gemini") setProvider(event.target.value); }}>
               <option value="deepseek">DeepSeek</option>
-              <option value="gemini">Gemini</option>
+              <option value="gemini">Gemini · Clientes</option>
             </select>
           </label>
           <label className="text-xs text-sarin-muted">

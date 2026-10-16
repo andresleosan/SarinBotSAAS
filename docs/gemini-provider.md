@@ -1,6 +1,16 @@
 # Gemini como proveedor manual
 
-El administrador puede elegir Gemini, IA local o DeepSeek para el chat, el copiloto y la configuración del negocio. Cada turno mantiene su proveedor y no hay cambio automático ante errores. Vault conserva exclusivamente Ollama y sus datos locales.
+El administrador puede elegir **Gemini · Clientes**, IA local o DeepSeek para el chat, el copiloto y la configuración del negocio. El indicador «En uso para los negocios» muestra la selección guardada, independientemente del radio que se esté editando. Cada turno mantiene su proveedor y no hay cambio automático ante errores. Vault conserva exclusivamente Ollama y sus datos locales.
+
+## Perfil separado de pruebas
+
+El bloque **Gemini · Pruebas** es informativo y usa exclusivamente `GEMINI_TEST_API_KEY` y `GEMINI_TEST_MODEL=gemini-3.5-flash-lite`. No hereda la clave ni el modelo de clientes y rechaza la misma clave exacta en ambos perfiles. No se puede seleccionar como proveedor de negocios: no modifica `serverSettings/ai`, no genera contenido y no consulta Google al actualizar su estado.
+
+«Clave configurada» solo confirma configuración sintácticamente válida; «Conexión sin comprobar» deja claro que no se verificaron credenciales, disponibilidad, plan ni cuota. La clave nunca llega al navegador. El enlace «Abrir AI Studio» abre el servicio externo para las pruebas manuales con datos ficticios; no pasa la clave ni cambia la conexión del bot.
+
+Para conservar el nivel gratuito, crear el perfil de pruebas en un **proyecto distinto sin facturación**. Dos claves distintas no garantizan proyectos separados: la separación del proyecto y su plan deben verificarse en Google. El perfil de clientes conserva su requisito de facturación de pago verificada. El modelo 3.5 Flash-Lite admite nivel gratuito según la [tabla oficial consultada el 16 de octubre de 2026](https://ai.google.dev/gemini-api/docs/pricing), sujeto a la cuota y disponibilidad de la cuenta. No enviar información personal o confidencial a las pruebas gratuitas.
+
+El historial administrativo «Gemini · Clientes» conserva sus registros de uso existentes. Este cambio no incluye un chat de pruebas dentro de Sarin ni contabiliza pruebas hechas directamente en AI Studio. Los lanzadores locales vacían ambas credenciales explícitamente para evitar conexiones accidentales.
 
 ## Configuración y activación
 

@@ -25,10 +25,80 @@ beforeEach(() => {
   vi.stubEnv('GEMINI_API_KEY', '');
   vi.stubEnv('GEMINI_BILLING_VERIFIED', 'false');
   vi.stubEnv('GEMINI_MODEL', 'gemini-3.5-flash-lite');
+  vi.stubEnv('GEMINI_TEST_API_KEY', '');
+  vi.stubEnv('GEMINI_TEST_MODEL', undefined);
   vi.stubEnv('CF_ACCESS_CLIENT_ID', 'synthetic-cf-id');
   vi.stubEnv('CF_ACCESS_CLIENT_SECRET', 'synthetic-cf-secret');
   vi.stubEnv('LLM_REQUEST_TIMEOUT_MS', '120000');
   vi.stubGlobal('fetch', vi.fn(async (url: string) => catalog(url)));
+});
+
+describe('informational Gemini test profile', () => {
+  beforeEach(() => {
+    // No production provider is configured: merely reading this profile must not fetch.
+    vi.stubEnv('SARIN_TUNNEL_URL', '');
+    vi.stubEnv('DEEPSEEK_API_KEY', '');
+  });
+
+  it('reports a separate configured test profile without probing, enabling clients or writing an override', async () => {
+    const original = { provider: 'ollama', updatedAt: 1234 };
+    const { db, rows } = memoryFirestore({ 'serverSettings/ai': original }); state.db = db;
+    vi.stubEnv('GEMINI_TEST_API_KEY', 'AQ-synthetic-test-key');
+    const response = await GET(request('GET'));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.geminiTest).toEqual({ configured: true, model: 'gemini-3.5-flash-lite', connection: 'not_checked' });
+    expect(data.provider).toBe('ollama');
+    expect(data.providers[2]).toMatchObject({ provider: 'gemini', configured: false, online: false });
+    expect(JSON.stringify(data)).not.toMatch(/synthetic|API_KEY|x-goog|https:\/\//);
+    expect(fetch).not.toHaveBeenCalled();
+    expect([...rows.keys()]).toEqual(['serverSettings/ai']);
+    expect(rows.get('serverSettings/ai')!.data).toEqual(original);
+    expect((await PATCH(request('PATCH', { provider: 'gemini' }))).status).toBe(503);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(rows.get('serverSettings/ai')!.data).toEqual(original);
+  });
+
+  it('does not fall back to a production credential or model when test configuration is absent', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'AQ-synthetic-production-key');
+    vi.stubEnv('GEMINI_MODEL', 'synthetic-production-model');
+    const data = await (await GET(request('GET'))).json();
+    expect(data.geminiTest).toMatchObject({ configured: false, model: null, connection: 'not_checked', error: expect.any(String) });
+    expect(JSON.stringify(data.geminiTest)).not.toMatch(/synthetic/);
+    vi.stubEnv('GEMINI_TEST_API_KEY', 'AQ-synthetic-test-key');
+    expect((await (await GET(request('GET'))).json()).geminiTest).toEqual({ configured: true, model: 'gemini-3.5-flash-lite', connection: 'not_checked' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GEMINI_TEST_API_KEY', ''], ['GEMINI_TEST_API_KEY', 'synthetic whitespace'],
+    ['GEMINI_TEST_API_KEY', 'synthetic\nheader'], ['GEMINI_TEST_API_KEY', 'synthetic\u007fcontrol'],
+    ['GEMINI_TEST_API_KEY', 'synthetic-é'], ['GEMINI_TEST_MODEL', 'synthetic-unapproved-model'],
+  ])('contains invalid test configuration %s without disclosing its value or fetching', async (name, value) => {
+    vi.stubEnv('GEMINI_TEST_API_KEY', 'AQ-synthetic-test-key');
+    vi.stubEnv(name, value);
+    const response = await GET(request('GET'));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.geminiTest).toMatchObject({ configured: false, model: null, connection: 'not_checked', error: expect.any(String) });
+    expect(JSON.stringify(data.geminiTest)).not.toContain('synthetic');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses the identical production key while allowing distinct test configuration without inferring project isolation', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'AQ-synthetic-production-key');
+    vi.stubEnv('GEMINI_TEST_API_KEY', 'AQ-synthetic-production-key');
+    const data = await (await GET(request('GET'))).json();
+    expect(data.geminiTest).toMatchObject({ configured: false, model: null, connection: 'not_checked', error: expect.stringMatching(/distinta/i) });
+    vi.stubEnv('GEMINI_TEST_API_KEY', 'AQ-synthetic-different-key');
+    expect((await (await GET(request('GET'))).json()).geminiTest).toEqual({ configured: true, model: 'gemini-3.5-flash-lite', connection: 'not_checked' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([{ provider: 'gemini-test' }, { provider: 'gemini', geminiTest: true }, { provider: 'ollama', GEMINI_TEST_API_KEY: 'synthetic-injected' }])('never accepts a test profile or its secrets as client provider settings: %j', async body => {
+    expect((await PATCH(request('PATCH', body))).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 

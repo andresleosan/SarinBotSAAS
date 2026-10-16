@@ -17,8 +17,17 @@ export interface AiProviderStatus {
   error?: string;
 }
 
+/** Local configuration only: this profile never probes or serves customer chats. */
+export interface AiTestProfileStatus {
+  configured: boolean;
+  model: string | null;
+  connection: 'not_checked';
+  error?: string;
+}
+
 export interface AdminAiSettings extends AiProviderSelection {
   providers: AiProviderStatus[];
+  geminiTest: AiTestProfileStatus;
 }
 
 export interface AiUsageTotals {
