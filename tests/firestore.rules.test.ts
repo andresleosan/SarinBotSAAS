@@ -45,6 +45,17 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
     await assertFails(updateDoc(doc(db,'businesses','one'),{'subscription.status':'active'}));
     await assertFails(setDoc(doc(db,'businesses','new'),{ownerUid:'owner-one'}));
   });
+  it('denies invitation reads, commands and courtesy entitlement changes even with forged admin flags', async () => {
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('owner-one'), environment.authenticatedContext('stale-admin', { role: 'superadmin', isSuperadmin: true })]) {
+      const db = context.firestore();
+      for (const path of ['invitations/synthetic', 'serverSettings/invitation_command_synthetic']) {
+        await assertFails(getDoc(doc(db, path)));
+        await assertFails(setDoc(doc(db, path), { state: 'redeemed' }));
+      }
+      await assertFails(getDocs(collection(db, 'invitations')));
+      await assertFails(updateDoc(doc(db, 'businesses/one'), { 'subscription.paidTrial.source': 'invitation', 'subscription.paidTrial.invitationId': 'fake', 'subscription.paidTrial.accessSuspended': false }));
+    }
+  });
   it('forbids owners and clients from activating introductory access, resetting its counter or approving a receipt', async () => {
     for (const uid of ['owner-one', 'customer']) {
       const db = environment.authenticatedContext(uid).firestore();

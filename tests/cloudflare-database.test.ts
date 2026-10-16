@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createInvitation } from '@/lib/server/invitations';
+import type { DecodedIdToken } from 'firebase-admin/auth';
 import { createCloudflareDatabase, StorageError } from '../src/lib/storage/database';
 import type { DataCommand, DataReadResult, DataCommitResult } from '../shared/data-protocol';
 
@@ -29,6 +31,18 @@ function storage() {
 }
 
 describe('Cloudflare data adapter', () => {
+  it('recovers invitation creation after a lost durable commit response without issuing a second secret', async () => {
+    vi.stubEnv('SUPERADMIN_UID', 'admin');
+    try {
+      const store = storage(), db = createCloudflareDatabase(store.transport);
+      store.loseNextResponse();
+      const admin = { uid: 'admin' } as DecodedIdToken, input = { recipientEmail: 'synthetic@example.test', requestId: 'create-one' };
+      const first = await createInvitation(admin, input, db);
+      expect(first.code).toMatch(/^SARIN-/);
+      expect([...store.rows.keys()].filter(path => path.startsWith('invitations/'))).toHaveLength(1);
+      expect(await createInvitation(admin, input, db)).toMatchObject({ code: null, replayed: true });
+    } finally { vi.unstubAllEnvs(); }
+  });
   it('accepts private invitation documents through the storage protocol', async () => {
     const store = storage(), db = createCloudflareDatabase(store.transport);
     await db.collection('invitations').doc('a'.repeat(24)).set({ id: 'a'.repeat(24), state: 'issued' });

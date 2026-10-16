@@ -12,6 +12,7 @@ import type { EngineUsageObservation } from '@/lib/sarin/engine';
 import { reserveResponseQuota, commitResponseQuota, releaseResponseQuota, getResponseQuota } from '@/lib/server/response-quota';
 import { ingestWhatsAppWebhook, persistWhatsAppReply, cleanupWhatsAppRetention, getWhatsAppUsage, whatsappHash } from '@/lib/server/whatsapp-store';
 import { syntheticWhatsAppEnv, inbound, phoneId, wabaId } from './whatsapp-fixtures';
+import { verifyInvitationLifecycle } from './invitation-contract';
 
 function user(uid: string): DecodedIdToken { return { uid, sub:uid, aud:'demo-sarin-bot', auth_time:0, exp:9999999999, iat:0, iss:'https://securetoken.google.com/demo-sarin-bot', firebase:{identities:{},sign_in_provider:'google.com'}, email:`${uid}@example.test`, name:uid }; }
 
@@ -38,6 +39,9 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     return createBusiness(identity, chosenConfig, db);
   }
   afterAll(async () => { if (db) { await db.terminate(); const app = getApps().find(value => value.name === 'sarin-admin'); if (app) await deleteApp(app); } });
+  it('preserves invitation access, quota, suspension and concurrent payment invariants on Firestore', async () => {
+    await verifyInvitationLifecycle(db, config, dateKey);
+  }, 75000);
   it('persists one encrypted WhatsApp turn and reconciles duplicate delivery and quota exactly once', async () => {
     syntheticWhatsAppEnv();
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('External HTTP prohibited in WhatsApp emulator test'); }));

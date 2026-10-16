@@ -10,6 +10,8 @@ import { businessIdForOwner, createBusiness } from '../src/lib/server/businesses
 import { readReceiptImage, readReceipts, reviewPayment, submitReceipt } from '../src/lib/server/billing';
 import { commitResponseQuota, getResponseQuota, releaseResponseQuota, reserveResponseQuota } from '../src/lib/server/response-quota';
 import { businessConfigSchema } from '../src/lib/server/schemas';
+import { verifyInvitationLifecycle } from './invitation-contract';
+import { listInvitations } from '@/lib/server/invitations';
 
 const now = Date.now();
 const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now + 3 * 86400000);
@@ -34,6 +36,28 @@ describe('commercial invariants on Cloudflare data', () => {
     });
   }, 30_000);
   afterAll(async () => { await runtime?.dispose(); });
+
+  it('preserves invitation access, quota, suspension and concurrent payment invariants on actual D1', async () => {
+    await db.collection('platformSettings').doc('main').set({ bankAccounts: [{ id: 'bank', bankName: 'Test', accountType: 'Ahorros', accountNumber: '000', holderName: 'Test' }] });
+    await verifyInvitationLifecycle(db, businessConfigSchema.parse({ ...config, slug: 'synthetic-invitation' }), dateKey);
+  }, 75000);
+
+  it('paginates 51 equal-date invitations without duplicates using a string cursor on D1', async () => {
+    const { vi } = await import('vitest');
+    vi.stubEnv('SUPERADMIN_UID', 'pagination-admin');
+    try {
+      for (const document of (await db.collection('invitations').get()).docs) await db.collection('invitations').doc(document.id).delete();
+      for (let index = 0; index < 51; index++) {
+        const id = index.toString(16).padStart(24, '0');
+        await db.collection('invitations').doc(id).set({ id, recipientEmail: 'synthetic@example.test', createdAt: now, expiresAt: now + 86400000, state: 'issued', version: 0, codeHash: 'a'.repeat(64), createFingerprint: 'b'.repeat(64), maskedCode: 'SARIN-…test', createdBy: 'pagination-admin', expiresInDays: 1 });
+      }
+      const admin = { uid: 'pagination-admin' } as DecodedIdToken;
+      const first = await listInvitations(admin, undefined, db), second = await listInvitations(admin, first.nextCursor!, db);
+      expect(first.invitations).toHaveLength(50); expect(second.invitations).toHaveLength(1);
+      expect(second.nextCursor).toBeNull();
+      expect(new Set([...first.invitations, ...second.invitations].map(item => item.id)).size).toBe(51);
+    } finally { vi.unstubAllEnvs(); }
+  }, 75000);
 
   it('confirms only one overlapping booking and scopes client reads/cancellation', async () => {
     const value = business('conflict');
