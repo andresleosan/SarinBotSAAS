@@ -53,13 +53,13 @@ export function AdminAiUsage({ businesses }: { businesses: Pick<Business, "id" |
   const names = new Map(businesses.map(business => [business.id, business.name]));
 
   return (
-    <section aria-labelledby="admin-ai-usage-title" className="space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+    <section aria-labelledby="admin-ai-usage-title" className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between xl:gap-4">
+        <div className="min-w-0 flex-1">
           <h2 id="admin-ai-usage-title" className="text-xl font-semibold">Consumo de DeepSeek</h2>
-          <p className="mt-2 text-sm leading-6 text-sarin-muted">Llamadas y tokens registrados por mes, en hora de Colombia. El costo estimado en USD no es una factura.</p>
+          <p className="mt-1 text-sm leading-6 text-sarin-muted">Llamadas y tokens registrados por mes, en hora de Colombia. El costo estimado en USD no es una factura.</p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex shrink-0 flex-wrap items-end gap-3">
           <label className="text-xs text-sarin-muted">
             Mes de consumo
             <input type="month" value={month} max={monthInColombia(Date.now())} disabled={loading} className={fieldClass + " mt-1"} onChange={event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) setMonth(event.target.value); }} />

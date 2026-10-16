@@ -1,5 +1,11 @@
 # Estado de implementación — 2026-10-14
 
+## Formularios compactos — 2026-10-15
+
+- [x] Espaciado y agrupación en administración, suscripción, configuración del negocio y bloqueos de agenda. Horarios alineados según el ancho del formulario; controles de 44 px y estilo Agenda clara conservados.
+- [x] Revisión independiente de presentación y seguridad, TypeScript, 408 pruebas y QA visual en Chrome a 320/640/1280 px y escritorio. Recorte de AM/PM en móvil detectado y corregido. Evidencia: `docs/qa/2026-10-15-compact-forms.md`.
+- [ ] Publicar el commit y verificar la nueva imagen en la instancia privada.
+
 ## Estructura comercial — 2026-10-15
 
 - [x] Estructura aprobada por el propietario: Esencial 7/15/30 días a $20.000/$35.000/$59.900 con 700/1.500/3.000 respuestas; WhatsApp 30 días a $149.900 + Meta con 4.500; ampliaciones de 1.000 por $20.000. Referencia: `docs/commercial-plans.md`.

@@ -171,7 +171,7 @@ function Console() {
     return <Notice error>{error || "No se pudo cargar la consola."}</Notice>;
   const pending = data.receipts.filter((item) => item.status === "pending");
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-widest text-sarin-blue">
@@ -192,8 +192,8 @@ function Console() {
       </header>
       {error && <Notice error>{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
-      <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
+      <section className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-4">
           <p className="flex items-center gap-2 text-xs text-sarin-muted">
             <Cpu className="h-4 w-4" />
             IA del negocio
@@ -216,13 +216,13 @@ function Console() {
           <button
             disabled={engine.checking}
             onClick={() => void engine.refresh()}
-            className="mt-3 flex min-h-11 items-center gap-1 text-xs text-sarin-blue disabled:opacity-50"
+            className="mt-1 flex min-h-11 items-center gap-1 text-xs text-sarin-blue disabled:opacity-50"
           >
             <RefreshCw className="h-3 w-3" />
             Comprobar conexión
           </button>
         </div>
-        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
+        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-4">
           <p className="text-xs text-sarin-muted">Cola de inferencia</p>
           <p className="mt-2 text-lg font-semibold">
             {engine.health?.queue
@@ -236,7 +236,7 @@ function Console() {
             </p>
           )}
         </div>
-        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-5">
+        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-4">
           <p className="text-xs text-sarin-muted">Comprobantes pendientes</p>
           <p className="mt-2 text-3xl font-semibold text-sarin-blue">
             {pending.length}
@@ -244,7 +244,7 @@ function Console() {
           <button
             onClick={() => void refresh()}
             disabled={Boolean(working)}
-            className="mt-3 min-h-11 text-xs text-sarin-blue underline disabled:opacity-50"
+            className="mt-1 min-h-11 text-xs text-sarin-blue underline disabled:opacity-50"
           >
             Actualizar bandeja
           </button>
@@ -253,7 +253,7 @@ function Console() {
       <AdminAiSettings onSaved={() => void engine.refresh()} />
       <AdminAiUsage businesses={data.businesses} />
       <AdminWhatsApp businesses={data.businesses} />
-      <section className="space-y-4">
+      <section className="space-y-3">
         <h2 className="text-xl font-semibold">Comprobantes de pago</h2>
         {data.receipts.length === 0 ? (
           <Notice>No hay comprobantes enviados.</Notice>
@@ -268,7 +268,7 @@ function Console() {
               )
               .map((receipt) => (
                 <article
-                  className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-5"
+                  className="space-y-3 rounded-2xl border border-sarin-line bg-sarin-paper p-4"
                   key={receipt.id}
                 >
                   <div className="flex justify-between gap-3">
@@ -320,11 +320,11 @@ function Console() {
                     />
                   )}
                   {receipt.status === "pending" ? (
-                    <div className="space-y-3 border-t border-sarin-line pt-4">
+                    <div className="space-y-3 border-t border-sarin-line pt-3">
                       <label className="block text-xs text-sarin-muted">
                         Motivo si rechazas el comprobante
                         <input
-                          className={fieldClass + " mt-2"}
+                          className={fieldClass + " mt-1"}
                           value={reasons[receipt.id] || ""}
                           maxLength={500}
                           onChange={(event) =>
@@ -376,7 +376,7 @@ function Console() {
           </div>
         )}
       </section>
-      <section className="space-y-4">
+      <section className="space-y-3">
         <h2 className="text-xl font-semibold">Negocios y suscripciones</h2>
         {data.businesses.length === 0 ? (
           <Notice>Todavía no hay negocios registrados.</Notice>
@@ -433,17 +433,17 @@ function Console() {
       </section>
       {settings && (
         <form
-          className="space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6"
+          className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5"
           onSubmit={(event) => void saveSettings(event)}
         >
           <h2 className="text-xl font-semibold">Datos de facturación</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-xs text-sarin-muted">
+          <div className="max-w-md">
+            <label className="block text-xs text-sarin-muted">
               Nombre comercial
               <input
                 required
                 maxLength={120}
-                className={fieldClass + " mt-2"}
+                className={fieldClass + " mt-1"}
                 value={settings.companyName}
                 onChange={(event) =>
                   setSettings({ ...settings, companyName: event.target.value })
@@ -451,109 +451,114 @@ function Console() {
               />
             </label>
           </div>
-          <fieldset className="grid gap-4 sm:grid-cols-3" disabled={Boolean(working)}>
-            <legend className="mb-3 text-sm font-semibold">Tarifas de suscripción y ampliación</legend>
+          <fieldset className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5" disabled={Boolean(working)}>
+            <legend className="mb-2 text-sm font-semibold">Tarifas de suscripción y ampliación</legend>
             {BILLING_PLANS.map((plan) => (
               <label className="text-xs text-sarin-muted" key={plan.id}>
-                {plan.label} · {plan.periodDays} días, en COP{plan.id === "whatsapp" ? " (solo al conectar WhatsApp)" : ""}
+                <span className="block sm:min-h-8">{plan.label} · {plan.periodDays} días, en COP</span>
                 <input
                   required
                   min="1"
                   step="1"
                   type="number"
-                  className={fieldClass + " mt-2"}
+                  className={fieldClass + " mt-1"}
                   value={settings[plan.priceField]}
                   onChange={(event) =>
                     setSettings({ ...settings, [plan.priceField]: Number(event.target.value) })
                   }
                 />
                 <span className="mt-1 block">{plan.includedResponses.toLocaleString("es-CO")} respuestas incluidas</span>
+                {plan.id === "whatsapp" && <span className="mt-1 block">Solo al conectar WhatsApp.</span>}
               </label>
             ))}
-            <label className="text-xs text-sarin-muted">Ampliación · 1.000 respuestas, en COP
-              <input required min="1" step="1" type="number" className={fieldClass + " mt-2"} value={settings.responsePackPriceCOP} onChange={(event) => setSettings({ ...settings, responsePackPriceCOP: Number(event.target.value) })} />
+            <label className="text-xs text-sarin-muted"><span className="block sm:min-h-8">Ampliación · 1.000 respuestas, en COP</span>
+              <input required min="1" step="1" type="number" className={fieldClass + " mt-1"} value={settings.responsePackPriceCOP} onChange={(event) => setSettings({ ...settings, responsePackPriceCOP: Number(event.target.value) })} />
               <span className="mt-1 block">Vence con el período de pago; no añade días.</span>
             </label>
           </fieldset>
-          {settings.bankAccounts.map((account) => (
-            <fieldset
-              className="grid gap-3 rounded-xl border border-sarin-line p-4 sm:grid-cols-2"
-              key={account.id}
-            >
-              <legend className="px-2 text-xs text-sarin-muted">
-                Cuenta de pago
-              </legend>
-              {(
-                [
-                  ["bankName", "Banco o entidad"],
-                  ["accountType", "Tipo de cuenta"],
-                  ["accountNumber", "Número de cuenta"],
-                  ["holderName", "Titular"],
-                  ["holderDoc", "Documento del titular (opcional)"],
-                ] as const
-              ).map(([key, label]) => (
-                <label className="text-xs text-sarin-muted" key={key}>
-                  {label}
-                  <input
-                    required={key !== "holderDoc"}
-                    maxLength={120}
-                    className={fieldClass + " mt-2"}
-                    value={account[key] || ""}
-                    onChange={(event) =>
-                      setSettings({
-                        ...settings,
-                        bankAccounts: settings.bankAccounts.map((item) =>
-                          item.id === account.id
-                            ? { ...item, [key]: event.target.value }
-                            : item,
-                        ),
-                      })
-                    }
-                  />
-                </label>
-              ))}
-              <button
-                type="button"
-                className="flex min-h-11 items-center gap-2 self-end rounded-[10px] p-2 text-sm text-rose-700 hover:bg-rose-50"
-                onClick={() =>
-                  setSettings({
-                    ...settings,
-                    bankAccounts: settings.bankAccounts.filter(
-                      (item) => item.id !== account.id,
-                    ),
-                  })
-                }
+          <div className="grid items-start gap-3 xl:grid-cols-2">
+            {settings.bankAccounts.map((account) => (
+              <fieldset
+                className="grid min-w-0 gap-3 rounded-xl border border-sarin-line p-3 sm:grid-cols-2"
+                key={account.id}
               >
-                <Trash2 className="h-4 w-4" />
-                Eliminar cuenta
-              </button>
-            </fieldset>
-          ))}
-          <button
-            type="button"
-            className="flex min-h-11 items-center gap-1 text-sm text-sarin-blue"
-            onClick={() =>
-              setSettings({
-                ...settings,
-                bankAccounts: [
-                  ...settings.bankAccounts,
-                  {
-                    id: crypto.randomUUID(),
-                    bankName: "",
-                    accountType: "",
-                    accountNumber: "",
-                    holderName: "",
-                  },
-                ],
-              })
-            }
-          >
-            <Plus className="h-4 w-4" />
-            Añadir cuenta
-          </button>
-          <button className={buttonClass} disabled={Boolean(working)}>
-            {working === "settings" ? "Guardando…" : "Guardar facturación"}
-          </button>
+                <legend className="px-2 text-xs text-sarin-muted">
+                  Cuenta de pago
+                </legend>
+                {(
+                  [
+                    ["bankName", "Banco o entidad"],
+                    ["accountType", "Tipo de cuenta"],
+                    ["accountNumber", "Número de cuenta"],
+                    ["holderName", "Titular"],
+                    ["holderDoc", "Documento del titular (opcional)"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label className="text-xs text-sarin-muted" key={key}>
+                    {label}
+                    <input
+                      required={key !== "holderDoc"}
+                      maxLength={120}
+                      className={fieldClass + " mt-1"}
+                      value={account[key] || ""}
+                      onChange={(event) =>
+                        setSettings({
+                          ...settings,
+                          bankAccounts: settings.bankAccounts.map((item) =>
+                            item.id === account.id
+                              ? { ...item, [key]: event.target.value }
+                              : item,
+                          ),
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  className="flex min-h-11 items-center gap-2 self-end rounded-[10px] p-2 text-sm text-rose-700 hover:bg-rose-50"
+                  onClick={() =>
+                    setSettings({
+                      ...settings,
+                      bankAccounts: settings.bankAccounts.filter(
+                        (item) => item.id !== account.id,
+                      ),
+                    })
+                  }
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar cuenta
+                </button>
+              </fieldset>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-sarin-line pt-3">
+            <button
+              type="button"
+              className="flex min-h-11 items-center gap-1 text-sm text-sarin-blue"
+              onClick={() =>
+                setSettings({
+                  ...settings,
+                  bankAccounts: [
+                    ...settings.bankAccounts,
+                    {
+                      id: crypto.randomUUID(),
+                      bankName: "",
+                      accountType: "",
+                      accountNumber: "",
+                      holderName: "",
+                    },
+                  ],
+                })
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Añadir cuenta
+            </button>
+            <button className={buttonClass} disabled={Boolean(working)}>
+              {working === "settings" ? "Guardando…" : "Guardar facturación"}
+            </button>
+          </div>
         </form>
       )}
     </div>

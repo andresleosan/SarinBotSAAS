@@ -64,13 +64,13 @@ export function AdminWhatsApp({ businesses }: { businesses: Pick<Business, "id" 
   }
 
   return (
-    <section aria-labelledby="admin-whatsapp-title" className="space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <section aria-labelledby="admin-whatsapp-title" className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
           <h2 id="admin-whatsapp-title" className="text-xl font-semibold">WhatsApp para los negocios</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-sarin-muted">Prepara un número por negocio. La modalidad de WhatsApp solo se puede contratar cuando su conexión está verificada; el consumo de Meta es adicional.</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-sarin-muted">Prepara un número por negocio. La modalidad de WhatsApp solo se puede contratar cuando su conexión está verificada; el consumo de Meta es adicional.</p>
         </div>
-        <button type="button" disabled={busy} onClick={() => void refresh()} className="min-h-11 text-sm text-sarin-blue disabled:opacity-50">{checking ? "Consultando WhatsApp…" : "Actualizar WhatsApp"}</button>
+        <button type="button" disabled={busy} onClick={() => void refresh()} className="min-h-11 shrink-0 self-start text-sm text-sarin-blue disabled:opacity-50">{checking ? "Consultando WhatsApp…" : "Actualizar WhatsApp"}</button>
       </div>
       {error && <Notice error>{error}{data ? " Se conserva el último estado confirmado." : ""}</Notice>}
       {notice && <Notice>{notice}</Notice>}
@@ -96,13 +96,13 @@ export function AdminWhatsApp({ businesses }: { businesses: Pick<Business, "id" 
           <p className="text-xs leading-5 text-sarin-muted">Estados observados de esas respuestas, aunque la entrega se confirme después. Las entregas incluyen los mensajes leídos. Los resultados inciertos todavía no tienen una confirmación definitiva.</p>
           <p className="text-xs leading-5 text-sarin-muted">Costo no calculado. Consulta el consumo y la factura en Meta; este registro de estados no es una factura ni implica costo cero. El consumo de Meta es independiente de la suscripción de Sarin.</p>
         </div>}
-        {businesses.length > 0 && <form onSubmit={event => void save(event)} className="space-y-4 border-t border-sarin-line pt-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm">Negocio<select name="whatsappBusiness" className={fieldClass + " mt-2"} value={businessId} disabled={busy} onChange={event => { setBusinessId(event.target.value); setNotice(null); setError(null); }}>
+        {businesses.length > 0 && <form onSubmit={event => void save(event)} className="space-y-3 border-t border-sarin-line pt-4">
+          <div className="grid items-end gap-3 md:grid-cols-3">
+            <label className="text-sm">Negocio<select name="whatsappBusiness" className={fieldClass + " mt-1"} value={businessId} disabled={busy} onChange={event => { setBusinessId(event.target.value); setNotice(null); setError(null); }}>
               {businesses.map(business => <option key={business.id} value={business.id}>{business.name}</option>)}
             </select></label>
-            <label className="text-sm">Identificador del número en Meta<input name="phoneNumberId" required inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} className={fieldClass + " mt-2"} value={phoneNumberId} disabled={busy || Boolean(binding)} onChange={event => setPhoneNumberId(event.target.value)} /></label>
-            <label className="text-sm">Identificador de la cuenta de WhatsApp Business<input name="wabaId" required inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} className={fieldClass + " mt-2"} value={wabaId} disabled={busy || Boolean(binding)} onChange={event => setWabaId(event.target.value)} /></label>
+            <label className="text-sm">Identificador del número en Meta<input name="phoneNumberId" required inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} className={fieldClass + " mt-1"} value={phoneNumberId} disabled={busy || Boolean(binding)} onChange={event => setPhoneNumberId(event.target.value)} /></label>
+            <label className="text-sm">Identificador de la cuenta de WhatsApp Business<input name="wabaId" required inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} className={fieldClass + " mt-1"} value={wabaId} disabled={busy || Boolean(binding)} onChange={event => setWabaId(event.target.value)} /></label>
           </div>
           <p className="text-xs text-sarin-muted">Estos identificadores los proporciona Meta; no son el teléfono de contacto del negocio. Guarda primero la vinculación pausada.</p>
           <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" name="whatsappEnabled" checked={enabled} disabled={busy || (!canEnable && !enabled)} onChange={event => setEnabled(event.target.checked)} className="h-4 w-4 accent-sarin-blue" />Habilitar tras verificar la conexión con Meta</label>

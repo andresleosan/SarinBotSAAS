@@ -444,7 +444,7 @@ function Agenda() {
       </section>
 
       <details className="group rounded-2xl border border-sarin-line bg-sarin-paper">
-        <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sarin-soft">
               <Plus className="h-4 w-4 text-sarin-blue" />
@@ -461,13 +461,13 @@ function Agenda() {
           <ChevronDown className="h-4 w-4 shrink-0 text-sarin-muted transition group-open:rotate-180 motion-reduce:transition-none" />
         </summary>
         <form
-          className="grid gap-4 border-t border-sarin-line px-5 py-5 sm:grid-cols-2 xl:grid-cols-4"
+          className="grid gap-3 border-t border-sarin-line px-4 py-4 sm:grid-cols-2 xl:grid-cols-4"
           onSubmit={(event) => void block(event)}
         >
           <label className="text-xs text-sarin-muted">
             Desde
             <input
-              className={fieldClass + " mt-2"}
+              className={fieldClass + " mt-1"}
               type="time"
               value={blockStart}
               onChange={(event) => setBlockStart(event.target.value)}
@@ -477,7 +477,7 @@ function Agenda() {
           <label className="text-xs text-sarin-muted">
             Hasta
             <input
-              className={fieldClass + " mt-2"}
+              className={fieldClass + " mt-1"}
               type="time"
               value={blockEnd}
               onChange={(event) => setBlockEnd(event.target.value)}
@@ -487,7 +487,7 @@ function Agenda() {
           <label className="text-xs text-sarin-muted">
             Profesional o estación
             <select
-              className={fieldClass + " mt-2"}
+              className={fieldClass + " mt-1"}
               value={
                 resource ||
                 business.resources.find((item) => item.active)?.id ||

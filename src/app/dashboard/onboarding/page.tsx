@@ -153,7 +153,7 @@ function Configuration() {
   if (loading) return <Notice>Cargando configuración…</Notice>;
   if (businessError) return <Notice error>{businessError}</Notice>;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <p className="text-xs uppercase tracking-widest text-sarin-blue">
           Configuración
@@ -161,7 +161,7 @@ function Configuration() {
         <h1 className="mt-2 text-3xl font-bold">
           {business ? "Así trabaja tu negocio" : "Abre tu isla privada"}
         </h1>
-        <p className="mt-3 text-sm text-sarin-muted">
+        <p className="mt-2 text-sm text-sarin-muted">
           Cuéntaselo a Sarin o completa los datos. Los negocios nuevos reciben 7
           días de prueba al guardar su configuración.
         </p>
@@ -173,15 +173,15 @@ function Configuration() {
           panel.
         </Notice>
       )}
-      <div className="grid items-start gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-        <section className="flex min-h-[28rem] flex-col rounded-2xl border border-sarin-line bg-sarin-paper xl:sticky xl:top-6">
-          <h2 className="flex items-center gap-2 border-b border-sarin-line p-5 font-semibold">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(17rem,0.7fr)_minmax(0,1.3fr)]">
+        <section className="flex min-w-0 flex-col rounded-2xl border border-sarin-line bg-sarin-paper xl:sticky xl:top-6">
+          <h2 className="flex items-center gap-2 border-b border-sarin-line px-4 py-3 font-semibold">
             <SarinMark className="h-8 w-8" />
             Configurar con Sarin
           </h2>
           <div
             aria-live="polite"
-            className="max-h-[32rem] min-h-72 flex-1 space-y-4 overflow-auto p-5"
+            className="max-h-[28rem] min-h-36 flex-1 space-y-3 overflow-auto p-4 xl:min-h-48"
           >
             <p className="text-sm leading-relaxed text-sarin-muted">
               Describe el nombre de tu negocio, sus servicios, precios,
@@ -246,15 +246,15 @@ function Configuration() {
           </form>
         </section>
         <form
-          className="space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6"
+          className="@container min-w-0 space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5"
           onSubmit={(event) => void save(event)}
         >
           <h2 className="text-lg font-semibold">Datos de tu negocio</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs text-sarin-muted">
               Nombre
               <input
-                className={fieldClass + " mt-2"}
+                className={fieldClass + " mt-1.5"}
                 value={name}
                 required
                 maxLength={120}
@@ -267,7 +267,7 @@ function Configuration() {
             <label className="text-xs text-sarin-muted">
               Categoría
               <input
-                className={fieldClass + " mt-2"}
+                className={fieldClass + " mt-1.5"}
                 value={category}
                 required
                 maxLength={100}
@@ -277,7 +277,7 @@ function Configuration() {
             <label className="text-xs text-sarin-muted">
               Enlace /b/
               <input
-                className={fieldClass + " mt-2"}
+                className={fieldClass + " mt-1.5"}
                 value={slug}
                 readOnly={Boolean(business)}
                 required
@@ -287,7 +287,7 @@ function Configuration() {
                 onChange={(event) => setSlug(event.target.value)}
               />
               {business && (
-                <span className="mt-2 block text-sarin-muted">
+                <span className="mt-1.5 block text-sarin-muted">
                   El enlace queda reservado a tu negocio.
                 </span>
               )}
@@ -295,7 +295,7 @@ function Configuration() {
             <label className="text-xs text-sarin-muted">
               WhatsApp (código de país y número)
               <input
-                className={fieldClass + " mt-2"}
+                className={fieldClass + " mt-1.5"}
                 value={phone}
                 type="tel"
                 required
@@ -305,7 +305,7 @@ function Configuration() {
               />
             </label>
           </div>
-          <section className="space-y-3">
+          <section className="space-y-2">
             <h3 className="font-semibold">Profesionales o estaciones</h3>
             {resources.map((resource, index) => (
               <div key={resource.id} className="flex gap-2">
@@ -367,11 +367,11 @@ function Configuration() {
               Añadir recurso
             </button>
           </section>
-          <section className="space-y-3">
+          <section className="space-y-2">
             <h3 className="font-semibold">Servicios</h3>
             {services.map((service, index) => (
               <div
-                className="space-y-3 rounded-xl border border-sarin-line p-4"
+                className="space-y-3 rounded-xl border border-sarin-line p-3"
                 key={service.id}
               >
                 <div className="flex gap-2">
@@ -406,7 +406,7 @@ function Configuration() {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 @min-[24rem]:grid-cols-3">
                   {(
                     [
                       ["durationMinutes", "Duración (min)", 5],
@@ -417,7 +417,7 @@ function Configuration() {
                     <label className="text-xs text-sarin-muted" key={key}>
                       {label}
                       <input
-                        className={fieldClass + " mt-2"}
+                        className={fieldClass + " mt-1.5"}
                         type="number"
                         min={minimum}
                         max={
@@ -443,8 +443,8 @@ function Configuration() {
                     </label>
                   ))}
                 </div>
-                <fieldset className="flex flex-wrap gap-3">
-                  <legend className="mb-2 text-xs text-sarin-muted">
+                <fieldset className="flex flex-wrap gap-x-3 gap-y-1">
+                  <legend className="text-xs text-sarin-muted">
                     Disponible con
                   </legend>
                   {resources.map((resource) => (
@@ -499,123 +499,127 @@ function Configuration() {
               Añadir servicio
             </button>
           </section>
-          <section className="space-y-3">
+          <section className="space-y-2">
             <h3 className="font-semibold">Horarios · Colombia</h3>
-            {days.map((day, index) => {
-              const config = schedule[index] ?? {
-                isOpen: false,
-                intervals: [],
-              };
-              return (
-                <div
-                  key={day}
-                  className="rounded-xl border border-sarin-line p-3"
-                >
-                  <label className="flex min-h-11 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={config.isOpen}
-                      onChange={(event) =>
-                        updateDay(index, {
-                          isOpen: event.target.checked,
-                          intervals: event.target.checked
-                            ? config.intervals.length
-                              ? config.intervals
-                              : [{ start: "09:00", end: "17:00" }]
-                            : [],
-                        })
-                      }
-                    />
-                    {day}
-                    <span className="ml-auto text-xs text-sarin-muted">
-                      {config.isOpen ? "Abierto" : "Cerrado"}
-                    </span>
-                  </label>
-                  {config.isOpen && (
-                    <div className="mt-3 space-y-2">
-                      {config.intervals.map((interval, intervalIndex) => (
-                        <div
-                          key={intervalIndex}
-                          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_44px] sm:items-center"
-                        >
-                          <input
-                            aria-label={`${day} apertura ${intervalIndex + 1}`}
-                            className={fieldClass}
-                            type="time"
-                            required
-                            value={interval.start}
-                            onChange={(event) =>
-                              updateDay(index, {
-                                ...config,
-                                intervals: config.intervals.map((item, i) =>
-                                  i === intervalIndex
-                                    ? { ...item, start: event.target.value }
-                                    : item,
-                                ),
-                              })
-                            }
-                          />
-                          <span className="hidden text-sarin-muted sm:inline">a</span>
-                          <input
-                            aria-label={`${day} cierre ${intervalIndex + 1}`}
-                            className={fieldClass}
-                            type="time"
-                            required
-                            value={interval.end}
-                            onChange={(event) =>
-                              updateDay(index, {
-                                ...config,
-                                intervals: config.intervals.map((item, i) =>
-                                  i === intervalIndex
-                                    ? { ...item, end: event.target.value }
-                                    : item,
-                                ),
-                              })
-                            }
-                          />
-                          <button
-                            aria-label="Eliminar intervalo"
-                            type="button"
-                            disabled={config.intervals.length === 1}
-                            className="grid h-11 w-11 place-items-center justify-self-end rounded-[10px] text-sarin-muted hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30"
-                            onClick={() =>
-                              updateDay(index, {
-                                ...config,
-                                intervals: config.intervals.filter(
-                                  (_, i) => i !== intervalIndex,
-                                ),
-                              })
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        className="min-h-11 text-xs text-sarin-blue"
-                        onClick={() =>
+            <div className="divide-y divide-sarin-line border-y border-sarin-line">
+              {days.map((day, index) => {
+                const config = schedule[index] ?? {
+                  isOpen: false,
+                  intervals: [],
+                };
+                return (
+                  <div
+                    key={day}
+                    className="grid gap-x-4 py-2 @min-[32rem]:grid-cols-[8rem_minmax(0,1fr)]"
+                  >
+                    <label className="flex min-h-11 items-center gap-2 self-start text-sm">
+                      <input
+                        type="checkbox"
+                        checked={config.isOpen}
+                        onChange={(event) =>
                           updateDay(index, {
-                            ...config,
-                            intervals: [
-                              ...config.intervals,
-                              { start: "18:00", end: "20:00" },
-                            ],
+                            isOpen: event.target.checked,
+                            intervals: event.target.checked
+                              ? config.intervals.length
+                                ? config.intervals
+                                : [{ start: "09:00", end: "17:00" }]
+                              : [],
                           })
                         }
-                      >
-                        Añadir intervalo
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                      />
+                      <span className="flex flex-1 items-center justify-between gap-x-2 @min-[32rem]:flex-col @min-[32rem]:items-start @min-[32rem]:justify-center">
+                        <span>{day}</span>
+                        <span className="text-xs text-sarin-muted">
+                          {config.isOpen ? "Abierto" : "Cerrado"}
+                        </span>
+                      </span>
+                    </label>
+                    {config.isOpen && (
+                      <div className="min-w-0 space-y-1">
+                        {config.intervals.map((interval, intervalIndex) => (
+                          <div
+                            key={intervalIndex}
+                            className="grid grid-cols-[minmax(0,1fr)_44px] items-center gap-1.5 @min-[24rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_44px]"
+                          >
+                            <input
+                              aria-label={`${day} apertura ${intervalIndex + 1}`}
+                              className={fieldClass + " px-2!"}
+                              type="time"
+                              required
+                              value={interval.start}
+                              onChange={(event) =>
+                                updateDay(index, {
+                                  ...config,
+                                  intervals: config.intervals.map((item, i) =>
+                                    i === intervalIndex
+                                      ? { ...item, start: event.target.value }
+                                      : item,
+                                  ),
+                                })
+                              }
+                            />
+                            <span className="hidden text-xs text-sarin-muted @min-[24rem]:inline">a</span>
+                            <input
+                              aria-label={`${day} cierre ${intervalIndex + 1}`}
+                              className={fieldClass + " px-2!"}
+                              type="time"
+                              required
+                              value={interval.end}
+                              onChange={(event) =>
+                                updateDay(index, {
+                                  ...config,
+                                  intervals: config.intervals.map((item, i) =>
+                                    i === intervalIndex
+                                      ? { ...item, end: event.target.value }
+                                      : item,
+                                  ),
+                                })
+                              }
+                            />
+                            <button
+                              aria-label="Eliminar intervalo"
+                              type="button"
+                              disabled={config.intervals.length === 1}
+                              className="col-start-2 row-span-2 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded-[10px] text-sarin-muted hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30 @min-[24rem]:col-start-4 @min-[24rem]:row-span-1"
+                              onClick={() =>
+                                updateDay(index, {
+                                  ...config,
+                                  intervals: config.intervals.filter(
+                                    (_, i) => i !== intervalIndex,
+                                  ),
+                                })
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="min-h-11 text-xs text-sarin-blue"
+                          onClick={() =>
+                            updateDay(index, {
+                              ...config,
+                              intervals: [
+                                ...config.intervals,
+                                { start: "18:00", end: "20:00" },
+                              ],
+                            })
+                          }
+                        >
+                          Añadir intervalo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </section>
           <label className="block text-xs text-sarin-muted">
             Preguntas obligatorias para reservar (una por línea)
             <textarea
-              className={fieldClass + " mt-2 min-h-24"}
+              className={fieldClass + " mt-1.5 min-h-20"}
               value={intake}
               maxLength={2000}
               onChange={(event) => setIntake(event.target.value)}
@@ -624,7 +628,7 @@ function Configuration() {
           <label className="block text-xs text-sarin-muted">
             Tono del asistente
             <input
-              className={fieldClass + " mt-2"}
+              className={fieldClass + " mt-1.5"}
               value={tone}
               maxLength={150}
               onChange={(event) => setTone(event.target.value)}
@@ -633,7 +637,7 @@ function Configuration() {
           <label className="block text-xs text-sarin-muted">
             Indicaciones del negocio
             <textarea
-              className={fieldClass + " mt-2 min-h-24"}
+              className={fieldClass + " mt-1.5 min-h-20"}
               value={rules}
               maxLength={3000}
               onChange={(event) => setRules(event.target.value)}

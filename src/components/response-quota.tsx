@@ -10,15 +10,15 @@ export function ResponseQuota({ allowance, compact = false }: { allowance: Respo
   const percent = capacity > 0 ? Math.min(100, Math.floor(period.usedResponses / capacity * 100)) : 0;
   const label = allowance.state === "exhausted" ? "Agotada" : allowance.state === "warning" ? "Uso alto" : allowance.state === "expired" ? "Vencida" : allowance.state === "suspended" ? "Suspendida" : "Disponible";
   if (compact) return (
-    <div className="min-w-44 space-y-1 text-xs">
+    <div className="min-w-44 space-y-0.5 text-xs">
       <p className="font-medium text-sarin-ink">{number(period.usedResponses)} de {number(capacity)} respuestas · {label}</p>
       <p className="text-sarin-muted">{number(period.remainingResponses)} disponibles · hasta {quotaDate(period.endsAt)}</p>
       {allowance.nextPeriod && <p className="text-sarin-muted">Renovación desde {quotaDate(allowance.nextPeriod.startsAt)}</p>}
     </div>
   );
   return (
-    <section aria-label="Respuestas de IA" className="space-y-3 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section aria-label="Respuestas de IA" className="space-y-2 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold">Respuestas de IA</h2>
           <p className="mt-1 text-xs text-sarin-muted">{period.source === "trial" ? "Prueba gratuita" : "Vigencia actual"} · {quotaDate(period.startsAt)}–{quotaDate(period.endsAt)}</p>
@@ -35,8 +35,8 @@ export function ResponseQuota({ allowance, compact = false }: { allowance: Respo
       {allowance.state === "exhausted" && <p role="status" className="text-sm text-amber-800">La atención de IA está pausada: no quedan respuestas disponibles. Tu agenda sigue disponible.</p>}
       {allowance.state === "expired" && <p className="text-sm text-sarin-muted">Esta vigencia terminó. Revisa las opciones de renovación.</p>}
       {allowance.state === "suspended" && <p className="text-sm text-sarin-muted">La suscripción está suspendida. Contacta al administrador.</p>}
-      <p className="text-xs leading-5 text-sarin-muted">La atención al cliente y el copiloto comparten esta bolsa. Cada respuesta completa cuenta una vez; tus mensajes y las llamadas internas al modelo no son respuestas adicionales.</p>
-      {allowance.nextPeriod && <p className="border-t border-sarin-line pt-3 text-sm text-sarin-muted">Renovación programada: {number(allowance.nextPeriod.includedResponses + allowance.nextPeriod.extraResponses)} respuestas del {quotaDate(allowance.nextPeriod.startsAt)} al {quotaDate(allowance.nextPeriod.endsAt)}.</p>}
+      <p className="text-xs leading-4 text-sarin-muted">La atención al cliente y el copiloto comparten esta bolsa. Cada respuesta completa cuenta una vez; tus mensajes y las llamadas internas al modelo no son respuestas adicionales.</p>
+      {allowance.nextPeriod && <p className="border-t border-sarin-line pt-2 text-sm text-sarin-muted">Renovación programada: {number(allowance.nextPeriod.includedResponses + allowance.nextPeriod.extraResponses)} respuestas del {quotaDate(allowance.nextPeriod.startsAt)} al {quotaDate(allowance.nextPeriod.endsAt)}.</p>}
     </section>
   );
 }

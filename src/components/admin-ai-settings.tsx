@@ -65,13 +65,13 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
   }
 
   return (
-    <section aria-labelledby="admin-ai-title" className="space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <section aria-labelledby="admin-ai-title" className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
           <h2 id="admin-ai-title" className="text-xl font-semibold">IA para los negocios</h2>
-          <p className="mt-2 text-sm leading-6 text-sarin-muted">Elige la IA para todos los negocios y su configuración inicial. El cambio se aplica a los próximos mensajes; una respuesta en curso mantiene la IA anterior. Si falla, no se usa otra automáticamente.</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-sarin-muted">Elige la IA para todos los negocios y su configuración inicial. El cambio se aplica a los próximos mensajes; una respuesta en curso mantiene la IA anterior. Si falla, no se usa otra automáticamente.</p>
         </div>
-        <button type="button" disabled={busy} onClick={() => void refresh()} className="flex min-h-11 items-center gap-2 text-sm text-sarin-blue disabled:opacity-50">
+        <button type="button" disabled={busy} onClick={() => void refresh()} className="flex min-h-11 shrink-0 items-center gap-2 text-sm text-sarin-blue disabled:opacity-50">
           <RefreshCw aria-hidden="true" className="h-4 w-4" />
           {checking ? "Comprobando IA…" : "Actualizar estado de IA"}
         </button>
@@ -81,13 +81,13 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
       {data && (
         <>
           <p aria-label="IA activa" role="status" className="text-sm font-semibold text-sarin-ink">En uso: {providerLabels[data.provider]}</p>
-          <fieldset className="space-y-3" disabled={busy}>
-            <legend className="mb-3 text-sm font-medium">Seleccionar IA</legend>
-            <div className="grid gap-3 md:grid-cols-2">
+          <fieldset disabled={busy}>
+            <legend className="mb-2 text-sm font-medium">Seleccionar IA</legend>
+            <div className="grid items-start gap-3 md:grid-cols-2">
               {providers.map(provider => {
                 const status = data.providers.find(item => item.provider === provider);
                 return (
-                  <label key={provider} className={`block min-w-0 space-y-3 rounded-xl border p-4 ${selected === provider ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"}`}>
+                  <label key={provider} className={`block min-w-0 space-y-2 rounded-xl border p-3 ${selected === provider ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"}`}>
                     <span className="flex items-center gap-2 font-semibold">
                       <input type="radio" name="aiProvider" value={provider} checked={selected === provider} disabled={busy || !status?.configured} onChange={() => { if (!busy && status?.configured) { setSelected(provider); setNotice(null); setError(null); } }} className="h-4 w-4 accent-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" />
                       {providerLabels[provider]}
@@ -103,8 +103,10 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
               })}
             </div>
           </fieldset>
-          <p className="text-xs leading-6 text-sarin-muted">Sarin Vault conserva sus datos en este navegador y sigue usando la IA local. Las credenciales de los proveedores se administran en el servidor.</p>
-          <button type="button" className={buttonClass} disabled={busy || !selectedStatus?.configured || selected === data.provider} onClick={() => void save()}>{saving ? "Guardando IA…" : "Guardar IA"}</button>
+          <div className="flex flex-col items-start gap-3 border-t border-sarin-line pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Sarin Vault conserva sus datos en este navegador y sigue usando la IA local. Las credenciales de los proveedores se administran en el servidor.</p>
+            <button type="button" className={buttonClass + " shrink-0"} disabled={busy || !selectedStatus?.configured || selected === data.provider} onClick={() => void save()}>{saving ? "Guardando IA…" : "Guardar IA"}</button>
+          </div>
         </>
       )}
     </section>

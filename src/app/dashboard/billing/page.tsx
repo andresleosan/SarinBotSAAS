@@ -211,47 +211,49 @@ function Billing() {
     style: "currency", currency: "COP", maximumFractionDigits: 0,
   });
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div>
           <p className="text-xs uppercase tracking-widest text-sarin-blue">
             Suscripción
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Mantén tu agenda abierta</h1>
-          <p className="mt-2 text-sm text-sarin-muted">
+          <h1 className="mt-1 text-3xl font-bold">Mantén tu agenda abierta</h1>
+          <p className="mt-1 text-sm text-sarin-muted">
             {data.business.name} · Estado: {subscriptionLabels[data.business.subscription.status]}
           </p>
         </div>
-        <p className="text-2xl font-bold text-sarin-blue">
-          {formatPrice(selectedPrice)}
-          <span className="mt-1 block text-right text-xs font-normal text-sarin-muted">
-            {selectedKind === "response_pack" ? "COP por ampliación" : `COP por ${selectedDays} días`}
-          </span>
-        </p>
+        <div className="flex flex-col items-start sm:items-end">
+          <p className="text-2xl font-bold text-sarin-blue">
+            {formatPrice(selectedPrice)}
+            <span className="block text-xs font-normal text-sarin-muted sm:text-right">
+              {selectedKind === "response_pack" ? "COP por ampliación" : `COP por ${selectedDays} días`}
+            </span>
+          </p>
+          <button type="button" className="min-h-11 text-left text-sm text-sarin-blue underline disabled:opacity-50 sm:text-right" disabled={saving || compressing || refreshing} onClick={() => void refreshBilling()}>{refreshing ? "Actualizando consumo…" : "Actualizar consumo y comprobantes"}</button>
+        </div>
       </div>
       {error && <Notice error>{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
       <ResponseQuota allowance={data.allowance} />
-      <button type="button" className="min-h-11 text-sm text-sarin-blue underline disabled:opacity-50" disabled={saving || compressing || refreshing} onClick={() => void refreshBilling()}>{refreshing ? "Actualizando consumo…" : "Actualizar consumo y comprobantes"}</button>
       <form
         onSubmit={(event) => void submit(event)}
-        className="space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6"
+        className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5"
       >
-        <fieldset className="space-y-3" disabled={formLocked}>
+        <fieldset className="space-y-2" disabled={formLocked}>
           <legend className="font-semibold">¿Qué quieres pagar?</legend>
-          <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex flex-wrap gap-x-4 gap-y-0 text-sm">
             <label className="flex min-h-11 items-center gap-2"><input type="radio" name="purchaseKind" value="subscription" checked={selectedKind === "subscription"} disabled={formLocked} onChange={() => selectPurchaseKind("subscription")} className="accent-sarin-blue" />Renovar suscripción</label>
             <label className="flex min-h-11 items-center gap-2"><input type="radio" name="purchaseKind" value="response_pack" checked={selectedKind === "response_pack"} disabled={formLocked || !canBuyPack} onChange={() => selectPurchaseKind("response_pack")} className="accent-sarin-blue" />Ampliar {RESPONSE_PACK.responses.toLocaleString("es-CO")} respuestas</label>
           </div>
           {!canBuyPack && !pendingReceipt && <p className="text-xs text-sarin-muted">Las ampliaciones requieren una vigencia de pago activa; no se aplican a la prueba gratuita.</p>}
         </fieldset>
-        {selectedKind === "subscription" ? <fieldset className="space-y-3" disabled={formLocked}>
+        {selectedKind === "subscription" ? <fieldset className="space-y-2" disabled={formLocked}>
           <legend className="font-semibold">Elige tu período</legend>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
             {BILLING_PLANS.filter((plan) => plan.id !== "whatsapp" || data.whatsappAvailable || selectedPlan.id === "whatsapp").map((plan) => (
               <label
                 key={plan.id}
-                className={`min-w-0 rounded-xl border p-4 ${formLocked ? "cursor-default" : "cursor-pointer"} ${selectedPlan.id === plan.id ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"} focus-within:ring-2 focus-within:ring-sarin-blue focus-within:ring-offset-2`}
+                className={`min-w-0 rounded-xl border p-3 ${formLocked ? "cursor-default" : "cursor-pointer"} ${selectedPlan.id === plan.id ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"} focus-within:ring-2 focus-within:ring-sarin-blue focus-within:ring-offset-2`}
               >
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <input
@@ -265,13 +267,13 @@ function Billing() {
                   />
                   {plan.label}
                 </span>
-                <span className="mt-3 block text-lg font-semibold tabular-nums text-sarin-blue">
+                <span className="mt-2 block text-lg font-semibold tabular-nums text-sarin-blue">
                   {formatPrice(pendingReceipt && selectedPlan.id === plan.id ? selectedPrice : data.settings[plan.priceField])}
                 </span>
                 <span className="mt-1 block text-xs text-sarin-muted">
                   COP · {plan.periodDays} días
                 </span>
-                <span className="mt-2 block text-xs font-medium text-sarin-ink">{plan.includedResponses.toLocaleString("es-CO")} respuestas</span>
+                <span className="mt-1 block text-xs font-medium text-sarin-ink">{plan.includedResponses.toLocaleString("es-CO")} respuestas</span>
                 {plan.id === "whatsapp" && <span className="mt-1 block text-xs text-sarin-muted">{data.whatsappAvailable ? "Web + WhatsApp · consumo de Meta adicional" : "Conexión no disponible. Este plan no se puede contratar."}</span>}
               </label>
             ))}
@@ -279,7 +281,7 @@ function Billing() {
           <p className="text-xs text-sarin-muted">
             La prueba gratuita inicial incluye 700 respuestas durante 7 días. Una renovación pagada comienza después de tu vigencia actual.
           </p>
-        </fieldset> : <div className="space-y-2 rounded-xl border border-sarin-line bg-sarin-canvas p-4">
+        </fieldset> : <div className="space-y-1 rounded-xl border border-sarin-line bg-sarin-canvas p-3">
           <h2 className="font-semibold">{purchaseDescription} · {formatPrice(selectedPrice)} COP</h2>
           <p className="text-sm text-sarin-muted">No extiende la vigencia. Se activa tras aprobar el comprobante{period && (!pendingReceipt || pendingReceipt.quotaPeriodId === period.id) ? ` y vence el ${quotaDate(period.endsAt)}` : " en el período indicado al enviar el pago"}. No hay cobros automáticos.</p>
         </div>}
@@ -291,57 +293,59 @@ function Billing() {
           </Notice>
         )}
         {!data.whatsappAvailable && <p className="text-xs text-sarin-muted">Sarin WhatsApp está en preparación y todavía no se puede contratar. Para mayor volumen, solicita una cotización a medida.</p>}
-        <h2 className="font-semibold">Datos para tu transferencia</h2>
-        {data.settings.bankAccounts.length === 0 ? (
-          <Notice>
-            El administrador aún no ha configurado las cuentas de pago.
-          </Notice>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {data.settings.bankAccounts.map((account) => (
-              <label
-                key={account.id}
-                className={`cursor-pointer space-y-2 rounded-xl border p-4 ${bank === account.id ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"}`}
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold">
-                  <input
-                    type="radio"
-                    name="bank"
-                    value={account.id}
-                    checked={bank === account.id}
-                    disabled={formLocked}
-                    onChange={() => {
-                      if (formLocked || bank === account.id) return;
-                      setBank(account.id);
-                      setRequestId(crypto.randomUUID());
-                    }}
-                  />
-                  {account.bankName}
-                </span>
-                <span className="block text-xs text-sarin-muted">
-                  {account.accountType} · {account.holderName}
-                </span>
-                <span className="block break-all tabular-nums text-sm">
-                  {account.accountNumber}
-                </span>
-                {account.holderDoc && (
-                  <span className="block text-xs text-sarin-muted">
-                    {account.holderDoc}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="flex min-h-11 items-center gap-1 text-xs text-sarin-blue"
-                  onClick={() => void copy(account.accountNumber)}
+        <div className="space-y-2">
+          <h2 className="font-semibold">Datos para tu transferencia</h2>
+          {data.settings.bankAccounts.length === 0 ? (
+            <Notice>
+              El administrador aún no ha configurado las cuentas de pago.
+            </Notice>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+              {data.settings.bankAccounts.map((account) => (
+                <label
+                  key={account.id}
+                  className={`cursor-pointer space-y-1 rounded-xl border p-3 ${bank === account.id ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"}`}
                 >
-                  <Copy className="h-3.5 w-3.5" />
-                  Copiar número
-                </button>
-              </label>
-            ))}
-          </div>
-        )}
-        <div className="space-y-3">
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    <input
+                      type="radio"
+                      name="bank"
+                      value={account.id}
+                      checked={bank === account.id}
+                      disabled={formLocked}
+                      onChange={() => {
+                        if (formLocked || bank === account.id) return;
+                        setBank(account.id);
+                        setRequestId(crypto.randomUUID());
+                      }}
+                    />
+                    {account.bankName}
+                  </span>
+                  <span className="block text-xs text-sarin-muted">
+                    {account.accountType} · {account.holderName}
+                  </span>
+                  <span className="block break-all tabular-nums text-sm">
+                    {account.accountNumber}
+                  </span>
+                  {account.holderDoc && (
+                    <span className="block text-xs text-sarin-muted">
+                      {account.holderDoc}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="flex min-h-11 items-center gap-1 text-xs text-sarin-blue"
+                    onClick={() => void copy(account.accountNumber)}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copiar número
+                  </button>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
           <h2 className="font-semibold">Envía el comprobante</h2>
           <p className="text-sm font-medium text-sarin-ink">
             {purchaseDescription} · {formatPrice(selectedPrice)} COP
@@ -350,15 +354,15 @@ function Billing() {
             La captura se optimiza antes de enviarla y se revisa manualmente.{" "}
             {selectedKind === "subscription" ? "El acceso preventivo de 24 horas se aplica según el estado de tu suscripción." : "El paquete se habilita únicamente después de su aprobación."}
           </p>
-          <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border border-dashed border-sarin-line bg-sarin-canvas p-4 text-center hover:border-sarin-blue sm:p-6">
-            <UploadCloud className="h-8 w-8 text-sarin-blue" />
+          <label className="grid cursor-pointer grid-cols-[24px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-xl border border-dashed border-sarin-line bg-sarin-canvas p-3 hover:border-sarin-blue sm:p-4">
+            <UploadCloud className="h-6 w-6 text-sarin-blue" />
             <span className="text-sm">
               {compressing
                 ? "Optimizando imagen…"
                 : "Seleccionar captura de pago"}
             </span>
             <input
-              className={fieldClass + " max-w-sm"}
+              className={fieldClass + " col-span-2 min-w-0 sm:col-span-1 sm:col-start-2"}
               type="file"
               accept="image/jpeg,image/png,image/webp"
               disabled={uploadDisabled}
@@ -385,7 +389,7 @@ function Billing() {
           </button>
         </div>
       </form>
-      <section className="space-y-3">
+      <section className="space-y-2">
         <h2 className="text-lg font-semibold">Tus comprobantes</h2>
         {data.receipts.length === 0 ? (
           <Notice>Todavía no has enviado comprobantes.</Notice>
@@ -393,7 +397,7 @@ function Billing() {
           data.receipts.map((receipt) => (
             <article
               key={receipt.id}
-              className="flex flex-wrap justify-between gap-3 rounded-xl border border-sarin-line bg-sarin-paper p-4"
+              className="flex flex-wrap justify-between gap-2 rounded-xl border border-sarin-line bg-sarin-paper p-3"
             >
               <div>
                 <p className="font-semibold">
