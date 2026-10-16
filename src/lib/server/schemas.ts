@@ -46,6 +46,7 @@ export type BusinessConfig = z.infer<typeof businessConfigSchema>;
 export const chatSchema = z.object({
   mode: z.enum(['sarin_onboarding', 'sarin_client', 'sarin_owner_copilot']),
   tenantId: z.string().max(128), requestId: requestIdSchema,
+  stateVersion: z.number().int().nonnegative().safe().optional(),
   messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().min(1).max(12000) }).strict()).min(1).max(60),
 }).strict().refine((body) => body.messages.reduce((length, message) => length + message.content.length, 0) <= 60000 && body.messages.at(-1)?.role === 'user', 'Historial inválido.');
 

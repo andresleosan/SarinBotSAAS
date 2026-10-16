@@ -7,12 +7,14 @@ import type { ChatMessage, ChatToolResult } from "@/types/chat";
 interface ChatParams {
   mode: "sarin_onboarding" | "sarin_client" | "sarin_owner_copilot";
   tenantId: string;
+  actorUid?: string;
   debounceMs?: number;
   onToolExecuted?: (toolName: string, result: Record<string, unknown>) => void;
 }
 interface Batch {
   texts: string[];
   requestId: string;
+  stateVersion?: number;
 }
 type Turn = { role: "user" | "assistant"; content: string };
 
@@ -51,6 +53,7 @@ function contextFor(history: Turn[], userTurn: Turn): Turn[] {
 export function useDebouncedChat({
   mode,
   tenantId,
+  actorUid = '',
   debounceMs = 2500,
   onToolExecuted,
 }: ChatParams) {
@@ -60,6 +63,7 @@ export function useDebouncedChat({
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const history = useRef<Turn[]>([]);
+  const stateVersion = useRef<number | undefined>(undefined);
   const pending = useRef<string[]>([]);
   const failed = useRef<Batch | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,6 +81,7 @@ export function useDebouncedChat({
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     history.current = [];
+    stateVersion.current = undefined;
     pending.current = [];
     failed.current = null;
     busy.current = false;
@@ -91,12 +96,13 @@ export function useDebouncedChat({
       controller.current?.abort();
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [mode, tenantId]);
+  }, [mode, tenantId, actorUid]);
 
   const flush = useCallback(async () => {
     if (busy.current || !tenantId) return;
     const batch = failed.current ?? takeBatch(pending.current);
     if (!batch) return;
+    if (!failed.current) batch.stateVersion = stateVersion.current;
     failed.current = null;
     ready.current = pending.current.length > 0 && timer.current === null;
     busy.current = true;
@@ -111,6 +117,7 @@ export function useDebouncedChat({
       const data = await apiFetch<{
         reply: string;
         toolResults?: ChatToolResult[];
+        stateVersion?: number;
       }>("/api/sarin/chat", {
         method: "POST",
         signal: abort.signal,
@@ -118,11 +125,13 @@ export function useDebouncedChat({
           mode,
           tenantId,
           requestId: batch.requestId,
-          messages: contextFor(history.current, userTurn),
+          messages: [userTurn],
+          ...(batch.stateVersion !== undefined ? { stateVersion: batch.stateVersion } : {}),
         }),
       });
       if (generation.current !== currentGeneration) return;
       setErrorCode(null);
+      stateVersion.current = data.stateVersion;
       history.current.push(userTurn, {
         role: "assistant",
         content: data.reply,
@@ -143,7 +152,8 @@ export function useDebouncedChat({
         return;
       const code = cause instanceof Error && "code" in cause && typeof cause.code === "string" ? cause.code : null;
       setErrorCode(code);
-      failed.current = code === "REQUEST_ALREADY_COMPLETED" ? null : batch;
+      failed.current = code === "REQUEST_ALREADY_COMPLETED" ? null : code === 'CHAT_STATE_CONFLICT' ? { texts: batch.texts, requestId: crypto.randomUUID() } : batch;
+      if (code === 'CHAT_STATE_CONFLICT') stateVersion.current = undefined;
       if (code === "REQUEST_ALREADY_COMPLETED") {
         ready.current = false;
         setIsWaitingBatch(false);
@@ -156,7 +166,7 @@ export function useDebouncedChat({
         if (ready.current && !failed.current) void flushRef.current();
       }
     }
-  }, [mode, tenantId]);
+  }, [mode, tenantId, actorUid]);
   flushRef.current = flush;
 
   const sendMessage = useCallback(

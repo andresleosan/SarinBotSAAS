@@ -15,6 +15,7 @@ import { listInvitations } from '@/lib/server/invitations';
 import { normalizeBusinessLogo, readPublicBusinessLogo, saveBusinessLogo } from '@/lib/server/business-logos';
 import sharp from 'sharp';
 import { updateClientPolicy } from '@/lib/server/client-policy';
+import { readChatState, saveChatState } from '@/lib/server/chat-state';
 
 const now = Date.now();
 const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now + 3 * 86400000);
@@ -39,6 +40,13 @@ describe('commercial invariants on Cloudflare data', () => {
     });
   }, 30_000);
   afterAll(async () => { await runtime?.dispose(); });
+  it('persists only scoped structured selections across D1 handles', async () => {
+    const scope = { actorUid: 'state-client', businessId: 'state-business', mode: 'sarin_client' as const, channel: 'web' as const };
+    await saveChatState(scope, 0, { serviceId: 'cut', dateKey }, db);
+    expect(await readChatState(scope, db)).toMatchObject({ version: 1, selection: { serviceId: 'cut', dateKey } });
+    await expect(saveChatState(scope, 0, {}, db)).rejects.toMatchObject({ code: 'CHAT_STATE_CONFLICT' });
+    expect((await readChatState({ ...scope, actorUid: 'other' }, db)).selection).toEqual({});
+  });
   it('serializes client limits across independent D1 handles and keeps policies private', async () => {
     const value = business('client-policy');
     await db.collection('businesses').doc(value.id).set(value);

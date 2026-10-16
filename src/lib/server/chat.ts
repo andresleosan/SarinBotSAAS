@@ -10,6 +10,7 @@ import { HttpError } from '@/lib/server/http';
 import { runUserInference } from '@/lib/server/inference';
 import { enforceInferenceAdmission } from '@/lib/server/inference-rate-limit';
 import { readClientPolicy } from './client-policy';
+import { readChatState, saveChatState } from './chat-state';
 import { getAiProviderSelection } from '@/lib/server/provider-settings';
 import { recordAiUsage } from '@/lib/server/ai-usage';
 import { assertOwner, createBusiness, getBusiness, getOwnedBusiness, stableDocumentId } from '@/lib/server/businesses';
@@ -106,19 +107,23 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     if (!isSubscriptionAllowed(business) && !(body.mode === 'sarin_client' && getBusinessAccess(business) === 'trial_exhausted')) throw new HttpError(402, 'Activa el acceso de pago para continuar.', 'PAYMENT_REQUIRED');
     const tools = body.mode === 'sarin_onboarding' ? SARIN_ONBOARDING_TOOLS : body.mode === 'sarin_owner_copilot' ? SARIN_COPILOT_TOOLS : SARIN_CLIENT_TOOLS;
     const system = body.mode === 'sarin_onboarding' ? buildSarinOnboardingPrompt() : body.mode === 'sarin_owner_copilot' ? buildSarinOwnerCopilotPrompt(business!) : buildSarinClientPrompt(business!);
-    const messages: EngineMessage[] = [{ role: 'system', content: system }, ...body.messages];
+    const messages: EngineMessage[] = [{ role: 'system', content: system }, body.messages.at(-1)!];
     const toolResults: ToolResult[] = [];
 
     const db = getAdminDb();
     const scope = body.mode === 'sarin_onboarding' ? 'onboarding' : business!.id;
     const cacheKey = stableDocumentId(scope, user.uid, body.mode, body.requestId, channel);
-    const fingerprint = createHash('sha256').update(JSON.stringify({ mode: body.mode, tenantId: body.tenantId, messages: body.messages })).digest('hex');
+    const fingerprint = createHash('sha256').update(JSON.stringify({ mode: body.mode, tenantId: body.tenantId, messages: body.stateVersion === undefined ? body.messages : [body.messages.at(-1)!], ...(body.stateVersion === undefined ? {} : { stateVersion: body.stateVersion }) })).digest('hex');
+    const stateScope = { actorUid: user.uid, businessId: business!.id, mode: body.mode, channel };
     const assertClientAccess = async () => {
       if (body.mode === 'sarin_client' && (await readClientPolicy(business!.id, user.uid, db)).blocked) throw new HttpError(403, 'Este negocio ha pausado tus nuevas consultas. Puedes consultar y cancelar tus citas.', 'CLIENT_BLOCKED');
     };
     await assertClientAccess();
     await enforceInferenceAdmission({ businessId: business!.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel }, db);
     const execute = async (): Promise<ChatResponse> => {
+      const state = await readChatState(stateScope, db);
+      if (body.stateVersion !== undefined && body.stateVersion !== state.version) throw new HttpError(409, 'La selección cambió. Reintenta para usar los datos actuales.', 'CHAT_STATE_CONFLICT');
+      messages[0] = { role: 'system', content: `${system}\nSelección validada del servidor: ${JSON.stringify(state.selection)}` };
       const { provider } = await getAiProviderSelection();
       for (let round = 0; round < 4; round++) {
         // A request can spend time queued: entitlement is checked again after
@@ -234,7 +239,14 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
       }
       let response: ChatResponse;
       try {
+        const state = await readChatState(stateScope, db);
         response = await execute();
+        try { response.stateVersion = (await saveChatState(stateScope, state.version, state.selection, db)).version; }
+        catch (error) {
+          if (error instanceof HttpError && error.code === 'CHAT_STATE_CONFLICT') throw error;
+          // A computed result must not become another provider call if storage
+          // fails afterward. No new selection is advertised without its CAS.
+        }
       } catch (error) {
         if (toolResults.some(result => result.result.appointment || result.result.business)) response = { reply: verifiedReply(toolResults), toolResults };
         else {

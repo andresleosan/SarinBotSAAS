@@ -34,6 +34,7 @@ function Island({ slug }: { slug: string }) {
   const chat = useDebouncedChat({
     mode: "sarin_client",
     tenantId: business?.id || "",
+    actorUid: user?.uid,
   });
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "auto", block: "nearest" });

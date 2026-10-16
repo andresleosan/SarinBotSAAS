@@ -9,7 +9,7 @@ import { TextSuggestions } from "@/components/text-suggestions";
 import { BusinessLogoField } from '@/components/business-logo-field';
 import { BusinessSocialFields } from '@/components/business-social-fields';
 import type { BusinessSocialLink } from '@/lib/business-branding';
-import { AuthGate } from "@/components/auth-provider";
+import { AuthGate, useAuth } from "@/components/auth-provider";
 import {
   AppShell,
   Notice,
@@ -52,6 +52,7 @@ function initialSchedule(): Record<number, DaySchedule> {
 }
 
 function Configuration() {
+  const { user } = useAuth();
   const { business, loading, error: businessError, setBusiness } = useBusiness();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -118,6 +119,7 @@ function Configuration() {
     setSchedule(business.weeklySchedule);
   }, [business]);
   const chat = useDebouncedChat({
+    actorUid: user?.uid,
     mode: "sarin_onboarding",
     tenantId: business?.id || "onboarding",
     onToolExecuted: (toolName, result) => {

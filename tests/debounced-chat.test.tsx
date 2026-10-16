@@ -100,8 +100,6 @@ describe("debounced authenticated chat lifecycle", () => {
     });
     expect(apiFetch).toHaveBeenCalledTimes(2);
     expect(payload(1).messages).toEqual([
-      { role: "user", content: "Primero" },
-      { role: "assistant", content: "Recibido" },
       { role: "user", content: "Después\nOtro dato" },
     ]);
   });
