@@ -16,19 +16,33 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
     collection(name: string) { return new Query(`${this.path}/${name}`); }
     async get() { return read(this.path); }
     async set(data: Data, options?: { merge?: boolean }) { write(this.path, data, options?.merge); }
+    async delete() { rows.delete(this.path); }
   }
   class Query {
-    constructor(public readonly path: string, public readonly filters: [string, unknown][] = [], public readonly cap = Infinity) {}
+    constructor(public readonly path: string, public readonly filters: [string, string, unknown][] = [], public readonly cap = Infinity, public readonly ordering?: [string, string]) {}
     doc(id: string) { return new Reference(`${this.path}/${id}`); }
-    where(field: string, _operator: string, value: unknown) { return new Query(this.path, [...this.filters, [field, value]], this.cap); }
-    limit(cap: number) { return new Query(this.path, this.filters, cap); }
-    orderBy(_field: string, _direction?: string) { return this; }
+    where(field: string, operator: string, value: unknown) { return new Query(this.path, [...this.filters, [field, operator, value]], this.cap, this.ordering); }
+    limit(cap: number) { return new Query(this.path, this.filters, cap, this.ordering); }
+    orderBy(field: string, direction = 'asc') { return new Query(this.path, this.filters, this.cap, [field, direction]); }
     async get() {
-      const docs = [...rows.keys()].filter((path) => path.startsWith(`${this.path}/`) && path.slice(this.path.length + 1).split('/').length === 1).filter((path) => this.filters.every(([field, value]) => {
+      const paths = [...rows.keys()].filter((path) => path.startsWith(`${this.path}/`) && path.slice(this.path.length + 1).split('/').length === 1).filter((path) => this.filters.every(([field, operator, value]) => {
         const data = rows.get(path)!.data;
         const nested = field.split('.').reduce<unknown>((current, key) => current && typeof current === 'object' ? (current as Data)[key] : undefined, data);
-        return nested === value;
-      })).slice(0, this.cap).map(read);
+        if (operator === '==') return nested === value;
+        if (typeof nested !== 'number' || typeof value !== 'number') throw new Error('Unsupported fixture comparison');
+        if (operator === '<=') return nested <= value;
+        if (operator === '>') return nested > value;
+        throw new Error('Unsupported fixture operator');
+      }));
+      if (this.ordering) {
+        const [field, direction] = this.ordering;
+        paths.sort((a, b) => {
+          const first = rows.get(a)!.data[field], second = rows.get(b)!.data[field];
+          const comparison = typeof first === 'number' && typeof second === 'number' ? first - second : String(first).localeCompare(String(second));
+          return direction === 'desc' ? -comparison : comparison;
+        });
+      }
+      const docs = paths.slice(0, this.cap).map(read);
       return { docs, empty: docs.length === 0, size: docs.length };
     }
   }
@@ -41,7 +55,7 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
     runTransaction: async <T>(handler: (transaction: unknown) => Promise<T>) => {
       for (let attempt = 0; attempt < 10; attempt++) {
         const reads = new Map<string, number>();
-        const writes: { path: string; data: Data; merge?: boolean; create?: boolean }[] = [];
+        const writes: { path: string; data?: Data; merge?: boolean; create?: boolean; deleted?: boolean }[] = [];
         const transaction = {
           get: async (target: Reference | Query) => {
             if (target instanceof Reference) {
@@ -58,11 +72,15 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
           set: (reference: Reference, data: Data, options?: { merge?: boolean }) => { writes.push({ path: reference.path, data, merge: options?.merge }); },
           update: (reference: Reference, data: Data) => { writes.push({ path: reference.path, data, merge: true }); },
           create: (reference: Reference, data: Data) => { writes.push({ path: reference.path, data, create: true }); },
+          delete: (reference: Reference) => { writes.push({ path: reference.path, deleted: true }); },
         };
         const value = await handler(transaction);
         if ([...reads].some(([path, version]) => (rows.get(path)?.version ?? 0) !== version)) continue;
         if (writes.some((item) => item.create && rows.has(item.path))) throw new Error('Document exists');
-        for (const item of writes) write(item.path, item.data, item.merge);
+        for (const item of writes) {
+          if (item.deleted) rows.delete(item.path);
+          else write(item.path, item.data!, item.merge);
+        }
         return value;
       }
       throw new Error('Transaction retry limit');

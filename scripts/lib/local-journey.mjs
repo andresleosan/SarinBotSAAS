@@ -24,6 +24,8 @@ export function journeyEnvironment(input, port, runId) {
   const env = {};
   for (const name of ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'TMP', 'TEMP', 'TMPDIR', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA']) if (input[name]) env[name] = input[name];
   return { ...env, NODE_ENV: 'test', NEXT_TELEMETRY_DISABLED: '1', CI: '1', NO_COLOR: '1',
+    WHATSAPP_ENABLED: 'false', WHATSAPP_RETENTION_ENABLED: 'false', WHATSAPP_GRAPH_API_VERSION: 'v25.0',
+    WHATSAPP_APP_SECRET: '', WHATSAPP_VERIFY_TOKEN: '', WHATSAPP_CONTENT_KEY: '', WHATSAPP_PHONE_CREDENTIALS_JSON: '',
     SARIN_LOCAL_JOURNEY: '1', SARIN_JOURNEY_PORT: String(port), SARIN_JOURNEY_RUN: runId,
     FIREBASE_ADMIN_PROJECT_ID: LOCAL_FIREBASE_PROJECT_ID, NEXT_PUBLIC_FIREBASE_PROJECT_ID: LOCAL_FIREBASE_PROJECT_ID,
     NEXT_PUBLIC_FIREBASE_EMULATORS: 'true', FIREBASE_AUTH_EMULATOR_HOST: LOCAL_FIREBASE_AUTH_HOST,
@@ -36,6 +38,7 @@ export function journeyEnvironment(input, port, runId) {
 /** @param {Record<string, string | undefined>} env */
 export function assertJourneyEnvironment(env) {
   const required = { SARIN_LOCAL_JOURNEY: '1', NODE_ENV: 'test', FIREBASE_ADMIN_PROJECT_ID: LOCAL_FIREBASE_PROJECT_ID,
+    WHATSAPP_ENABLED: 'false', WHATSAPP_RETENTION_ENABLED: 'false',
     NEXT_PUBLIC_FIREBASE_PROJECT_ID: LOCAL_FIREBASE_PROJECT_ID, NEXT_PUBLIC_FIREBASE_EMULATORS: 'true',
     FIREBASE_AUTH_EMULATOR_HOST: LOCAL_FIREBASE_AUTH_HOST, FIRESTORE_EMULATOR_HOST: LOCAL_FIREBASE_FIRESTORE_HOST,
     NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: LOCAL_FIREBASE_AUTH_HOST, NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST: LOCAL_FIREBASE_FIRESTORE_HOST,
@@ -44,6 +47,7 @@ export function assertJourneyEnvironment(env) {
   assertRun(env.SARIN_JOURNEY_RUN ?? '');
   if (!/^\d+$/.test(env.SARIN_JOURNEY_PORT ?? '')) throw new Error('Falta el puerto local del ensayo.');
   assertPort(Number(env.SARIN_JOURNEY_PORT));
+  for (const name of ['WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_CONTENT_KEY', 'WHATSAPP_PHONE_CREDENTIALS_JSON']) if (env[name]) throw new Error(`No se admite ${name} en el ensayo local.`);
   for (const name of ['FIREBASE_ADMIN_PRIVATE_KEY', 'FIREBASE_ADMIN_CLIENT_EMAIL', 'GOOGLE_APPLICATION_CREDENTIALS', 'FIREBASE_TOKEN', 'GOOGLE_CLOUD_PROJECT', 'GCLOUD_PROJECT', 'FIREBASE_CONFIG', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NODE_OPTIONS', 'SARIN_TUNNEL_URL', 'CF_ACCESS_CLIENT_ID', 'CF_ACCESS_CLIENT_SECRET', 'SARIN_CHAT_PROVIDER', 'DEEPSEEK_API_KEY', 'DEEPSEEK_MODEL']) if (env[name]) throw new Error(`No se admite ${name} en el ensayo local.`);
 }
 
@@ -91,19 +95,21 @@ export async function cleanupOwnedDocuments(records, fixture, remove) {
   if (fixture.ownerUid !== canonical.ownerUid || fixture.businessId !== canonical.businessId || fixture.slug !== canonical.slug) throw new Error('El manifiesto de limpieza no pertenece a esta corrida.');
   const uids = canonical.accounts.map(account => account.uid);
   const parentPath = `businesses/${canonical.businessId}`;
+  const quotaScopePath = `responseQuotaScopes/business_${canonical.businessId}`;
   const ownsParent = records.some(item => item.path === parentPath && item.data.ownerUid === canonical.ownerUid && item.data.slug === canonical.slug);
   for (const { path, data } of records) {
     const parts = path.split('/');
     const allowed = parts.length === 2 && (
       (parts[0] === 'users' && uids.includes(parts[1]) && (data.uid === parts[1] || (parts[1] === canonical.ownerUid && data.ownedTenantId === canonical.businessId)))
       || (path === parentPath && data.ownerUid === canonical.ownerUid && data.slug === canonical.slug)
+      || (path === quotaScopePath && ownsParent)
       || (path === `publicBusinesses/${canonical.slug}` && data.id === canonical.businessId && data.slug === canonical.slug)
       || (path === `businessSlugs/${canonical.slug}` && data.ownerUid === canonical.ownerUid && data.businessId === canonical.businessId)
       || (parts[0] === 'paymentReceipts' && data.ownerUid === canonical.ownerUid && data.tenantId === canonical.businessId)
       || (parts[0] === 'paymentImages' && data.ownerUid === canonical.ownerUid)
     ) || parts.length === 4 && ownsParent && `${parts[0]}/${parts[1]}` === parentPath && (
       parts[2] === 'bookingLocks' || parts[2] === 'appointments' && data.tenantId === canonical.businessId && (uids.includes(String(record(data.client).uid)) || data.type === 'manual_block' && data.createdBy === 'manual_panel')
-    );
+    ) || parts.length === 4 && ownsParent && `${parts[0]}/${parts[1]}` === quotaScopePath && parts[2] === 'periods' && data.id === parts[3];
     if (!allowed || parts.some(part => !/^[A-Za-z0-9_-]+$/.test(part))) throw new Error(`Limpieza rechazada para un documento ajeno: ${path}.`);
   }
   for (const { path } of records) await remove(path);

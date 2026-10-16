@@ -2,6 +2,7 @@ import { act, createElement, type ReactNode } from "react";
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AdminPage from "@/app/admin/page";
+vi.mock("@/components/admin-whatsapp", () => ({ AdminWhatsApp: () => null }));
 import type { AdminAiUsage, AiUsageTotals } from "@/types/ai";
 
 const state = vi.hoisted(() => ({ api: vi.fn() }));

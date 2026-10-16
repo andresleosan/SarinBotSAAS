@@ -14,7 +14,7 @@ export function approveSubscription(subscription: Subscription, paymentId: strin
   if (!BILLING_PLANS.some((plan) => plan.periodDays === periodDays)) throw new RangeError('Duración de suscripción no válida.');
   return {
     status: 'active', trialEndsAt: subscription.trialEndsAt,
-    currentPeriodEndsAt: Math.max(now, subscription.currentPeriodEndsAt) + periodDays * 86400000,
+    currentPeriodEndsAt: Math.max(now, subscription.currentPeriodEndsAt, subscription.trialEndsAt) + periodDays * 86400000,
     lastPaymentId: paymentId,
   };
 }

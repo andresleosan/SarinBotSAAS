@@ -3,13 +3,15 @@ import type { Firestore } from 'firebase-admin/firestore';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Business, PaymentReceipt, PlatformSettings } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
-import { BILLING_PLANS, getBillingPlan } from '@/lib/billing-plans';
+import { BILLING_PLANS, getBillingPlan, RESPONSE_PACK } from '@/lib/billing-plans';
 import { isSuperadmin } from './auth';
 import { HttpError } from './http';
 import { businessIdForOwner, publicBusiness, stableDocumentId } from './businesses';
 import { approveSubscription, grantReceiptGrace } from './billing-policy';
 import type { z } from 'zod';
 import { receiptSchema, settingsSchema } from './schemas';
+import { initializeResponsePeriods, readResponsePeriodState, responsePeriodReference } from './response-periods';
+import { getWhatsAppBusinessStatus } from './whatsapp-config';
 
 function defaultSettings(): PlatformSettings {
   const configuredPrice = (value: string | undefined, fallback: number) => {
@@ -21,6 +23,8 @@ function defaultSettings(): PlatformSettings {
     weeklyPriceCOP: configuredPrice(process.env.WEEKLY_PRICE_COP, getBillingPlan('weekly').defaultPriceCOP),
     fortnightlyPriceCOP: configuredPrice(process.env.FORTNIGHTLY_PRICE_COP, getBillingPlan('fortnightly').defaultPriceCOP),
     monthlyPriceCOP: configuredPrice(process.env.MONTHLY_PRICE_COP, getBillingPlan('monthly').defaultPriceCOP),
+    whatsappPriceCOP: getBillingPlan('whatsapp').defaultPriceCOP,
+    responsePackPriceCOP: RESPONSE_PACK.defaultPriceCOP,
     trialDaysDefault: 7, graceHoursOnUpload: 24, bankAccounts: [], tunnelStatus: { isOnline: false, lastPingAt: 0 },
   };
 }
@@ -41,6 +45,8 @@ export async function saveSettings(input: z.infer<typeof settingsSchema>, db: Fi
       ...parsed,
       weeklyPriceCOP: parsed.weeklyPriceCOP ?? previous.weeklyPriceCOP,
       fortnightlyPriceCOP: parsed.fortnightlyPriceCOP ?? previous.fortnightlyPriceCOP,
+      whatsappPriceCOP: parsed.whatsappPriceCOP ?? previous.whatsappPriceCOP,
+      responsePackPriceCOP: parsed.responsePackPriceCOP ?? previous.responsePackPriceCOP,
       tunnelStatus: { isOnline: false, lastPingAt: 0 },
     };
     transaction.set(reference, settings);
@@ -66,7 +72,7 @@ export async function readReceiptImage(user: DecodedIdToken, paymentId: string, 
 
 export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof receiptSchema>, db: Firestore = getAdminDb()): Promise<{ receipt: PaymentReceipt; business: Business }> {
   const parsed = receiptSchema.parse(input);
-  const plan = getBillingPlan(parsed.planId);
+  const plan = parsed.kind === 'subscription' ? getBillingPlan(parsed.planId) : undefined;
   const id = stableDocumentId(user.uid, parsed.requestId, 'receipt');
   const receiptReference = db.collection('paymentReceipts').doc(id);
   const businessReference = db.collection('businesses').doc(businessIdForOwner(user.uid));
@@ -76,6 +82,7 @@ export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof 
     if (!businessDocument.exists || businessDocument.data()?.ownerUid !== user.uid) throw new HttpError(403, 'Primero configura tu negocio.');
     const business = businessDocument.data() as Business;
     if (existing.exists) return { receipt: existing.data() as PaymentReceipt, business };
+    if (plan?.id === 'whatsapp' && !(await getWhatsAppBusinessStatus(business.id)).ready) throw new HttpError(409, 'WhatsApp requiere una conexión verificada antes de contratar.', 'WHATSAPP_NOT_READY');
     const settings = { ...defaultSettings(), ...settingsDocument.data() } as PlatformSettings;
     const bank = settings.bankAccounts.find((account) => account.id === parsed.bankSelected || account.bankName === parsed.bankSelected);
     if (!bank) throw new HttpError(409, 'Selecciona una cuenta bancaria configurada por el administrador.');
@@ -83,9 +90,15 @@ export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof 
       const previous = await transaction.get(db.collection('paymentReceipts').doc(business.subscription.lastPaymentId));
       if (previous.data()?.status === 'pending') throw new HttpError(409, 'Ya tienes un comprobante pendiente de revisión.');
     }
+    const quota = parsed.kind === 'response_pack' ? await readResponsePeriodState(business, db, transaction) : undefined;
+    if (quota && (!quota.current || quota.current.source === 'trial' || quota.current.endsAt <= Date.now() || business.subscription.status !== 'active')) throw new HttpError(409, 'La ampliación requiere un período pagado vigente.', 'RESPONSE_PACK_UNAVAILABLE');
     const now = Date.now();
-    const receipt: PaymentReceipt = { id, tenantId: business.id, tenantName: business.name, ownerUid: user.uid, ownerEmail: user.email ?? '', planId: plan.id, periodDays: plan.periodDays, amountCOP: settings[plan.priceField], bankSelected: bank.bankName, status: 'pending', submittedAt: now };
-    const updatedBusiness: Business = { ...business, subscription: grantReceiptGrace(business.subscription, id, now) };
+    const receipt: PaymentReceipt = { id, tenantId: business.id, tenantName: business.name, ownerUid: user.uid, ownerEmail: user.email ?? '', kind: parsed.kind,
+      ...(plan ? { planId: plan.id, periodDays: plan.periodDays, responseAllowance: plan.includedResponses, amountCOP: settings[plan.priceField] }
+        : { responseAllowance: RESPONSE_PACK.responses, quotaPeriodId: quota!.current!.id, amountCOP: settings.responsePackPriceCOP }),
+      bankSelected: bank.bankName, status: 'pending', submittedAt: now };
+    const updatedBusiness: Business = { ...business, subscription: plan ? grantReceiptGrace(business.subscription, id, now) : { ...business.subscription, lastPaymentId: id } };
+    if (quota) initializeResponsePeriods(transaction, db, quota);
     transaction.create(receiptReference, receipt);
     transaction.create(db.collection('paymentImages').doc(id), { ownerUid: user.uid, receiptDataUrl: parsed.receiptDataUrl, submittedAt: now });
     transaction.set(businessReference, updatedBusiness);
@@ -118,8 +131,24 @@ export async function reviewPayment(paymentId: string, action: 'approve' | 'reje
     const now = Date.now();
     const reviewed: PaymentReceipt = { ...receipt, status, reviewedAt: now, ...(action === 'reject' && reason ? { rejectionReason: reason } : {}) };
     let subscription = business.subscription;
-    if (action === 'approve') subscription = approveSubscription(subscription, receipt.id, now, receiptPeriodDays(receipt));
-    else if (subscription.lastPaymentId === receipt.id) {
+    if (receipt.kind !== undefined && receipt.kind !== 'subscription' && receipt.kind !== 'response_pack') throw new HttpError(409, 'El tipo de comprobante no es válido.');
+    const quota = action === 'approve' ? await readResponsePeriodState(business, db, transaction, now) : undefined;
+    if (action === 'approve' && receipt.kind === 'response_pack') {
+      if (receipt.responseAllowance !== RESPONSE_PACK.responses || receipt.planId !== undefined || receipt.periodDays !== undefined || !quota?.current || receipt.quotaPeriodId !== quota.current.id || quota.current.source === 'trial' || quota.current.endsAt <= now || subscription.status !== 'active') throw new HttpError(409, 'La vigencia de esta ampliación ya no está disponible. Revisa el comprobante.', 'RESPONSE_PACK_EXPIRED');
+      initializeResponsePeriods(transaction, db, { ...quota, current: null });
+      transaction.set(responsePeriodReference(db, quota.scopeId, quota.current.id), { ...quota.current, extraResponses: quota.current.extraResponses + receipt.responseAllowance });
+    } else if (action === 'approve') {
+      if (receipt.planId === 'whatsapp' && !(await getWhatsAppBusinessStatus(business.id)).ready) throw new HttpError(409, 'WhatsApp requiere una conexión verificada antes de aprobar.', 'WHATSAPP_NOT_READY');
+      const periodDays = receiptPeriodDays(receipt);
+      const plan = getBillingPlan(receipt.planId);
+      const includedResponses = receipt.responseAllowance ?? plan.includedResponses;
+      if (!Number.isSafeInteger(includedResponses) || includedResponses < 1 || includedResponses > 1_000_000) throw new HttpError(409, 'La capacidad del comprobante no es válida.');
+      const startsAt = Math.max(now, subscription.currentPeriodEndsAt, subscription.trialEndsAt);
+      subscription = approveSubscription(subscription, receipt.id, now, periodDays);
+      initializeResponsePeriods(transaction, db, quota!);
+      const periodId = `payment_${receipt.id}`;
+      transaction.create(responsePeriodReference(db, quota!.scopeId, periodId), { id: periodId, source: 'subscription', planId: plan.id, startsAt, endsAt: subscription.currentPeriodEndsAt, includedResponses, extraResponses: 0, usedResponses: 0, reservedResponses: 0 });
+    } else if (receipt.kind !== 'response_pack' && subscription.lastPaymentId === receipt.id) {
       const { graceEndsAt: _graceEndsAt, ...withoutGrace } = subscription;
       const stillPaid = subscription.status === 'active' && subscription.currentPeriodEndsAt > now;
       const stillTrial = subscription.status === 'trial' && subscription.trialEndsAt > now;

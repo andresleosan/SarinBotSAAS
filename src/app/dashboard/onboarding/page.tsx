@@ -205,21 +205,22 @@ function Configuration() {
             )}
             {chat.error && (
               <div className="space-y-2">
-                <Notice error>{chat.error}</Notice>
-                <button
+                <Notice error={!chat.requestAlreadyCompleted}>{chat.error}</Notice>
+                {!chat.requestAlreadyCompleted && <button
                   type="button"
                   className="min-h-11 text-sm text-sarin-blue underline"
                   onClick={chat.retry}
+                  disabled={chat.isGenerating}
                 >
-                  Reintentar mensaje
-                </button>
+                  {chat.quotaExhausted ? "Comprobar disponibilidad" : "Reintentar mensaje"}
+                </button>}
               </div>
             )}
           </div>
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (input.trim()) {
+              if (input.trim() && !chat.quotaExhausted) {
                 chat.sendMessage(input);
                 setInput("");
               }
@@ -230,6 +231,7 @@ function Configuration() {
               aria-label="Mensaje para Sarin"
               className={fieldClass}
               value={input}
+              disabled={chat.quotaExhausted}
               maxLength={8000}
               onChange={(event) => setInput(event.target.value)}
               placeholder="Cuéntale cómo trabajas…"
@@ -237,7 +239,7 @@ function Configuration() {
             <button
               aria-label="Enviar mensaje"
               className={buttonClass}
-              disabled={!input.trim() || Boolean(chat.error)}
+              disabled={!input.trim() || chat.quotaExhausted || (Boolean(chat.error) && !chat.requestAlreadyCompleted)}
             >
               <Send className="h-4 w-4" />
             </button>

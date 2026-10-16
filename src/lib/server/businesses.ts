@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { ChatActor } from '@/types/chat';
 import type { Firestore } from 'firebase-admin/firestore';
 import type { Business, PublicBusiness } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
@@ -39,7 +39,7 @@ export function assertOwner(business: Business, uid: string): void {
   if (business.ownerUid !== uid) throw new HttpError(403, 'Esta operación es exclusiva del dueño del negocio.');
 }
 
-export async function createBusiness(user: DecodedIdToken, config: BusinessConfig, db: Firestore = getAdminDb()): Promise<Business> {
+export async function createBusiness(user: ChatActor, config: BusinessConfig, db: Firestore = getAdminDb()): Promise<Business> {
   const id = businessIdForOwner(user.uid);
   const reference = db.collection('businesses').doc(id);
   const slugReference = db.collection('businessSlugs').doc(config.slug);

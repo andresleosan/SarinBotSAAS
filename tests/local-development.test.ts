@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { localDevelopmentEnvironment, parseLocalArguments, javaMajorVersion, pnpmFirebaseInvocation } from '../scripts/lib/local-development.mjs';
 
 describe('isolated local development launcher', () => {
+  it('disables WhatsApp delivery and maintenance and prevents dotenv credentials from reappearing', () => {
+    const env = localDevelopmentEnvironment({ WHATSAPP_ENABLED: 'true', WHATSAPP_RETENTION_ENABLED: 'true', WHATSAPP_APP_SECRET: 'synthetic-secret', WHATSAPP_VERIFY_TOKEN: 'synthetic-token', WHATSAPP_CONTENT_KEY: 'synthetic-key', WHATSAPP_PHONE_CREDENTIALS_JSON: 'synthetic-credentials' });
+    expect(env).toMatchObject({ WHATSAPP_ENABLED: 'false', WHATSAPP_RETENTION_ENABLED: 'false', WHATSAPP_APP_SECRET: '', WHATSAPP_VERIFY_TOKEN: '', WHATSAPP_CONTENT_KEY: '', WHATSAPP_PHONE_CREDENTIALS_JSON: '' });
+  });
   it('pins a demo project and loopback emulators while removing inherited cloud credentials', () => {
     const env = localDevelopmentEnvironment({ FIREBASE_ADMIN_PRIVATE_KEY:'must-not-be-inherited', FIREBASE_ADMIN_CLIENT_EMAIL:'private@example.com', FIREBASE_TOKEN:'secret', GOOGLE_APPLICATION_CREDENTIALS:'/secret.json', FIREBASE_ADMIN_PROJECT_ID:'production-project', NEXT_PUBLIC_FIREBASE_PROJECT_ID:'production-project', SUPERADMIN_UID:'real-admin', PATH:'runtime-path' });
     expect(env.FIREBASE_ADMIN_PRIVATE_KEY).toBeUndefined(); expect(env.FIREBASE_TOKEN).toBeUndefined(); expect(env.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined();

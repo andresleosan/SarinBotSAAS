@@ -19,6 +19,12 @@ describe('untrusted inputs', () => {
   it('defaults older receipt requests to monthly', () => {
     expect(receiptSchema.parse(receiptInput)).toHaveProperty('planId', 'monthly');
   });
+  it('accepts a pack without accepting its quantity, price, target period, or a changed plan from the browser', () => {
+    expect(receiptSchema.parse({ ...receiptInput, kind: 'response_pack' })).toMatchObject({ kind: 'response_pack' });
+    for (const forged of [{ responseAllowance: 100000 }, { quotaPeriodId: 'future' }, { amountCOP: 1 }, { planId: 'monthly' }, { periodDays: 365 }, { quantity: 100 }]) {
+      expect(receiptSchema.safeParse({ ...receiptInput, kind: 'response_pack', ...forged }).success).toBe(false);
+    }
+  });
   it.each([{ planId: 'yearly' }, { planId: null }, { amountCOP: 1 }, { price: 1 }, { periodDays: 365 }, { durationDays: 365 }])('rejects forged receipt pricing or plan metadata %j', (overrides) => {
     expect(receiptSchema.safeParse({ ...receiptInput, planId: 'weekly', ...overrides }).success).toBe(false);
   });

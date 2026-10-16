@@ -28,6 +28,11 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
         setDoc(doc(db, 'aiUsageMonths', '2026-10'), { calls:1 }),
         setDoc(doc(db, 'aiUsageMonths', '2026-10', 'businesses', 'one'), { calls:1 }),
         setDoc(doc(db, 'aiUsageMeta', 'main'), { measurementStartedAt:1 }),
+        setDoc(doc(db, 'responseQuotaScopes', 'business_one'), { initializedAt: 1 }),
+        setDoc(doc(db, 'responseQuotaScopes', 'business_one', 'periods', 'initial'), { includedResponses: 700 }),
+        setDoc(doc(db, 'responseQuotaTurns', 'synthetic-turn'), { status: 'reserved' }),
+        setDoc(doc(db, 'whatsappNumbers', 'synthetic-number'), { businessId: 'one', enabled: false }),
+        setDoc(doc(db, 'whatsappBusinesses', 'one'), { phoneNumberId: 'synthetic-number' }),
       ]);
     });
   });
@@ -88,6 +93,18 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
       }
       await assertFails(getDocs(collection(db, 'aiUsageCalls')));
       await assertFails(getDocs(collection(db, 'aiUsageMonths/2026-10/businesses')));
+    }
+  });
+  it('denies direct quota and WhatsApp configuration access even to owners and forged administrators', async () => {
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('owner-one'), environment.authenticatedContext('stale-admin', { role: 'superadmin', isSuperadmin: true })]) {
+      const db = context.firestore();
+      for (const path of ['responseQuotaScopes/business_one', 'responseQuotaScopes/business_one/periods/initial', 'responseQuotaTurns/synthetic-turn', 'whatsappNumbers/synthetic-number', 'whatsappBusinesses/one', 'whatsappInbox/synthetic', 'whatsappOutbox/synthetic', 'whatsappConversations/synthetic', 'whatsappMessageIds/synthetic', 'whatsappUsage/2026-10', 'whatsappUsage/2026-10/businesses/one']) {
+        await assertFails(getDoc(doc(db, path)));
+        await assertFails(setDoc(doc(db, path), { enabled: true, includedResponses: 999999 }));
+      }
+      await assertFails(getDocs(collection(db, 'responseQuotaScopes')));
+      await assertFails(getDocs(collection(db, 'responseQuotaTurns')));
+      await assertFails(getDocs(collection(db, 'whatsappNumbers')));
     }
   });
 });

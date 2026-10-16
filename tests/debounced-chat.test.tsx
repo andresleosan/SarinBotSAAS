@@ -180,4 +180,48 @@ describe("debounced authenticated chat lifecycle", () => {
       chat.messages.filter((message) => message.role === "user"),
     ).toHaveLength(37);
   });
+
+  it("pauses new messages after quota exhaustion while preserving the failed request for an explicit retry", async () => {
+    vi.mocked(apiFetch).mockRejectedValueOnce(Object.assign(new Error("Capacidad agotada"), { status: 402, code: "AI_QUOTA_EXHAUSTED" }));
+    await mount();
+    act(() => chat.sendMessage("Quiero reservar"));
+    await advance();
+    expect(chat.quotaExhausted).toBe(true);
+    const count = chat.messages.length;
+    act(() => chat.sendMessage("No debe acumularse durante la pausa"));
+    await advance(10000);
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    expect(chat.messages).toHaveLength(count);
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: "Podemos continuar" });
+    await act(async () => chat.retry());
+    expect(payload(1).requestId).toBe(payload(0).requestId);
+    expect(chat.quotaExhausted).toBe(false);
+    expect(chat.messages.at(-1)?.content).toBe("Podemos continuar");
+  });
+
+  it("does not confuse a transport failure with quota exhaustion", async () => {
+    vi.mocked(apiFetch).mockRejectedValueOnce(Object.assign(new Error("Motor temporalmente ocupado"), { status: 429 }));
+    await mount();
+    act(() => chat.sendMessage("Hola"));
+    await advance();
+    expect(chat.error).toBe("Motor temporalmente ocupado");
+    expect(chat.quotaExhausted).toBe(false);
+  });
+
+  it("does not retry an already completed turn and permits a new request", async () => {
+    vi.mocked(apiFetch).mockRejectedValueOnce(Object.assign(new Error("Esta solicitud ya fue atendida"), { status: 409, code: "REQUEST_ALREADY_COMPLETED" }));
+    await mount();
+    act(() => chat.sendMessage("Reserva original"));
+    await advance();
+    expect(chat.requestAlreadyCompleted).toBe(true);
+    await act(async () => chat.retry());
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: "Nueva respuesta" });
+    act(() => chat.sendMessage("Consulta nueva"));
+    await advance();
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(payload(1).requestId).not.toBe(payload(0).requestId);
+    expect(payload(1).messages.at(-1)?.content).toBe("Consulta nueva");
+    expect(chat.requestAlreadyCompleted).toBe(false);
+  });
 });

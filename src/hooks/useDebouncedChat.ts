@@ -58,6 +58,7 @@ export function useDebouncedChat({
   const [isWaitingBatch, setIsWaitingBatch] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const history = useRef<Turn[]>([]);
   const pending = useRef<string[]>([]);
   const failed = useRef<Batch | null>(null);
@@ -82,6 +83,7 @@ export function useDebouncedChat({
     ready.current = false;
     setMessages([]);
     setError(null);
+    setErrorCode(null);
     setIsGenerating(false);
     setIsWaitingBatch(false);
     return () => {
@@ -120,6 +122,7 @@ export function useDebouncedChat({
         }),
       });
       if (generation.current !== currentGeneration) return;
+      setErrorCode(null);
       history.current.push(userTurn, {
         role: "assistant",
         content: data.reply,
@@ -138,7 +141,13 @@ export function useDebouncedChat({
     } catch (cause) {
       if (generation.current !== currentGeneration || abort.signal.aborted)
         return;
-      failed.current = batch;
+      const code = cause instanceof Error && "code" in cause && typeof cause.code === "string" ? cause.code : null;
+      setErrorCode(code);
+      failed.current = code === "REQUEST_ALREADY_COMPLETED" ? null : batch;
+      if (code === "REQUEST_ALREADY_COMPLETED") {
+        ready.current = false;
+        setIsWaitingBatch(false);
+      }
       setError(errorMessage(cause));
     } finally {
       if (generation.current === currentGeneration) {
@@ -153,7 +162,11 @@ export function useDebouncedChat({
   const sendMessage = useCallback(
     (text: string) => {
       const content = text.trim();
-      if (!content || !tenantId) return;
+      if (!content || !tenantId || errorCode === "AI_QUOTA_EXHAUSTED") return;
+      if (errorCode === "REQUEST_ALREADY_COMPLETED") {
+        setError(null);
+        setErrorCode(null);
+      }
       setMessages((previous) => [
         ...previous,
         {
@@ -173,11 +186,11 @@ export function useDebouncedChat({
         if (!busy.current && !failed.current) void flushRef.current();
       }, debounceMs);
     },
-    [debounceMs, tenantId],
+    [debounceMs, tenantId, errorCode],
   );
 
   const retry = useCallback(() => {
-    if (!busy.current) void flushRef.current();
+    if (!busy.current && failed.current) void flushRef.current();
   }, []);
-  return { messages, sendMessage, isWaitingBatch, isGenerating, error, retry };
+  return { messages, sendMessage, isWaitingBatch, isGenerating, error, retry, quotaExhausted: errorCode === "AI_QUOTA_EXHAUSTED", requestAlreadyCompleted: errorCode === "REQUEST_ALREADY_COMPLETED" };
 }

@@ -8,7 +8,7 @@ import { createAppointment, readAvailability } from '@/lib/server/bookings';
 import { publicBusiness } from '@/lib/server/businesses';
 import { bookingSchema, businessConfigSchema } from '@/lib/server/schemas';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
-import type { Appointment, Business, PaymentReceipt, PlatformSettings } from '@/types/firestore';
+import type { Appointment, Business, PaymentReceipt, PlatformSettings, ResponseAllowance } from '@/types/firestore';
 import { LOCAL_TEST_ACCOUNTS, LOCAL_SUPERADMIN_UID } from '../src/lib/firebase/emulator-constants.mjs';
 import { assertJourneyEnvironment, assertJourneyUrl, cleanupOwnedDocuments, createJourneyFixture, removeJourneyBank } from '../scripts/lib/local-journey.mjs';
 
@@ -65,7 +65,9 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
         const snapshot = await db.collection(collection).where('ownerUid', '==', fixture.ownerUid).get();
         for (const doc of snapshot.docs) rows.push({ path: doc.ref.path, data: doc.data() });
       }
-      const references = [db.doc(`publicBusinesses/${fixture.slug}`), db.doc(`businessSlugs/${fixture.slug}`), ...fixture.accounts.map(account => db.doc(`users/${account.uid}`)), db.doc(`businesses/${fixture.businessId}`)];
+      const quotaScope = db.doc(`responseQuotaScopes/business_${fixture.businessId}`);
+      for (const doc of (await quotaScope.collection('periods').get()).docs) rows.push({ path: doc.ref.path, data: doc.data() });
+      const references = [quotaScope, db.doc(`publicBusinesses/${fixture.slug}`), db.doc(`businessSlugs/${fixture.slug}`), ...fixture.accounts.map(account => db.doc(`users/${account.uid}`)), db.doc(`businesses/${fixture.businessId}`)];
       for (const doc of await db.getAll(...references)) if (doc.exists) rows.push({ path: doc.ref.path, data: doc.data()! });
       return rows;
     }
@@ -109,6 +111,10 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       }
       check((await api('/api/admin/ai/usage')).response.status === 401, 'El consumo de IA admitió una solicitud sin sesión.');
       check((await api('/api/admin/ai/usage', owner.token)).response.status === 403, 'Una cuenta normal accedió al consumo de IA.');
+      check((await api('/api/admin/whatsapp')).response.status === 401, 'WhatsApp admitió acceso sin sesión.');
+      check((await api('/api/admin/whatsapp', owner.token)).response.status === 403, 'Una cuenta normal accedió a la configuración de WhatsApp.');
+      const whatsapp = await api<{ enabled: boolean; configured: boolean }>('/api/admin/whatsapp', admin.token);
+      check(whatsapp.response.ok && !whatsapp.body.enabled && !whatsapp.body.configured, 'WhatsApp no permanece deshabilitado en el ensayo aislado.');
       const usage = await api<{ provider: string; timeZone: string; totals: { calls: number }; businesses: unknown[] }>('/api/admin/ai/usage', admin.token);
       check(usage.response.ok && usage.body.provider === 'deepseek' && usage.body.timeZone === 'America/Bogota' && Array.isArray(usage.body.businesses) && Number.isSafeInteger(usage.body.totals?.calls), 'El administrador no pudo consultar el consumo de IA.');
       console.log('Fase 1 OK: Auth oficial, roles y aislamiento del servidor demo.');
@@ -122,6 +128,8 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       check(created.response.status === 201 && created.body.business.id === fixture.businessId && created.body.business.ownerUid === fixture.ownerUid, 'Onboarding no creó el negocio esperado.');
       const business = created.body.business;
       check(business.subscription.status === 'trial' && business.subscription.trialEndsAt - business.createdAt === 7 * 86400000, 'La prueba no dura siete días.');
+      const trialBilling = await api<{ allowance: ResponseAllowance }>('/api/billing', owner.token);
+      check(trialBilling.response.ok && trialBilling.body.allowance.currentPeriod?.includedResponses === 700 && trialBilling.body.allowance.currentPeriod.source === 'trial', 'La prueba no tiene su bolsa de 700 respuestas.');
       const repeated = await api<{ business: Business }>('/api/businesses', owner.token, 'POST', { ...config, name: 'Negocio sintético actualizado' });
       check(repeated.response.status === 201 && repeated.body.business.subscription.trialEndsAt === business.subscription.trialEndsAt && repeated.body.business.name === 'Negocio sintético actualizado', 'Guardar configuración reinició la prueba o no aplicó cambios.');
       const collision = await api('/api/businesses', outsider.token, 'POST', config);
@@ -211,6 +219,15 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       check(repeatedApproval.response.ok && repeatedApproval.body.business.subscription.currentPeriodEndsAt === approved.body.business.subscription.currentPeriodEndsAt && repeatedApproval.body.receipt.reviewedAt === approved.body.receipt.reviewedAt, 'Repetir aprobación extendió dos veces la suscripción.');
       check((await api('/api/admin', admin.token, 'PATCH', { action: 'reject', paymentId: receiptId })).response.status === 409, 'Se cambió un pago previamente aprobado.');
       let paidUntil = approved.body.business.subscription.currentPeriodEndsAt;
+      const paidBilling = await api<{ allowance: ResponseAllowance }>('/api/billing', owner.token);
+      check(paidBilling.body.allowance.currentPeriod?.planId === 'weekly' && paidBilling.body.allowance.currentPeriod.includedResponses === 700, 'La aprobación no creó la bolsa semanal.');
+      const { planId: _planId, ...packBase } = uploadInput;
+      const pack = await api<{ receipt: PaymentReceipt; business: Business }>('/api/billing', owner.token, 'POST', { ...packBase, kind: 'response_pack', requestId: requestId('response-pack') });
+      check(pack.response.status === 201 && pack.body.receipt.kind === 'response_pack' && pack.body.receipt.amountCOP === 20000 && pack.body.receipt.responseAllowance === 1000 && pack.body.business.subscription.currentPeriodEndsAt === paidUntil, 'El paquete no conserva precio, capacidad o fecha de vencimiento.');
+      for (let repeat = 0; repeat < 2; repeat++) {
+        const packApproval = await api<{ business: Business; allowance: ResponseAllowance }>('/api/admin', admin.token, 'PATCH', { action: 'approve', paymentId: pack.body.receipt.id });
+        check(packApproval.response.ok && packApproval.body.business.subscription.currentPeriodEndsAt === paidUntil && packApproval.body.allowance.currentPeriod?.extraResponses === 1000, 'La aprobación del paquete duplicó capacidad o cambió el vencimiento.');
+      }
       for (const plan of [
         { id: 'fortnightly', days: 15, amount: ownerBilling.body.settings.fortnightlyPriceCOP },
         { id: 'monthly', days: 30, amount: ownerBilling.body.settings.monthlyPriceCOP },
@@ -221,6 +238,8 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
         check(approval.response.ok && approval.body.business.subscription.currentPeriodEndsAt === paidUntil + plan.days * 86400000, 'La renovación no suma los días contratados al acceso vigente.');
         paidUntil = approval.body.business.subscription.currentPeriodEndsAt;
       }
+      const renewedBilling = await api<{ allowance: ResponseAllowance }>('/api/billing', owner.token);
+      check(renewedBilling.body.allowance.currentPeriod?.planId === 'weekly' && renewedBilling.body.allowance.currentPeriod.extraResponses === 1000 && renewedBilling.body.allowance.nextPeriod?.planId === 'fortnightly', 'La renovación anticipada cambió la bolsa actual o perdió el siguiente período.');
       const reactivated = await createAppointment(client.decoded, fixture.businessId, { ...booking, startTimeStr: '09:00' }, requestId('reactivated'), db);
       check(reactivated.status === 'confirmed', 'No se pudo reservar después de reactivar.');
       check(isDeepStrictEqual((await db.doc(`users/${LOCAL_SUPERADMIN_UID}`).get()).data(), adminProfileBefore), 'El ensayo modificó el perfil del administrador sembrado.');

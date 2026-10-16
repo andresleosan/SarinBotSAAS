@@ -68,12 +68,18 @@ function validReceiptData(value: string): boolean {
   if (match[1] === 'png') return bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   return bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
 }
-export const receiptSchema = z.object({ bankSelected: shortText, receiptDataUrl: z.string().max(210000).refine(validReceiptData), requestId: requestIdSchema, planId: z.enum(SUBSCRIPTION_PLAN_IDS).default('monthly') }).strict();
+export const receiptSchema = z.object({ bankSelected: shortText, receiptDataUrl: z.string().max(210000).refine(validReceiptData), requestId: requestIdSchema,
+  kind: z.enum(['subscription', 'response_pack']).default('subscription'), planId: z.enum(SUBSCRIPTION_PLAN_IDS).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.kind === 'response_pack' && value.planId !== undefined) context.addIssue({ code: 'custom', message: 'La ampliación no cambia el plan.' });
+}).transform(value => value.kind === 'subscription' ? { ...value, planId: value.planId ?? 'monthly' as const } : value);
 export const settingsSchema = z.object({
   companyName: shortText, monthlyPriceCOP: z.number().int().min(1).max(100000000),
   // Omitted by older admin clients; saveSettings preserves the current prices.
   weeklyPriceCOP: z.number().int().min(1).max(100000000).optional(),
   fortnightlyPriceCOP: z.number().int().min(1).max(100000000).optional(),
+  whatsappPriceCOP: z.number().int().min(1).max(100000000).optional(),
+  responsePackPriceCOP: z.number().int().min(1).max(100000000).optional(),
   trialDaysDefault: z.literal(7).default(7), graceHoursOnUpload: z.literal(24).default(24),
   bankAccounts: z.array(z.object({ id: documentIdSchema, bankName: shortText, accountType: shortText, accountNumber: shortText, holderName: shortText, holderDoc: z.string().max(120).optional() }).strict()).max(10),
   tunnelStatus: z.object({ isOnline: z.boolean(), lastPingAt: z.number() }).optional(),

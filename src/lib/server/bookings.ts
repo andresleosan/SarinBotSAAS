@@ -1,5 +1,5 @@
 import 'server-only';
-import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { ChatActor } from '@/types/chat';
 import type { Firestore } from 'firebase-admin/firestore';
 import type { Appointment, Business } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
@@ -15,7 +15,7 @@ function assertDate(dateKey: string) {
   if (toColombiaTimestamp(dateKey, '00:00') > Date.now() + 366 * 86400000) throw new HttpError(400, 'Puedes reservar hasta un año por adelantado.');
 }
 
-export async function readAppointments(businessId: string, dateKey: string, user: DecodedIdToken, db: Firestore = getAdminDb()): Promise<Appointment[]> {
+export async function readAppointments(businessId: string, dateKey: string, user: ChatActor, db: Firestore = getAdminDb()): Promise<Appointment[]> {
   assertDate(dateKey);
   const business = await getBusiness(businessId, db);
   let query = db.collection('businesses').doc(businessId).collection('appointments').where('dateKey', '==', dateKey);
@@ -31,7 +31,7 @@ export async function readAvailability(business: Business, dateKey: string, serv
   return getAvailableSlots({ tenant: business, dateKey, serviceId, resourceId, existingAppointments: snapshot.docs.map((document) => document.data() as Appointment) });
 }
 
-export async function createAppointment(user: DecodedIdToken, businessId: string, input: BookingInput, requestId: string, db: Firestore = getAdminDb()): Promise<Appointment> {
+export async function createAppointment(user: ChatActor, businessId: string, input: BookingInput, requestId: string, db: Firestore = getAdminDb()): Promise<Appointment> {
   assertDate(input.dateKey);
   if (!documentIdSchema.safeParse(businessId).success) throw new HttpError(400, 'Negocio inválido.');
   const businessReference = db.collection('businesses').doc(businessId);
@@ -73,7 +73,7 @@ export async function createAppointment(user: DecodedIdToken, businessId: string
   });
 }
 
-export async function createManualBlock(user: DecodedIdToken, businessId: string, input: BlockInput, db: Firestore = getAdminDb()): Promise<Appointment> {
+export async function createManualBlock(user: ChatActor, businessId: string, input: BlockInput, db: Firestore = getAdminDb()): Promise<Appointment> {
   assertDate(input.dateKey);
   const businessReference = db.collection('businesses').doc(businessId);
   const id = stableDocumentId(user.uid, input.requestId, 'block');
@@ -102,7 +102,7 @@ export async function createManualBlock(user: DecodedIdToken, businessId: string
   });
 }
 
-export async function cancelAppointment(user: DecodedIdToken, businessId: string, appointmentId: string, db: Firestore = getAdminDb()): Promise<Appointment> {
+export async function cancelAppointment(user: ChatActor, businessId: string, appointmentId: string, db: Firestore = getAdminDb()): Promise<Appointment> {
   const businessReference = db.collection('businesses').doc(businessId);
   const reference = businessReference.collection('appointments').doc(appointmentId);
   return db.runTransaction(async (transaction) => {

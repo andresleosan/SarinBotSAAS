@@ -9,6 +9,12 @@ import { journeyEnvironment, assertJourneyEnvironment, assertEmulatorInventory, 
 const runId = '83276e9c-8e62-4ec8-8a59-7e8a91787ae3';
 
 describe('local journey isolation', () => {
+  it('rejects WhatsApp delivery, retention and secrets in an isolated journey', () => {
+    const unsafe = { WHATSAPP_ENABLED: 'true', WHATSAPP_RETENTION_ENABLED: 'true', WHATSAPP_APP_SECRET: 'synthetic-app', WHATSAPP_VERIFY_TOKEN: 'synthetic-token', WHATSAPP_CONTENT_KEY: 'synthetic-key', WHATSAPP_PHONE_CREDENTIALS_JSON: 'synthetic-credentials' };
+    const env = journeyEnvironment(unsafe, 3040, runId);
+    expect(env.WHATSAPP_ENABLED).toBe('false'); expect(env.WHATSAPP_RETENTION_ENABLED).toBe('false');
+    for (const [key, value] of Object.entries(unsafe)) expect(() => assertJourneyEnvironment({ ...env, [key]: value })).toThrow();
+  });
   it('creates an explicit demo environment without inherited credentials, proxies or Node hooks', () => {
     const env = journeyEnvironment({ PATH: 'safe-path', FIREBASE_ADMIN_PRIVATE_KEY: 'private', GOOGLE_APPLICATION_CREDENTIALS: 'private.json', CF_ACCESS_CLIENT_SECRET: 'secret', SARIN_TUNNEL_URL: 'https://production.invalid', HTTPS_PROXY: 'https://proxy.invalid', NODE_OPTIONS: '--import=untrusted.mjs' }, 3040, runId);
     expect(env.PATH).toBe('safe-path');
@@ -79,6 +85,21 @@ describe('local journey isolation', () => {
     expect(removed).toHaveLength(8);
     expect(removed).toContain('paymentImages/receipt-a');
     await expect(cleanupOwnedDocuments([{ path: `businesses/${fixture.businessId}/unknown/manual`, data: {} }], fixture, async () => {})).rejects.toThrow();
+  });
+
+  it('cleans quota periods only with proof of the exact synthetic parent', async () => {
+    const fixture = createJourneyFixture(runId);
+    const parent = { path: `businesses/${fixture.businessId}`, data: { ownerUid: fixture.ownerUid, slug: fixture.slug } };
+    const scope = { path: `responseQuotaScopes/business_${fixture.businessId}`, data: { initializedAt: 1 } };
+    const period = { path: `${scope.path}/periods/paid-period`, data: { id: 'paid-period' } };
+    const removed: string[] = [];
+    await cleanupOwnedDocuments([period, scope, parent], fixture, async path => { removed.push(path); });
+    expect(removed).toEqual([period.path, scope.path, parent.path]);
+    for (const rows of [[period], [scope], [parent, { ...period, path: 'responseQuotaScopes/business_other/periods/paid-period' }], [parent, { ...period, data: { id: 'other-period' } }]]) {
+      const attempted: string[] = [];
+      await expect(cleanupOwnedDocuments(rows, fixture, async path => { attempted.push(path); })).rejects.toThrow();
+      expect(attempted).toEqual([]);
+    }
   });
 
   it('removes only the exact synthetic bank while preserving concurrent settings edits', () => {

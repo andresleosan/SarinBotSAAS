@@ -83,6 +83,7 @@ function Island({ slug }: { slug: string }) {
     if (
       !input.trim() ||
       !business ||
+      chat.quotaExhausted ||
       !isSubscriptionAllowed(business, Date.now())
     )
       return;
@@ -131,6 +132,7 @@ function Island({ slug }: { slug: string }) {
       </div>
     );
   const allowed = isSubscriptionAllowed(business, now);
+  const chatAllowed = allowed && !chat.quotaExhausted;
   const future = appointments.filter((item) => item.endAt > now);
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col border-x border-sarin-line bg-sarin-canvas">
@@ -141,10 +143,10 @@ function Island({ slug }: { slug: string }) {
             <div className="min-w-0">
               <h1 className="truncate font-bold">{business.name}</h1>
               <p
-                className={`mt-1 text-xs ${engine.health?.status === "online" && allowed ? "text-sarin-blue" : "text-sarin-muted"}`}
+                className={`mt-1 text-xs ${engine.health?.status === "online" && chatAllowed ? "text-sarin-blue" : "text-sarin-muted"}`}
               >
-                {!allowed
-                  ? "Agenda en pausa"
+                {!chatAllowed
+                  ? "Atención de IA en pausa"
                   : engine.health
                     ? engine.health.status === "online"
                       ? "Sarin disponible"
@@ -164,9 +166,9 @@ function Island({ slug }: { slug: string }) {
       </header>
       <div className="flex-1 space-y-5 p-4 sm:p-6">
         {error && <Notice error>{error}</Notice>}
-        {!allowed && (
+        {!chatAllowed && (
           <Notice>
-            La agenda automática está temporalmente en pausa. Contacta
+            La atención de IA está temporalmente en pausa. Contacta
             directamente al establecimiento para reservar.
             {business.phoneWhatsApp && (
               <>
@@ -242,14 +244,14 @@ function Island({ slug }: { slug: string }) {
           )}
           {chat.error && (
             <div className="space-y-3">
-              <Notice error>{chat.error}</Notice>
-              <button
+              {!chat.quotaExhausted && <Notice error={!chat.requestAlreadyCompleted}>{chat.error}</Notice>}
+              {!chat.requestAlreadyCompleted && <button
                 className="min-h-11 text-sm text-sarin-blue underline"
                 onClick={chat.retry}
                 disabled={chat.isGenerating || !allowed}
               >
-                Reintentar mensaje
-              </button>
+                {chat.quotaExhausted ? "Comprobar disponibilidad" : "Reintentar mensaje"}
+              </button>}
             </div>
           )}
           <div ref={end} />
@@ -290,11 +292,11 @@ function Island({ slug }: { slug: string }) {
           className={fieldClass}
           aria-label="Mensaje para Sarin"
           placeholder={
-            allowed
+            chatAllowed
               ? "¿Qué te gustaría reservar?"
-              : "Agenda temporalmente pausada"
+              : "Atención de IA temporalmente pausada"
           }
-          disabled={!allowed}
+          disabled={!chatAllowed}
           value={input}
           maxLength={8000}
           onChange={(event) => setInput(event.target.value)}
@@ -302,7 +304,7 @@ function Island({ slug }: { slug: string }) {
         <button
           className={buttonClass}
           aria-label="Enviar mensaje"
-          disabled={!allowed || !input.trim() || Boolean(chat.error)}
+          disabled={!chatAllowed || !input.trim() || (Boolean(chat.error) && !chat.requestAlreadyCompleted)}
         >
           <Send className="h-4 w-4" />
         </button>

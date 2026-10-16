@@ -12,17 +12,21 @@ import {
 } from "@/components/app-shell";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { compressReceiptToWebP } from "@/lib/utils/imageCompression";
-import { BILLING_PLANS, getBillingPlan, type SubscriptionPlanId } from "@/lib/billing-plans";
+import { BILLING_PLANS, RESPONSE_PACK, getBillingPlan, type SubscriptionPlanId } from "@/lib/billing-plans";
+import { ResponseQuota, quotaDate } from "@/components/response-quota";
 import type {
   Business,
   PaymentReceipt,
   PlatformSettings,
+  ResponseAllowance,
 } from "@/types/firestore";
 
 interface BillingData {
   settings: PlatformSettings;
   receipts: PaymentReceipt[];
   business: Business | null;
+  allowance: ResponseAllowance | null;
+  whatsappAvailable: boolean;
 }
 const subscriptionLabels: Record<Business["subscription"]["status"], string> = {
   trial: "Prueba gratis",
@@ -52,11 +56,16 @@ function Billing() {
   const [imageSize, setImageSize] = useState(0);
   const [compressing, setCompressing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [requestId, setRequestId] = useState("");
   const [planId, setPlanId] = useState<SubscriptionPlanId>("monthly");
+  const [purchaseKind, setPurchaseKind] = useState<"subscription" | "response_pack">("subscription");
   const pendingReceipt = data?.receipts.find((receipt) => receipt.status === "pending");
-  const formLocked = saving || compressing || Boolean(pendingReceipt);
-  const uploadDisabled = formLocked || !data?.settings.bankAccounts.length;
+  const selectedKind = pendingReceipt ? pendingReceipt.kind ?? "subscription" : purchaseKind;
+  const period = data?.allowance?.currentPeriod;
+  const canBuyPack = Boolean(period && period.source !== "trial" && period.endsAt > Date.now() && data?.business?.subscription.status === "active" && data.allowance && ["active", "warning", "exhausted"].includes(data.allowance.state));
+  const formLocked = saving || compressing || refreshing || Boolean(pendingReceipt);
+  const uploadDisabled = formLocked || !data?.settings.bankAccounts.length || (selectedKind === "response_pack" && !canBuyPack) || (selectedKind === "subscription" && planId === "whatsapp" && !data?.whatsappAvailable);
   useEffect(() => {
     const controller = new AbortController();
     void apiFetch<BillingData>("/api/billing", { signal: controller.signal })
@@ -73,10 +82,29 @@ function Billing() {
     return () => controller.abort();
   }, []);
   function selectPlan(nextPlan: SubscriptionPlanId) {
-    if (formLocked || nextPlan === planId) return;
+    if (formLocked || nextPlan === planId || (nextPlan === "whatsapp" && !data?.whatsappAvailable)) return;
     setPlanId(nextPlan);
     setRequestId(crypto.randomUUID());
     setNotice(null);
+  }
+  function selectPurchaseKind(kind: "subscription" | "response_pack") {
+    if (formLocked || kind === purchaseKind || (kind === "response_pack" && !canBuyPack)) return;
+    setPurchaseKind(kind);
+    setRequestId(crypto.randomUUID());
+    setNotice(null);
+    setError(null);
+  }
+  async function refreshBilling() {
+    if (saving || compressing || refreshing) return;
+    setRefreshing(true);
+    setError(null);
+    try {
+      setData(await apiFetch<BillingData>("/api/billing"));
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setRefreshing(false);
+    }
   }
   async function selectImage(file: File | undefined) {
     if (!file || uploadDisabled) return;
@@ -109,11 +137,13 @@ function Billing() {
       const response = await apiFetch<{
         receipt: PaymentReceipt;
         business: Business;
+        allowance?: ResponseAllowance;
       }>("/api/billing", {
         method: "POST",
         body: JSON.stringify({
           bankSelected: bank,
-          planId,
+          kind: selectedKind,
+          ...(selectedKind === "subscription" ? { planId } : {}),
           receiptDataUrl: image,
           requestId,
         }),
@@ -123,6 +153,7 @@ function Billing() {
           ? {
               ...previous,
               business: response.business,
+              allowance: response.allowance ?? null,
               receipts: [
                 response.receipt,
                 ...previous.receipts.filter(
@@ -135,7 +166,7 @@ function Billing() {
       setImage("");
       const grace = response.business.subscription.graceEndsAt;
       setNotice(
-        grace && grace > Date.now()
+        selectedKind === "subscription" && grace && grace > Date.now()
           ? `Comprobante recibido. Acceso preventivo hasta ${new Date(grace).toLocaleString("es-CO", { timeZone: "America/Bogota" })}. La activación del período elegido depende de su aprobación.`
           : "Comprobante recibido y pendiente de revisión.",
       );
@@ -173,7 +204,9 @@ function Billing() {
     );
   const selectedPlan = getBillingPlan(pendingReceipt ? pendingReceipt.planId ?? "monthly" : planId);
   const selectedDays = pendingReceipt ? pendingReceipt.periodDays ?? 30 : selectedPlan.periodDays;
-  const selectedPrice = pendingReceipt?.amountCOP ?? data.settings[selectedPlan.priceField];
+  const selectedPrice = pendingReceipt?.amountCOP ?? (selectedKind === "response_pack" ? data.settings.responsePackPriceCOP : data.settings[selectedPlan.priceField]);
+  const selectedResponses = pendingReceipt?.responseAllowance ?? (selectedKind === "response_pack" ? RESPONSE_PACK.responses : selectedPlan.includedResponses);
+  const purchaseDescription = selectedKind === "response_pack" ? `Ampliación de ${selectedResponses.toLocaleString("es-CO")} respuestas` : `${selectedPlan.label} · ${selectedDays} días`;
   const formatPrice = (price: number) => price.toLocaleString("es-CO", {
     style: "currency", currency: "COP", maximumFractionDigits: 0,
   });
@@ -192,20 +225,30 @@ function Billing() {
         <p className="text-2xl font-bold text-sarin-blue">
           {formatPrice(selectedPrice)}
           <span className="mt-1 block text-right text-xs font-normal text-sarin-muted">
-            COP por {selectedDays} días
+            {selectedKind === "response_pack" ? "COP por ampliación" : `COP por ${selectedDays} días`}
           </span>
         </p>
       </div>
       {error && <Notice error>{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
+      <ResponseQuota allowance={data.allowance} />
+      <button type="button" className="min-h-11 text-sm text-sarin-blue underline disabled:opacity-50" disabled={saving || compressing || refreshing} onClick={() => void refreshBilling()}>{refreshing ? "Actualizando consumo…" : "Actualizar consumo y comprobantes"}</button>
       <form
         onSubmit={(event) => void submit(event)}
         className="space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6"
       >
         <fieldset className="space-y-3" disabled={formLocked}>
+          <legend className="font-semibold">¿Qué quieres pagar?</legend>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex min-h-11 items-center gap-2"><input type="radio" name="purchaseKind" value="subscription" checked={selectedKind === "subscription"} disabled={formLocked} onChange={() => selectPurchaseKind("subscription")} className="accent-sarin-blue" />Renovar suscripción</label>
+            <label className="flex min-h-11 items-center gap-2"><input type="radio" name="purchaseKind" value="response_pack" checked={selectedKind === "response_pack"} disabled={formLocked || !canBuyPack} onChange={() => selectPurchaseKind("response_pack")} className="accent-sarin-blue" />Ampliar {RESPONSE_PACK.responses.toLocaleString("es-CO")} respuestas</label>
+          </div>
+          {!canBuyPack && !pendingReceipt && <p className="text-xs text-sarin-muted">Las ampliaciones requieren una vigencia de pago activa; no se aplican a la prueba gratuita.</p>}
+        </fieldset>
+        {selectedKind === "subscription" ? <fieldset className="space-y-3" disabled={formLocked}>
           <legend className="font-semibold">Elige tu período</legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            {BILLING_PLANS.map((plan) => (
+            {BILLING_PLANS.filter((plan) => plan.id !== "whatsapp" || data.whatsappAvailable || selectedPlan.id === "whatsapp").map((plan) => (
               <label
                 key={plan.id}
                 className={`min-w-0 rounded-xl border p-4 ${formLocked ? "cursor-default" : "cursor-pointer"} ${selectedPlan.id === plan.id ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"} focus-within:ring-2 focus-within:ring-sarin-blue focus-within:ring-offset-2`}
@@ -216,7 +259,7 @@ function Billing() {
                     name="planId"
                     value={plan.id}
                     checked={selectedPlan.id === plan.id}
-                    disabled={formLocked}
+                    disabled={formLocked || (plan.id === "whatsapp" && !data.whatsappAvailable)}
                     onChange={() => selectPlan(plan.id)}
                     className="accent-sarin-blue"
                   />
@@ -228,20 +271,26 @@ function Billing() {
                 <span className="mt-1 block text-xs text-sarin-muted">
                   COP · {plan.periodDays} días
                 </span>
+                <span className="mt-2 block text-xs font-medium text-sarin-ink">{plan.includedResponses.toLocaleString("es-CO")} respuestas</span>
+                {plan.id === "whatsapp" && <span className="mt-1 block text-xs text-sarin-muted">{data.whatsappAvailable ? "Web + WhatsApp · consumo de Meta adicional" : "Conexión no disponible. Este plan no se puede contratar."}</span>}
               </label>
             ))}
           </div>
           <p className="text-xs text-sarin-muted">
-            La prueba gratuita inicial de 7 días no cambia al elegir un período de pago.
+            La prueba gratuita inicial incluye 700 respuestas durante 7 días. Una renovación pagada comienza después de tu vigencia actual.
           </p>
-        </fieldset>
+        </fieldset> : <div className="space-y-2 rounded-xl border border-sarin-line bg-sarin-canvas p-4">
+          <h2 className="font-semibold">{purchaseDescription} · {formatPrice(selectedPrice)} COP</h2>
+          <p className="text-sm text-sarin-muted">No extiende la vigencia. Se activa tras aprobar el comprobante{period && (!pendingReceipt || pendingReceipt.quotaPeriodId === period.id) ? ` y vence el ${quotaDate(period.endsAt)}` : " en el período indicado al enviar el pago"}. No hay cobros automáticos.</p>
+        </div>}
         {pendingReceipt && (
           <Notice>
-            Tu comprobante {selectedPlan.label.toLowerCase()} por {selectedDays} días
+            Tu comprobante de {purchaseDescription.toLowerCase()}
             {" "}y {formatPrice(selectedPrice)} COP está pendiente de revisión. Espera la
             revisión antes de enviar otro pago.
           </Notice>
         )}
+        {!data.whatsappAvailable && <p className="text-xs text-sarin-muted">Sarin WhatsApp está en preparación y todavía no se puede contratar. Para mayor volumen, solicita una cotización a medida.</p>}
         <h2 className="font-semibold">Datos para tu transferencia</h2>
         {data.settings.bankAccounts.length === 0 ? (
           <Notice>
@@ -295,12 +344,11 @@ function Billing() {
         <div className="space-y-3">
           <h2 className="font-semibold">Envía el comprobante</h2>
           <p className="text-sm font-medium text-sarin-ink">
-            {selectedPlan.label} · {selectedDays} días · {formatPrice(selectedPrice)} COP
+            {purchaseDescription} · {formatPrice(selectedPrice)} COP
           </p>
           <p className="text-sm text-sarin-muted">
-            La captura se optimiza antes de enviarla y se revisa manualmente. El
-            acceso preventivo de 24 horas se aplica según el estado de tu
-            suscripción.
+            La captura se optimiza antes de enviarla y se revisa manualmente.{" "}
+            {selectedKind === "subscription" ? "El acceso preventivo de 24 horas se aplica según el estado de tu suscripción." : "El paquete se habilita únicamente después de su aprobación."}
           </p>
           <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border border-dashed border-sarin-line bg-sarin-canvas p-4 text-center hover:border-sarin-blue sm:p-6">
             <UploadCloud className="h-8 w-8 text-sarin-blue" />
@@ -356,7 +404,7 @@ function Billing() {
                   })}
                 </p>
                 <p className="mt-1 text-sm text-sarin-muted">
-                  {getBillingPlan(receipt.planId ?? "monthly").label} · {receipt.periodDays ?? 30} días
+                  {receipt.kind === "response_pack" ? `Ampliación · ${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas` : `${getBillingPlan(receipt.planId ?? "monthly").label} · ${receipt.periodDays ?? 30} días`}
                 </p>
                 <p className="mt-1 text-xs text-sarin-muted">
                   {new Date(receipt.submittedAt).toLocaleString("es-CO", {

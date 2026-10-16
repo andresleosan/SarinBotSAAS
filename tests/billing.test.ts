@@ -5,11 +5,14 @@ import { getSettings, reviewPayment, saveSettings, submitReceipt } from '../src/
 import { businessIdForOwner } from '../src/lib/server/businesses';
 import { settingsSchema } from '../src/lib/server/schemas';
 import { memoryFirestore } from './memoryFirestore';
+import { getResponseQuota } from '@/lib/server/response-quota';
+const whatsapp = vi.hoisted(() => ({ ready: false }));
+vi.mock('@/lib/server/whatsapp-config', () => ({ getWhatsAppBusinessStatus: async () => ({ ready: whatsapp.ready }) }));
 
 const now = Date.parse('2030-01-01T12:00:00Z');
 const business: Business = { id: 'business', ownerUid: 'owner', ownerEmail: '', name: 'Real', category: 'Servicios', phoneWhatsApp: '573001234567', timezone: 'America/Bogota', slug: 'real', subscription: { status: 'past_due', trialEndsAt: 0, currentPeriodEndsAt: 0, graceGrantedAt: now - 86400000, graceEndsAt: now, lastPaymentId: 'receipt' }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, resources: [], services: [], weeklySchedule: {}, createdAt: now };
 const receipt: PaymentReceipt = { id: 'receipt', tenantId: 'business', tenantName: 'Real', ownerUid: 'owner', ownerEmail: '', amountCOP: 49900, bankSelected: 'Banco real', submittedAt: now, status: 'pending' };
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); for (const key of ['WEEKLY_PRICE_COP', 'FORTNIGHTLY_PRICE_COP', 'MONTHLY_PRICE_COP']) vi.stubEnv(key, ''); });
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); whatsapp.ready = false; for (const key of ['WEEKLY_PRICE_COP', 'FORTNIGHTLY_PRICE_COP', 'MONTHLY_PRICE_COP']) vi.stubEnv(key, ''); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 const database = () => memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'paymentReceipts/receipt': receipt as unknown as Record<string, unknown> });
 const owner = { uid: 'owner', email: 'owner@example.test' } as DecodedIdToken;
@@ -57,13 +60,65 @@ describe('billing plan settings and receipt snapshots', () => {
     expect(changedRetry.receipt).toEqual(first.receipt);
     const [approved, repeated] = await Promise.all([reviewPayment(first.receipt.id, 'approve', undefined, db), reviewPayment(first.receipt.id, 'approve', undefined, db)]);
     expect(approved.receipt).toMatchObject({ planId, periodDays, amountCOP, status: 'approved' });
-    expect(approved.business.subscription.currentPeriodEndsAt).toBe(now + periodDays * 86400000);
+    expect(approved.business.subscription.currentPeriodEndsAt).toBe(now + (7 + periodDays) * 86400000);
     expect(repeated.business.subscription.currentPeriodEndsAt).toBe(approved.business.subscription.currentPeriodEndsAt);
     expect(approved.business.subscription.trialEndsAt).toBe(now + 7 * 86400000);
   });
   it('treats an older upload without a plan as a new monthly receipt', async () => {
     const { db } = submissionDatabase();
     expect((await submitReceipt(owner, upload, db)).receipt).toMatchObject({ planId: 'monthly', periodDays: 30, amountCOP: 59900 });
+  });
+});
+describe('commercial response periods and packs', () => {
+  it('queues paid periods after the trial and each other without resetting the current quota', async () => {
+    const { db } = submissionDatabase();
+    const first = await submitReceipt(owner, { ...upload, planId: 'weekly' }, db);
+    await reviewPayment(first.receipt.id, 'approve', undefined, db);
+    let allowance = await getResponseQuota(first.business.id, db);
+    expect(allowance.currentPeriod).toMatchObject({ source: 'trial', includedResponses: 700, endsAt: now + 7 * 86400000 });
+    expect(allowance.nextPeriod).toMatchObject({ source: 'subscription', planId: 'weekly', includedResponses: 700, startsAt: now + 7 * 86400000, endsAt: now + 14 * 86400000 });
+    const second = await submitReceipt(owner, { ...upload, requestId: 'second-period', planId: 'fortnightly' }, db);
+    await reviewPayment(second.receipt.id, 'approve', undefined, db);
+    vi.setSystemTime(now + 14 * 86400000);
+    allowance = await getResponseQuota(first.business.id, db);
+    expect(allowance.currentPeriod).toMatchObject({ planId: 'fortnightly', includedResponses: 1500, startsAt: now + 14 * 86400000, endsAt: now + 29 * 86400000, usedResponses: 0 });
+  });
+  it('snapshots a pack into the paid period and grants it once without extending time or grace', async () => {
+    const { db } = submissionDatabase();
+    const id = businessIdForOwner(owner.uid);
+    const paid = { ...business, id, subscription: { status: 'active', trialEndsAt: now - 86400000, currentPeriodEndsAt: now + 30 * 86400000 } };
+    await db.collection('businesses').doc(id).set(paid);
+    const first = await submitReceipt(owner, { ...upload, kind: 'response_pack' }, db);
+    expect(first.receipt).toMatchObject({ kind: 'response_pack', amountCOP: 20000, responseAllowance: 1000, quotaPeriodId: 'initial' });
+    expect(first.receipt.planId).toBeUndefined(); expect(first.receipt.periodDays).toBeUndefined();
+    expect(first.business.subscription.graceEndsAt).toBeUndefined();
+    expect((await getResponseQuota(id, db)).currentPeriod?.extraResponses).toBe(0);
+    await db.collection('platformSettings').doc('main').set({ bankAccounts: [bank], responsePackPriceCOP: 30000 });
+    await Promise.all([reviewPayment(first.receipt.id, 'approve', undefined, db), reviewPayment(first.receipt.id, 'approve', undefined, db)]);
+    const result = await getResponseQuota(id, db);
+    expect(result.currentPeriod).toMatchObject({ extraResponses: 1000, includedResponses: 3000, endsAt: now + 30 * 86400000 });
+    expect((await db.collection('paymentReceipts').doc(first.receipt.id).get()).data()?.amountCOP).toBe(20000);
+  });
+  it('refuses packs for trials and refuses approval after the purchased period expires', async () => {
+    const { db } = submissionDatabase();
+    await expect(submitReceipt(owner, { ...upload, kind: 'response_pack' }, db)).rejects.toMatchObject({ status: 409 });
+    const id = businessIdForOwner(owner.uid);
+    await db.collection('businesses').doc(id).set({ ...business, id, subscription: { status: 'active', trialEndsAt: now - 86400000, currentPeriodEndsAt: now + 86400000 } });
+    const first = await submitReceipt(owner, { ...upload, kind: 'response_pack' }, db);
+    vi.setSystemTime(now + 86400000);
+    await expect(reviewPayment(first.receipt.id, 'approve', undefined, db)).rejects.toMatchObject({ status: 409 });
+    expect((await db.collection('paymentReceipts').doc(first.receipt.id).get()).data()?.status).toBe('pending');
+    expect((await getResponseQuota(id, db)).currentPeriod?.extraResponses).toBe(0);
+  });
+  it('does not sell or approve WhatsApp until the server confirms a verified connection', async () => {
+    const { db } = submissionDatabase();
+    await expect(submitReceipt(owner, { ...upload, planId: 'whatsapp' }, db)).rejects.toMatchObject({ status: 409 });
+    whatsapp.ready = true;
+    const first = await submitReceipt(owner, { ...upload, planId: 'whatsapp' }, db);
+    expect(first.receipt).toMatchObject({ planId: 'whatsapp', amountCOP: 149900, periodDays: 30, responseAllowance: 4500 });
+    whatsapp.ready = false;
+    await expect(reviewPayment(first.receipt.id, 'approve', undefined, db)).rejects.toMatchObject({ status: 409 });
+    expect((await db.collection('paymentReceipts').doc(first.receipt.id).get()).data()?.status).toBe('pending');
   });
 });
 describe('payment review transaction', () => {

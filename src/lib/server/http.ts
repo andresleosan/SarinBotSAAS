@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 export class HttpError extends Error {
-  constructor(public readonly status: number, message: string) { super(message); }
+  constructor(public readonly status: number, message: string, public readonly code?: string) { super(message); }
 }
 
 /** Checks actual streamed bytes even when Content-Length is absent. */
@@ -36,7 +36,7 @@ export async function readJson<T extends z.ZodType>(request: Request, schema: T,
 
 export function apiError(error: unknown) {
   // Never log request bodies, tokens, financial data or upstream error text.
-  if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'no-store' } });
+  if (error instanceof HttpError) return NextResponse.json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, { status: error.status, headers: { 'Cache-Control': 'no-store' } });
   if (error instanceof Error && 'status' in error && error.status === 429) return NextResponse.json({ error: error.message }, { status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': '5' } });
   if (error instanceof z.ZodError) return NextResponse.json({ error: 'Datos no válidos.' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
   if (error instanceof Error && error.name === 'AbortError') return NextResponse.json({ error: 'Solicitud cancelada.' }, { status: 499, headers: { 'Cache-Control': 'no-store' } });

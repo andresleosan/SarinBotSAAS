@@ -23,17 +23,21 @@ import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useEngineHealth } from "@/hooks/useEngineHealth";
 import { AdminAiSettings } from "@/components/admin-ai-settings";
 import { AdminAiUsage } from "@/components/admin-ai-usage";
+import { AdminWhatsApp } from "@/components/admin-whatsapp";
 import { BILLING_PLANS, getBillingPlan } from "@/lib/billing-plans";
+import { ResponseQuota } from "@/components/response-quota";
 import type {
   Business,
   PaymentReceipt,
   PlatformSettings,
+  ResponseAllowance,
 } from "@/types/firestore";
 
 interface AdminData {
   businesses: Business[];
   receipts: PaymentReceipt[];
   settings: PlatformSettings;
+  allowances: Record<string, ResponseAllowance>;
 }
 const subscriptionLabels: Record<Business["subscription"]["status"], string> = {
   trial: "Prueba gratis",
@@ -108,6 +112,7 @@ function Console() {
       const response = await apiFetch<{
         receipt: PaymentReceipt;
         business: Business;
+        allowance?: ResponseAllowance;
       }>("/api/admin", {
         method: "PATCH",
         body: JSON.stringify({
@@ -126,12 +131,15 @@ function Console() {
               businesses: previous.businesses.map((item) =>
                 item.id === response.business.id ? response.business : item,
               ),
+              allowances: response.allowance ? { ...previous.allowances, [response.business.id]: response.allowance } : Object.fromEntries(Object.entries(previous.allowances ?? {}).filter(([id]) => id !== response.business.id)),
             }
           : previous,
       );
       setNotice(
         action === "approve"
-          ? `Pago aprobado y suscripción extendida ${response.receipt.periodDays ?? 30} días.`
+          ? response.receipt.kind === "response_pack"
+            ? `Pago aprobado: ampliación de ${(response.receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas en la vigencia actual.`
+            : `Pago aprobado y suscripción extendida ${response.receipt.periodDays ?? 30} días.`
           : "Comprobante rechazado.",
       );
     } catch (cause) {
@@ -244,6 +252,7 @@ function Console() {
       </section>
       <AdminAiSettings onSaved={() => void engine.refresh()} />
       <AdminAiUsage businesses={data.businesses} />
+      <AdminWhatsApp businesses={data.businesses} />
       <section className="space-y-4">
         <h2 className="text-xl font-semibold">Comprobantes de pago</h2>
         {data.receipts.length === 0 ? (
@@ -288,7 +297,7 @@ function Console() {
                     · {receipt.bankSelected}
                   </p>
                   <p className="text-sm text-sarin-ink">
-                    {getBillingPlan(receipt.planId ?? "monthly").label} · {receipt.periodDays ?? 30} días
+                    {receipt.kind === "response_pack" ? `Ampliación · ${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas · sin extender vigencia` : `${getBillingPlan(receipt.planId ?? "monthly").label} · ${receipt.periodDays ?? 30} días${receipt.responseAllowance !== undefined ? ` · ${receipt.responseAllowance.toLocaleString("es-CO")} respuestas` : ""}`}
                   </p>
                   <p className="text-xs text-sarin-muted">
                     {new Date(receipt.submittedAt).toLocaleString("es-CO", {
@@ -336,7 +345,7 @@ function Console() {
                           onClick={() => void review(receipt.id, "approve")}
                         >
                           <Check className="h-4 w-4" />
-                          Aprobar +{receipt.periodDays ?? 30} días
+                          {receipt.kind === "response_pack" ? `Aprobar +${(receipt.responseAllowance ?? 0).toLocaleString("es-CO")} respuestas` : `Aprobar +${receipt.periodDays ?? 30} días`}
                         </button>
                         <button
                           className="flex min-h-11 items-center justify-center gap-1 rounded-[10px] border border-rose-200 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
@@ -380,6 +389,7 @@ function Console() {
                   <th className="p-4">Estado</th>
                   <th className="p-4">Fin de prueba</th>
                   <th className="p-4">Vigencia del pago</th>
+                  <th className="p-4">Respuestas de IA</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-sarin-line">
@@ -413,6 +423,7 @@ function Console() {
                         timeZone: "America/Bogota",
                       }) : "Sin pago aprobado"}
                     </td>
+                    <td className="p-4"><ResponseQuota compact allowance={data.allowances?.[business.id]} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -441,10 +452,10 @@ function Console() {
             </label>
           </div>
           <fieldset className="grid gap-4 sm:grid-cols-3" disabled={Boolean(working)}>
-            <legend className="mb-3 text-sm font-semibold">Tarifas de suscripción</legend>
+            <legend className="mb-3 text-sm font-semibold">Tarifas de suscripción y ampliación</legend>
             {BILLING_PLANS.map((plan) => (
               <label className="text-xs text-sarin-muted" key={plan.id}>
-                {plan.label} · {plan.periodDays} días, en COP
+                {plan.label} · {plan.periodDays} días, en COP{plan.id === "whatsapp" ? " (solo al conectar WhatsApp)" : ""}
                 <input
                   required
                   min="1"
@@ -456,8 +467,13 @@ function Console() {
                     setSettings({ ...settings, [plan.priceField]: Number(event.target.value) })
                   }
                 />
+                <span className="mt-1 block">{plan.includedResponses.toLocaleString("es-CO")} respuestas incluidas</span>
               </label>
             ))}
+            <label className="text-xs text-sarin-muted">Ampliación · 1.000 respuestas, en COP
+              <input required min="1" step="1" type="number" className={fieldClass + " mt-2"} value={settings.responsePackPriceCOP} onChange={(event) => setSettings({ ...settings, responsePackPriceCOP: Number(event.target.value) })} />
+              <span className="mt-1 block">Vence con el período de pago; no añade días.</span>
+            </label>
           </fieldset>
           {settings.bankAccounts.map((account) => (
             <fieldset

@@ -6,6 +6,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -37,7 +38,8 @@ export async function apiFetch<T>(
             typeof data.message === "string"
           ? data.message
           : `No se pudo completar la solicitud (${response.status}).`;
-    throw new ApiError(message, response.status);
+    const code = data && typeof data === "object" && "code" in data && typeof data.code === "string" && /^[A-Z0-9_]{1,80}$/.test(data.code) ? data.code : undefined;
+    throw new ApiError(message, response.status, code);
   }
   return data as T;
 }

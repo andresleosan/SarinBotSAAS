@@ -6,6 +6,8 @@ export interface PlatformSettings {
   weeklyPriceCOP: number;
   fortnightlyPriceCOP: number;
   monthlyPriceCOP: number;
+  whatsappPriceCOP: number;
+  responsePackPriceCOP: number;
   trialDaysDefault: number;
   graceHoursOnUpload: number;
   bankAccounts: {
@@ -147,6 +149,9 @@ export interface PaymentReceipt {
   ownerUid: string;
   ownerEmail: string;
   amountCOP: number;
+  kind?: 'subscription' | 'response_pack';
+  responseAllowance?: number;
+  quotaPeriodId?: string;
   /** Absent only on historical monthly receipts; new receipts snapshot both. */
   planId?: SubscriptionPlanId;
   periodDays?: number;
@@ -161,3 +166,24 @@ export interface PaymentReceipt {
 }
 
 export type PaymentRequest = PaymentReceipt;
+
+export interface ResponseQuotaPeriod {
+  id: string;
+  source: 'trial' | 'subscription' | 'legacy';
+  planId: SubscriptionPlanId | null;
+  startsAt: number;
+  endsAt: number;
+  includedResponses: number;
+  extraResponses: number;
+  usedResponses: number;
+  reservedResponses: number;
+  remainingResponses: number;
+}
+
+export interface ResponseAllowance {
+  businessId: string;
+  currentPeriod: ResponseQuotaPeriod | null;
+  nextPeriod: ResponseQuotaPeriod | null;
+  state: 'active' | 'warning' | 'exhausted' | 'expired' | 'suspended';
+  warningThresholdPercent: 80;
+}

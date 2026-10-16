@@ -16,13 +16,16 @@ vi.mock("@/components/app-shell", () => ({
 vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => ({ health: null, checking: false, refresh: vi.fn() }) }));
 vi.mock("@/components/admin-ai-settings", () => ({ AdminAiSettings: () => null }));
 vi.mock("@/components/admin-ai-usage", () => ({ AdminAiUsage: () => null }));
+vi.mock("@/components/admin-whatsapp", () => ({ AdminWhatsApp: () => null }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const settings = { companyName: "Sarin", weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, trialDaysDefault: 7, graceHoursOnUpload: 24, bankAccounts: [], tunnelStatus: { isOnline: false, lastPingAt: 0 } };
-const business = { id: "business", name: "Negocio de prueba", slug: "prueba", ownerEmail: "owner@example.test", subscription: { status: "trial", trialEndsAt: 1900000000000, currentPeriodEndsAt: 1900000000000 } };
+const settings = { companyName: "Sarin", weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, whatsappPriceCOP: 149900, responsePackPriceCOP: 20000, trialDaysDefault: 7, graceHoursOnUpload: 24, bankAccounts: [], tunnelStatus: { isOnline: false, lastPingAt: 0 } };
+const business = { id: "business", name: "Negocio de prueba", slug: "prueba", ownerEmail: "owner@example.test", subscription: { status: "active", trialEndsAt: 1900000000000, currentPeriodEndsAt: 1900000000000 } };
 const account = { id: "bank-test", bankName: "Entidad de prueba", accountType: "Ahorros", accountNumber: "000000", holderName: "Titular sintético" };
 const receipt = { id: "receipt", tenantId: "business", tenantName: business.name, ownerUid: "owner", ownerEmail: business.ownerEmail, amountCOP: 20000, bankSelected: account.bankName, status: "pending", submittedAt: 1800000000000, planId: "weekly", periodDays: 7 };
+const quotaPeriod = { id: "period-paid", source: "subscription", planId: "monthly", startsAt: 1800000000000, endsAt: 1900000000000, includedResponses: 3000, extraResponses: 0, usedResponses: 2400, reservedResponses: 0, remainingResponses: 600 };
+const allowance = { businessId: "business", currentPeriod: quotaPeriod, nextPeriod: null, state: "warning", warningThresholdPercent: 80 };
 const preventDefault = () => {};
 function text(node: ReactTestInstance | string): string {
   return typeof node === "string" ? node : node.children.map(text).join("");
@@ -50,8 +53,8 @@ describe("billing plan screens", () => {
     await act(async () => { inputs().find((input) => input.props.type === "file")!.props.onChange({ target: { files: [new File(["synthetic"], "receipt.png", { type: "image/png" })] } }); });
   }
   beforeEach(() => {
-    billingData = { settings, receipts: [], business };
-    adminData = { settings, receipts: [], businesses: [business] };
+    billingData = { settings: { ...settings, whatsappPriceCOP: 149900, responsePackPriceCOP: 20000 }, receipts: [], business, allowance: null, whatsappAvailable: false };
+    adminData = { settings, receipts: [], businesses: [business], allowances: {} };
     state.api.mockReset().mockImplementation(async (path: string, init?: RequestInit) => {
       if (init?.method === "POST") throw new Error("Conexión interrumpida");
       if (init?.method === "PATCH") return {};
@@ -131,14 +134,14 @@ describe("billing plan screens", () => {
     expect(text(articles[1])).toContain("Mensual · 30 días");
   });
 
-  it("edits all three administrative prices without adding bank accounts", async () => {
+  it("edits administrative subscription and pack prices without adding bank accounts", async () => {
     await mount(AdminPage);
     const prices = inputs().filter((input) => input.props.type === "number");
-    expect(prices.map((input) => input.props.value)).toEqual([20000, 35000, 59900]);
+    expect(prices.map((input) => input.props.value)).toEqual([20000, 35000, 59900, 149900, 20000]);
     await act(async () => { prices[0].props.onChange({ target: { value: "21000" } }); });
     await act(async () => { renderer.root.findByType("form").props.onSubmit({ preventDefault }); });
     const payload = JSON.parse(state.api.mock.calls.find(([, init]) => init?.method === "PATCH")![1].body);
-    expect(payload.settings).toMatchObject({ weeklyPriceCOP: 21000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, bankAccounts: [] });
+    expect(payload.settings).toMatchObject({ weeklyPriceCOP: 21000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, whatsappPriceCOP: 149900, responsePackPriceCOP: 20000, bankAccounts: [] });
   });
 
   it("reviews and confirms the duration from the saved receipt", async () => {
@@ -158,5 +161,94 @@ describe("billing plan screens", () => {
     await mount(AdminPage);
     const cells = renderer.root.findByType("tbody").findAllByType("td");
     expect(text(cells[3])).toBe("Sin pago aprobado");
+  });
+
+  it("shows the current commercial period and a warning without exposing an unavailable WhatsApp purchase", async () => {
+    billingData.allowance = { ...allowance, nextPeriod: { ...quotaPeriod, id: "renewal", startsAt: 1900000000000, endsAt: 1902592000000, usedResponses: 0, remainingResponses: 3000 } };
+    await mount();
+    const meter = renderer.root.findAll((node) => node.props.role === "progressbar");
+    expect(meter).toHaveLength(1);
+    expect(meter[0].props["aria-valuenow"]).toBe(80);
+    expect(text(renderer.root)).toContain("600 respuestas disponibles");
+    expect(text(renderer.root)).toContain("Renovación programada");
+    expect(text(renderer.root)).toContain("80%");
+    expect(plans().map((input) => input.props.value)).toEqual(["weekly", "fortnightly", "monthly"]);
+    expect(text(renderer.root)).toContain("700 respuestas");
+  });
+
+  it("does not turn an absent allowance into zero consumption", async () => {
+    await mount();
+    expect(renderer.root.findAll((node) => node.props.role === "progressbar")).toHaveLength(0);
+    expect(text(renderer.root)).toContain("Consumo no disponible");
+  });
+
+  it("submits a response pack without a subscription plan and changes retry identity when purchase kind changes", async () => {
+    billingData.allowance = allowance;
+    billingData.settings = { ...settings, bankAccounts: [account], responsePackPriceCOP: 20000 };
+    await mount();
+    await selectImage();
+    await act(async () => { renderer.root.findByType("form").props.onSubmit({ preventDefault }); });
+    const pack = inputs().find((input) => input.props.name === "purchaseKind" && input.props.value === "response_pack");
+    expect(pack).toBeDefined();
+    await act(async () => { pack!.props.onChange(); });
+    await act(async () => { renderer.root.findByType("form").props.onSubmit({ preventDefault }); });
+    expect(posts()[1]).toMatchObject({ kind: "response_pack", bankSelected: "bank-test" });
+    expect(posts()[1]).not.toHaveProperty("planId");
+    expect(posts()[1]).not.toHaveProperty("amountCOP");
+    expect(posts()[1]).not.toHaveProperty("responseAllowance");
+    expect(posts()[1].requestId).not.toBe(posts()[0].requestId);
+    expect(text(renderer.root)).toContain("No extiende la vigencia");
+  });
+
+  it("keeps an exhausted paid allowance eligible for a pack but prevents purchases for a trial", async () => {
+    billingData.allowance = { ...allowance, state: "exhausted", currentPeriod: { ...quotaPeriod, usedResponses: 3000, remainingResponses: 0 } };
+    await mount();
+    expect(text(renderer.root)).toContain("La atención de IA está pausada");
+    expect(inputs().find((input) => input.props.value === "response_pack")?.props.disabled).toBe(false);
+    await act(async () => renderer.unmount());
+    billingData.allowance = { ...allowance, state: "active", currentPeriod: { ...quotaPeriod, source: "trial", planId: null, includedResponses: 700, usedResponses: 0, remainingResponses: 700 } };
+    await mount();
+    expect(inputs().find((input) => input.props.value === "response_pack")?.props.disabled).toBe(true);
+  });
+
+  it("keeps a pending pack distinct from a renewal in the owner screen and admin approval", async () => {
+    const pack = { ...receipt, kind: "response_pack", planId: undefined, periodDays: undefined, responseAllowance: 1000, quotaPeriodId: "period-paid" };
+    billingData.receipts = [pack];
+    billingData.allowance = allowance;
+    await mount();
+    expect(text(renderer.root)).toContain("1.000 respuestas");
+    expect(text(renderer.root)).not.toContain("por 30 días");
+    expect(button("Enviar comprobante").props.disabled).toBe(true);
+    await act(async () => renderer.unmount());
+    adminData.receipts = [pack];
+    adminData.allowances = { business: allowance };
+    await mount(AdminPage);
+    expect(button("Aprobar +1.000 respuestas")).toBeDefined();
+    state.api.mockResolvedValueOnce({ receiptDataUrl: "data:image/webp;base64,c3ludGhldGlj" });
+    await act(async () => { button("Ver captura").props.onClick(); });
+    state.api.mockResolvedValueOnce({ receipt: { ...pack, status: "approved" }, business, allowance: { ...allowance, state: "active", currentPeriod: { ...quotaPeriod, extraResponses: 1000, remainingResponses: 1600 } } });
+    await act(async () => { button("Aprobar +1.000 respuestas").props.onClick(); });
+    expect(text(renderer.root)).toContain("ampliación de 1.000 respuestas");
+    expect(text(renderer.root)).not.toContain("suscripción extendida 30 días");
+  });
+
+  it("refreshes usage without treating reserved responses as free or displaying a warning below eighty percent", async () => {
+    billingData.allowance = { ...allowance, state: "active", currentPeriod: { ...quotaPeriod, usedResponses: 2370, reservedResponses: 30, remainingResponses: 600 } };
+    await mount();
+    expect(renderer.root.findAll((node) => node.props.role === "progressbar")[0].props["aria-valuenow"]).toBe(79);
+    expect(text(renderer.root)).not.toContain("Has alcanzado el 80%");
+    expect(text(renderer.root)).toContain("30 respuestas reservadas o pendientes de confirmación");
+    billingData.allowance = { ...allowance, state: "exhausted", currentPeriod: { ...quotaPeriod, usedResponses: 3000, remainingResponses: 0 } };
+    const refresh = button("Actualizar consumo");
+    expect(refresh).toBeDefined();
+    await act(async () => refresh.props.onClick());
+    expect(text(renderer.root)).toContain("0 respuestas disponibles");
+  });
+
+  it("does not sell a pack during preventive access even when old responses remain", async () => {
+    billingData.business = { ...business, subscription: { ...business.subscription, status: "past_due", graceEndsAt: 1900000000000 } };
+    billingData.allowance = { ...allowance, state: "active" };
+    await mount();
+    expect(inputs().find(input => input.props.value === "response_pack")?.props.disabled).toBe(true);
   });
 });

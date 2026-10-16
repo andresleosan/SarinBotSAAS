@@ -1,6 +1,6 @@
 # Estructura comercial aprobada — 15 de octubre de 2026
 
-El propietario aprobó esta estructura tras revisar los precios, la capacidad incluida y la segmentación por volumen de atención. Esta decisión define el producto comercial; no significa que las cuotas, paquetes o integración WhatsApp estén implementados o disponibles para contratar.
+El propietario aprobó esta estructura y después autorizó su implementación. Las cuotas, paquetes y pantallas se implementan según el [contrato de capacidad](response-quotas.md). WhatsApp permanece preparado en código y deshabilitado hasta enlazar y verificar el número que proporcionará el propietario.
 
 ## Modalidades y capacidad
 
@@ -12,15 +12,17 @@ El propietario aprobó esta estructura tras revisar los precios, la capacidad in
 | Sarin WhatsApp | 30 días | $149.900 + consumo de Meta | 4.500 |
 | Sarin a medida | Según acuerdo | Cotización | Según volumen |
 
-Esencial incluye agenda, reservas y atención por el enlace web y QR. Las tres duraciones ofrecen las mismas funciones, con capacidad proporcional a la vigencia. Sus precios ya están configurados; las cuotas todavía no se aplican.
+Esencial incluye agenda, reservas y atención por el enlace web y QR. Las tres duraciones ofrecen las mismas funciones, con capacidad proporcional a la vigencia.
 
-WhatsApp añade automatización mediante la API oficial para un negocio y un número. La atención web y WhatsApp comparten una bolsa de 4.500 respuestas: no son 4.500 por canal. Inicialmente se ofrece solo por 30 días. La suscripción incluye la IA; el consumo de Meta se cobra aparte. La integración y esta modalidad siguen pendientes.
+WhatsApp añade automatización mediante la API oficial para un negocio y un número. La atención web y WhatsApp comparten una bolsa de 4.500 respuestas: no son 4.500 por canal. Se prepara solo por 30 días. La suscripción incluye la IA; el consumo de Meta se cobra aparte. La contratación y aprobación se bloquean mientras el número no esté conectado y verificado.
 
 El administrador conserva la elección manual entre IA local y DeepSeek. La capacidad comercial se expresa en respuestas, independientemente del proveedor; el costo técnico de DeepSeek es un gasto de Sarin, no un cargo duplicado al cliente.
 
 ## Unidad de consumo
 
 Una respuesta completa de Sarin al cliente cuenta una vez, aunque internamente utilice varias llamadas al modelo. Los mensajes enviados por el cliente no descuentan respuestas. Las llamadas técnicas y los tokens del medidor existente no equivalen a respuestas comerciales.
+
+La prueba gratuita incluye 700 respuestas durante siete días. El copiloto comparte la bolsa del negocio. La configuración asistida anterior a crear el negocio tiene un límite separado de 30 respuestas por cuenta. Ambas reglas fueron confirmadas por el propietario.
 
 Las conversaciones son una referencia orientativa, no un segundo límite. Suponiendo diez respuestas por conversación:
 
@@ -51,8 +53,8 @@ Estos textos solo deben publicarse como condiciones disponibles cuando la funci�
 
 Disponible: suscripciones Esencial por 7, 15 y 30 días, selector administrativo de IA y medidor de llamadas/tokens/costo estimado DeepSeek. El medidor actual usa meses calendario y no impone límites de suscripción.
 
-Pendiente: contador de respuestas por vigencia y negocio, cuotas, paquetes, aviso de consumo, pausa de IA al agotarse la bolsa y visualización para cliente y administrador. Deben definirse técnicamente los reintentos, las respuestas fallidas, las operaciones ya confirmadas y las renovaciones para evitar conteos duplicados o afectar reservas guardadas. La capacidad de la prueba gratuita y el tratamiento del copiloto/onboarding requieren definición antes de aplicar límites; no se deducen de esta aprobación.
+Implementado: contador por vigencia, paquetes por comprobante, aviso de consumo, pausa de IA al agotarse la bolsa y visualización para propietario y administrador. Los reintentos, fallos, operaciones confirmadas y renovaciones se describen en [capacidad de respuestas](response-quotas.md). El despliegue y las pruebas efectivamente realizadas se registran por separado en la evidencia QA.
 
-Pendiente por separado: alta e integración oficial de WhatsApp, entrega de mensajes, medición del consumo de Meta y condiciones operativas para contratar esa modalidad. No se han activado envíos, cargos ni métodos de pago de terceros.
+Preparado: webhook firmado, bandejas cifradas, entrega con deduplicación, estados de mensajes y contadores administrativos de WhatsApp. Pendiente por separado: número y cuenta Meta, credenciales, prueba real de recepción/entrega y conciliación con su factura. El costo Meta no calculado se muestra como desconocido, nunca como cero. No se han activado envíos, cargos ni métodos de pago de terceros.
 
 Los cálculos de referencia y sus supuestos están en [costos de WhatsApp y DeepSeek](whatsapp-premium-proposal.md). La estructura se adopta para el piloto; la rentabilidad debe revisarse con tokens, rondas, infraestructura y soporte reales. La cantidad de respuestas por sí sola no garantiza un costo técnico máximo.
