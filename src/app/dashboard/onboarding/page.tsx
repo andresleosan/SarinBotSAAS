@@ -276,7 +276,7 @@ function Configuration() {
               />
             </label>
             <label className="text-xs text-sarin-muted">
-              Enlace /b/
+              Enlace
               <input
                 className={fieldClass + " mt-1.5"}
                 value={slug}
@@ -400,15 +400,16 @@ function Configuration() {
                   {(
                     [
                       ["durationMinutes", "Duración (min)", 5],
-                      ["bufferMinutes", "Limpieza (min)", 0],
+                      ["bufferMinutes", "Tiempo entre citas (min)", 0],
                       ["price", "Precio COP", 0],
                     ] as const
                   ).map(([key, label, minimum]) => (
-                    <label className="text-xs text-sarin-muted" key={key}>
-                      {label}
+                    <label className="flex min-w-0 flex-col text-xs text-sarin-muted" key={key}>
+                      <span className="mb-1.5">{label}</span>
                       <input
-                        className={fieldClass + " mt-1.5"}
+                        className={fieldClass + " mt-auto"}
                         type="number"
+                        aria-describedby={key === "bufferMinutes" ? `service-buffer-help-${service.id}` : undefined}
                         min={minimum}
                         max={
                           key === "price"
@@ -433,6 +434,9 @@ function Configuration() {
                     </label>
                   ))}
                 </div>
+                <p id={`service-buffer-help-${service.id}`} className="text-xs leading-relaxed text-sarin-muted">
+                  El tiempo entre citas es un margen después del servicio para preparar el puesto. Usa 0 si no lo necesitas.
+                </p>
                 <fieldset className="flex flex-wrap gap-x-3 gap-y-1">
                   <legend className="text-xs text-sarin-muted">
                     Disponible con
