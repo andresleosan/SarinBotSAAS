@@ -10,7 +10,7 @@ export function localDevelopmentEnvironment(input) {
   for (const name of Object.keys(env)) if (name.startsWith('WHATSAPP_')) delete env[name];
   return {
     ...env, NODE_ENV:'development', NEXT_TELEMETRY_DISABLED:'1', CI:'1',
-    SARIN_DATA_BACKEND:'firestore', SARIN_MAINTENANCE:'false', SARIN_PUBLIC_BOOKING_ORIGIN:'',
+    SARIN_DATA_BACKEND:'firestore', SARIN_MAINTENANCE:'false', SARIN_PUBLIC_BOOKING_ORIGIN:'', PILOT_AI_BUDGET_ENFORCED:'false',
     // Explicit values also prevent Next's dotenv loading from enabling cloud inference.
     SARIN_CHAT_PROVIDER:'ollama', DEEPSEEK_API_KEY:'', DEEPSEEK_MODEL:'',
     GEMINI_API_KEY:'', GEMINI_MODEL:'', GEMINI_BILLING_VERIFIED:'false',

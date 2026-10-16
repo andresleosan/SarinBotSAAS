@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { HttpError } from '@/lib/server/http';
 import type { AiProvider, CloudAiProvider } from '@/types/ai';
+import { reservePaidCallBudget, settlePaidCallBudget, type PaidCallContext, type BudgetReservation } from '@/lib/server/ai-budget';
+import { quotePaidCall } from '@/lib/server/ai-pricing';
 
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
 export interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string }; }
@@ -177,7 +179,7 @@ function geminiAssistant(data: unknown): EngineAssistantMessage {
   return assistant;
 }
 
-export async function completeChat(messages: EngineMessage[], tools?: readonly ToolDefinition[], options: { vision?: boolean; signal?: AbortSignal; provider?: EngineProvider; onUsage?: (observation: EngineUsageObservation) => void | Promise<void> } = {}): Promise<EngineAssistantMessage> {
+export async function completeChat(messages: EngineMessage[], tools?: readonly ToolDefinition[], options: { vision?: boolean; signal?: AbortSignal; provider?: EngineProvider; billingContext?: PaidCallContext; onUsage?: (observation: EngineUsageObservation) => void | Promise<void> } = {}): Promise<EngineAssistantMessage> {
   const config = engineConfig(options.vision, options.provider);
   if (config.provider !== 'ollama' && messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url'))) {
     throw new HttpError(503, 'Las imágenes requieren el motor local de la Mac.');
@@ -192,13 +194,25 @@ export async function completeChat(messages: EngineMessage[], tools?: readonly T
     temperature: 0.2, ...(config.provider === 'deepseek' ? { thinking: { type: 'disabled' } } : { think: false }),
     ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
   };
-  const observation: EngineUsageObservation | undefined = config.provider !== 'ollama' && options.onUsage
+  const gate = process.env.PILOT_AI_BUDGET_ENFORCED;
+  if (gate !== undefined && !['true', 'false'].includes(gate)) throw new HttpError(503, 'El presupuesto de IA no está configurado.', 'AI_BUDGET_UNAVAILABLE');
+  const budgetActive = config.provider !== 'ollama' && gate === 'true';
+  const requestBody = JSON.stringify(body);
+  const observation: EngineUsageObservation | undefined = config.provider !== 'ollama' && (options.onUsage || budgetActive)
     ? { callId: randomUUID(), provider: config.provider, model: config.provider === 'gemini' ? null : config.model,
       ...(config.provider === 'gemini' ? { serviceTier: null } : {}), startedAt: Date.now(), finishedAt: 0, success: false, usage: null } : undefined;
+  let reservation: BudgetReservation | undefined;
+  if (budgetActive) {
+    if (!options.billingContext) throw new HttpError(503, 'Falta el contexto del presupuesto de IA.', 'AI_BUDGET_UNAVAILABLE');
+    if (options.signal?.aborted) throw new DOMException('Solicitud cancelada.', 'AbortError');
+    const quote = quotePaidCall({ provider: config.provider as CloudAiProvider, model: config.model, requestBytes: Buffer.byteLength(requestBody, 'utf8'), maxOutputTokens: 4096 });
+    reservation = await reservePaidCallBudget({ ...options.billingContext, ...quote, callId: observation!.callId, provider: config.provider as CloudAiProvider, model: config.model });
+    observation!.model = null;
+  }
   try {
     const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(config.timeoutMs)]) : AbortSignal.timeout(config.timeoutMs);
     const response = await fetch(config.url.toString(), { method: 'POST', headers: config.headers, cache: 'no-store', redirect: 'error', signal,
-      body: JSON.stringify(body) });
+      body: requestBody });
     if (!response.ok) { await response.body?.cancel(); throw new HttpError(503, unavailableMessage(config.provider, response.status)); }
     const data = await responseJson(response);
     if (observation && data && typeof data === 'object') {
@@ -239,7 +253,8 @@ export async function completeChat(messages: EngineMessage[], tools?: readonly T
     if (observation) {
       observation.finishedAt = Date.now();
       // Accounting never changes a model result or retries a committed tool.
-      try { await options.onUsage!(observation); } catch { /* The recorder reports its own safe write-failure counter. */ }
+      if (reservation) { try { await settlePaidCallBudget(reservation, observation); } catch { /* maximum reservation stays held; never repeat fetch */ } }
+      try { await options.onUsage?.(observation); } catch { /* The recorder reports its own safe write-failure counter. */ }
     }
   }
 }

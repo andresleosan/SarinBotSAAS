@@ -16,7 +16,7 @@ export type InterpretedChat = z.infer<typeof interpretedSchema>;
 export const INTERPRETATION_TOOLS: readonly ToolDefinition[] = [{ type: 'function', function: { name: 'interpretar_solicitud', description: 'Clasifica la solicitud y extrae exclusivamente identificadores y fechas. No ejecuta operaciones ni confirma reservas.', parameters: z.toJSONSchema(interpretedSchema) } }];
 export async function interpretChat(input: { mode: ChatMode; message: string; business: Business; state: ChatState; signal?: AbortSignal; requestId: string; actorUid: string }): Promise<InterpretedChat> {
   const { provider } = await getAiProviderSelection();
-  const assistant = await completeChat([{ role: 'system', content: buildBusinessIntentPrompt(input.business, input.mode, input.state.selection) }, { role: 'user', content: input.message }], INTERPRETATION_TOOLS, { signal: input.signal, provider,
+  const assistant = await completeChat([{ role: 'system', content: buildBusinessIntentPrompt(input.business, input.mode, input.state.selection) }, { role: 'user', content: input.message }], INTERPRETATION_TOOLS, { signal: input.signal, provider, billingContext: { businessId: input.business.id, actorUid: input.actorUid, mode: input.mode, requestId: input.requestId },
     ...(provider !== 'ollama' ? { onUsage: observation => recordAiUsage(observation, { businessId: input.business.id, mode: input.mode }) } : {}),
   });
   const clarify = (): InterpretedChat => ({ intent: 'clarify', selection: input.state.selection });

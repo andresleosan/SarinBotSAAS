@@ -16,6 +16,9 @@ import { normalizeBusinessLogo, readPublicBusinessLogo, saveBusinessLogo } from 
 import sharp from 'sharp';
 import { updateClientPolicy } from '@/lib/server/client-policy';
 import { readChatState, saveChatState } from '@/lib/server/chat-state';
+import { DEFAULT_AI_BUDGET_LIMITS, saveAiBudgetSettings, reservePaidCallBudget, settlePaidCallBudget } from '@/lib/server/ai-budget';
+import { quotePaidCall } from '@/lib/server/ai-pricing';
+import { randomUUID } from 'node:crypto';
 
 const now = Date.now();
 const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now + 3 * 86400000);
@@ -40,6 +43,27 @@ describe('commercial invariants on Cloudflare data', () => {
     });
   }, 30_000);
   afterAll(async () => { await runtime?.dispose(); });
+  it('reserves the final cloud budget atomically across D1 handles and retains unknown usage', async () => {
+    const { vi } = await import('vitest'); vi.stubEnv('SUPERADMIN_UID', 'budget-admin');
+    try {
+      const quote = quotePaidCall({ provider: 'deepseek', model: 'deepseek-flash', requestBytes: 4000, maxOutputTokens: 4096 });
+      await saveAiBudgetSettings({ uid: 'budget-admin' }, { expectedVersion: 0, paused: false, reason: 'Synthetic last slot', limits: { ...DEFAULT_AI_BUDGET_LIMITS, businessDayUsd: quote.maxCostNanoUsd / 1e9 } }, db);
+      const second = createCloudflareDatabase(async command => {
+        const response = await runtime.fetch(command), body = await response.json() as DataReadResult | DataCommitResult;
+        if (!response.ok) throw new StorageError(response.status, (body as unknown as { code: string }).code); return body;
+      });
+      const input = () => ({ ...quote, callId: randomUUID(), provider: 'deepseek' as const, model: 'deepseek-flash', businessId: 'budget-business', actorUid: 'budget-client', mode: 'sarin_client' as const, requestId: 'synthetic-budget' });
+      const results = await Promise.allSettled([reservePaidCallBudget(input(), db), reservePaidCallBudget(input(), second)]);
+      expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.find(result => result.status === 'rejected')).toMatchObject({ reason: { code: 'AI_BUDGET_EXHAUSTED' } });
+      const winner = results.find(result => result.status === 'fulfilled')!;
+      if (winner.status !== 'fulfilled') throw new Error('Expected winner');
+      const reservation = winner.value;
+      await settlePaidCallBudget(reservation, { callId: reservation.callId, provider: 'deepseek', model: 'deepseek-flash', startedAt: Date.now(), finishedAt: Date.now(), success: false, usage: null }, second);
+      await expect(reservePaidCallBudget(input(), db)).rejects.toMatchObject({ code: 'AI_BUDGET_EXHAUSTED' });
+      expect((await second.collection('aiBudgetCalls').doc(reservation.callId).get()).data()?.status).toBe('uncertain');
+    } finally { vi.unstubAllEnvs(); }
+  });
   it('persists only scoped structured selections across D1 handles', async () => {
     const scope = { actorUid: 'state-client', businessId: 'state-business', mode: 'sarin_client' as const, channel: 'web' as const };
     await saveChatState(scope, 0, { serviceId: 'cut', dateKey }, db);

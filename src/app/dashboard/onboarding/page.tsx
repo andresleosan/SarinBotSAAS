@@ -102,6 +102,7 @@ function Configuration() {
     ]);
     if (loadedVersion.current === version) return;
     if (loadedBusiness.current === business.id && baseline.current && baseline.current !== latestSnapshot.current) return;
+    if (loadedBusiness.current !== business.id) proposedIntake.current = [];
     loadedBusiness.current = business.id;
     baseline.current = JSON.stringify([business.name, business.slug, business.category, business.phoneWhatsApp, business.sarinConfig.tone, business.sarinConfig.customRules, business.sarinConfig.intakeFields.map(item => item.label).join('\n'), business.resources, business.services, business.weeklySchedule, business.socialLinks ?? []]);
     loadedVersion.current = version;

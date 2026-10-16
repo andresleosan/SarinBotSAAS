@@ -4,11 +4,9 @@ import type { Database as Firestore } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { EngineUsageObservation } from '@/lib/sarin/engine';
 import type { AdminAiUsage, AiUsageTotals, CloudAiProvider } from '@/types/ai';
+import { AI_TARIFFS } from './ai-pricing';
 
-const tariffs = {
-  deepseek: { model: 'deepseek-flash', pricingVersion: 'deepseek-flash-verified-2026-10-15' },
-  gemini: { model: 'gemini-3.5-flash-lite', pricingVersion: 'gemini-3.5-flash-lite-standard-verified-2026-10-16' },
-} as const;
+const tariffs = AI_TARIFFS;
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const tokenCount = z.number().int().min(0).max(2_000_000);
 const usageSchema = z.object({ promptTokens: tokenCount, cacheHitTokens: tokenCount, cacheMissTokens: tokenCount, completionTokens: tokenCount, totalTokens: z.number().int().min(0).max(4_000_000) })
@@ -50,15 +48,17 @@ function estimate(event: z.infer<typeof observationSchema>): { min: number; max:
   if (event.provider === 'deepseek') {
     // USD/1M: .003 hit, .15 miss, .60 output off-peak; peak is twice that.
     // https://api-docs.deepseek.com/quick_start/pricing/ (2026-10-15).
-    const min = usage.cacheHitTokens * 3 + usage.cacheMissTokens * 150 + usage.completionTokens * 600;
-    return { min, max: min * 2 };
+    const tariff = tariffs.deepseek;
+    const max = usage.cacheHitTokens * tariff.cache + usage.cacheMissTokens * tariff.input + usage.completionTokens * tariff.output;
+    return { min: max / 2, max };
   }
   if (event.serviceTier !== 'standard') return null;
   // Integer nanodollars. Gemini Standard USD/1M: .03 cache, .30 input, 2.50 output.
   // Normalized completionTokens includes visible output AND thinking exactly once.
   // Gross API estimate: no unverified plan allowance, credit or discount is deducted.
   // https://ai.google.dev/gemini-api/docs/pricing (2026-10-16).
-  const amount = usage.cacheHitTokens * 30 + usage.cacheMissTokens * 300 + usage.completionTokens * 2500;
+  const tariff = tariffs.gemini;
+  const amount = usage.cacheHitTokens * tariff.cache + usage.cacheMissTokens * tariff.input + usage.completionTokens * tariff.output;
   return { min: amount, max: amount };
 }
 
@@ -109,7 +109,7 @@ export async function readAdminAiUsage(month = aiUsageMonth(), db: Firestore = g
   const monthly = db.collection('aiUsageMonths').doc(key);
   const [meta, total, rows] = await Promise.all([db.collection('aiUsageMeta').doc(metaKey(provider)).get(), monthly.get(), monthly.collection('businesses').limit(501).get()]);
   return {
-    month, timeZone: 'America/Bogota', provider, ...tariffs[provider],
+    month, timeZone: 'America/Bogota', provider, model: tariffs[provider].model, pricingVersion: tariffs[provider].pricingVersion,
     measurementStartedAt: meta.exists ? timestamp.parse(meta.data()?.measurementStartedAt) : null,
     coverage: 'best_effort', telemetryProcessStartedAt: monitor.startedAt, telemetryWriteFailures: monitor.failures.get(key) ?? 0,
     totals: publicTotals(total.data()),
