@@ -10,7 +10,7 @@ import {
   buttonClass,
   fieldClass,
 } from "@/components/app-shell";
-import { apiFetch, errorMessage } from "@/lib/client/api";
+import { apiFetch, ApiError, errorMessage } from "@/lib/client/api";
 import { compressReceiptToWebP } from "@/lib/utils/imageCompression";
 import { BILLING_PLANS, RESPONSE_PACK, getBillingPlan, type SubscriptionPlanId } from "@/lib/billing-plans";
 import { ResponseQuota, quotaDate } from "@/components/response-quota";
@@ -61,6 +61,7 @@ function Billing() {
   const [compressing, setCompressing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [priceNeedsRefresh, setPriceNeedsRefresh] = useState(false);
   const [requestId, setRequestId] = useState("");
   const [planId, setPlanId] = useState<SubscriptionPlanId>("monthly");
   const [purchaseKind, setPurchaseKind] = useState<"paid_trial" | "subscription" | "response_pack">("subscription");
@@ -70,7 +71,7 @@ function Billing() {
   const period = data?.allowance?.currentPeriod;
   const canBuyPack = Boolean(period && period.source !== "trial" && period.endsAt > Date.now() && data?.business?.subscription.status === "active" && data.allowance && ["active", "warning", "exhausted"].includes(data.allowance.state));
   const formLocked = saving || compressing || refreshing || Boolean(pendingReceipt);
-  const uploadDisabled = formLocked || !data?.settings.bankAccounts.length || (selectedKind === "paid_trial" && !canBuyTrial) || (selectedKind === "response_pack" && !canBuyPack) || (selectedKind === "subscription" && planId === "whatsapp" && !data?.whatsappAvailable);
+  const uploadDisabled = priceNeedsRefresh || formLocked || !data?.settings.bankAccounts.length || (selectedKind === "paid_trial" && !canBuyTrial) || (selectedKind === "response_pack" && !canBuyPack) || (selectedKind === "subscription" && planId === "whatsapp" && !data?.whatsappAvailable);
   useEffect(() => {
     const controller = new AbortController();
     void apiFetch<BillingData>("/api/billing", { signal: controller.signal })
@@ -106,6 +107,7 @@ function Billing() {
     setError(null);
     try {
       setData(await apiFetch<BillingData>("/api/billing"));
+      setPriceNeedsRefresh(false);
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -150,6 +152,7 @@ function Billing() {
           bankSelected: bank,
           kind: selectedKind,
           ...(selectedKind === "subscription" ? { planId } : {}),
+          ...(selectedKind !== "paid_trial" ? { quotedPriceCOP: selectedKind === "response_pack" ? data!.settings.responsePackPriceCOP : data!.settings[getBillingPlan(planId).priceField] } : {}),
           receiptDataUrl: image,
           requestId,
         }),
@@ -177,7 +180,16 @@ function Billing() {
           : "Comprobante recibido y pendiente de revisión.",
       );
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (cause instanceof ApiError && cause.code === "OFFER_PRICE_CHANGED") {
+        setPriceNeedsRefresh(true);
+        try {
+          setData(await apiFetch<BillingData>("/api/billing"));
+          setPriceNeedsRefresh(false);
+          setError(cause.message);
+        } catch {
+          setError("El precio cambió y no pudimos actualizar las tarifas. Pulsa Actualizar consumo antes de volver a enviar.");
+        }
+      } else setError(errorMessage(cause));
     } finally {
       setSaving(false);
     }

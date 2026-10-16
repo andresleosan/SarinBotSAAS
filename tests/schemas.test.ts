@@ -5,6 +5,10 @@ const schedule = Object.fromEntries(Array.from({ length: 7 }, (_, day) => [Strin
 const config = { name: 'Negocio real', slug: 'negocio-real', category: 'Barbería', phoneWhatsApp: '573001234567', resources: [{ id: 'one', name: 'Uno', active: true }], services: [{ id: 'cut', name: 'Corte', durationMinutes: 30, bufferMinutes: 15, price: 20000, resourceIds: ['one'] }], intakeFields: [], weeklySchedule: schedule };
 const receiptInput = { bankSelected: 'bank', requestId: 'request-one', receiptDataUrl: `data:image/webp;base64,${Buffer.from('RIFFxxxxWEBPfixture').toString('base64')}` };
 describe('untrusted inputs', () => {
+  it('accepts an optional price quote but rejects invalid quoted amounts', () => {
+    expect(receiptSchema.parse({ ...receiptInput, quotedPriceCOP: 65000 }).quotedPriceCOP).toBe(65000);
+    for (const quotedPriceCOP of [0, -1, 1.5, 100000001, '65000', NaN, null]) expect(receiptSchema.safeParse({ ...receiptInput, quotedPriceCOP }).success).toBe(false);
+  });
   it('accepts a complete onboarding config', () => expect(businessConfigSchema.safeParse(config).success).toBe(true));
   it('rejects overlapping work intervals', () => expect(businessConfigSchema.safeParse({ ...config, weeklySchedule: { ...schedule, 1: { isOpen: true, intervals: [{ start: '09:00', end: '12:00' }, { start: '11:00', end: '15:00' }] } } }).success).toBe(false));
   it('rejects references to an unknown booking resource', () => expect(businessConfigSchema.safeParse({ ...config, services: [{ ...config.services[0], resourceIds: ['other'] }] }).success).toBe(false));

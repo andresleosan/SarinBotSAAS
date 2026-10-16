@@ -3,9 +3,10 @@ import { create, type ReactTestInstance, type ReactTestRenderer } from "react-te
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BillingPage from "@/app/dashboard/billing/page";
 import AdminPage from "@/app/admin/page";
+import { ApiError } from "@/lib/client/api";
 
 const state = vi.hoisted(() => ({ api: vi.fn(), compress: vi.fn() }));
-vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
+vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message, ApiError: class extends Error { constructor(message: string, public status: number, public code?: string) { super(message); } } }));
 vi.mock("@/lib/utils/imageCompression", () => ({ compressReceiptToWebP: state.compress }));
 vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children }));
 vi.mock("@/components/app-shell", () => ({
@@ -79,6 +80,34 @@ describe("billing plan screens", () => {
     expect(plans().find((input) => input.props.checked)?.props.value).toBe("weekly");
     expect(text(renderer.root)).toContain("por 7 días");
     expect(button("Enviar comprobante").props.disabled).toBe(true);
+  });
+
+  it("refreshes an obsolete quote, keeps the selected image and bank, and waits for a second explicit submission", async () => {
+    billingData.settings = { ...settings, bankAccounts: [account] };
+    await mount();
+    await selectImage();
+    state.api.mockRejectedValueOnce(new ApiError("El precio cambió. Revisa el importe actualizado antes de enviar.", 409, "OFFER_PRICE_CHANGED"));
+    billingData = { ...billingData, settings: { ...settings, bankAccounts: [account], monthlyPriceCOP: 65000 } };
+    await act(async () => { renderer.root.findByType("form").props.onSubmit({ preventDefault }); });
+    expect(posts()).toHaveLength(1);
+    expect(posts()[0].quotedPriceCOP).toBe(59900);
+    expect(text(renderer.root)).toContain("65.000");
+    expect(text(renderer.root)).toContain("El precio cambió");
+    expect(button("Enviar comprobante").props.disabled).toBe(false);
+    await act(async () => { renderer.root.findByType("form").props.onSubmit({ preventDefault }); });
+    expect(posts()[1]).toMatchObject({ quotedPriceCOP: 65000, receiptDataUrl: posts()[0].receiptDataUrl, bankSelected: "bank-test", requestId: posts()[0].requestId });
+  });
+
+  it("blocks a repeated upload when refreshing a changed price fails until an explicit refresh succeeds", async () => {
+    billingData.settings = { ...settings, bankAccounts: [account] };
+    await mount();
+    await selectImage();
+    state.api.mockRejectedValueOnce(new ApiError("El precio cambió", 409, "OFFER_PRICE_CHANGED")).mockRejectedValueOnce(new Error("Sin conexión"));
+    await act(async () => { renderer.root.findByType("form").props.onSubmit({ preventDefault }); });
+    expect(button("Enviar comprobante").props.disabled).toBe(true);
+    expect(text(renderer.root)).toContain("actualizar las tarifas");
+    await act(async () => { button("Actualizar consumo").props.onClick(); });
+    expect(button("Enviar comprobante").props.disabled).toBe(false);
   });
 
   it("submits only the selected plan and preserves retry identity until that selection changes", async () => {

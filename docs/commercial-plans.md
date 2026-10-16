@@ -6,6 +6,8 @@ El propietario aprobó esta estructura y después autorizó su implementación. 
 
 Los importes de la tabla son los valores iniciales aprobados. Las tarifas vigentes de suscripciones y ampliaciones se guardan en administración; facturación y GET público `/api/public/commercial-offer` leen esa misma fuente. La landing consulta esa proyección mínima sin sesión y la renueva cada 15 segundos mientras está visible. No expone bancos ni ajustes privados y oculta las tarifas si falla la consulta. El precio de prueba permanece fijo en $5.000 COP.
 
+Los formularios nuevos envían el importe mostrado como cotización. Si la tarifa cambió antes de guardar el comprobante, el servidor responde `409 OFFER_PRICE_CHANGED` sin escribir recibo, imagen ni borrador. La pantalla conserva imagen y banco, actualiza las tarifas y espera un segundo envío explícito; si falla la actualización bloquea el envío hasta refrescar. Los clientes anteriores sin cotización usan el importe calculado por el servidor. Recuperar una solicitud ya aceptada conserva su precio histórico.
+
 | Modalidad | Vigencia | Precio COP | Respuestas de IA incluidas |
 | --- | ---: | ---: | ---: |
 | Prueba pagada: configuración y hasta 10 citas | Sin vencimiento por días | $5.000, una sola compra | 700 en total |

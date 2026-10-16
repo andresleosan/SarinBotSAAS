@@ -90,6 +90,8 @@ export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof 
     if (parsed.kind === 'paid_trial' && !canPurchasePaidTrial(business.subscription)) throw new HttpError(409, 'La prueba pagada solo se puede comprar una vez.', 'PAID_TRIAL_UNAVAILABLE');
     if (plan?.id === 'whatsapp' && !(await getWhatsAppBusinessStatus(business.id)).ready) throw new HttpError(409, 'WhatsApp requiere una conexión verificada antes de contratar.', 'WHATSAPP_NOT_READY');
     const settings = { ...defaultSettings(), ...settingsDocument.data() } as PlatformSettings;
+    const amountCOP = commercialPriceCOP(settings, parsed.kind, plan?.id);
+    if (parsed.quotedPriceCOP !== undefined && parsed.quotedPriceCOP !== amountCOP) throw new HttpError(409, 'El precio cambió. Revisa el importe actualizado antes de enviar.', 'OFFER_PRICE_CHANGED');
     const bank = settings.bankAccounts.find((account) => account.id === parsed.bankSelected || account.bankName === parsed.bankSelected);
     if (!bank) throw new HttpError(409, 'Selecciona una cuenta bancaria configurada por el administrador.');
     if (business.subscription.lastPaymentId) {
@@ -99,9 +101,10 @@ export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof 
     const quota = parsed.kind === 'response_pack' ? await readResponsePeriodState(business, db, transaction) : undefined;
     if (quota && (!quota.current || quota.current.source === 'trial' || quota.current.endsAt <= Date.now() || business.subscription.status !== 'active')) throw new HttpError(409, 'La ampliación requiere un período pagado vigente.', 'RESPONSE_PACK_UNAVAILABLE');
     const receipt: PaymentReceipt = { id, tenantId: business.id, tenantName: business.name, ownerUid: user.uid, ownerEmail: user.email ?? '', kind: parsed.kind,
-      ...(plan ? { planId: plan.id, periodDays: plan.periodDays, responseAllowance: plan.includedResponses, amountCOP: commercialPriceCOP(settings, 'subscription', plan.id) }
-        : parsed.kind === 'paid_trial' ? { appointmentAllowance: PAID_TRIAL_APPOINTMENT_LIMIT, amountCOP: PAID_TRIAL_PRICE_COP }
-          : { responseAllowance: RESPONSE_PACK.responses, quotaPeriodId: quota!.current!.id, amountCOP: commercialPriceCOP(settings, 'response_pack') }),
+      amountCOP,
+      ...(plan ? { planId: plan.id, periodDays: plan.periodDays, responseAllowance: plan.includedResponses }
+        : parsed.kind === 'paid_trial' ? { appointmentAllowance: PAID_TRIAL_APPOINTMENT_LIMIT }
+          : { responseAllowance: RESPONSE_PACK.responses, quotaPeriodId: quota!.current!.id }),
       bankSelected: bank.bankName, status: 'pending', submittedAt: now };
     const updatedBusiness: Business = { ...business, subscription: plan ? grantReceiptGrace(business.subscription, id, now) : { ...business.subscription, lastPaymentId: id } };
     if (quota) initializeResponsePeriods(transaction, db, quota);

@@ -69,6 +69,7 @@ function validReceiptData(value: string): boolean {
   return bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
 }
 export const receiptSchema = z.object({ bankSelected: shortText, receiptDataUrl: z.string().max(210000).refine(validReceiptData), requestId: requestIdSchema,
+  quotedPriceCOP: z.number().int().min(1).max(100000000).optional(),
   kind: z.enum(['subscription', 'response_pack', 'paid_trial']).default('subscription'), planId: z.enum(SUBSCRIPTION_PLAN_IDS).optional(),
 }).strict().superRefine((value, context) => {
   if (value.kind !== 'subscription' && value.planId !== undefined) context.addIssue({ code: 'custom', message: 'Este comprobante no cambia el plan.' });

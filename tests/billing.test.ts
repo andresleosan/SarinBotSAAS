@@ -24,6 +24,30 @@ function submissionDatabase() {
 }
 
 describe('billing plan settings and receipt snapshots', () => {
+  it('rejects a stale subscription quote before creating any draft or upload and accepts legacy clients at the current price', async () => {
+    const { db, rows } = memoryFirestore({ 'platformSettings/main': { bankAccounts: [bank], monthlyPriceCOP: 65000 } });
+    const before = structuredClone([...rows]);
+    await expect(submitReceipt(owner, { ...upload, quotedPriceCOP: 59900 }, db)).rejects.toMatchObject({ status: 409, code: 'OFFER_PRICE_CHANGED' });
+    expect([...rows]).toEqual(before);
+    expect((await submitReceipt(owner, upload, db)).receipt.amountCOP).toBe(65000);
+  });
+  it('returns an accepted quoted receipt unchanged after the administrator changes prices', async () => {
+    const { db } = submissionDatabase();
+    const first = await submitReceipt(owner, { ...upload, quotedPriceCOP: 59900 }, db);
+    await db.collection('platformSettings').doc('main').set({ bankAccounts: [bank], monthlyPriceCOP: 65000 });
+    expect((await submitReceipt(owner, { ...upload, quotedPriceCOP: 59900 }, db)).receipt).toEqual(first.receipt);
+  });
+  it('rejects a stale pack quote without writes and keeps the introductory price fixed', async () => {
+    const { db, rows } = submissionDatabase();
+    const id = businessIdForOwner(owner.uid);
+    await db.collection('businesses').doc(id).set({ ...business, id, subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: now + 86400000 } });
+    await db.collection('platformSettings').doc('main').set({ bankAccounts: [bank], responsePackPriceCOP: 23000 });
+    const before = structuredClone([...rows]);
+    await expect(submitReceipt(owner, { ...upload, kind: 'response_pack', quotedPriceCOP: 20000 }, db)).rejects.toMatchObject({ code: 'OFFER_PRICE_CHANGED' });
+    expect([...rows]).toEqual(before);
+    expect((await submitReceipt(owner, { ...upload, kind: 'response_pack', quotedPriceCOP: 23000 }, db)).receipt.amountCOP).toBe(23000);
+    expect((await submitReceipt(owner, { ...upload, kind: 'paid_trial' }, memoryFirestore({ 'platformSettings/main': { bankAccounts: [bank] } }).db)).receipt.amountCOP).toBe(5000);
+  });
   it('returns all default tariffs without creating settings and preserves a legacy monthly tariff', async () => {
     const memory = memoryFirestore();
     expect(await getSettings(memory.db)).toMatchObject({ weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, graceHoursOnUpload: 24 });
