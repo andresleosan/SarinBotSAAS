@@ -70,6 +70,9 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     const period=a.business.subscription.currentPeriodEndsAt-Date.now();
     expect(period).toBeGreaterThan(29.99*86400000); expect(period).toBeLessThan(30.01*86400000);
   });
+  // Each plan runs two sequential races (upload and approval). Emulator locks
+  // can take 30s to release per race; allow both plus 15s for setup/RPC overhead.
+  // https://firebase.google.com/docs/emulator-suite/connect_firestore#transactions
   it.each([
     { planId: 'weekly', amountCOP: 20000, periodDays: 7 },
     { planId: 'fortnightly', amountCOP: 35000, periodDays: 15 },
@@ -94,5 +97,5 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     expect(approved.business.subscription.trialEndsAt).toBe(business.subscription.trialEndsAt);
     const receipts = await db.collection('paymentReceipts').where('ownerUid', '==', planOwner.uid).get();
     expect(receipts.size).toBe(1);
-  });
+  }, 75000);
 });
