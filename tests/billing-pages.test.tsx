@@ -8,7 +8,7 @@ import { ApiError } from "@/lib/client/api";
 const state = vi.hoisted(() => ({ api: vi.fn(), compress: vi.fn() }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message, ApiError: class extends Error { constructor(message: string, public status: number, public code?: string) { super(message); } } }));
 vi.mock("@/lib/utils/imageCompression", () => ({ compressReceiptToWebP: state.compress }));
-vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children }));
+vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'owner' } }) }));
 vi.mock("@/components/app-shell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => children,
   Notice: ({ children }: { children: ReactNode }) => children,
@@ -18,6 +18,8 @@ vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => ({ health: nu
 vi.mock("@/components/admin-ai-settings", () => ({ AdminAiSettings: () => null }));
 vi.mock("@/components/admin-ai-usage", () => ({ AdminAiUsage: () => null }));
 vi.mock("@/components/admin-whatsapp", () => ({ AdminWhatsApp: () => null }));
+vi.mock("@/components/admin-invitations", () => ({ AdminInvitations: () => null }));
+vi.mock("@/components/invitation-redeem", () => ({ InvitationRedeem: () => null }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

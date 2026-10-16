@@ -23,6 +23,7 @@ import { useEngineHealth } from "@/hooks/useEngineHealth";
 import { AdminAiSettings } from "@/components/admin-ai-settings";
 import { AdminAiUsage } from "@/components/admin-ai-usage";
 import { AdminWhatsApp } from "@/components/admin-whatsapp";
+import { AdminInvitations } from "@/components/admin-invitations";
 import { BILLING_PLANS, getBillingPlan } from "@/lib/billing-plans";
 import { ResponseQuota } from "@/components/response-quota";
 import { paidTrialRemaining, PAID_TRIAL_APPOINTMENT_LIMIT } from "@/lib/paid-trial";
@@ -249,6 +250,7 @@ function Console() {
       <AdminAiSettings onSaved={() => void engine.refresh()} />
       <AdminAiUsage businesses={data.businesses} />
       <AdminWhatsApp businesses={data.businesses} />
+      <AdminInvitations />
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Comprobantes de pago</h2>
         {data.receipts.length === 0 ? (
@@ -413,9 +415,9 @@ function Console() {
                         business.subscription.currentPeriodEndsAt,
                       ).toLocaleDateString("es-CO", {
                         timeZone: "America/Bogota",
-                      }) : business.subscription.status === "trial" && business.subscription.paidTrial ? "Prueba pagada sin caducidad" : "Sin pago aprobado"}
+                      }) : business.subscription.status === "trial" && business.subscription.paidTrial ? business.subscription.paidTrial.source === 'invitation' ? "Prueba de cortesía sin caducidad" : "Prueba pagada sin caducidad" : "Sin pago aprobado"}
                     </td>
-                    <td className="p-4"><ResponseQuota compact allowance={data.allowances?.[business.id]} /></td>
+                    <td className="p-4"><ResponseQuota compact allowance={data.allowances?.[business.id]} introductorySource={business.subscription.paidTrial?.source} /></td>
                   </tr>
                 ))}
               </tbody>

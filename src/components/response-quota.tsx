@@ -3,7 +3,8 @@ import type { ResponseAllowance } from "@/types/firestore";
 const number = (value: number) => value.toLocaleString("es-CO");
 export const quotaDate = (value: number) => new Date(value).toLocaleDateString("es-CO", { timeZone: "America/Bogota" });
 
-export function ResponseQuota({ allowance, compact = false }: { allowance: ResponseAllowance | null | undefined; compact?: boolean }) {
+export function ResponseQuota({ allowance, compact = false, introductorySource }: { allowance: ResponseAllowance | null | undefined; compact?: boolean; introductorySource?: 'payment' | 'invitation' }) {
+  const trialLabel = introductorySource === 'invitation' ? 'Prueba de cortesía' : 'Prueba pagada';
   const period = allowance?.currentPeriod;
   if (!period) return <p className="text-sm text-sarin-muted">{allowance ? "No hay una bolsa de respuestas vigente." : "Consumo no disponible. Actualiza para consultar tu vigencia."}</p>;
   const capacity = period.includedResponses + period.extraResponses;
@@ -13,7 +14,7 @@ export function ResponseQuota({ allowance, compact = false }: { allowance: Respo
   if (compact) return (
     <div className="min-w-44 space-y-0.5 text-xs">
       <p className="font-medium text-sarin-ink">{number(period.usedResponses)} de {number(capacity)} respuestas · {label}</p>
-      <p className="text-sarin-muted">{number(period.remainingResponses)} {trialEnded ? "sin utilizar" : "disponibles"} · {period.source === "trial" ? "prueba pagada sin caducidad" : `hasta ${quotaDate(period.endsAt)}`}</p>
+      <p className="text-sarin-muted">{number(period.remainingResponses)} {trialEnded ? "sin utilizar" : "disponibles"} · {period.source === "trial" ? `${trialLabel.toLowerCase()} sin caducidad` : `hasta ${quotaDate(period.endsAt)}`}</p>
       {allowance.nextPeriod && <p className="text-sarin-muted">Renovación desde {quotaDate(allowance.nextPeriod.startsAt)}</p>}
     </div>
   );
@@ -22,7 +23,7 @@ export function ResponseQuota({ allowance, compact = false }: { allowance: Respo
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold">Respuestas de IA</h2>
-          <p className="mt-1 text-xs text-sarin-muted">{period.source === "trial" ? "Prueba pagada · límite total independiente de tus 10 citas · sin caducidad" : `Vigencia actual · ${quotaDate(period.startsAt)}–${quotaDate(period.endsAt)}`}</p>
+          <p className="mt-1 text-xs text-sarin-muted">{period.source === "trial" ? `${trialLabel} · límite total independiente de tus 10 citas · sin caducidad` : `Vigencia actual · ${quotaDate(period.startsAt)}–${quotaDate(period.endsAt)}`}</p>
         </div>
         <span className={`text-xs font-semibold ${allowance.state === "warning" || allowance.state === "exhausted" ? "text-amber-800" : "text-sarin-blue"}`}>{label}</span>
       </div>

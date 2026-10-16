@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Copy, UploadCloud } from "lucide-react";
-import { AuthGate } from "@/components/auth-provider";
+import { AuthGate, useAuth } from "@/components/auth-provider";
 import {
   AppShell,
   Notice,
@@ -15,6 +15,7 @@ import { compressReceiptToWebP } from "@/lib/utils/imageCompression";
 import { BILLING_PLANS, RESPONSE_PACK, getBillingPlan, type SubscriptionPlanId } from "@/lib/billing-plans";
 import { ResponseQuota, quotaDate } from "@/components/response-quota";
 import { PaidTrialStatus } from "@/components/paid-trial-status";
+import { InvitationRedeem } from "@/components/invitation-redeem";
 import { canPurchasePaidTrial, PAID_TRIAL_PRICE_COP, PAID_TRIAL_APPOINTMENT_LIMIT, PAID_TRIAL_INCLUDED_RESPONSES } from "@/lib/paid-trial";
 import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
 import type {
@@ -51,6 +52,8 @@ function readDataUrl(blob: Blob): Promise<string> {
 }
 
 function Billing() {
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const [data, setData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -241,7 +244,13 @@ function Billing() {
       {notice && <Notice>{notice}</Notice>}
       {data.business && <PaidTrialStatus subscription={data.business.subscription} />}
       {data.business && !data.business.sarinConfig?.onboardingCompleted && isSubscriptionAllowed(data.business) && <Link href="/dashboard/onboarding" className="inline-flex min-h-11 items-center text-sm font-semibold text-sarin-blue underline">Continuar con la configuración</Link>}
-      <ResponseQuota allowance={data.allowance} />
+      <ResponseQuota allowance={data.allowance} introductorySource={data.business?.subscription.paidTrial?.source} />
+      <InvitationRedeem onRedeemed={result => {
+        setData(previous => previous ? { ...previous, business: result.business, allowance: null } : previous);
+        setPurchaseKind('subscription');
+        setNotice('Prueba de cortesía activada. Puedes continuar con la configuración de tu negocio.');
+        void apiFetch<BillingData>('/api/billing').then(response => { if (active.current) setData(response); }).catch(() => { if (active.current) setError('El acceso está activado. No pudimos consultar el consumo; pulsa Actualizar consumo.'); });
+      }} />
       <form
         onSubmit={(event) => void submit(event)}
         className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5"
@@ -450,10 +459,11 @@ function Billing() {
   );
 }
 export default function BillingPage() {
+  const { user } = useAuth();
   return (
     <AuthGate>
       <AppShell>
-        <Billing />
+        <Billing key={user?.uid ?? 'signed-out'} />
       </AppShell>
     </AuthGate>
   );

@@ -199,7 +199,7 @@ function Agenda() {
             <Clock className="h-4 w-4 text-sarin-blue" />
           </span>
           {isSubscriptionAllowed(business, now)
-            ? sub.status === "trial" ? "Prueba pagada · hasta 10 citas, sin caducidad" : "Suscripción" +
+            ? sub.status === "trial" ? (sub.paidTrial?.source === 'invitation' ? "Prueba de cortesía · hasta 10 citas, sin caducidad" : "Prueba pagada · hasta 10 citas, sin caducidad") : "Suscripción" +
               " · " +
               Math.max(0, Math.ceil((end - now) / 86400000)) +
               " días de acceso"

@@ -162,7 +162,7 @@ function Configuration() {
     <section className="max-w-2xl space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
       <h1 className="text-3xl font-bold">{canPurchasePaidTrial(business?.subscription) ? "Empieza con tu prueba pagada" : "Elige un plan para continuar"}</h1>
       <p className="text-sm leading-6 text-sarin-muted">{canPurchasePaidTrial(business?.subscription) ? "Por $5.000 COP puedes configurar tu negocio y recibir hasta 10 citas, sin caducidad. Después, elige un plan para continuar." : "Revisa los planes y el estado de tus pagos para volver a configurar tu negocio y recibir nuevas citas. Tu agenda existente se conserva."}</p>
-      <Notice>{business?.subscription.status === "pending_payment" ? "La configuración y Sarin se habilitan después de aprobar tu comprobante. Si ya lo enviaste, espera su revisión." : "Necesitas un pago aprobado para configurar tu negocio y usar Sarin."}</Notice>
+      <Notice>{business?.subscription.paidTrial?.source === 'invitation' && business.subscription.paidTrial.accessSuspended ? 'El acceso de cortesía está suspendido. Contacta a administración; tus citas y consumo se conservan.' : business?.subscription.status === "pending_payment" ? "La configuración y Sarin se habilitan después de aprobar tu comprobante o canjear una invitación. Si ya enviaste el comprobante, espera su revisión." : "Necesitas acceso vigente para configurar tu negocio y usar Sarin."}</Notice>
       <Link href="/dashboard/billing" className={buttonClass + " inline-flex items-center"}>Ver pagos y planes</Link>
     </section>
   );
@@ -176,7 +176,7 @@ function Configuration() {
           {business?.sarinConfig.onboardingCompleted ? "Así trabaja tu negocio" : "Configura el espacio de tu negocio"}
         </h1>
         <p className="mt-2 text-sm text-sarin-muted">
-          Cuéntaselo a Sarin o completa los datos.{business?.subscription.status === "trial" ? " Tu prueba pagada incluye la configuración y hasta 10 citas, sin caducidad." : ""}
+          Cuéntaselo a Sarin o completa los datos.{business?.subscription.status === "trial" ? business.subscription.paidTrial?.source === 'invitation' ? " Tu prueba de cortesía incluye diez citas y 700 respuestas; sin cobro ni caducidad." : " Tu prueba pagada incluye la configuración y hasta 10 citas, sin caducidad." : ""}
         </p>
       </div>
       {error && <Notice error>{error}</Notice>}
