@@ -155,7 +155,7 @@ function Configuration() {
   if (loading) return <Notice>Cargando configuración…</Notice>;
   if (businessError) return <Notice error>{businessError}</Notice>;
   return (
-    <div className="space-y-5">
+    <div className="max-w-[45rem] space-y-5 xl:max-w-5xl">
       <div>
         <p className="text-xs uppercase tracking-widest text-sarin-blue">
           Configuración
@@ -175,7 +175,7 @@ function Configuration() {
           panel.
         </Notice>
       )}
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(17rem,0.7fr)_minmax(0,1.3fr)]">
+      <div className="grid items-start gap-5 xl:grid-cols-[18rem_minmax(0,1fr)]">
         <section className="flex min-w-0 flex-col rounded-2xl border border-sarin-line bg-sarin-paper xl:sticky xl:top-6">
           <h2 className="flex items-center gap-2 border-b border-sarin-line px-4 py-3 font-semibold">
             <SarinMark className="h-8 w-8" />

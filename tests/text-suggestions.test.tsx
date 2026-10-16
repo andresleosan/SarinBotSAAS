@@ -8,17 +8,23 @@ import { TextSuggestions } from '@/components/text-suggestions';
 describe('editable field suggestions', () => {
   let renderer: ReactTestRenderer;
   let changes: string[];
-  function Harness({ initial = 'Texto propio', limit = 2000 }: { initial?: string; limit?: number }) {
+  const suggestions = [
+    { label: 'Primera visita', value: '¿Es tu primera visita?' },
+    { label: 'Profesional', value: '¿Qué profesional prefieres?' },
+    { label: 'Servicio', value: '¿Qué servicio deseas?' },
+    { label: 'Día', value: '¿Qué día prefieres?' },
+  ];
+  function Harness({ initial = 'Texto propio', limit = 2000, overflow = false }: { initial?: string; limit?: number; overflow?: boolean }) {
     const [value, setValue] = useState(initial);
     return createElement(TextSuggestions, {
       label: 'Ejemplos de prueba', value, maxLength: limit,
-      suggestions: [{ label: 'Primera visita', value: '¿Es tu primera visita?' }],
+      suggestions: overflow ? suggestions : suggestions.slice(0, 1),
       onChange: (next: string) => { changes.push(next); setValue(next); },
     });
   }
-  async function mount(initial?: string, limit?: number) {
+  async function mount(initial?: string, limit?: number, overflow?: boolean) {
     changes = [];
-    await act(async () => { renderer = create(createElement(Harness, { initial, limit })); });
+    await act(async () => { renderer = create(createElement(Harness, { initial, limit, overflow })); });
   }
   afterEach(async () => { await act(async () => renderer?.unmount()); });
 
@@ -51,6 +57,23 @@ describe('editable field suggestions', () => {
     await mount('Texto propio', 20);
     expect(renderer.root.findByType('button').props.disabled).toBe(true);
     await act(async () => renderer.root.findByType('button').props.onClick());
+    expect(changes).toEqual([]);
+  });
+
+  it('keeps additional suggestions selectable without duplicating existing lines or accepting unknown values', async () => {
+    await mount('Texto propio\n  ¿QUÉ DÍA   PREFIERES? ', undefined, true);
+    const choose = (value: string) => renderer.root.findByType('select').props.onChange({ target: { value } });
+    expect(renderer.root.findAllByType('button')).toHaveLength(3);
+    expect(renderer.root.findByProps({ value: suggestions[3].value }).props.disabled).toBe(true);
+    await act(async () => choose(suggestions[3].value));
+    await act(async () => choose('Opción desconocida'));
+    expect(changes).toEqual([]);
+  });
+
+  it('enforces the field length limit for dropdown suggestions too', async () => {
+    await mount('Texto propio', 20, true);
+    expect(renderer.root.findByProps({ value: suggestions[3].value }).props.disabled).toBe(true);
+    await act(async () => renderer.root.findByType('select').props.onChange({ target: { value: suggestions[3].value } }));
     expect(changes).toEqual([]);
   });
 });

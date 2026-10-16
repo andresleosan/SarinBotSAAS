@@ -59,11 +59,19 @@ describe('onboarding editable examples', () => {
     for (const label of ['Ejemplos de preguntas para reservar', 'Ejemplos de indicaciones del negocio']) {
       const group = () => renderer.root.findByProps({ 'aria-label': label });
       const choices = group().findAllByType('button').map(button => button.props['aria-label']);
-      expect(choices).toHaveLength(6);
+      expect(choices).toHaveLength(3);
       for (const choice of choices) {
         await act(async () => group().findByProps({ 'aria-label': choice }).props.onClick());
         expect(group().findByProps({ 'aria-label': choice }).props.disabled).toBe(true);
         await act(async () => group().findByProps({ 'aria-label': choice }).props.onClick());
+      }
+      const moreChoices = group().findAllByType('option').filter(option => option.props.value).map(option => option.props.value);
+      expect(moreChoices).toHaveLength(3);
+      for (const choice of moreChoices) {
+        await act(async () => group().findByType('select').props.onChange({ target: { value: choice } }));
+        expect(group().findByType('select').props.value).toBe('');
+        expect(group().findAllByType('option').find(option => option.props.value === choice)?.props.disabled).toBe(true);
+        await act(async () => group().findByType('select').props.onChange({ target: { value: choice } }));
       }
     }
     const [questions, instructions] = renderer.root.findAllByType('textarea').map(input => input.props.value as string);
