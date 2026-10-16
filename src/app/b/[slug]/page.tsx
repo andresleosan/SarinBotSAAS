@@ -72,7 +72,7 @@ function Island({ slug }: { slug: string }) {
     );
   const allowed = isSubscriptionAllowed(business, now);
   const retryAllowed = allowed || getBusinessAccess(business, now) === "trial_exhausted";
-  const chatAllowed = allowed && !chat.quotaExhausted;
+  const chatAllowed = allowed && !chat.quotaExhausted && !chat.confirming;
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col border-x border-sarin-line bg-sarin-canvas">
       <header className="sticky top-0 z-20 border-b border-sarin-line bg-sarin-paper/95 p-4 backdrop-blur">
@@ -210,7 +210,7 @@ function Island({ slug }: { slug: string }) {
             </div>
           )}
           <div ref={end} />
-          {chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming} onConfirm={chat.confirmProposal} />}
+          {chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming || chat.isGenerating || chat.isWaitingBatch} onConfirm={chat.confirmProposal} />}
         </div>
         {user && <ClientAppointments key={`${business.id}:${user.uid}`} businessId={business.id} businessName={business.name} resources={business.resources} userId={user.uid} now={now} />}
       </div>

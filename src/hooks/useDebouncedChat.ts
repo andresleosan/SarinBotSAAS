@@ -158,7 +158,7 @@ export function useDebouncedChat({
   const sendMessage = useCallback(
     (text: string) => {
       const content = text.trim();
-      if (!content || !tenantId || errorCode === "AI_QUOTA_EXHAUSTED") return;
+      if (!content || !tenantId || confirmation.current || errorCode === "AI_QUOTA_EXHAUSTED") return;
       if (errorCode === "REQUEST_ALREADY_COMPLETED") {
         setError(null);
         setErrorCode(null);
@@ -189,7 +189,7 @@ export function useDebouncedChat({
     if (!busy.current && failed.current) void flushRef.current();
   }, []);
   const confirmProposal = useCallback(async (proposalId: string, contact: Pick<import('@/lib/server/schemas').BookingInput, 'clientPhone' | 'intakeAnswers'>) => {
-    if (confirmation.current || proposal?.id !== proposalId || proposal.businessId !== tenantId) return;
+    if (confirmation.current || busy.current || pending.current.length || proposal?.id !== proposalId || proposal.businessId !== tenantId) return;
     const abort = confirmation.current = new AbortController(), current = generation.current;
     setConfirming(true); setError(null);
     try {
@@ -197,7 +197,7 @@ export function useDebouncedChat({
       if (generation.current !== current || abort.signal.aborted) return;
       const appointment = result.appointment;
       if (appointment.tenantId !== tenantId || (actorUid && appointment.client?.uid !== actorUid)) throw new Error('No se pudo validar la cita recibida.');
-      setProposal(undefined);
+      setProposal(currentProposal => currentProposal?.id === proposalId ? undefined : currentProposal);
       setMessages(previous => [...previous, { id: crypto.randomUUID(), role: 'assistant', content: `${appointment.status === 'confirmed' ? 'Tu cita está confirmada.' : 'Esta cita ya fue atendida o cancelada. Revisa su estado en Mis citas.'}\n${appointment.serviceName} · ${appointment.dateKey} ${appointment.startTimeStr}–${appointment.endTimeStr} (Colombia).`, timestamp: Date.now() }]);
       callback.current?.('cita_confirmada', { appointment });
     } catch (cause) { if (generation.current === current && !abort.signal.aborted) setError(errorMessage(cause)); }

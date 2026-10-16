@@ -100,7 +100,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
       const selection = interpreted.selection, data: Record<string, unknown> = { ...selection };
       switch (interpreted.intent) {
         case 'booking':
-          if (selection.serviceId && selection.resourceId && selection.dateKey && selection.startTimeStr && channel === 'web') data.proposal = await createBookingProposal(user, business.id, { serviceId: selection.serviceId, resourceId: selection.resourceId, dateKey: selection.dateKey, startTimeStr: selection.startTimeStr }, body.requestId);
+          if (body.mode === 'sarin_client' && selection.serviceId && selection.resourceId && selection.dateKey && selection.startTimeStr && channel === 'web') data.proposal = await createBookingProposal(user, business.id, { serviceId: selection.serviceId, resourceId: selection.resourceId, dateKey: selection.dateKey, startTimeStr: selection.startTimeStr }, body.requestId);
           break;
         case 'availability':
           if (selection.dateKey && selection.serviceId) data.availability = await readAvailability(business, selection.dateKey, selection.serviceId, selection.resourceId);
