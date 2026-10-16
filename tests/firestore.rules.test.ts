@@ -24,6 +24,10 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
         setDoc(doc(db, 'paymentReceipts', 'payment'), { ownerUid:'owner-one' }),
         setDoc(doc(db, 'paymentImages', 'payment'), { ownerUid:'owner-one', receiptDataUrl:'sensitive' }),
         setDoc(doc(db, 'serverSettings', 'ai'), { provider:'ollama', updatedAt:1 }),
+        setDoc(doc(db, 'aiUsageCalls', 'synthetic-call'), { businessId:'one', promptTokens:100 }),
+        setDoc(doc(db, 'aiUsageMonths', '2026-10'), { calls:1 }),
+        setDoc(doc(db, 'aiUsageMonths', '2026-10', 'businesses', 'one'), { calls:1 }),
+        setDoc(doc(db, 'aiUsageMeta', 'main'), { measurementStartedAt:1 }),
       ]);
     });
   });
@@ -73,6 +77,17 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
       await assertFails(getDocs(collection(db,'serverSettings')));
       await assertFails(updateDoc(doc(db,'serverSettings','ai'),{provider:'deepseek'}));
       await assertFails(setDoc(doc(db,'serverSettings','other'),{provider:'deepseek'}));
+    }
+  });
+  it('keeps usage records and aggregates private even from the business owner and forged admin claims', async () => {
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('owner-one'), environment.authenticatedContext('stale-admin', { role:'superadmin', isSuperadmin:true })]) {
+      const db = context.firestore();
+      for (const path of ['aiUsageCalls/synthetic-call', 'aiUsageMonths/2026-10', 'aiUsageMonths/2026-10/businesses/one', 'aiUsageMeta/main']) {
+        await assertFails(getDoc(doc(db, path)));
+        await assertFails(setDoc(doc(db, path), { calls:0 }));
+      }
+      await assertFails(getDocs(collection(db, 'aiUsageCalls')));
+      await assertFails(getDocs(collection(db, 'aiUsageMonths/2026-10/businesses')));
     }
   });
 });

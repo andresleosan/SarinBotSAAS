@@ -12,6 +12,7 @@ vi.mock('../src/lib/sarin/engine', async (importOriginal) => ({ ...await importO
 import { POST } from '../src/app/api/sarin/chat/route';
 import { cancelAppointment } from '../src/lib/server/bookings';
 import type { DecodedIdToken } from 'firebase-admin/auth';
+import { readAdminAiUsage } from '../src/lib/server/ai-usage';
 
 const now = Date.parse('2030-01-01T12:00:00Z');
 const business: Business = { id: 'business', slug: 'real', ownerUid: 'owner', ownerEmail: '', name: 'Real', category: 'Barbería', phoneWhatsApp: '573001234567', timezone: 'America/Bogota', subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: now + 30 * 86400000 }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, resources: [{ id: 'chair', name: 'Silla', active: true }], services: [{ id: 'cut', name: 'Corte', durationMinutes: 30, bufferMinutes: 15, price: 20000, resourceIds: ['chair'] }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '11:00' }] } }, createdAt: now };
@@ -21,6 +22,57 @@ const bookingCall = () => ({ role: 'assistant', content: null, tool_calls: [{ id
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); vi.stubEnv('SARIN_CHAT_PROVIDER', 'ollama'); state.db = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown> }).db; state.complete.mockReset(); state.userName = 'Cliente'; });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 describe('authenticated tool orchestration', () => {
+  it('records every DeepSeek tool round under the business without repeating a booking after a failed explanation', async () => {
+    const { db, rows } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }); state.db = db;
+    const usage = { promptTokens: 10, cacheHitTokens: 0, cacheMissTokens: 10, completionTokens: 5, totalTokens: 15 };
+    const first = { callId: '00000000-0000-4000-8000-000000000001', provider: 'deepseek', model: 'deepseek-flash', startedAt: now, finishedAt: now + 1, success: true, usage };
+    state.complete.mockImplementationOnce(async (_messages, _tools, options) => {
+      await options.onUsage?.(first);
+      return bookingCall();
+    }).mockImplementationOnce(async (_messages, _tools, options) => {
+      await options.onUsage?.({ ...first, callId: '00000000-0000-4000-8000-000000000002', success: false, usage: null });
+      throw new Error('provider failed after committed tool');
+    });
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect((await response.json()).reply).toContain('Tu cita está confirmada');
+    const recorded = await readAdminAiUsage('2030-01', db);
+    expect(recorded.totals).toMatchObject({ calls: 2, successfulCalls: 1, failedCalls: 1, missingUsageCalls: 1 });
+    expect(recorded.businesses[0]).toMatchObject({ businessId: 'business', calls: 2 });
+    expect([...rows.keys()].filter(key => key.startsWith('businesses/business/appointments/'))).toHaveLength(1);
+    expect(JSON.stringify([...rows.entries()].filter(([key]) => key.startsWith('aiUsage')))).not.toMatch(/client@example|573001234567|Corte|Agenda corte/);
+  });
+  it('attributes initial DeepSeek onboarding to the unassigned bucket and omits a meter for Ollama', async () => {
+    const { db } = memoryFirestore({ 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }); state.db = db;
+    state.complete.mockImplementationOnce(async (_messages, _tools, options) => {
+      await options.onUsage?.({ callId: '00000000-0000-4000-8000-000000000003', provider: 'deepseek', model: 'deepseek-flash', startedAt: now, finishedAt: now + 1, success: true, usage: null });
+      return { role: 'assistant', content: 'Describe tu negocio.' };
+    }).mockResolvedValue({ role: 'assistant', content: 'Describe tu negocio.' });
+    expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '' }))).status).toBe(200);
+    expect((await readAdminAiUsage('2030-01', db)).businesses[0]).toMatchObject({ businessId: null, calls: 1 });
+    await db.collection('serverSettings').doc('ai').set({ provider: 'ollama', updatedAt: now + 1 });
+    expect((await POST(request({ ...body, mode: 'sarin_onboarding', tenantId: '', requestId: 'next-local-turn' }))).status).toBe(200);
+    expect(state.complete.mock.calls.at(-1)?.[2]?.onUsage).toBeUndefined();
+  });
+  it('returns one persisted booking when recording the final explanation fails', async () => {
+    const { db, rows } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } }); state.db = db;
+    const failuresBefore = (await readAdminAiUsage('2030-01', db)).telemetryWriteFailures;
+    state.complete.mockResolvedValueOnce(bookingCall()).mockImplementationOnce(async (_messages, _tools, options) => {
+      expect([...rows.keys()].filter(key => key.startsWith('businesses/business/appointments/'))).toHaveLength(1);
+      const unavailable = vi.spyOn(db, 'runTransaction').mockRejectedValue(new Error('synthetic storage outage'));
+      try {
+        await options.onUsage?.({ callId: '00000000-0000-4000-8000-000000000004', provider: 'deepseek', model: 'deepseek-flash', startedAt: now, finishedAt: now + 1, success: true, usage: null });
+      } finally { unavailable.mockRestore(); }
+      return { role: 'assistant', content: 'Explicación de la reserva.' };
+    });
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect((await response.json()).toolResults[0].result.appointment.status).toBe('confirmed');
+    expect(state.complete).toHaveBeenCalledTimes(2);
+    expect([...rows.keys()].filter(key => key.startsWith('businesses/business/appointments/'))).toHaveLength(1);
+    expect((await readAdminAiUsage('2030-01', db)).telemetryWriteFailures).toBe(failuresBefore + 1);
+    expect([...rows.keys()].filter(key => key.startsWith('aiUsageCalls/'))).toHaveLength(0);
+  });
   it('keeps one provider across the tool loop while a later turn observes an admin switch', async () => {
     const { db } = memoryFirestore({ 'businesses/business': business as unknown as Record<string, unknown>, 'serverSettings/ai': { provider: 'deepseek', updatedAt: now } });
     state.db = db;

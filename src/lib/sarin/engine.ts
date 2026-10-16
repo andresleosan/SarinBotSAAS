@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { HttpError } from '@/lib/server/http';
 import type { AiProvider } from '@/types/ai';
@@ -10,6 +11,8 @@ export interface EngineMessage { role: 'system' | 'user' | 'assistant' | 'tool';
 export interface EngineAssistantMessage { role: 'assistant'; content: string | null; tool_calls?: ToolCall[]; }
 export type EngineProvider = AiProvider;
 export interface EngineHealth { provider: EngineProvider | null; online: boolean; checkedAt: number; visionAvailable: boolean; error?: string; }
+export interface EngineTokenUsage { promptTokens: number; cacheHitTokens: number; cacheMissTokens: number; completionTokens: number; totalTokens: number; }
+export interface EngineUsageObservation { callId: string; provider: 'deepseek'; model: string | null; startedAt: number; finishedAt: number; success: boolean; usage: EngineTokenUsage | null; }
 
 function validateProvider(provider: string): EngineProvider {
   if (provider !== 'ollama' && provider !== 'deepseek') throw new HttpError(503, 'El proveedor de conversaciones no es válido.');
@@ -83,7 +86,11 @@ const assistantSchema = z.object({ choices: z.array(z.object({ message: z.object
   tool_calls: z.array(z.object({ id: z.string().min(1).max(200), type: z.literal('function'), function: z.object({ name: z.string().min(1).max(100), arguments: z.string().max(64_000) }) })).max(8).optional(),
 }) })).min(1).max(4) });
 
-export async function completeChat(messages: EngineMessage[], tools?: readonly ToolDefinition[], options: { vision?: boolean; signal?: AbortSignal; provider?: EngineProvider } = {}): Promise<EngineAssistantMessage> {
+const tokenCount = z.number().int().min(0).max(2_000_000);
+const usageSchema = z.object({ prompt_tokens: tokenCount, prompt_cache_hit_tokens: tokenCount, prompt_cache_miss_tokens: tokenCount, completion_tokens: tokenCount, total_tokens: z.number().int().min(0).max(4_000_000) })
+  .refine(value => value.prompt_tokens === value.prompt_cache_hit_tokens + value.prompt_cache_miss_tokens && value.total_tokens === value.prompt_tokens + value.completion_tokens);
+
+export async function completeChat(messages: EngineMessage[], tools?: readonly ToolDefinition[], options: { vision?: boolean; signal?: AbortSignal; provider?: EngineProvider; onUsage?: (observation: EngineUsageObservation) => void | Promise<void> } = {}): Promise<EngineAssistantMessage> {
   const config = engineConfig(options.vision, options.provider);
   if (config.provider !== 'ollama' && messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url'))) {
     throw new HttpError(503, 'Las imágenes requieren el motor local de la Mac.');
@@ -92,6 +99,8 @@ export async function completeChat(messages: EngineMessage[], tools?: readonly T
   const requestMessages = messages.map(message => message.tool_calls ? {
     ...message, tool_calls: message.tool_calls.map(call => ({ id: call.id, type: call.type, function: call.function })),
   } : message);
+  const observation: EngineUsageObservation | undefined = config.provider === 'deepseek' && options.onUsage
+    ? { callId: randomUUID(), provider: 'deepseek', model: config.model, startedAt: Date.now(), finishedAt: 0, success: false, usage: null } : undefined;
   try {
     const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(config.timeoutMs)]) : AbortSignal.timeout(config.timeoutMs);
     const response = await fetch(config.url.toString(), { method: 'POST', headers: config.headers, cache: 'no-store', redirect: 'error', signal,
@@ -99,15 +108,29 @@ export async function completeChat(messages: EngineMessage[], tools?: readonly T
         temperature: 0.2, ...(config.provider === 'deepseek' ? { thinking: { type: 'disabled' } } : { think: false }),
         ...(tools?.length ? { tools, tool_choice: 'auto' } : {}) }) });
     if (!response.ok) { await response.body?.cancel(); throw new HttpError(503, unavailableMessage(config.provider, response.status)); }
-    const parsed = assistantSchema.safeParse(await responseJson(response));
+    const data = await responseJson(response);
+    if (observation && data && typeof data === 'object') {
+      const metadata = data as Record<string, unknown>;
+      if ('model' in metadata) observation.model = typeof metadata.model === 'string' && /^[A-Za-z0-9_.:-]{1,100}$/.test(metadata.model) ? metadata.model : null;
+      const usage = usageSchema.safeParse(metadata.usage);
+      if (usage.success) observation.usage = { promptTokens: usage.data.prompt_tokens, cacheHitTokens: usage.data.prompt_cache_hit_tokens, cacheMissTokens: usage.data.prompt_cache_miss_tokens, completionTokens: usage.data.completion_tokens, totalTokens: usage.data.total_tokens };
+    }
+    const parsed = assistantSchema.safeParse(data);
     if (!parsed.success) throw new HttpError(502, 'Respuesta no válida del motor.');
     const message = parsed.data.choices[0].message;
     if (!message.content?.trim() && !message.tool_calls?.length) throw new HttpError(502, 'El motor no produjo una respuesta.');
+    if (observation) observation.success = true;
     return { role: 'assistant', content: message.content ?? null, ...(message.tool_calls?.length ? { tool_calls: message.tool_calls } : {}) };
   } catch (error) {
     if (options.signal?.aborted) throw new DOMException('Solicitud cancelada.', 'AbortError');
     if (error instanceof HttpError) throw error;
     throw new HttpError(503, unavailableMessage(config.provider));
+  } finally {
+    if (observation) {
+      observation.finishedAt = Date.now();
+      // Accounting never changes a model result or retries a committed tool.
+      try { await options.onUsage!(observation); } catch { /* The recorder reports its own safe write-failure counter. */ }
+    }
   }
 }
 

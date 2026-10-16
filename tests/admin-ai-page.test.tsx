@@ -12,6 +12,7 @@ vi.mock("@/components/app-shell", () => ({
   buttonClass: "button", fieldClass: "field",
 }));
 vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => ({ health: { status: "online", provider: "ollama" }, checking: false, refresh: state.refresh }) }));
+vi.mock("@/components/admin-ai-usage", () => ({ AdminAiUsage: () => null }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

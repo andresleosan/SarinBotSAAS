@@ -74,6 +74,55 @@ describe('explicit DeepSeek transport', () => {
     expect(JSON.parse(String(init.body))).toEqual({ model: 'deepseek-flash', messages: textTurn, stream: false, temperature: 0.2, max_tokens: 4096, thinking: { type: 'disabled' }, tools, tool_choice: 'auto' });
   });
 
+  it('reports actual usage once per HTTP call without adding telemetry to the returned assistant', async () => {
+    const onUsage = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ model: 'deepseek-flash', usage: { prompt_tokens: 1000, prompt_cache_hit_tokens: 800, prompt_cache_miss_tokens: 200, completion_tokens: 100, total_tokens: 1100 }, choices: [{ message: { content: 'Respuesta de prueba.' } }] })));
+    expect(await completeChat(textTurn, undefined, { onUsage })).toEqual({ role: 'assistant', content: 'Respuesta de prueba.' });
+    await completeChat(textTurn, undefined, { onUsage });
+    expect(onUsage).toHaveBeenCalledTimes(2);
+    expect(onUsage.mock.calls[0][0]).toEqual({ callId: expect.any(String), provider: 'deepseek', model: 'deepseek-flash', startedAt: expect.any(Number), finishedAt: expect.any(Number), success: true,
+      usage: { promptTokens: 1000, cacheHitTokens: 800, cacheMissTokens: 200, completionTokens: 100, totalTokens: 1100 } });
+    expect(onUsage.mock.calls[0][0].callId).not.toBe(onUsage.mock.calls[1][0].callId);
+    expect(JSON.stringify(onUsage.mock.calls)).not.toMatch(/Consulta sintética|Respuesta de prueba/);
+  });
+
+  it('captures billed usage before rejecting a malformed assistant and preserves an unexpected returned model', async () => {
+    const onUsage = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ model: 'unexpected-model', usage: { prompt_tokens: 10, prompt_cache_hit_tokens: 0, prompt_cache_miss_tokens: 10, completion_tokens: 5, total_tokens: 15 }, choices: [] })));
+    await expect(completeChat(textTurn, undefined, { onUsage })).rejects.toMatchObject({ status: 502 });
+    expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ success: false, model: 'unexpected-model', usage: { promptTokens: 10, cacheHitTokens: 0, cacheMissTokens: 10, completionTokens: 5, totalTokens: 15 } }));
+  });
+
+  it.each([
+    undefined,
+    { prompt_tokens: 10, prompt_cache_hit_tokens: 4, prompt_cache_miss_tokens: 7, completion_tokens: 5, total_tokens: 15 },
+    { prompt_tokens: 10, prompt_cache_hit_tokens: -1, prompt_cache_miss_tokens: 11, completion_tokens: 5, total_tokens: 15 },
+    { prompt_tokens: 10, prompt_cache_hit_tokens: 0, prompt_cache_miss_tokens: 10, completion_tokens: 5, total_tokens: 900 },
+  ])('reports missing or inconsistent usage as unknown without rejecting a valid reply: %j', async usage => {
+    const onUsage = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ usage, choices: [{ message: { content: 'Bien.' } }] })));
+    expect((await completeChat(textTurn, undefined, { onUsage })).content).toBe('Bien.');
+    expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ success: true, usage: null }));
+  });
+
+  it('records a failed transport as missing usage and contains telemetry errors', async () => {
+    const onUsage = vi.fn(async () => { throw new Error('telemetry unavailable'); });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('synthetic secret', { status: 503 })));
+    await expect(completeChat(textTurn, undefined, { onUsage })).rejects.toMatchObject({ status: 503, message: expect.stringMatching(/DeepSeek/) });
+    expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ success: false, usage: null }));
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ choices: [{ message: { content: 'Bien.' } }] })));
+    expect((await completeChat(textTurn, undefined, { onUsage })).content).toBe('Bien.');
+  });
+
+  it('does not emit cloud usage for Ollama or configuration failures before a request', async () => {
+    const onUsage = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(async () => completionResponse()));
+    await completeChat(textTurn, undefined, { provider: 'ollama', onUsage });
+    vi.stubEnv('DEEPSEEK_API_KEY', '');
+    await expect(completeChat(textTurn, undefined, { onUsage })).rejects.toMatchObject({ status: 503 });
+    expect(onUsage).not.toHaveBeenCalled();
+  });
+
   it('keeps explicitly local requests on Ollama despite the chat provider switch', async () => {
     const fetcher = vi.fn().mockResolvedValue(completionResponse());
     vi.stubGlobal('fetch', fetcher);

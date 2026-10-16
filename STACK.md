@@ -18,7 +18,11 @@ Estado operativo del 15 de octubre de 2026: DeepSeek se seleccionó temporalment
 
 Costo de inferencia, revisado el 15 de octubre de 2026: Ollama usa equipo y energía propios. DeepSeek es una API de pago opcional: el escenario de 1.000 llamadas mensuales de 2.000 tokens de entrada y 500 de salida equivale aproximadamente a USD 0,60–1,20/mes, según horario y sin aciertos de caché; ver [tarifa y supuestos](docs/deepseek-option-b.md#coste-y-límites). Las cifras excluyen impuestos y corresponden a llamadas, no conversaciones.
 
-Las cuatro rondas por turno, la cola y el límite de salida no equivalen a un presupuesto mensual. No hay límite monetario propio ni alertas de gasto verificadas para DeepSeek; el operador controla saldo y consumo. El selector administrativo no habilita facturación ni recargas.
+El [medidor administrativo](docs/ai-usage-meter.md) registra por negocio y mes las llamadas y tokens devueltos por DeepSeek, incluidas las rondas de herramientas, y estima un rango USD con tarifas versionadas. No guarda contenido de conversaciones ni mide WhatsApp, Ollama o Vault. La cobertura es de mejor esfuerzo desde su primer registro; los tokens/costos desconocidos y errores de confirmación se muestran explícitamente. Usa registros idempotentes y acumulados privados de Firestore, sin escanear el histórico en cada consulta.
+
+Para una barbería con 15–50 conversaciones diarias de 6–12 respuestas durante 30 días, el ejemplo de dos llamadas por respuesta y 2.000 tokens de entrada + 500 de salida por llamada equivale a USD 3,24–43,20 de DeepSeek al mes, sin aciertos de caché y según volumen/horario. No es un máximo garantizado. El [desglose de Meta, IA y precio al cliente](docs/whatsapp-premium-proposal.md) documenta todos los supuestos. El escenario alto añade unas 108.000 escrituras mensuales de telemetría y lecturas transaccionales; su costo depende del uso total de Firestore. No hay retención automática habilitada.
+
+Las cuatro rondas por turno, la cola y el límite de salida no equivalen a un presupuesto mensual. No hay límite monetario propio ni alertas de gasto verificadas para DeepSeek; el operador controla saldo y consumo. El selector y el medidor administrativos no habilitan facturación ni recargas.
 
 No se usa Firebase Storage. El proyecto Firebase elegido es `sarinbotsaas`, con Firestore en `us-east1`. Su costo depende del volumen de lecturas/escrituras/tráfico; no existe todavía una proyección de uso comercial. Antes de producción revisar presupuesto y alertas de facturación.
 

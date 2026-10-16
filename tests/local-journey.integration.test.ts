@@ -107,6 +107,10 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
         check((await api('/api/admin/ai', undefined, method, body)).response.status === 401, 'El selector de IA admitió una solicitud sin sesión.');
         check((await api('/api/admin/ai', owner.token, method, body)).response.status === 403, 'Una cuenta normal accedió al selector de IA.');
       }
+      check((await api('/api/admin/ai/usage')).response.status === 401, 'El consumo de IA admitió una solicitud sin sesión.');
+      check((await api('/api/admin/ai/usage', owner.token)).response.status === 403, 'Una cuenta normal accedió al consumo de IA.');
+      const usage = await api<{ provider: string; timeZone: string; totals: { calls: number }; businesses: unknown[] }>('/api/admin/ai/usage', admin.token);
+      check(usage.response.ok && usage.body.provider === 'deepseek' && usage.body.timeZone === 'America/Bogota' && Array.isArray(usage.body.businesses) && Number.isSafeInteger(usage.body.totals?.calls), 'El administrador no pudo consultar el consumo de IA.');
       console.log('Fase 1 OK: Auth oficial, roles y aislamiento del servidor demo.');
 
       const config = businessConfigSchema.parse({ name: 'Negocio sintético del ensayo', category: 'Ensayo sin clientes reales', slug: fixture.slug, phoneWhatsApp: '573001234567',

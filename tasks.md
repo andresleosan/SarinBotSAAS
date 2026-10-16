@@ -1,5 +1,12 @@
 # Estado de implementación — 2026-10-14
 
+## Consumo de IA — 2026-10-15
+
+- [x] Medición privada de llamadas y tokens DeepSeek por negocio y mes, rango estimado USD y avisos sobre cobertura incompleta; sin cuerpos de conversaciones ni cambios de proveedor.
+- [x] Tipos, 314 pruebas, 13 pruebas Firestore y 75 comprobaciones del recorrido; idempotencia, permisos, fallos de telemetría y revisión visual a 320 px. Evidencia: `docs/qa/2026-10-15-ai-usage.md`.
+- [ ] Construcción y actualización de la instancia privada, con verificación autenticada del nuevo panel.
+- [x] Proyección de barbería para 15–50 conversaciones diarias y 6–12 respuestas, sin notificaciones proactivas; costos de Meta/DeepSeek y precio al cliente separados en `docs/whatsapp-premium-proposal.md`.
+
 ## Control administrativo — 2026-10-15
 
 - [x] Selector global manual Ollama/DeepSeek para superadministrador, persistencia privada y Vault exclusivamente local. Gemini retirado y su clave dedicada revocada; OAuth/Firebase intactos.

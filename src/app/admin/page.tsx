@@ -22,6 +22,7 @@ import {
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useEngineHealth } from "@/hooks/useEngineHealth";
 import { AdminAiSettings } from "@/components/admin-ai-settings";
+import { AdminAiUsage } from "@/components/admin-ai-usage";
 import { BILLING_PLANS, getBillingPlan } from "@/lib/billing-plans";
 import type {
   Business,
@@ -242,6 +243,7 @@ function Console() {
         </div>
       </section>
       <AdminAiSettings onSaved={() => void engine.refresh()} />
+      <AdminAiUsage businesses={data.businesses} />
       <section className="space-y-4">
         <h2 className="text-xl font-semibold">Comprobantes de pago</h2>
         {data.receipts.length === 0 ? (

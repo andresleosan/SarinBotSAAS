@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/server/auth';
 import { apiError, HttpError, readJson } from '@/lib/server/http';
 import { runUserInference } from '@/lib/server/inference';
 import { getAiProviderSelection } from '@/lib/server/provider-settings';
+import { recordAiUsage } from '@/lib/server/ai-usage';
 import { assertOwner, createBusiness, getBusiness, getOwnedBusiness, stableDocumentId } from '@/lib/server/businesses';
 import { createAppointment, createManualBlock, readAppointments, readAvailability } from '@/lib/server/bookings';
 import { availabilitySchema, bookingSchema, businessConfigSchema, chatSchema } from '@/lib/server/schemas';
@@ -66,7 +67,13 @@ export async function POST(request: Request) {
           if (body.mode === 'sarin_owner_copilot') assertOwner(business, user.uid);
         }
         let assistant;
-        try { assistant = await completeChat(messages, tools, { signal: request.signal, provider }); }
+        try {
+          const usageContext = { businessId: business?.id ?? null, mode: body.mode };
+          assistant = await completeChat(messages, tools, {
+            signal: request.signal, provider,
+            ...(provider === 'deepseek' ? { onUsage: (observation) => recordAiUsage(observation, usageContext) } : {}),
+          });
+        }
         catch (error) {
           // A model explanation can fail after a committed mutation. Return its
           // verified result so the browser never retries an already saved action.
