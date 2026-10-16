@@ -25,4 +25,19 @@ describe('owner client policy controls', () => {
     expect(renderer.root.findByProps({ 'aria-label': 'Máximo de citas futuras' }).props.value).toBe('3');
     expect(JSON.stringify(renderer.toJSON())).not.toContain('private old reason');
   });
+  it('preserves inherited limits when changing only a client block', async () => {
+    state.api.mockResolvedValue({ policy: { blocked: false, futureAppointmentLimit: 3, inheritsLimit: true, reason: null } });
+    await act(async () => { renderer = create(createElement(ClientPolicyControls, { businessId: 'one', ownerUid: 'owner', clients: [{ uid: 'client', name: 'Cliente' }] })); });
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Cliente o política general' }).props.onChange({ target: { value: 'client' } }));
+    await act(async () => { renderer.root.findByProps({ type: 'checkbox' }).props.onChange({ target: { checked: true } }); renderer.root.findByProps({ 'aria-label': 'Motivo del cambio' }).props.onChange({ target: { value: 'Revisión' } }); });
+    await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }));
+    expect(JSON.parse(state.api.mock.calls.at(-1)![1].body)).toMatchObject({ blocked: true, futureAppointmentLimit: null });
+  });
+  it('cannot overwrite an unknown policy after a failed read', async () => {
+    state.api.mockRejectedValue(new Error('Lectura interrumpida'));
+    await act(async () => { renderer = create(createElement(ClientPolicyControls, { businessId: 'one', ownerUid: 'owner', clients: [] })); });
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Motivo del cambio' }).props.onChange({ target: { value: 'No sobrescribir' } }));
+    await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }));
+    expect(state.api.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false);
+  });
 });

@@ -18,7 +18,7 @@ describe('owner-only client policy API', () => {
   it('keeps configuration private and validates strict, bounded input', async () => {
     const response = await GET(new Request('https://sarin.test/api'), context);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(await response.json()).toEqual({ policy: { blocked: false, futureAppointmentLimit: 3, reason: null } });
+    expect(await response.json()).toEqual({ policy: { blocked: false, futureAppointmentLimit: 3, reason: null, inheritsLimit: true } });
     for (const body of [{ futureAppointmentLimit: 21, reason: 'Invalid' }, { futureAppointmentLimit: 3, reason: 'Valid', ownerUid: 'other' }, { reason: 'a'.repeat(5000) }]) {
       expect((await PATCH(new Request('https://sarin.test/api', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), context)).status).toBeGreaterThanOrEqual(400);
     }

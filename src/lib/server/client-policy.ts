@@ -8,7 +8,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { assertOwner, getBusiness } from './businesses';
 import { HttpError } from './http';
 
-export type ClientPolicy = { blocked: boolean; futureAppointmentLimit: number; reason: string | null };
+export type ClientPolicy = { blocked: boolean; futureAppointmentLimit: number; reason: string | null; inheritsLimit: boolean };
 export const clientUidSchema = z.string().min(1).max(128).regex(/^[^\x00-\x1f\x7f]+$/);
 export const clientPolicyInputSchema = z.object({ clientUid: clientUidSchema.optional(), blocked: z.boolean().optional(), futureAppointmentLimit: z.number().int().min(1).max(20).nullable().optional(), reason: z.string().trim().min(1).max(300) }).strict();
 const recordSchema = z.object({ version: z.literal(1), blocked: z.boolean(), futureAppointmentLimit: z.number().int().min(1).max(20).nullable(), reason: z.string().min(1).max(300), updatedBy: clientUidSchema, updatedAt: z.number().int().nonnegative() }).strict();
@@ -22,7 +22,7 @@ function parseRecord(value: unknown) {
 function resolvePolicy(defaultValue: unknown, overrideValue: unknown): ClientPolicy {
   const defaults = parseRecord(defaultValue), override = parseRecord(overrideValue);
   if (defaults?.blocked || defaults?.futureAppointmentLimit === null) throw new HttpError(503, 'No se puede validar la política general.');
-  return { blocked: override?.blocked ?? false, futureAppointmentLimit: override?.futureAppointmentLimit ?? defaults?.futureAppointmentLimit ?? 3, reason: override?.reason ?? defaults?.reason ?? null };
+  return { blocked: override?.blocked ?? false, futureAppointmentLimit: override?.futureAppointmentLimit ?? defaults?.futureAppointmentLimit ?? 3, reason: override?.reason ?? defaults?.reason ?? null, inheritsLimit: override?.futureAppointmentLimit == null };
 }
 async function readPolicy(businessId: string, uid: string, db: Database, tx?: Transaction): Promise<ClientPolicy> {
   const collection = db.collection('businesses').doc(businessId).collection('clientPolicies');
@@ -55,7 +55,7 @@ export async function updateClientPolicy(owner: ChatActor, businessId: string, i
 export async function assertClientCanBook(tx: Transaction, business: Business, actorUid: string, now: number, db: Database): Promise<void> {
   const policy = await readPolicy(business.id, actorUid, db, tx);
   if (policy.blocked) throw new HttpError(403, 'Este negocio ha pausado tus nuevas reservas. Puedes consultar y cancelar tus citas.', 'CLIENT_BLOCKED');
-  const appointments = await tx.get(db.collection('businesses').doc(business.id).collection('appointments').where('client.uid', '==', actorUid));
+  const appointments = await tx.get(db.collection('businesses').doc(business.id).collection('appointments').where('client.uid', '==', actorUid).where('status', '==', 'confirmed').where('type', '==', 'appointment').where('startAt', '>', now).limit(21));
   const count = appointments.docs.filter(doc => { const item = doc.data() as Appointment; return item.type === 'appointment' && item.status === 'confirmed' && item.startAt > now; }).length;
   if (count >= policy.futureAppointmentLimit) throw new HttpError(409, `Puedes tener hasta ${policy.futureAppointmentLimit} citas futuras activas en este negocio.`, 'CLIENT_BOOKING_LIMIT');
 }
