@@ -1,5 +1,10 @@
+import type { SubscriptionPlanId } from '@/lib/billing-plans';
+export type { SubscriptionPlanId } from '@/lib/billing-plans';
+
 export interface PlatformSettings {
   companyName: string;
+  weeklyPriceCOP: number;
+  fortnightlyPriceCOP: number;
   monthlyPriceCOP: number;
   trialDaysDefault: number;
   graceHoursOnUpload: number;
@@ -142,6 +147,9 @@ export interface PaymentReceipt {
   ownerUid: string;
   ownerEmail: string;
   amountCOP: number;
+  /** Absent only on historical monthly receipts; new receipts snapshot both. */
+  planId?: SubscriptionPlanId;
+  periodDays?: number;
   bankSelected: string;
   /** Image content lives separately in paymentImages/{id}, never in list queries. */
   receiptDataUrl?: string;

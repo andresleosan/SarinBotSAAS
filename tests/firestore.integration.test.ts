@@ -48,4 +48,29 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     const period=a.business.subscription.currentPeriodEndsAt-Date.now();
     expect(period).toBeGreaterThan(29.99*86400000); expect(period).toBeLessThan(30.01*86400000);
   });
+  it.each([
+    { planId: 'weekly', amountCOP: 20000, periodDays: 7 },
+    { planId: 'fortnightly', amountCOP: 35000, periodDays: 15 },
+    { planId: 'monthly', amountCOP: 59900, periodDays: 30 },
+  ])('stores and approves $planId without repricing a pending receipt', async ({ planId, amountCOP, periodDays }) => {
+    const planOwner = user(`plan-${crypto.randomUUID()}`);
+    const business = await createBusiness(planOwner, { ...config, slug: `plan-${crypto.randomUUID()}` }, db);
+    await db.doc('platformSettings/main').set({ weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900,
+      bankAccounts: [{ id: 'bank', bankName: 'Synthetic bank', accountType: 'Test', accountNumber: 'fixture-only', holderName: 'Fixture' }] });
+    const input = receiptSchema.parse({ planId, bankSelected: 'bank', requestId: crypto.randomUUID(),
+      receiptDataUrl: `data:image/webp;base64,${Buffer.from('RIFFxxxxWEBPfixture').toString('base64')}` });
+    const [first, retried] = await Promise.all([submitReceipt(planOwner, input, db), submitReceipt(planOwner, input, db)]);
+    expect(first.receipt.id).toBe(retried.receipt.id);
+    expect(first.receipt).toMatchObject({ planId, amountCOP, periodDays, status: 'pending' });
+    await db.doc('platformSettings/main').update({ weeklyPriceCOP: 25000, fortnightlyPriceCOP: 40000, monthlyPriceCOP: 65000 });
+    const [approved, duplicate] = await Promise.all([
+      reviewPayment(first.receipt.id, 'approve', undefined, db), reviewPayment(first.receipt.id, 'approve', undefined, db),
+    ]);
+    expect(approved.receipt).toMatchObject({ planId, amountCOP, periodDays, status: 'approved' });
+    expect(approved.business.subscription.currentPeriodEndsAt).toBe(approved.receipt.reviewedAt! + periodDays * 86400000);
+    expect(duplicate.business.subscription.currentPeriodEndsAt).toBe(approved.business.subscription.currentPeriodEndsAt);
+    expect(approved.business.subscription.trialEndsAt).toBe(business.subscription.trialEndsAt);
+    const receipts = await db.collection('paymentReceipts').where('ownerUid', '==', planOwner.uid).get();
+    expect(receipts.size).toBe(1);
+  });
 });

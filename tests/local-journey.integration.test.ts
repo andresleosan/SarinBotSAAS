@@ -168,14 +168,17 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       });
       const receiptDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jwL8AAAAASUVORK5CYII=';
       check(Buffer.from(receiptDataUrl.split(',')[1], 'base64').byteLength < 150 * 1024, 'La captura sintética supera el límite.');
-      const uploadInput = { bankSelected, receiptDataUrl, requestId: requestId('receipt') };
+      const uploadInput = { bankSelected, receiptDataUrl, planId: 'weekly', requestId: requestId('receipt') };
       check((await api('/api/billing', client.token, 'POST', uploadInput)).response.status === 403, 'Un cliente subió pagos de un negocio ajeno.');
+      check((await api('/api/billing', owner.token, 'POST', { ...uploadInput, planId: 'unlimited' })).response.status === 400, 'Se aceptó un plan inexistente.');
+      check((await api('/api/billing', owner.token, 'POST', { ...uploadInput, amountCOP: 1, periodDays: 365 })).response.status === 400, 'El cliente pudo elegir un importe o duración arbitrarios.');
       const uploaded = await api<{ receipt: PaymentReceipt; business: Business }>('/api/billing', owner.token, 'POST', uploadInput);
       check(uploaded.response.status === 201 && uploaded.body.receipt.status === 'pending' && uploaded.body.receipt.ownerUid === fixture.ownerUid, 'La API no almacenó el comprobante pendiente.');
       const receiptId = uploaded.body.receipt.id;
       const repeatedUpload = await api<{ receipt: PaymentReceipt; business: Business }>('/api/billing', owner.token, 'POST', uploadInput);
       check(repeatedUpload.response.status === 201 && repeatedUpload.body.receipt.id === receiptId && repeatedUpload.body.business.subscription.graceEndsAt === uploaded.body.business.subscription.graceEndsAt, 'Repetir el comprobante duplicó el pago o su gracia.');
       const ownerBilling = await api<{ receipts: PaymentReceipt[]; settings: PlatformSettings }>('/api/billing', owner.token);
+      check(uploaded.body.receipt.planId === 'weekly' && uploaded.body.receipt.periodDays === 7 && uploaded.body.receipt.amountCOP === ownerBilling.body.settings.weeklyPriceCOP, 'El comprobante semanal no conserva los siete días y su precio configurado.');
       check(ownerBilling.response.ok && ownerBilling.body.receipts.some(item => item.id === receiptId) && !JSON.stringify(ownerBilling.body.receipts).includes('data:image/'), 'La lista de pagos expuso la imagen o perdió el comprobante.');
       const image = (await db.doc(`paymentImages/${receiptId}`).get()).data();
       check(image?.receiptDataUrl === receiptDataUrl && !(await db.doc(`paymentReceipts/${receiptId}`).get()).data()?.receiptDataUrl, 'La imagen no está separada del documento de lista.');
@@ -194,10 +197,21 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       const approved = await api<{ receipt: PaymentReceipt; business: Business }>('/api/admin', admin.token, 'PATCH', { action: 'approve', paymentId: receiptId });
       check(approved.response.ok && approved.body.receipt.status === 'approved' && approved.body.business.subscription.status === 'active' && isSubscriptionAllowed(approved.body.business), 'La aprobación no reactivó la suscripción.');
       const days = (approved.body.business.subscription.currentPeriodEndsAt - Date.now()) / 86400000;
-      check(days > 29.99 && days <= 30, 'La activación no dura treinta días.');
+      check(days > 6.99 && days <= 7, 'La activación semanal no dura siete días.');
       const repeatedApproval = await api<{ receipt: PaymentReceipt; business: Business }>('/api/admin', admin.token, 'PATCH', { action: 'approve', paymentId: receiptId });
       check(repeatedApproval.response.ok && repeatedApproval.body.business.subscription.currentPeriodEndsAt === approved.body.business.subscription.currentPeriodEndsAt && repeatedApproval.body.receipt.reviewedAt === approved.body.receipt.reviewedAt, 'Repetir aprobación extendió dos veces la suscripción.');
       check((await api('/api/admin', admin.token, 'PATCH', { action: 'reject', paymentId: receiptId })).response.status === 409, 'Se cambió un pago previamente aprobado.');
+      let paidUntil = approved.body.business.subscription.currentPeriodEndsAt;
+      for (const plan of [
+        { id: 'fortnightly', days: 15, amount: ownerBilling.body.settings.fortnightlyPriceCOP },
+        { id: 'monthly', days: 30, amount: ownerBilling.body.settings.monthlyPriceCOP },
+      ]) {
+        const renewal = await api<{ receipt: PaymentReceipt }>('/api/billing', owner.token, 'POST', { ...uploadInput, planId: plan.id, requestId: requestId(plan.id) });
+        check(renewal.response.status === 201 && renewal.body.receipt.planId === plan.id && renewal.body.receipt.periodDays === plan.days && renewal.body.receipt.amountCOP === plan.amount, 'La renovación no conserva su plan y precio.');
+        const approval = await api<{ business: Business }>('/api/admin', admin.token, 'PATCH', { action: 'approve', paymentId: renewal.body.receipt.id });
+        check(approval.response.ok && approval.body.business.subscription.currentPeriodEndsAt === paidUntil + plan.days * 86400000, 'La renovación no suma los días contratados al acceso vigente.');
+        paidUntil = approval.body.business.subscription.currentPeriodEndsAt;
+      }
       const reactivated = await createAppointment(client.decoded, fixture.businessId, { ...booking, startTimeStr: '09:00' }, requestId('reactivated'), db);
       check(reactivated.status === 'confirmed', 'No se pudo reservar después de reactivar.');
       check(isDeepStrictEqual((await db.doc(`users/${LOCAL_SUPERADMIN_UID}`).get()).data(), adminProfileBefore), 'El ensayo modificó el perfil del administrador sembrado.');

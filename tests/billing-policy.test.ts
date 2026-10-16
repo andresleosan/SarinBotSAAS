@@ -20,6 +20,14 @@ describe('subscription payment policy', () => {
   it('adds thirty days after the existing paid period', () => {
     expect(approveSubscription({ ...expired, status: 'active', currentPeriodEndsAt: now + 5 * day }, 'r1', now).currentPeriodEndsAt).toBe(now + 35 * day);
   });
+  it.each([7, 15, 30])('extends an active subscription by the purchased %i days without losing remaining time', (periodDays) => {
+    const result = approveSubscription({ ...expired, status: 'active', currentPeriodEndsAt: now + 5 * day }, 'plan-receipt', now, periodDays);
+    expect(result.currentPeriodEndsAt).toBe(now + (5 + periodDays) * day);
+    expect(result.trialEndsAt).toBe(expired.trialEndsAt);
+  });
+  it.each([0, -7, 7.5, 365, Number.NaN])('rejects an unsupported purchased duration %s', (periodDays) => {
+    expect(() => approveSubscription(expired, 'plan-receipt', now, periodDays)).toThrow();
+  });
   it('removes used grace only after an approved payment', () => {
     const result = approveSubscription(grantReceiptGrace(expired, 'r1', now), 'r1', now);
     expect(result).toMatchObject({ status: 'active', currentPeriodEndsAt: now + 30 * day });

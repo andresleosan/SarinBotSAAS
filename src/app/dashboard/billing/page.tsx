@@ -12,6 +12,7 @@ import {
 } from "@/components/app-shell";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { compressReceiptToWebP } from "@/lib/utils/imageCompression";
+import { BILLING_PLANS, getBillingPlan, type SubscriptionPlanId } from "@/lib/billing-plans";
 import type {
   Business,
   PaymentReceipt,
@@ -52,6 +53,10 @@ function Billing() {
   const [compressing, setCompressing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [requestId, setRequestId] = useState("");
+  const [planId, setPlanId] = useState<SubscriptionPlanId>("monthly");
+  const pendingReceipt = data?.receipts.find((receipt) => receipt.status === "pending");
+  const formLocked = saving || compressing || Boolean(pendingReceipt);
+  const uploadDisabled = formLocked || !data?.settings.bankAccounts.length;
   useEffect(() => {
     const controller = new AbortController();
     void apiFetch<BillingData>("/api/billing", { signal: controller.signal })
@@ -67,8 +72,14 @@ function Billing() {
       });
     return () => controller.abort();
   }, []);
+  function selectPlan(nextPlan: SubscriptionPlanId) {
+    if (formLocked || nextPlan === planId) return;
+    setPlanId(nextPlan);
+    setRequestId(crypto.randomUUID());
+    setNotice(null);
+  }
   async function selectImage(file: File | undefined) {
-    if (!file) return;
+    if (!file || uploadDisabled) return;
     setImage("");
     setNotice(null);
     setError(null);
@@ -90,7 +101,7 @@ function Billing() {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!image || !bank) return;
+    if (!image || !bank || uploadDisabled) return;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -102,6 +113,7 @@ function Billing() {
         method: "POST",
         body: JSON.stringify({
           bankSelected: bank,
+          planId,
           receiptDataUrl: image,
           requestId,
         }),
@@ -124,7 +136,7 @@ function Billing() {
       const grace = response.business.subscription.graceEndsAt;
       setNotice(
         grace && grace > Date.now()
-          ? `Comprobante recibido. Acceso preventivo hasta ${new Date(grace).toLocaleString("es-CO", { timeZone: "America/Bogota" })}. La activación mensual depende de su aprobación.`
+          ? `Comprobante recibido. Acceso preventivo hasta ${new Date(grace).toLocaleString("es-CO", { timeZone: "America/Bogota" })}. La activación del período elegido depende de su aprobación.`
           : "Comprobante recibido y pendiente de revisión.",
       );
     } catch (cause) {
@@ -159,6 +171,12 @@ function Billing() {
         .
       </Notice>
     );
+  const selectedPlan = getBillingPlan(pendingReceipt ? pendingReceipt.planId ?? "monthly" : planId);
+  const selectedDays = pendingReceipt ? pendingReceipt.periodDays ?? 30 : selectedPlan.periodDays;
+  const selectedPrice = pendingReceipt?.amountCOP ?? data.settings[selectedPlan.priceField];
+  const formatPrice = (price: number) => price.toLocaleString("es-CO", {
+    style: "currency", currency: "COP", maximumFractionDigits: 0,
+  });
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -172,13 +190,9 @@ function Billing() {
           </p>
         </div>
         <p className="text-2xl font-bold text-sarin-blue">
-          {data.settings.monthlyPriceCOP.toLocaleString("es-CO", {
-            style: "currency",
-            currency: "COP",
-            maximumFractionDigits: 0,
-          })}
+          {formatPrice(selectedPrice)}
           <span className="mt-1 block text-right text-xs font-normal text-sarin-muted">
-            por 30 días
+            COP por {selectedDays} días
           </span>
         </p>
       </div>
@@ -188,6 +202,46 @@ function Billing() {
         onSubmit={(event) => void submit(event)}
         className="space-y-6 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6"
       >
+        <fieldset className="space-y-3" disabled={formLocked}>
+          <legend className="font-semibold">Elige tu período</legend>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {BILLING_PLANS.map((plan) => (
+              <label
+                key={plan.id}
+                className={`min-w-0 rounded-xl border p-4 ${formLocked ? "cursor-default" : "cursor-pointer"} ${selectedPlan.id === plan.id ? "border-sarin-blue bg-sarin-soft" : "border-sarin-line"} focus-within:ring-2 focus-within:ring-sarin-blue focus-within:ring-offset-2`}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <input
+                    type="radio"
+                    name="planId"
+                    value={plan.id}
+                    checked={selectedPlan.id === plan.id}
+                    disabled={formLocked}
+                    onChange={() => selectPlan(plan.id)}
+                    className="accent-sarin-blue"
+                  />
+                  {plan.label}
+                </span>
+                <span className="mt-3 block text-lg font-semibold tabular-nums text-sarin-blue">
+                  {formatPrice(pendingReceipt && selectedPlan.id === plan.id ? selectedPrice : data.settings[plan.priceField])}
+                </span>
+                <span className="mt-1 block text-xs text-sarin-muted">
+                  COP · {plan.periodDays} días
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-sarin-muted">
+            La prueba gratuita inicial de 7 días no cambia al elegir un período de pago.
+          </p>
+        </fieldset>
+        {pendingReceipt && (
+          <Notice>
+            Tu comprobante {selectedPlan.label.toLowerCase()} por {selectedDays} días
+            {" "}y {formatPrice(selectedPrice)} COP está pendiente de revisión. Espera la
+            revisión antes de enviar otro pago.
+          </Notice>
+        )}
         <h2 className="font-semibold">Datos para tu transferencia</h2>
         {data.settings.bankAccounts.length === 0 ? (
           <Notice>
@@ -206,7 +260,12 @@ function Billing() {
                     name="bank"
                     value={account.id}
                     checked={bank === account.id}
-                    onChange={() => setBank(account.id)}
+                    disabled={formLocked}
+                    onChange={() => {
+                      if (formLocked || bank === account.id) return;
+                      setBank(account.id);
+                      setRequestId(crypto.randomUUID());
+                    }}
                   />
                   {account.bankName}
                 </span>
@@ -235,6 +294,9 @@ function Billing() {
         )}
         <div className="space-y-3">
           <h2 className="font-semibold">Envía el comprobante</h2>
+          <p className="text-sm font-medium text-sarin-ink">
+            {selectedPlan.label} · {selectedDays} días · {formatPrice(selectedPrice)} COP
+          </p>
           <p className="text-sm text-sarin-muted">
             La captura se optimiza antes de enviarla y se revisa manualmente. El
             acceso preventivo de 24 horas se aplica según el estado de tu
@@ -251,7 +313,7 @@ function Billing() {
               className={fieldClass + " max-w-sm"}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              disabled={compressing || saving}
+              disabled={uploadDisabled}
               onChange={(event) => void selectImage(event.target.files?.[0])}
             />
           </label>
@@ -268,7 +330,7 @@ function Billing() {
             </div>
           )}
           <button
-            disabled={!image || !bank || saving || compressing}
+            disabled={!image || !bank || uploadDisabled}
             className={buttonClass + " w-full"}
           >
             {saving ? "Enviando comprobante…" : "Enviar comprobante"}
@@ -292,6 +354,9 @@ function Billing() {
                     currency: "COP",
                     maximumFractionDigits: 0,
                   })}
+                </p>
+                <p className="mt-1 text-sm text-sarin-muted">
+                  {getBillingPlan(receipt.planId ?? "monthly").label} · {receipt.periodDays ?? 30} días
                 </p>
                 <p className="mt-1 text-xs text-sarin-muted">
                   {new Date(receipt.submittedAt).toLocaleString("es-CO", {

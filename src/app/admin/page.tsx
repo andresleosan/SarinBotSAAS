@@ -21,6 +21,7 @@ import {
 } from "@/components/app-shell";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useEngineHealth } from "@/hooks/useEngineHealth";
+import { BILLING_PLANS, getBillingPlan } from "@/lib/billing-plans";
 import type {
   Business,
   PaymentReceipt,
@@ -128,7 +129,7 @@ function Console() {
       );
       setNotice(
         action === "approve"
-          ? "Pago aprobado y suscripción extendida 30 días."
+          ? `Pago aprobado y suscripción extendida ${response.receipt.periodDays ?? 30} días.`
           : "Comprobante rechazado.",
       );
     } catch (cause) {
@@ -279,6 +280,9 @@ function Console() {
                     })}{" "}
                     · {receipt.bankSelected}
                   </p>
+                  <p className="text-sm text-sarin-ink">
+                    {getBillingPlan(receipt.planId ?? "monthly").label} · {receipt.periodDays ?? 30} días
+                  </p>
                   <p className="text-xs text-sarin-muted">
                     {new Date(receipt.submittedAt).toLocaleString("es-CO", {
                       timeZone: "America/Bogota",
@@ -325,7 +329,7 @@ function Console() {
                           onClick={() => void review(receipt.id, "approve")}
                         >
                           <Check className="h-4 w-4" />
-                          Aprobar +30 días
+                          Aprobar +{receipt.periodDays ?? 30} días
                         </button>
                         <button
                           className="flex min-h-11 items-center justify-center gap-1 rounded-[10px] border border-rose-200 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
@@ -368,7 +372,7 @@ function Console() {
                   <th className="p-4">Negocio</th>
                   <th className="p-4">Estado</th>
                   <th className="p-4">Fin de prueba</th>
-                  <th className="p-4">Vigencia mensual</th>
+                  <th className="p-4">Vigencia del pago</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-sarin-line">
@@ -428,24 +432,26 @@ function Console() {
                 }
               />
             </label>
-            <label className="text-xs text-sarin-muted">
-              Mensualidad en COP
-              <input
-                required
-                min="1"
-                step="1"
-                type="number"
-                className={fieldClass + " mt-2"}
-                value={settings.monthlyPriceCOP}
-                onChange={(event) =>
-                  setSettings({
-                    ...settings,
-                    monthlyPriceCOP: Number(event.target.value),
-                  })
-                }
-              />
-            </label>
           </div>
+          <fieldset className="grid gap-4 sm:grid-cols-3" disabled={Boolean(working)}>
+            <legend className="mb-3 text-sm font-semibold">Tarifas de suscripción</legend>
+            {BILLING_PLANS.map((plan) => (
+              <label className="text-xs text-sarin-muted" key={plan.id}>
+                {plan.label} · {plan.periodDays} días, en COP
+                <input
+                  required
+                  min="1"
+                  step="1"
+                  type="number"
+                  className={fieldClass + " mt-2"}
+                  value={settings[plan.priceField]}
+                  onChange={(event) =>
+                    setSettings({ ...settings, [plan.priceField]: Number(event.target.value) })
+                  }
+                />
+              </label>
+            ))}
+          </fieldset>
           {settings.bankAccounts.map((account) => (
             <fieldset
               className="grid gap-3 rounded-xl border border-sarin-line p-4 sm:grid-cols-2"

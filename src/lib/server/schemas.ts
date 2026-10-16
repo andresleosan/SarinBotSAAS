@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isDateKey, isTimeString } from '@/lib/sarin/availability';
+import { SUBSCRIPTION_PLAN_IDS } from '@/lib/billing-plans';
 
 export const documentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 export const requestIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,128}$/);
@@ -67,9 +68,12 @@ function validReceiptData(value: string): boolean {
   if (match[1] === 'png') return bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   return bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
 }
-export const receiptSchema = z.object({ bankSelected: shortText, receiptDataUrl: z.string().max(210000).refine(validReceiptData), requestId: requestIdSchema }).strict();
+export const receiptSchema = z.object({ bankSelected: shortText, receiptDataUrl: z.string().max(210000).refine(validReceiptData), requestId: requestIdSchema, planId: z.enum(SUBSCRIPTION_PLAN_IDS).default('monthly') }).strict();
 export const settingsSchema = z.object({
   companyName: shortText, monthlyPriceCOP: z.number().int().min(1).max(100000000),
+  // Omitted by older admin clients; saveSettings preserves the current prices.
+  weeklyPriceCOP: z.number().int().min(1).max(100000000).optional(),
+  fortnightlyPriceCOP: z.number().int().min(1).max(100000000).optional(),
   trialDaysDefault: z.literal(7).default(7), graceHoursOnUpload: z.literal(24).default(24),
   bankAccounts: z.array(z.object({ id: documentIdSchema, bankName: shortText, accountType: shortText, accountNumber: shortText, holderName: shortText, holderDoc: z.string().max(120).optional() }).strict()).max(10),
   tunnelStatus: z.object({ isOnline: z.boolean(), lastPingAt: z.number() }).optional(),

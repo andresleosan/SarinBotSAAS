@@ -57,6 +57,14 @@ docker compose --env-file deploy/firebase.public.env up -d --no-build app
 
 El Dockerfile solo recibe argumentos `NEXT_PUBLIC_*`. `.dockerignore` excluye los `.env*` reales; el contenedor recibe `.env.production` al arrancar. Dentro del contenedor, `127.0.0.1` identifica al propio contenedor: configura `SARIN_TUNNEL_URL` con la URL HTTPS real del motor, no el loopback de la Mac. No añadas variables de emuladores al runtime de producción.
 
+### Planes de suscripción y actualización de precios
+
+Los planes cubren 7 días por 20.000 COP, 15 días por 35.000 COP y 30 días por 59.900 COP. `WEEKLY_PRICE_COP`, `FORTNIGHTLY_PRICE_COP` y `MONTHLY_PRICE_COP` definen los precios iniciales del servidor; los campos guardados en `platformSettings/main` tienen prioridad. Cambiar los ejemplos de entorno no modifica un runtime existente ni sus datos. La prueba gratuita de 7 días y las 24 horas de gracia por comprobante conservan sus reglas.
+
+Al actualizar una instalación existente, despliega primero la imagen que reconoce los tres planes. Después respalda el documento de ajustes y cambia únicamente `weeklyPriceCOP`, `fortnightlyPriceCOP` y `monthlyPriceCOP`, con una transacción que rechace modificaciones concurrentes y una lectura de verificación. Conserva los bancos y los demás ajustes. No migres importes ni períodos de recibos anteriores; los recibos antiguos sin plan explícito conservan 30 días.
+
+Una reversión de imagen no revierte Firestore: la versión anterior puede mostrar el precio mensual actualizado, pero solo conoce períodos de 30 días. Mientras opere esa versión, no apruebes comprobantes nuevos de 7 o 15 días. La reversión de precios es una operación separada, limitada a los tres campos y protegida contra cambios posteriores; no debe reescribir bancos, negocios ni comprobantes.
+
 ### Opción B temporal de chat
 
 La [guía de DeepSeek](../docs/deepseek-option-b.md) describe activación y vuelta a Ollama. Después de desplegar una imagen que incluya ese soporte, selecciona `SARIN_CHAT_PROVIDER=deepseek` y guarda `DEEPSEEK_API_KEY` exclusivamente en el archivo runtime privado. Compose con `env_file` raw admite estas variables sin argumentos de build. Recrea únicamente `app`, conserva una sola réplica y comprueba el chat autenticado. Vault sigue ligado a Ollama; no cambies `SARIN_TUNNEL_URL` ni los secretos de Access. Para volver, selecciona `ollama` y recrea `app` tras verificar la Mac. `docker compose restart` por sí solo no carga un archivo de entorno modificado.

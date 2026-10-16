@@ -56,3 +56,11 @@ test('requires the four public build values and never includes Admin credentials
   assert.throws(() => publicBuildArguments({}));
   assert.throws(() => publicBuildArguments({ ...input, NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'demo-sarin-bot' }));
 });
+
+test('forwards all three optional subscription prices only to server runtime', () => {
+  const input = { FIREBASE_ADMIN_PROJECT_ID: 'real-project', FIREBASE_ADMIN_CLIENT_EMAIL: 'configured@example.test', FIREBASE_ADMIN_PRIVATE_KEY: 'synthetic-key', SUPERADMIN_UID: 'owner', SARIN_TUNNEL_URL: 'https://engine.example.invalid/v1/chat/completions', OLLAMA_MAIN_MODEL: 'main-local', OLLAMA_VISION_MODEL: 'vision-local', CF_ACCESS_CLIENT_ID: 'synthetic-id', CF_ACCESS_CLIENT_SECRET: 'synthetic-secret', WEEKLY_PRICE_COP: '20000', FORTNIGHTLY_PRICE_COP: '35000', MONTHLY_PRICE_COP: '59900' };
+  const env = runtimeEnvironment(input);
+  assert.equal(env.WEEKLY_PRICE_COP, '20000');
+  assert.equal(env.FORTNIGHTLY_PRICE_COP, '35000');
+  assert.equal(env.MONTHLY_PRICE_COP, '59900');
+});
