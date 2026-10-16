@@ -7,6 +7,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { HttpError } from './http';
 import { documentIdSchema, type BusinessConfig } from './schemas';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
+import { normalizeBusinessSocialLinks, type BusinessSocialLink } from '@/lib/business-branding';
 
 export const businessIdForOwner = (uid: string) => `b_${createHash('sha256').update(uid).digest('hex').slice(0, 32)}`;
 export const stableDocumentId = (...parts: string[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
@@ -23,9 +24,15 @@ export function privateBusinessDraft(user: Pick<ChatActor, 'uid' | 'email'>, now
 }
 
 export function publicBusiness(business: Business): PublicBusiness {
+  let socialLinks: BusinessSocialLink[] | undefined;
+  if (business.socialLinks !== undefined) {
+    try { socialLinks = normalizeBusinessSocialLinks(business.socialLinks); } catch { /* Invalid historic contacts are not public. */ }
+  }
   return {
     id: business.id, slug: business.slug, name: business.name, category: business.category,
     phoneWhatsApp: business.phoneWhatsApp, timezone: business.timezone,
+    ...(socialLinks !== undefined ? { socialLinks } : {}),
+    ...(business.logo && /^[a-f0-9]{64}$/.test(business.logo.sha256) ? { logo: { sha256: business.logo.sha256 } } : {}),
     subscription: { status: business.subscription.status, trialEndsAt: business.subscription.trialEndsAt, currentPeriodEndsAt: business.subscription.currentPeriodEndsAt, ...(business.subscription.graceEndsAt !== undefined ? { graceEndsAt: business.subscription.graceEndsAt } : {}), ...(business.subscription.paidTrial ? { paidTrial: { activatedAt: business.subscription.paidTrial.activatedAt, appointmentLimit: business.subscription.paidTrial.appointmentLimit, appointmentsUsed: business.subscription.paidTrial.appointmentsUsed, ...(business.subscription.paidTrial.source ? { source: business.subscription.paidTrial.source } : {}), ...(business.subscription.paidTrial.source === 'invitation' ? { accessSuspended: business.subscription.paidTrial.accessSuspended } : {}) } } : {}) },
     sarinConfig: { onboardingCompleted: business.sarinConfig.onboardingCompleted, tone: business.sarinConfig.tone, customRules: business.sarinConfig.customRules, intakeFields: business.sarinConfig.intakeFields },
     resources: business.resources, services: business.services, weeklySchedule: business.weeklySchedule,
@@ -64,7 +71,7 @@ export async function createBusiness(user: ChatActor, config: BusinessConfig, db
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa un plan para configurar tu negocio.', 'PAYMENT_REQUIRED');
     if (business.slug && business.slug !== config.slug) throw new HttpError(409, 'El enlace del negocio es permanente para conservar tu código QR.');
     if (!business.slug && slug.exists) throw new HttpError(409, 'Este enlace ya está ocupado. Escoge otro slug.');
-    const updated: Business = { ...business, slug: config.slug, name: config.name, category: config.category, phoneWhatsApp: config.phoneWhatsApp, sarinConfig: { onboardingCompleted: true, tone: config.tone, customRules: config.customRules, intakeFields: config.intakeFields }, resources: config.resources, services: config.services, weeklySchedule: config.weeklySchedule };
+    const updated: Business = { ...business, slug: config.slug, name: config.name, category: config.category, phoneWhatsApp: config.phoneWhatsApp, ...(config.socialLinks !== undefined ? { socialLinks: normalizeBusinessSocialLinks(config.socialLinks) } : {}), sarinConfig: { onboardingCompleted: true, tone: config.tone, customRules: config.customRules, intakeFields: config.intakeFields }, resources: config.resources, services: config.services, weeklySchedule: config.weeklySchedule };
     if (!business.slug) transaction.create(slugReference, { businessId: id, ownerUid: user.uid });
     transaction.set(reference, updated);
     transaction.set(db.collection('publicBusinesses').doc(config.slug), publicBusiness(updated));

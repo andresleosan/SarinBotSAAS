@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isDateKey, isTimeString } from '@/lib/sarin/availability';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/billing-plans';
+import { businessSocialLinksSchema } from '@/lib/business-branding';
 
 export const documentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 export const requestIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,128}$/);
@@ -21,6 +22,7 @@ export const businessConfigSchema = z.object({
   name: shortText, category: shortText,
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(3).max(70),
   phoneWhatsApp: phoneSchema,
+  socialLinks: businessSocialLinksSchema.optional(),
   tone: z.string().trim().max(500).default('Cercano, claro y servicial'),
   customRules: z.string().trim().max(4000).default(''),
   intakeFields: z.array(z.object({ key: documentIdSchema, label: shortText, required: z.boolean() }).strict()).max(20),

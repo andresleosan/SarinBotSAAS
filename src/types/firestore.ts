@@ -1,4 +1,5 @@
 import type { SubscriptionPlanId } from '@/lib/billing-plans';
+import type { BusinessLogo, BusinessSocialLink } from '@/lib/business-branding';
 export type { SubscriptionPlanId } from '@/lib/billing-plans';
 
 export interface PlatformSettings {
@@ -86,6 +87,8 @@ export interface Business {
   name: string;
   category: string;
   phoneWhatsApp: string;
+  socialLinks?: BusinessSocialLink[];
+  logo?: BusinessLogo;
   timezone: 'America/Bogota';
   subscription: {
     status: SubscriptionStatus;
