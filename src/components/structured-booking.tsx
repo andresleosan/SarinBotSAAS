@@ -6,6 +6,7 @@ import { useStructuredBooking } from '@/hooks/useStructuredBooking';
 import type { BookingCapability, BookingSubjectCase, BookingBeneficiary, BookingSubjectKind, RepresentativeRole } from '@/lib/booking-subject';
 import type { PublicBusiness, Appointment } from '@/types/firestore';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
+import { serviceCatalogMetadata } from '@/lib/service-catalog';
 import { BookingSubjectConsent } from './booking-subject-consent';
 import { BookingProposal } from './booking-proposal';
 import { buttonClass, fieldClass, Notice } from './app-shell';
@@ -33,6 +34,7 @@ function CaseBooking({ uid, business, subjectCase, enabled, onConfirmed, onLocke
   useEffect(() => { onLocked(booking.busy || booking.uncertain); return () => onLocked(false); }, [booking.busy, booking.uncertain, onLocked]);
   useEffect(() => { if (booking.appointment && notified.current !== booking.appointment.id) { notified.current = booking.appointment.id; onConfirmed(booking.appointment); } }, [booking.appointment, onConfirmed]);
   const selected = booking.selection, represented = subjectCase.subjectKind === 'represented_minor', canBook = enabled && isSubscriptionAllowed(business), service = business.services.find(item => item.id === selected.serviceId);
+  const metadata = service ? serviceCatalogMetadata(service) : {};
   const beneficiary: BookingBeneficiary = represented ? { kind: 'represented_minor', displayName: name.trim(), representativeRole: subjectCase.representativeRole } : { kind: 'self' };
   return <div className="space-y-5">
     {(subject.loading || subject.error || subject.status?.required !== false) && <BookingSubjectConsent controller={subject} enabled={enabled} />}
@@ -43,6 +45,14 @@ function CaseBooking({ uid, business, subjectCase, enabled, onConfirmed, onLocke
       <div className="space-y-4">
         {represented && <label className="block text-sm">Nombre breve del menor<input aria-label="Nombre breve del menor" className={fieldClass} maxLength={80} value={name} disabled={booking.frozen} onChange={event => setName(event.target.value)} /><span className="text-xs text-sarin-muted">Solo el nombre necesario para distinguir la cita. El teléfono será del adulto.</span></label>}
         <label className="block text-sm">Servicio<select aria-label="Servicio de la reserva" className={fieldClass} value={selected.serviceId} disabled={booking.frozen || !canBook} onChange={event => booking.setSelection({ ...selected, serviceId: event.target.value, resourceId: '', startTimeStr: '' })}><option value="">Selecciona un servicio</option>{business.services.map(item => <option key={item.id} value={item.id}>{item.name} · {item.price.toLocaleString('es-CO')} COP</option>)}</select></label>
+        {service && <section aria-label="Detalles del servicio" className="min-w-0 space-y-3 rounded-xl border border-sarin-line bg-sarin-soft p-4">
+          {metadata.category && <p className="text-sm font-medium">{metadata.category}</p>}
+          {metadata.description && <p className="whitespace-pre-wrap text-sm leading-relaxed text-sarin-muted">{metadata.description}</p>}
+          <dl className="flex flex-wrap gap-x-6 gap-y-2">
+            <div><dt className="text-xs text-sarin-muted">Duración</dt><dd className="text-sm font-medium">{service.durationMinutes} minutos</dd></div>
+            <div><dt className="text-xs text-sarin-muted">Precio</dt><dd className="text-sm font-medium">{service.price.toLocaleString('es-CO')} COP</dd></div>
+          </dl>
+        </section>}
         <label className="block text-sm">Profesional o recurso<select aria-label="Recurso de la reserva" className={fieldClass} value={selected.resourceId} disabled={booking.frozen || !canBook || !service} onChange={event => booking.setSelection({ ...selected, resourceId: event.target.value, startTimeStr: '' })}><option value="">Cualquiera disponible</option>{business.resources.filter(item => item.active && service?.resourceIds.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label className="block text-sm">Día (Colombia)<input aria-label="Día de la reserva" type="date" className={`${fieldClass} min-w-0`} value={selected.dateKey} disabled={booking.frozen || !canBook} onChange={event => booking.setSelection({ ...selected, dateKey: event.target.value, startTimeStr: '' })} /></label>
         <button className={buttonClass} disabled={!canBook || !selected.serviceId || !selected.dateKey || booking.loadingAvailability || booking.frozen || (represented && !name.trim())} onClick={() => void booking.loadAvailability()}>{booking.loadingAvailability ? 'Consultando horarios…' : 'Consultar horarios'}</button>

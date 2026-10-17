@@ -1,5 +1,5 @@
 import { act, createElement } from 'react';
-import { create, type ReactTestRenderer } from 'react-test-renderer';
+import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
 import { StructuredBooking } from '@/components/structured-booking';
 import { BookingProposal } from '@/components/booking-proposal';
@@ -14,7 +14,7 @@ vi.mock('@/hooks/useEngineHealth', () => ({ useEngineHealth: () => { throw new E
 vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => { throw new Error('Structured booking must not mount chat'); } }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const capability = { configured: true, revision: 1, dataMode: 'general' as const, representedMinorsEnabled: true };
-const business = { id: 'demo-business', name: 'Demo', phoneWhatsApp: '573001234567', services: [{ id: 's', name: 'Corte', price: 10000, resourceIds: ['r'] }], resources: [{ id: 'r', name: 'Recurso', active: true }], subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 9999999999999 } } as unknown as PublicBusiness;
+const business = { id: 'demo-business', name: 'Demo', phoneWhatsApp: '573001234567', services: [{ id: 's', name: 'Corte', price: 10000, durationMinutes: 30, bufferMinutes: 10, resourceIds: ['r'] }], resources: [{ id: 'r', name: 'Recurso', active: true }], subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 9999999999999 } } as unknown as PublicBusiness;
 let renderer: ReactTestRenderer | undefined;
 afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; authState.uid = 'demo-user'; vi.mocked(apiFetch).mockReset(); });
 
@@ -43,6 +43,64 @@ function latestSubjectRead() {
 async function click(label: string) {
   await act(async () => renderer!.root.findAllByType('button').find(button => button.children.join('') === label)!.props.onClick());
 }
+
+function textContent(node: ReactTestInstance): string {
+  return node.children.map(child => typeof child === 'string' ? child : textContent(child)).join('');
+}
+
+it('shows selected service metadata as plain text with the customer duration and COP price', async () => {
+  mockStructuredApi(capability);
+  const service = { ...business.services[0], category: '  Cabello  ', description: '  Acabado <strong>natural</strong>\nIncluye asesoría.  ' };
+  await act(async () => { renderer = create(createElement(StructuredBooking, { business: { ...business, services: [service] }, capability, initialSubjectKind: 'self', onConfirmed: vi.fn() })); });
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Detalles del servicio' })).toHaveLength(0);
+  const initialRequests = vi.mocked(apiFetch).mock.calls.length;
+  await act(async () => renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.onChange({ target: { value: 's' } }));
+  const details = renderer!.root.findByProps({ 'aria-label': 'Detalles del servicio' });
+  expect(textContent(details)).toContain('Cabello');
+  expect(textContent(details)).toContain('Acabado <strong>natural</strong>\nIncluye asesoría.');
+  expect(textContent(details)).toContain('30 minutos');
+  expect(textContent(details)).toContain('10.000 COP');
+  expect(textContent(details)).not.toContain('40 minutos');
+  expect(details.findAllByType('strong')).toHaveLength(0);
+  expect(vi.mocked(apiFetch).mock.calls).toHaveLength(initialRequests);
+  await click('Consultar horarios'); await click('09:00'); await click('Revisar propuesta');
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.disabled).toBe(true);
+  expect(textContent(renderer!.root.findByProps({ 'aria-label': 'Detalles del servicio' }))).toContain('30 minutos');
+});
+
+it.each([
+  { category: undefined, description: undefined },
+  { category: '  ', description: '\n ' },
+  { category: 42, description: { historic: true } },
+  { category: 'c'.repeat(61), description: 'd'.repeat(301) },
+])('replaces service details and clears the previous time with optional metadata %j', async metadata => {
+  mockStructuredApi(capability);
+  const services = [
+    { ...business.services[0], category: 'Cabello', description: 'Descripción del corte' },
+    { ...business.services[0], id: 'other', name: 'Consulta', price: 0, durationMinutes: 15, ...metadata },
+  ] as PublicBusiness['services'];
+  await act(async () => { renderer = create(createElement(StructuredBooking, { business: { ...business, services }, capability, initialSubjectKind: 'self', onConfirmed: vi.fn() })); });
+  const select = () => renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' });
+  await act(async () => select().props.onChange({ target: { value: 's' } }));
+  await click('Consultar horarios'); await click('09:00');
+  expect(renderer!.root.findByProps({ 'aria-label': 'Recurso de la reserva' }).props.value).toBe('r');
+  const initialRequests = vi.mocked(apiFetch).mock.calls.length;
+  await act(async () => select().props.onChange({ target: { value: 'other' } }));
+  const details = renderer!.root.findByProps({ 'aria-label': 'Detalles del servicio' });
+  expect(textContent(details)).toContain('15 minutos');
+  expect(textContent(details)).toContain('0 COP');
+  expect(textContent(details)).not.toContain('Cabello');
+  expect(textContent(details)).not.toContain('Descripción del corte');
+  expect(details.findAllByType('p')).toHaveLength(0);
+  expect(renderer!.root.findByProps({ 'aria-label': 'Recurso de la reserva' }).props.value).toBe('');
+  expect(renderer!.root.findAllByProps({ 'aria-pressed': true })).toHaveLength(0);
+  expect(renderer!.root.findAllByType('button').find(button => button.children.join('') === 'Revisar propuesta')!.props.disabled).toBe(true);
+  expect(vi.mocked(apiFetch).mock.calls).toHaveLength(initialRequests);
+  for (const value of ['', 'removed-service']) {
+    await act(async () => select().props.onChange({ target: { value } }));
+    expect(renderer!.root.findAllByProps({ 'aria-label': 'Detalles del servicio' })).toHaveLength(0);
+  }
+});
 
 it.each([false, true])('general self booking stays adult-only when minor bookings are enabled: %s', async representedMinorsEnabled => {
   const general = { ...capability, representedMinorsEnabled };
@@ -98,6 +156,7 @@ it('starts a fresh case when the explicit subject, business or adult account cha
   expect(selfRead.query.has('representativeRole')).toBe(false);
   expect(renderer!.root.findAllByProps({ 'aria-label': 'Nombre breve del menor' })).toHaveLength(0);
   expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('');
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Detalles del servicio' })).toHaveLength(0);
   await act(async () => renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.onChange({ target: { value: 's' } }));
   const nextBusinessProps = { ...selfProps, business: { ...business, id: 'demo-other-business' } };
   await act(async () => renderer!.update(createElement(StructuredBooking, nextBusinessProps)));
@@ -105,11 +164,14 @@ it('starts a fresh case when the explicit subject, business or adult account cha
   expect(businessRead.query.get('businessId')).toBe('demo-other-business');
   expect(businessRead.query.get('bookingRequestId')).not.toBe(selfRead.query.get('bookingRequestId'));
   expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('');
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Detalles del servicio' })).toHaveLength(0);
+  await act(async () => renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.onChange({ target: { value: 's' } }));
   authState.uid = 'demo-other-user';
   await act(async () => renderer!.update(createElement(StructuredBooking, nextBusinessProps)));
   const accountRead = latestSubjectRead();
   expect(accountRead.uid).toBe('demo-other-user');
   expect(accountRead.query.get('bookingRequestId')).not.toBe(businessRead.query.get('bookingRequestId'));
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Detalles del servicio' })).toHaveLength(0);
   await act(async () => renderer!.update(createElement(StructuredBooking, { ...nextBusinessProps, initialSubjectKind: 'represented_minor' as const })));
   const newMinorRead = latestSubjectRead();
   expect(newMinorRead.query.get('subjectKind')).toBe('represented_minor');
@@ -121,6 +183,7 @@ it('minor name field appears only after current case authorization and role chan
   vi.mocked(apiFetch).mockImplementation(async (path, init) => { const query = new URL(path, 'http://localhost').searchParams, body = init?.body ? JSON.parse(String(init.body)) : null, subjectCase = body?.case ?? { bookingRequestId: query.get('bookingRequestId')!, subjectKind: 'represented_minor' as const, representativeRole: query.get('representativeRole') as 'parent' }; return { required: true, active: init?.method === 'POST', revision: init?.method ? 1 : 0, capability, receipt: null, documents: { ...bookingSubjectContent(business, subjectCase, capability), fingerprint: 'a'.repeat(64) } }; });
   await act(async () => { renderer = create(createElement(StructuredBooking, { business, capability, onConfirmed: vi.fn() })); });
   expect(renderer!.root.findAllByProps({ 'aria-label': 'Nombre breve del menor' })).toHaveLength(0);
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Detalles del servicio' })).toHaveLength(0);
   for (const checkbox of renderer!.root.findAllByType('input').filter(input => input.props.type === 'checkbox')) await act(async () => checkbox.props.onChange({ target: { checked: true } }));
   await act(async () => renderer!.root.findByType('form').props.onSubmit({ preventDefault() {} }));
   expect(renderer!.root.findAllByProps({ 'aria-label': 'Nombre breve del menor' })).toHaveLength(1);
