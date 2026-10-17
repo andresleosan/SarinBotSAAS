@@ -1,14 +1,14 @@
 # Estado de implementación — 2026-10-17
 
-## Categorías y descripciones — aprobado en local
+## Categorías y descripciones — publicado
 
 - [x] Diseño acotado aprobado por el propietario: descripción y categoría opcionales por servicio, edición y agrupación en la ficha pública. [Decisión y fuentes](docs/design/2026-10-17-service-catalog.md).
 - [x] Validación 300/60, texto plano, omisión compatible por ID y borrado explícito; catálogo histórico plano, datos operativos de IA y citas confirmadas conservados. Sin migraciones ni dependencias.
 - [x] Corregir pérdida del borrado al aplicar borrador omiso con regresión RED/GREEN y revisión independiente sin bloqueantes. 927 pruebas aprobadas/26 omitidas, tipos y build; 129 comprobaciones locales. Chrome en 320/390/1280 px. [Evidencia](docs/qa/2026-10-17-service-catalog.md).
 - [x] Congelar candidato `accab51` y respaldo compatible `929c43e`; construir y comprobar ambas imágenes Linux sin red/credenciales. Respaldo con 919 pruebas aprobadas/26 omitidas; 74 pruebas Worker y dry-run correctos. Imágenes aún locales, sin cambios de producción.
-- [ ] Publicar tras autorización específica del propietario y verificar la instancia efectiva y el catálogo real.
+- [x] Publicar tras autorización específica del propietario: imagen `b2b925f5…`, Worker `274d9bf2…`, Containers v10; cola drenada, una instancia conectada y cero antiguas. Campos visibles en Chrome, perfil/API públicos e iconos verificados; sesión administrativa conservada y respaldo compatible `8575a007…` disponible. [Publicación y reversión](docs/qa/2026-10-17-service-catalog.md).
 
-Rama de este incremento: `codex/service-catalog-20261017`, worktree `F:/Proyectos/SarinBot-worktrees/service-catalog`, basada en `d942e90`. La producción y las fuentes del checkout original se conservan.
+Rama de este incremento: `codex/service-catalog-20261017`, worktree `F:/Proyectos/SarinBot-worktrees/service-catalog`, basada en `d942e90`. Las fuentes del checkout original se conservan; el runtime publicado procede del archivo Git congelado `accab51`.
 
 ## Perfil público antes del acceso — publicado
 
