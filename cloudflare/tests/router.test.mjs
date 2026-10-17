@@ -12,6 +12,20 @@ const workloadRuntime = {
   FIREBASE_WIF_AUDIENCE: '//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/sarin-cloudflare/providers/worker-oidc',
   FIREBASE_WIF_SERVICE_ACCOUNT_EMAIL: 'sarin-runtime@real-project.iam.gserviceaccount.com',
 };
+test('maintenance allows only exact authenticated booking classification administration', async () => {
+  const allowed = [['GET', '?businessId=demo'], ['PATCH', '']];
+  for (const [method, query] of allowed) {
+    let calls = 0;
+    const response = await forwardToSingleton(new Request(`https://example.com/api/admin/booking-data-policy${query}`, { method, headers: { authorization: 'Bearer synthetic' } }), () => ({ fetch: async () => { calls++; return new Response('authorized in Next'); } }), { SARIN_MAINTENANCE: 'true' });
+    assert.equal(response.status, 200); assert.equal(calls, 1);
+  }
+  for (const [method, suffix, auth] of [['GET', '', true], ['GET', '?businessId=demo&businessId=demo', true], ['GET', '?businessId=demo&cursor=a', true], ['GET', '?businessId=demo&extra=1', true], ['GET', '?businessId=bad%2Fid', true], ['PATCH', '?businessId=demo', true], ['GET', '?businessId=demo', false], ['POST', '', true], ['GET', '/extra?businessId=demo', true]]) {
+    let calls = 0;
+    const response = await forwardToSingleton(new Request(`https://example.com/api/admin/booking-data-policy${suffix}`, { method, headers: auth ? { authorization: 'Bearer synthetic' } : {} }), () => { calls++; throw new Error('must stay closed'); }, { SARIN_MAINTENANCE: 'true' });
+    assert.equal(response.status, 503); assert.equal(calls, 0);
+  }
+});
+
 test('maintains a narrowly authenticated budget configuration route while chat stays closed', async () => {
   const get = () => ({ fetch: async () => Response.json({ configured: true }) });
   for (const method of ['GET', 'PATCH']) assert.equal((await forwardToSingleton(new Request('https://app.example.invalid/api/admin/abuse', { method, headers: { Authorization: 'Bearer synthetic' } }), get, { SARIN_MAINTENANCE: 'true' })).status, 200);

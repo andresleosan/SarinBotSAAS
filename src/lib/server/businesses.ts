@@ -9,6 +9,7 @@ import { documentIdSchema, type BusinessConfig } from './schemas';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { normalizeBusinessSocialLinks, type BusinessSocialLink } from '@/lib/business-branding';
 import { assertConsent } from './consent';
+import { assertBookingIntakePolicy } from './booking-data-policy';
 
 export const businessIdForOwner = (uid: string) => `b_${createHash('sha256').update(uid).digest('hex').slice(0, 32)}`;
 export const stableDocumentId = (...parts: string[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
@@ -70,6 +71,7 @@ export async function createBusiness(user: ChatActor, config: BusinessConfig, db
     const business = existing.data() as Business;
     assertOwner(business, user.uid);
     await assertConsent(user.uid, 'account', undefined, db, transaction);
+    await assertBookingIntakePolicy(transaction, id, config.intakeFields, db);
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa un plan para configurar tu negocio.', 'PAYMENT_REQUIRED');
     if (business.slug && business.slug !== config.slug) throw new HttpError(409, 'El enlace del negocio es permanente para conservar tu código QR.');
     if (!business.slug && slug.exists) throw new HttpError(409, 'Este enlace ya está ocupado. Escoge otro slug.');

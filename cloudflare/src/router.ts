@@ -125,7 +125,8 @@ export async function forwardToSingleton(request: Request, get: (name: string) =
     const budgetCursorRead = request.method === 'GET' && [...url.searchParams.keys()].every(key => key === 'cursor') && url.searchParams.getAll('cursor').length === 1 && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.searchParams.get('cursor') ?? '');
     const businessBudgetRead = request.method === 'GET' && [...url.searchParams.keys()].every(key => key === 'businessId') && url.searchParams.getAll('businessId').length === 1 && /^[A-Za-z0-9_-]{1,128}$/.test(url.searchParams.get('businessId') ?? '');
     const budgetAdministration = ['GET', 'PATCH'].includes(request.method) && url.pathname === '/api/admin/abuse' && (!url.search || budgetCursorRead || businessBudgetRead) && !url.hash && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '');
-    if (!drainRead && !budgetAdministration) return Response.json({ error: 'La aplicación está en mantenimiento.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
+    const bookingAdministration = url.pathname === '/api/admin/booking-data-policy' && !url.hash && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '') && ((request.method === 'GET' && businessBudgetRead) || (request.method === 'PATCH' && !url.search));
+    if (!drainRead && !budgetAdministration && !bookingAdministration) return Response.json({ error: 'La aplicación está en mantenimiento.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
   }
   try {
     const requestHeaders = new Headers(request.headers);

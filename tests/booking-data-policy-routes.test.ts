@@ -1,0 +1,25 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { GET, PATCH } from '@/app/api/admin/booking-data-policy/route';
+import { GET as capability } from '@/app/api/businesses/[id]/booking-policy/route';
+import { privateBusinessDraft } from '@/lib/server/businesses';
+import { memoryFirestore } from './memoryFirestore';
+const boundary = vi.hoisted(() => ({ db: null as unknown, uid: 'demo-admin' }));
+vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => boundary.db, getAdminAuth: () => ({ verifyIdToken: async () => ({ uid: boundary.uid }) }) }));
+afterEach(() => vi.unstubAllEnvs());
+it('authenticates admin in Next and rejects query variants and oversized or extra input', async () => {
+  vi.stubEnv('SUPERADMIN_UID', 'demo-admin'); boundary.db = memoryFirestore({ 'businesses/demo': { ...privateBusinessDraft({ uid: 'demo-owner' }, 0), id: 'demo' } }).db;
+  const request = (query: string, auth = true) => new Request(`http://localhost/api/admin/booking-data-policy${query}`, { headers: auth ? { authorization: 'Bearer synthetic' } : {} });
+  expect((await GET(request('?businessId=demo', false))).status).toBe(401);
+  boundary.uid = 'demo-owner'; expect((await GET(request('?businessId=demo'))).status).toBe(403); boundary.uid = 'demo-admin';
+  for (const query of ['', '?businessId=demo&businessId=demo', '?businessId=demo&cursor=a', '?businessId=demo&extra=1']) expect((await GET(request(query))).status).toBe(400);
+  expect((await GET(request('?businessId=demo'))).status).toBe(200);
+  const body = { businessId: 'demo', expectedRevision: 0, dataMode: 'general', representedMinorsEnabled: false, reason: 'Test' };
+  const patch = (input: object, query = '') => PATCH(new Request(`http://localhost/api/admin/booking-data-policy${query}`, { method: 'PATCH', headers: { authorization: 'Bearer synthetic', 'content-type': 'application/json' }, body: JSON.stringify(input) }));
+  expect((await patch({ ...body, ownerUid: 'x' })).status).toBe(400);
+  expect((await patch(body, '?businessId=demo')).status).toBe(400);
+  expect((await patch({ ...body, reason: 'a'.repeat(9000) })).status).toBe(413);
+  expect((await patch(body)).status).toBe(200);
+  const response = await capability(new Request('http://localhost/api/businesses/demo/booking-policy', { headers: { authorization: 'Bearer synthetic' } }), { params: Promise.resolve({ id: 'demo' }) });
+  expect(response.status).toBe(200); expect(await response.json()).toEqual({ configured: true, revision: 1, dataMode: 'general', representedMinorsEnabled: false });
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
+});
