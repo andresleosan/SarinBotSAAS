@@ -71,7 +71,7 @@ Capturas reales JPEG: [pediatría 390](assets/health-20261016/pediatria-390.jpg)
 
 Contexto obtenido con `git archive` del commit exacto, solo cuatro argumentos públicos Firebase. Sin archivos de entorno, scratch, llaves Admin ni secretos en la imagen. Smoke con usuario `node`, red `none`, raíz de solo lectura, todas las capabilities retiradas y `no-new-privileges`. Sharp nativo generó WebP de 512×512; términos/privacidad/ayuda y documentos públicos 200; sesión/permisos/política/disponibilidad/propuestas anónimos 401; preautorización canónica 200, origen ajeno 403 y decisión sin marcar 400. No equivale a integración remota.
 
-Los procesos locales de esta sesión se detuvieron y los puertos 3042/8080/9099/8188/4400/4500 quedaron sin listener. Contenedor de smoke detenido. Logs, ledger y scripts se archivan privadamente en `%LOCALAPPDATA%/SarinBot/health-qa-20261016/evidence` antes de limpiar exclusivamente el scratch de este plan. Rama y worktree se conservan; no merge, push ni publicación.
+Los procesos locales de esta sesión se detuvieron y los puertos 3042/8080/9099/8188/4400/4500 quedaron sin listener. Contenedor de smoke detenido. Logs, ledger y scripts se archivan privadamente en `%LOCALAPPDATA%/SarinBot/health-qa-20261016/evidence` y el scratch se conserva ignorado por Git: el control automático rechazó su borrado recursivo sin motivo detallado. No se intentó otro método de eliminación. Rama y worktree se conservan; no merge, push ni publicación.
 
 ## Menores diferidos
 
