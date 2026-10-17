@@ -66,6 +66,13 @@ describe("chat pause surfaces", () => {
     }
     expect(state.structuredMount).toHaveBeenCalledTimes(1); expect(state.chatMount).not.toHaveBeenCalled();
   });
+  it('does not return a browser scrolling promise as an effect cleanup', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) })), { createNodeMock: element => element.type === 'div' ? { scrollIntoView: () => Promise.resolve() } : null }); });
+      expect(errors.mock.calls.some(call => String(call[0]).includes('useEffect must not return'))).toBe(false);
+    } finally { errors.mockRestore(); }
+  });
   it("allows a new configuration message after the server reports the earlier turn completed", async () => {
     state.chat.error = "Solicitud ya atendida";
     state.chat.requestAlreadyCompleted = true;

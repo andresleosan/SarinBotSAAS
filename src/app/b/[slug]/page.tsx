@@ -22,7 +22,7 @@ import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/busines
 function GeneralBookingChat({ business, uid, permitted, now, onConfirmed }: { business: PublicBusiness; uid: string; permitted: boolean; now: number; onConfirmed: () => void }) {
   const [input, setInput] = useState(''), end = useRef<HTMLDivElement>(null), engine = useEngineHealth();
   const chat = useDebouncedChat({ mode: 'sarin_client', tenantId: business.id, actorUid: uid, enabled: permitted, onToolExecuted: name => { if (name === 'cita_confirmada') onConfirmed(); } });
-  useEffect(() => end.current?.scrollIntoView({ behavior: 'auto', block: 'nearest' }), [chat.messages, chat.isGenerating]);
+  useEffect(() => { void end.current?.scrollIntoView({ behavior: 'auto', block: 'nearest' }); }, [chat.messages, chat.isGenerating]);
   const allowed = isSubscriptionAllowed(business, now), available = allowed && !chat.quotaExhausted, canSend = permitted && available && !chat.confirming;
   function submit(event: FormEvent) { event.preventDefault(); if (!canSend || !input.trim()) return; chat.sendMessage(input); setInput(''); }
   return <section aria-label="Asistente de reservas" className="space-y-4">
