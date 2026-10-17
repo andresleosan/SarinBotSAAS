@@ -6,11 +6,13 @@ import type { BookingProposalView } from '@/types/chat';
 import type { Appointment } from '@/types/firestore';
 type Selection = { serviceId: string; resourceId: string; dateKey: string; startTimeStr: string };
 type Slots = { resourceId: string; resourceName: string; slots: string[] }[];
-export function useStructuredBooking(uid: string | undefined, business: { id: string }, subjectCase: BookingSubjectCase, subjectActive: boolean) {
+type AvailabilityStatus = 'idle' | 'loading' | 'success' | 'error';
+export function useStructuredBooking(uid: string | undefined, business: { id: string }, subjectCase: BookingSubjectCase, subjectActive: boolean, initialServiceId = '') {
   const key = uid ? JSON.stringify([uid, business.id, subjectCase]) : null, identity = useRef({ key });
   if (identity.current.key !== key) identity.current = { key };
   const current = identity.current;
-  const initial = () => ({ identity: current, selection: { serviceId: '', resourceId: '', dateKey: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(Date.now()), startTimeStr: '' }, availability: [] as Slots, proposal: null as BookingProposalView | null, appointment: null as Appointment | null, busy: false, loadingAvailability: false, frozen: false, uncertain: false, error: null as string | null });
+  const initialService = useRef({ identity: current, serviceId: initialServiceId });
+  const initial = () => ({ identity: current, selection: { serviceId: initialService.current.identity === current ? initialService.current.serviceId : '', resourceId: '', dateKey: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(Date.now()), startTimeStr: '' }, availability: [] as Slots, availabilityStatus: 'idle' as AvailabilityStatus, proposal: null as BookingProposalView | null, appointment: null as Appointment | null, busy: false, frozen: false, uncertain: false, error: null as string | null });
   const [stored, setStored] = useState(initial), state = stored.identity === current ? stored : initial();
   const selection = useRef(state.selection); selection.current = state.selection;
   const availabilityRequest = useRef<AbortController | null>(null), mutation = useRef<AbortController | null>(null), proposalRequest = useRef<{ identity: object; body: string; beneficiary: BookingBeneficiary } | null>(null), confirmation = useRef<{ identity: object; path: string; body: string; uncertain: boolean } | null>(null);
@@ -18,19 +20,19 @@ export function useStructuredBooking(uid: string | undefined, business: { id: st
   useEffect(() => () => { availabilityRequest.current?.abort(); mutation.current?.abort(); availabilityRequest.current = null; mutation.current = null; proposalRequest.current = null; confirmation.current = null; }, [key]);
   function setSelection(value: Selection) {
     if (proposalRequest.current?.identity === current || confirmation.current?.identity === current) return;
-    availabilityRequest.current?.abort(); availabilityRequest.current = null; selection.current = value; update({ selection: value, availability: [], loadingAvailability: false, error: null });
+    availabilityRequest.current?.abort(); availabilityRequest.current = null; selection.current = value; update({ selection: value, availability: [], availabilityStatus: 'idle', error: null });
   }
   async function loadAvailability() {
     const selected = selection.current;
     if (!uid || !subjectActive || !selected.serviceId || !selected.dateKey || state.frozen) return;
-    availabilityRequest.current?.abort(); const abort = availabilityRequest.current = new AbortController(); update({ loadingAvailability: true, error: null, availability: [] });
+    availabilityRequest.current?.abort(); const abort = availabilityRequest.current = new AbortController(); update({ availabilityStatus: 'loading', error: null, availability: [] });
     try {
       const data = await apiFetch<{ availability: Slots }>(`/api/businesses/${encodeURIComponent(business.id)}/availability`, { method: 'POST', signal: abort.signal, body: JSON.stringify({ case: subjectCase, dateKey: selected.dateKey, serviceId: selected.serviceId, ...(selected.resourceId ? { resourceId: selected.resourceId } : {}) }) }, uid);
       if (identity.current !== current || abort.signal.aborted || availabilityRequest.current !== abort) return;
       if (!Array.isArray(data.availability) || data.availability.some(item => typeof item.resourceId !== 'string' || !Array.isArray(item.slots) || item.slots.some(slot => !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(slot)))) throw new Error('No se pudo comprobar la disponibilidad.');
-      update({ availability: data.availability });
-    } catch (cause) { if (identity.current === current && !abort.signal.aborted) update({ error: errorMessage(cause) }); }
-    finally { if (identity.current === current && !abort.signal.aborted && availabilityRequest.current === abort) { update({ loadingAvailability: false }); availabilityRequest.current = null; } }
+      update({ availability: data.availability, availabilityStatus: 'success' });
+    } catch (cause) { if (identity.current === current && !abort.signal.aborted && availabilityRequest.current === abort) update({ error: errorMessage(cause), availabilityStatus: 'error' }); }
+    finally { if (identity.current === current && !abort.signal.aborted && availabilityRequest.current === abort) availabilityRequest.current = null; }
   }
   async function propose(beneficiary: BookingBeneficiary) {
     if (!uid || !subjectActive || mutation.current) return;
@@ -68,5 +70,5 @@ export function useStructuredBooking(uid: string | undefined, business: { id: st
     const operation = { identity: current, path: `/api/businesses/${encodeURIComponent(business.id)}/booking-proposals/${encodeURIComponent(id)}/confirm`, body: JSON.stringify({ confirm: true, ...contact, beneficiary: proposalRequest.current.beneficiary }), uncertain: false };
     confirmation.current = operation; return sendConfirmation(operation);
   }
-  return { ...state, setSelection, loadAvailability, propose, confirm, retryConfirmation: async () => { if (confirmation.current?.identity === current) await sendConfirmation(confirmation.current); } };
+  return { ...state, loadingAvailability: state.availabilityStatus === 'loading', setSelection, loadAvailability, propose, confirm, retryConfirmation: async () => { if (confirmation.current?.identity === current) await sendConfirmation(confirmation.current); } };
 }

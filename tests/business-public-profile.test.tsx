@@ -47,17 +47,17 @@ describe('public business profile', () => {
   it('pairs each service with its fixed COP price and duration, including a zero price', async () => {
     await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile, onContinue: vi.fn() })); });
     const catalog = renderer.root.findByProps({ 'aria-label': 'Servicios del negocio' });
-    const services = catalog.findAllByType('li').map(textContent);
-    expect(services).toEqual(['Corte y peinado65.000 COP45 minutos', 'Asesoría0 COP30 minutos']);
+    const services = catalog.findAllByType('li').map(card => ({ name: textContent(card.findByType('h3')), details: card.findAllByType('p').map(textContent) }));
+    expect(services).toEqual([{ name: 'Corte y peinado', details: ['65.000 COP', '45 minutos'] }, { name: 'Asesoría', details: ['0 COP', '30 minutos'] }]);
   });
 
   it('shows each published service description as plain text alongside its price and duration', async () => {
     const services = [{ ...profile.services[0], description: 'Lavado y peinado.\n<strong>Texto literal</strong>' }, { ...profile.services[1], description: '' }];
     await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile: { ...profile, services }, onContinue: vi.fn() })); });
     const cards = renderer.root.findByProps({ 'aria-label': 'Servicios del negocio' }).findAllByType('li');
-    expect(textContent(cards[0])).toBe('Corte y peinadoLavado y peinado.\n<strong>Texto literal</strong>65.000 COP45 minutos');
+    expect(cards[0].findAllByType('p').map(textContent)).toEqual(['Lavado y peinado.\n<strong>Texto literal</strong>', '65.000 COP', '45 minutos']);
     expect(cards[0].findAllByType('strong')).toHaveLength(0);
-    expect(textContent(cards[1])).toBe('Asesoría0 COP30 minutos');
+    expect(cards[1].findAllByType('p').map(textContent)).toEqual(['0 COP', '30 minutos']);
   });
 
   it('groups categories in first appearance order, merging case and NFC equivalents without reordering services', async () => {
@@ -110,22 +110,43 @@ describe('public business profile', () => {
   it('continues only when the visitor chooses to reserve', async () => {
     const onContinue = vi.fn();
     await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile, onContinue })); });
-    const button = renderer.root.findByType('button');
+    const button = renderer.root.findAllByType('button').find(item => textContent(item) === 'Reservar')!;
     expect(textContent(button)).toBe('Reservar');
     expect(onContinue).not.toHaveBeenCalled();
-    await act(async () => button.props.onClick());
-    expect(onContinue).toHaveBeenCalledTimes(1);
+    await act(async () => button.props.onClick({ type: 'click' }));
+    expect(onContinue.mock.calls).toEqual([[]]);
+  });
+
+  it.each([false, true])('continues with the exact service ID from each service button, grouped=%s', async grouped => {
+    const onContinue = vi.fn();
+    const services = [
+      { ...profile.services[0], ...(grouped ? { category: 'Cortes' } : {}) },
+      { ...profile.services[1] },
+      { ...profile.services[0], id: 'long', name: 'Servicio extenso de cuidado y peinado con caracteres Unicode: áéíóú ñ — <texto literal>', ...(grouped ? { category: 'cortes' } : {}) },
+    ];
+    await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile: { ...profile, services }, onContinue })); });
+    const catalog = renderer.root.findByProps({ 'aria-label': 'Servicios del negocio' });
+    expect(catalog.findAllByType('button')).toHaveLength(3);
+    expect(onContinue).not.toHaveBeenCalled();
+    for (const name of ['Corte y peinado', 'Asesoría', 'Servicio extenso de cuidado y peinado con caracteres Unicode: áéíóú ñ — <texto literal>']) {
+      const button = catalog.findByProps({ 'aria-label': `Reservar este servicio: ${name}` });
+      expect(textContent(button)).toBe('Reservar este servicio');
+      expect(button.props['aria-label']).toContain(textContent(button));
+      await act(async () => button.props.onClick({ type: 'click' }));
+    }
+    expect(onContinue.mock.calls).toEqual([['cut'], ['advice'], ['long']]);
   });
 
   it('keeps existing appointments accessible when new bookings are paused', async () => {
     const onContinue = vi.fn();
     await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile: { ...profile, bookingAvailable: false }, onContinue })); });
     expect(textContent(renderer.root)).toContain('Las nuevas reservas están en pausa.');
-    const button = renderer.root.findByType('button');
+    expect(renderer.root.findByProps({ 'aria-label': 'Servicios del negocio' }).findAllByType('button')).toHaveLength(0);
+    const button = renderer.root.findAllByType('button').find(item => textContent(item) === 'Ver mis citas')!;
     expect(textContent(button)).toBe('Ver mis citas');
     expect(button.props.disabled).not.toBe(true);
-    await act(async () => button.props.onClick());
-    expect(onContinue).toHaveBeenCalledTimes(1);
+    await act(async () => button.props.onClick({ type: 'click' }));
+    expect(onContinue.mock.calls).toEqual([[]]);
   });
 
   it('handles unpublished catalog and optional identity details without inventing content', async () => {

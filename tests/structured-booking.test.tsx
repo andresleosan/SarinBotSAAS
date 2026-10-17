@@ -18,11 +18,11 @@ const business = { id: 'demo-business', name: 'Demo', phoneWhatsApp: '5730012345
 let renderer: ReactTestRenderer | undefined;
 afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; authState.uid = 'demo-user'; vi.mocked(apiFetch).mockReset(); });
 
-function mockStructuredApi(currentCapability: BookingCapability, restrictedCaseAuthorized = false) {
+function mockStructuredApi(currentCapability: BookingCapability, restrictedCaseAuthorized = false, availability = [{ resourceId: 'r', resourceName: 'Recurso', slots: ['09:00'] }]) {
   vi.mocked(apiFetch).mockImplementation(async (path, init) => {
     if (path.endsWith('/confirm')) return { appointment: { id: 'demo-confirmed', tenantId: business.id, client: { uid: authState.uid }, status: 'confirmed' } };
     if (path.endsWith('/booking-proposals')) return { proposal: { id: 'demo-self-proposal', businessId: business.id, serviceName: 'Corte', resourceName: 'Recurso', dateKey: '2030-01-01', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, intakeFields: [{ key: 'preference', label: 'Preferencia para la cita', required: false }], expiresAt: Date.now() + 600000 } };
-    if (path.endsWith('/availability')) return { availability: [{ resourceId: 'r', resourceName: 'Recurso', slots: ['09:00'] }] };
+    if (path.endsWith('/availability')) return { availability };
     const query = new URL(path, 'http://localhost').searchParams;
     const kind = query.get('subjectKind');
     const subjectCase: BookingSubjectCase = kind === 'self'
@@ -47,6 +47,98 @@ async function click(label: string) {
 function textContent(node: ReactTestInstance): string {
   return node.children.map(child => typeof child === 'string' ? child : textContent(child)).join('');
 }
+
+it.each([
+  { availability: [] },
+  { availability: [{ resourceId: 'r', resourceName: 'Recurso', slots: [] }, { resourceId: 'other', resourceName: 'Otro profesional', slots: [] }] },
+])('offers another day or professional only after a successful empty availability search: %j', async ({ availability }) => {
+  mockStructuredApi(capability, false, availability);
+  await act(async () => { renderer = create(createElement(StructuredBooking, { business, capability, initialSubjectKind: 'self', onConfirmed: vi.fn() })); });
+  const emptyNotices = () => renderer!.root.findAllByProps({ role: 'status' }).filter(node => textContent(node).includes('No hay horarios disponibles'));
+  expect(emptyNotices()).toHaveLength(0);
+  await act(async () => renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.onChange({ target: { value: 's' } }));
+  await click('Consultar horarios');
+  expect(emptyNotices()).toHaveLength(1);
+  expect(textContent(emptyNotices()[0])).toBe('No hay horarios disponibles para esta selección. Prueba otro día o profesional.');
+  expect(renderer!.root.findAllByType('fieldset')).toHaveLength(0);
+  expect(renderer!.root.findByProps({ 'aria-label': 'Día de la reserva' }).props.disabled).toBe(false);
+  expect(renderer!.root.findByProps({ 'aria-label': 'Recurso de la reserva' }).props.disabled).toBe(false);
+  await act(async () => renderer!.root.findByProps({ 'aria-label': 'Día de la reserva' }).props.onChange({ target: { value: '2030-01-02' } }));
+  expect(emptyNotices()).toHaveLength(0);
+  expect(vi.mocked(apiFetch).mock.calls.filter(([path]) => path.endsWith('/availability'))).toHaveLength(1);
+});
+
+it('shows request failure without reporting empty availability while loading or after an error', async () => {
+  mockStructuredApi(capability);
+  await act(async () => { renderer = create(createElement(StructuredBooking, { business, capability, initialSubjectKind: 'self', onConfirmed: vi.fn() })); });
+  await act(async () => renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.onChange({ target: { value: 's' } }));
+  let reject!: (reason: Error) => void;
+  vi.mocked(apiFetch).mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+  await click('Consultar horarios');
+  expect(renderer!.root.findAllByProps({ role: 'status' }).some(node => textContent(node).includes('No hay horarios disponibles'))).toBe(false);
+  expect(JSON.stringify(renderer!.toJSON())).toContain('Consultando horarios');
+  await act(async () => reject(new Error('No se pudo consultar. Intenta otra vez.')));
+  expect(JSON.stringify(renderer!.toJSON())).toContain('No se pudo consultar. Intenta otra vez.');
+  expect(renderer!.root.findAllByProps({ role: 'status' }).some(node => textContent(node).includes('No hay horarios disponibles'))).toBe(false);
+  expect(renderer!.root.findAllByType('button').find(button => button.children.join('') === 'Consultar horarios')!.props.disabled).toBe(false);
+});
+
+it('initializes a catalog service once without choosing a professional, searching or reserving', async () => {
+  mockStructuredApi(capability);
+  const services = [...business.services, { ...business.services[0], id: 'other', name: 'Consulta' }];
+  const onInitialServiceHandled = vi.fn();
+  const props = { business: { ...business, services }, capability, initialSubjectKind: 'self' as const, initialServiceId: 's', onInitialServiceHandled, onConfirmed: vi.fn() };
+  await act(async () => { renderer = create(createElement(StructuredBooking, props)); });
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('s');
+  expect(renderer!.root.findByProps({ 'aria-label': 'Recurso de la reserva' }).props.value).toBe('');
+  expect(renderer!.root.findAllByProps({ 'aria-pressed': true })).toHaveLength(0);
+  expect(textContent(renderer!.root.findByProps({ 'aria-label': 'Detalles del servicio' }))).toContain('30 minutos');
+  expect(renderer!.root.findAllByType('button').find(button => button.children.join('') === 'Revisar propuesta')!.props.disabled).toBe(true);
+  expect(onInitialServiceHandled).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(apiFetch).mock.calls.every(([path]) => path.startsWith('/api/booking-subject-consent?'))).toBe(true);
+  await act(async () => renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.onChange({ target: { value: 'other' } }));
+  await act(async () => renderer!.update(createElement(StructuredBooking, { ...props, initialServiceId: undefined })));
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('other');
+  await click('Iniciar otra reserva');
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('');
+  expect(onInitialServiceHandled).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(apiFetch).mock.calls.every(([path]) => path.startsWith('/api/booking-subject-consent?'))).toBe(true);
+});
+
+it('consumes a removed service seed without selecting it or resetting later user changes', async () => {
+  mockStructuredApi(capability);
+  const onInitialServiceHandled = vi.fn();
+  const props = { business, capability, initialSubjectKind: 'self' as const, initialServiceId: 'removed-service', onInitialServiceHandled, onConfirmed: vi.fn() };
+  await act(async () => { renderer = create(createElement(StructuredBooking, props)); });
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('');
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Detalles del servicio' })).toHaveLength(0);
+  expect(onInitialServiceHandled).toHaveBeenCalledTimes(1);
+  await act(async () => renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.onChange({ target: { value: 's' } }));
+  await act(async () => renderer!.update(createElement(StructuredBooking, props)));
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('s');
+  expect(onInitialServiceHandled).toHaveBeenCalledTimes(1);
+});
+
+it.each(['account', 'business', 'subject'] as const)('does not transfer the initial service to a changed %s', async changed => {
+  mockStructuredApi(capability, true);
+  const onInitialServiceHandled = vi.fn();
+  const props = { business, capability, initialSubjectKind: 'self' as 'self' | 'represented_minor', initialServiceId: 's', onInitialServiceHandled, onConfirmed: vi.fn() };
+  await act(async () => { renderer = create(createElement(StructuredBooking, props)); });
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('s');
+  if (changed === 'account') authState.uid = 'demo-other-user';
+  await act(async () => renderer!.update(createElement(StructuredBooking, {
+    ...props,
+    ...(changed === 'business' ? { business: { ...business, id: 'demo-other-business' } } : {}),
+    ...(changed === 'subject' ? { initialSubjectKind: 'represented_minor' as const } : {}),
+  })));
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('');
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Detalles del servicio' })).toHaveLength(0);
+  expect(onInitialServiceHandled).toHaveBeenCalledTimes(1);
+  authState.uid = 'demo-user';
+  await act(async () => renderer!.update(createElement(StructuredBooking, props)));
+  expect(renderer!.root.findByProps({ 'aria-label': 'Servicio de la reserva' }).props.value).toBe('');
+  expect(onInitialServiceHandled).toHaveBeenCalledTimes(1);
+});
 
 it('shows selected service metadata as plain text with the customer duration and COP price', async () => {
   mockStructuredApi(capability);

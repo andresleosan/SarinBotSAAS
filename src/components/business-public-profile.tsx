@@ -16,7 +16,7 @@ const contactClass = 'inline-flex min-h-11 min-w-0 max-w-full items-center py-2 
 
 type PublicService = PublicBusinessProfile['services'][number];
 
-function ServiceCards({ services, grouped = false }: { services: readonly PublicService[]; grouped?: boolean }) {
+function ServiceCards({ services, grouped = false, onReserve }: { services: readonly PublicService[]; grouped?: boolean; onReserve?: (serviceId: string) => void }) {
   const Heading = grouped ? 'h4' : 'h3';
   return <ul className="mt-4 space-y-3">
     {services.map(service => <li key={service.id} className="min-w-0 rounded-xl border border-sarin-line p-4">
@@ -26,6 +26,7 @@ function ServiceCards({ services, grouped = false }: { services: readonly Public
         <p className="font-semibold">{service.price.toLocaleString('es-CO')} COP</p>
         <p className="text-sarin-muted">{service.durationMinutes} minutos</p>
       </div>
+      {onReserve && <button type="button" aria-label={`Reservar este servicio: ${service.name}`} onClick={() => onReserve(service.id)} className="mt-3 inline-flex min-h-11 max-w-full items-center rounded-[10px] border border-sarin-line px-3 py-2 text-left text-sm font-semibold text-sarin-blue hover:border-sarin-blue hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue">Reservar este servicio</button>}
     </li>)}
   </ul>;
 }
@@ -42,7 +43,7 @@ function categoryGroups(services: readonly PublicService[]) {
   return [...groups.entries()];
 }
 
-export function BusinessPublicProfile({ profile, onContinue }: { profile: PublicBusinessProfile; onContinue: () => void }) {
+export function BusinessPublicProfile({ profile, onContinue }: { profile: PublicBusinessProfile; onContinue: (serviceId?: string) => void }) {
   const telephone = profile.phoneWhatsApp.replace(/\D/g, '');
   const hasContact = Boolean(telephone || profile.socialLinks?.length);
   const hasCategories = profile.services.some(service => Boolean(service.category?.trim()));
@@ -60,7 +61,7 @@ export function BusinessPublicProfile({ profile, onContinue }: { profile: Public
 
     <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
       <p className="min-w-0 text-sm text-sarin-muted">{profile.bookingAvailable ? 'Consulta la disponibilidad para reservar tu cita.' : 'Las nuevas reservas están en pausa. Puedes consultar y cancelar tus citas existentes.'}</p>
-      <button type="button" onClick={onContinue} className="min-h-11 shrink-0 rounded-[10px] bg-sarin-blue px-6 py-3 text-sm font-semibold text-white hover:bg-[#244dd0] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue">{profile.bookingAvailable ? 'Reservar' : 'Ver mis citas'}</button>
+      <button type="button" onClick={() => onContinue()} className="min-h-11 shrink-0 rounded-[10px] bg-sarin-blue px-6 py-3 text-sm font-semibold text-white hover:bg-[#244dd0] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue">{profile.bookingAvailable ? 'Reservar' : 'Ver mis citas'}</button>
     </div>
 
     <div className="grid min-w-0 items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
@@ -69,9 +70,9 @@ export function BusinessPublicProfile({ profile, onContinue }: { profile: Public
         {profile.services.length ? hasCategories ? <div className="mt-5 space-y-6">
           {categoryGroups(profile.services).map(([key, group]) => <div key={key} className="min-w-0">
             <h3 className="font-semibold">{group.label}</h3>
-            <ServiceCards services={group.services} grouped />
+            <ServiceCards services={group.services} grouped onReserve={profile.bookingAvailable ? onContinue : undefined} />
           </div>)}
-        </div> : <ServiceCards services={profile.services} /> : <p className="mt-3 text-sm text-sarin-muted">El negocio aún no ha publicado sus servicios.</p>}
+        </div> : <ServiceCards services={profile.services} onReserve={profile.bookingAvailable ? onContinue : undefined} /> : <p className="mt-3 text-sm text-sarin-muted">El negocio aún no ha publicado sus servicios.</p>}
       </section>
 
       <div className="min-w-0 space-y-4">

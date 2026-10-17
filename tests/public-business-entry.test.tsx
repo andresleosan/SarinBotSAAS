@@ -47,7 +47,7 @@ it('can retry an unavailable public profile without requesting a Google session'
 });
 it('keeps the existing authenticated gate and returns to the profile after sign out', async () => {
   await render();
-  await act(async () => renderer.root.findByType('button').props.onClick());
+  await act(async () => renderer.root.findAllByType('button').find(button => text(button) === 'Reservar')!.props.onClick());
   state.user = { uid: 'client' };
   await act(async () => renderer.update(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'shop' }) }))));
   expect(text(renderer.root)).toBe('Acceso con Google');
@@ -58,7 +58,7 @@ it('keeps the existing authenticated gate and returns to the profile after sign 
 });
 it('resets the login choice when the business link changes', async () => {
   await render();
-  await act(async () => renderer.root.findByType('button').props.onClick());
+  await act(async () => renderer.root.findAllByType('button').find(button => text(button) === 'Reservar')!.props.onClick());
   vi.mocked(fetch).mockResolvedValue(Response.json({ business: { ...profile, slug: 'other', name: 'Otro negocio' } }));
   await act(async () => renderer.update(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'other' }) }))));
   expect(text(renderer.root)).toContain('Otro negocio');

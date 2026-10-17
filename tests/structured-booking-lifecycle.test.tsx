@@ -7,8 +7,63 @@ vi.mock('@/lib/client/api', async original => ({ ...await original<typeof import
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let renderer: ReactTestRenderer | undefined, controller!: ReturnType<typeof useStructuredBooking>;
 const subjectCase = { bookingRequestId: 'demo-ui-case', subjectKind: 'represented_minor' as const, representativeRole: 'parent' as const }, business = { id: 'demo-business' };
-function Harness({ uid = 'demo-user', active = true }: { uid?: string; active?: boolean }) { controller = useStructuredBooking(uid, business, subjectCase, active); return null; }
+function Harness({ uid = 'demo-user', active = true, businessId = business.id, requestId = subjectCase.bookingRequestId, initialServiceId }: { uid?: string; active?: boolean; businessId?: string; requestId?: string; initialServiceId?: string }) { controller = useStructuredBooking(uid, { id: businessId }, { ...subjectCase, bookingRequestId: requestId }, active, initialServiceId); return null; }
 afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; vi.mocked(apiFetch).mockReset(); });
+it('distinguishes unsearched, loading, successful empty and failed availability', async () => {
+  let resolve!: (value: unknown) => void;
+  vi.mocked(apiFetch).mockImplementationOnce(() => new Promise(complete => { resolve = complete; })).mockRejectedValueOnce(new Error('No se pudo consultar'));
+  await act(async () => { renderer = create(createElement(Harness)); });
+  expect(controller.availabilityStatus).toBe('idle');
+  await act(async () => controller.setSelection({ dateKey: '2030-01-01', serviceId: 'one', resourceId: '', startTimeStr: '' }));
+  let pending!: Promise<void>;
+  act(() => { pending = controller.loadAvailability(); });
+  expect(controller.availabilityStatus).toBe('loading');
+  await act(async () => { resolve({ availability: [] }); await pending; });
+  expect(controller.availabilityStatus).toBe('success');
+  expect(controller.availability).toEqual([]);
+  await act(async () => controller.loadAvailability());
+  expect(controller.availabilityStatus).toBe('error');
+  expect(controller.error).toBe('No se pudo consultar');
+});
+
+it.each([
+  { serviceId: 'two' },
+  { resourceId: 'other' },
+  { dateKey: '2030-01-02' },
+])('clears completed and late empty searches when selection changes: %j', async changed => {
+  const reads: { signal: AbortSignal; resolve: (data: unknown) => void }[] = [];
+  vi.mocked(apiFetch).mockResolvedValueOnce({ availability: [] }).mockImplementation((_path, init) => new Promise(resolve => reads.push({ signal: init!.signal as AbortSignal, resolve })));
+  await act(async () => { renderer = create(createElement(Harness)); });
+  const selected = { dateKey: '2030-01-01', serviceId: 'one', resourceId: 'r', startTimeStr: '' };
+  await act(async () => controller.setSelection(selected));
+  await act(async () => controller.loadAvailability());
+  expect(controller.availabilityStatus).toBe('success');
+  await act(async () => controller.setSelection({ ...selected, ...changed }));
+  expect(controller.availabilityStatus).toBe('idle');
+  let pending!: Promise<void>;
+  act(() => { pending = controller.loadAvailability(); });
+  await act(async () => controller.setSelection(selected));
+  expect(reads[0].signal.aborted).toBe(true);
+  await act(async () => { reads[0].resolve({ availability: [] }); await pending; });
+  expect(controller.availabilityStatus).toBe('idle');
+  expect(controller.availability).toEqual([]);
+});
+
+it.each([
+  { uid: 'demo-other-user' },
+  { businessId: 'demo-other-business' },
+  { requestId: 'demo-other-case' },
+])('clears successful availability and the initial service when booking identity changes: %j', async changed => {
+  vi.mocked(apiFetch).mockResolvedValue({ availability: [] });
+  await act(async () => { renderer = create(createElement(Harness, { initialServiceId: 'one' })); });
+  expect(controller.selection).toMatchObject({ serviceId: 'one', resourceId: '', startTimeStr: '' });
+  await act(async () => controller.loadAvailability());
+  expect(controller.availabilityStatus).toBe('success');
+  await act(async () => renderer!.update(createElement(Harness, { initialServiceId: 'one', ...changed })));
+  expect(controller.availabilityStatus).toBe('idle');
+  expect(controller.selection).toMatchObject({ serviceId: '', resourceId: '', startTimeStr: '' });
+  expect(controller.availability).toEqual([]);
+});
 it('late availability cannot replace changed service or account', async () => {
   const reads: { signal: AbortSignal; resolve: (data: unknown) => void }[] = [];
   vi.mocked(apiFetch).mockImplementation((_path, init) => new Promise(resolve => reads.push({ signal: init!.signal as AbortSignal, resolve })));
