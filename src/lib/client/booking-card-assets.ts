@@ -1,6 +1,6 @@
 "use client";
 
-import { getBookingCardLayout, type BookingCardDetails } from '@/lib/booking-card';
+import { DEVELOPER_WEBSITE_URL, getBookingCardLayout, type BookingCardDetails } from '@/lib/booking-card';
 
 const check = (signal: AbortSignal) => signal.throwIfAborted();
 async function loadImage(blob: Blob, signal: AbortSignal): Promise<HTMLImageElement> {
@@ -46,17 +46,18 @@ function validateQr(qrSvg: string, bookingUrl: string) {
     for (const attribute of node.attributes) if (/^on/i.test(attribute.name) || /href|style|filter/i.test(attribute.name)) throw new Error('El QR no es válido.');
   }
 }
-export async function buildBookingCardAssets({ details, qrSvg, signal }: { details: BookingCardDetails; qrSvg: string; signal: AbortSignal }): Promise<{ png: Blob; pdf: Blob; qrSvg: Blob }> {
+export async function buildBookingCardAssets({ details, qrSvg, developerQrSvg, signal }: { details: BookingCardDetails; qrSvg: string; developerQrSvg: string; signal: AbortSignal }): Promise<{ png: Blob; pdf: Blob; qrSvg: Blob }> {
   check(signal);
   const layout = getBookingCardLayout(details);
   validateQr(qrSvg, details.bookingUrl);
+  validateQr(developerQrSvg, DEVELOPER_WEBSITE_URL);
   try {
     const font = await new FontFace('SarinCardDM', 'url(/fonts/dm-sans-latin.woff2)', { weight: '100 1000' }).load();
     check(signal); document.fonts.add(font);
   } catch (error) { check(signal); throw new Error('No pudimos cargar la fuente de la tarjeta. Reintenta.', { cause: error }); }
   const logo = await logoBlob(details, signal); check(signal);
   const qrBlob = new Blob([qrSvg], { type: 'image/svg+xml;charset=utf-8' });
-  const [qrImage, logoImage] = await Promise.all([loadImage(qrBlob, signal), logo ? loadImage(logo, signal) : Promise.resolve(null)]);
+  const [qrImage, developerQrImage, logoImage] = await Promise.all([loadImage(qrBlob, signal), loadImage(new Blob([developerQrSvg], { type: 'image/svg+xml;charset=utf-8' }), signal), logo ? loadImage(logo, signal) : Promise.resolve(null)]);
   check(signal);
   const canvas = document.createElement('canvas');
   canvas.width = layout.width; canvas.height = layout.height;
@@ -82,6 +83,7 @@ export async function buildBookingCardAssets({ details, qrSvg, signal }: { detai
   }
   context.imageSmoothingEnabled = false;
   context.drawImage(qrImage, layout.qr.x, layout.qr.y, layout.qr.width, layout.qr.height);
+  context.drawImage(developerQrImage, layout.developerQr.x, layout.developerQr.y, layout.developerQr.width, layout.developerQr.height);
   const png = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('No pudimos generar la imagen de la tarjeta.')), 'image/png'));
   check(signal);
   const bytes = await png.arrayBuffer(); check(signal);

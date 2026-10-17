@@ -3,7 +3,8 @@ import { businessSocialLabel, businessSocialPlatformLabels, normalizeBusinessSoc
 export interface BookingCardDetails { businessId: string; slug: string; businessName: string; phoneWhatsApp: string; socialLinks: BusinessSocialLink[]; bookingUrl: string; logoSha256: string | null; }
 export interface CardBox { x: number; y: number; width: number; height: number; }
 export interface CardTextBox extends CardBox { text: string; fontSize: number; color: string; }
-export interface BookingCardLayout { width: 1241; height: 1749; background: string; logo: CardBox; qr: CardBox; texts: CardTextBox[]; }
+export interface BookingCardLayout { width: 1241; height: 1749; background: string; logo: CardBox; qr: CardBox; developerQr: CardBox; texts: CardTextBox[]; }
+export const DEVELOPER_WEBSITE_URL = 'https://www.alsdevstudio.com/';
 const graphemes = (text: string) => [...new Intl.Segmenter('es', { granularity: 'grapheme' }).segment(text)].map(part => part.segment);
 const widthOf = (char: string, size: number) => size * (/\s/.test(char) ? 0.4 : /[MW@#%]/.test(char) ? 1 : 0.78);
 function wrap(text: string, size: number): string[] {
@@ -34,15 +35,15 @@ export function getBookingCardLayout(details: BookingCardDetails): BookingCardLa
   if (lines.length > 5) throw new Error('No pudimos ajustar el nombre del negocio.');
   const lineHeight = fontSize * 1.14;
   const top = 365 + (300 - lines.length * lineHeight) / 2;
-  const textBox = (text: string, y: number, size: number, height: number, color = '#162344'): CardTextBox => ({ text, x: 59, y, width: 1123, height, fontSize: size, color });
+  const textBox = (text: string, y: number, size: number, height: number, color = '#162344', width = 1123): CardTextBox => ({ text, x: 59, y, width, height, fontSize: size, color });
   const texts = lines.map((text, index) => textBox(text, top + index * lineHeight, fontSize, lineHeight));
   texts.push(textBox('Escanea y agenda tu cita', 724, 53, 70));
-  if (details.phoneWhatsApp) texts.push(textBox(`+${details.phoneWhatsApp.replace(/^\+/, '')}`, 1475, 38, 48));
+  if (details.phoneWhatsApp) texts.push(textBox(`+${details.phoneWhatsApp.replace(/^\+/, '')}`, 1475, 38, 48, '#162344', 840));
   links.forEach((link, index) => {
     const label = `${businessSocialPlatformLabels[link.platform]} · ${businessSocialLabel(link)}`;
     const parts = graphemes(label);
-    texts.push(textBox(parts.length > 53 ? `${parts.slice(0, 52).join('')}…` : label, 1532 + index * 39, 31, 38, '#52617d'));
+    texts.push(textBox(parts.length > 53 ? `${parts.slice(0, 52).join('')}…` : label, 1532 + index * 39, 31, 38, '#52617d', 840));
   });
-  texts.push(textBox('Reservas con Sarin', 1658, 26, 32, '#315ff3'));
-  return { width: 1241, height: 1749, background: '#ffffff', logo: { x: 513, y: 125, width: 215, height: 215 }, qr: { x: 325, y: 835, width: 591, height: 591 }, texts };
+  texts.push(textBox('Desarrollado por www.alsdevstudio.com', 1658, 26, 32, '#315ff3', 840));
+  return { width: 1241, height: 1749, background: '#ffffff', logo: { x: 513, y: 125, width: 215, height: 215 }, qr: { x: 325, y: 835, width: 591, height: 591 }, developerQr: { x: 969, y: 1477, width: 213, height: 213 }, texts };
 }

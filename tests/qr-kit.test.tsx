@@ -16,14 +16,17 @@ describe('selected printable kit', () => {
   let renderer: ReactTestRenderer;
   const prepare = () => renderer.root.findAllByType('button').find(button => button.children.join('').includes('Preparar tarjeta'))!;
   const downloads = () => renderer.root.findAllByType('a').filter(link => link.props.download);
-  async function mount() { await act(async () => { renderer = create(createElement(QRKitPage), { createNodeMock: () => ({ querySelector: () => ({ getAttribute: () => data.bookingUrl }) }) }); }); }
+  async function mount() { await act(async () => { renderer = create(createElement(QRKitPage), { createNodeMock: (element) => ({ querySelector: () => ({ getAttribute: () => (element.props as Record<string, unknown>)['data-card-qr'] === 'developer' ? 'https://www.alsdevstudio.com/' : data.bookingUrl }) }) }); }); }
   beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal('window', { location: { origin: 'https://spoofed.invalid' } }); state.uid = 'owner'; state.api.mockReset().mockResolvedValue(data); state.build.mockReset().mockResolvedValue(assets); vi.stubGlobal('XMLSerializer', class { serializeToString() { return '<svg />'; } }); vi.stubGlobal('URL', class extends URL { static createObjectURL() { return 'blob:synthetic'; } static revokeObjectURL = vi.fn(); }); });
   afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); vi.useRealTimers(); });
   it('kit_uses_selected_template_without_style_selector and exports only server-supplied details', async () => {
     await mount();
     expect(state.api.mock.calls[0][0]).toBe('/api/businesses/qr-kit');
     expect(renderer.root.findAllByType('select')).toHaveLength(0);
-    expect(renderer.root.findByType(QRCodeSVG).props).toMatchObject({ value: data.bookingUrl, level: 'M', marginSize: 4, fgColor: '#000000', bgColor: '#ffffff' });
+    const qrs = renderer.root.findAllByType(QRCodeSVG);
+    expect(qrs).toHaveLength(2);
+    expect(qrs[0].props).toMatchObject({ value: data.bookingUrl, level: 'M', marginSize: 4, fgColor: '#000000', bgColor: '#ffffff' });
+    expect(qrs[1].props).toMatchObject({ value: 'https://www.alsdevstudio.com/', size: 213, level: 'M', marginSize: 4 });
     expect(downloads()).toHaveLength(0);
     await act(async () => { prepare().props.onClick(); });
     expect(state.build).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ bookingUrl: data.bookingUrl, businessName: data.business.name }) }));

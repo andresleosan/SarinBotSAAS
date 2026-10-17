@@ -28,7 +28,7 @@ export default function PrivacyPage() {
             <h2 id="cuenta" className="text-lg font-semibold">Tu cuenta y tus reservas</h2>
             <p className="mt-2">Sarin usa Firebase Authentication con Google para identificarte y comprobar tu acceso. Recibe el identificador de tu cuenta y datos como tu nombre y correo. La autenticación también utiliza información técnica de sesión.</p>
             <p className="mt-3">En Cloudflare D1 se conservan los perfiles y permisos, la configuración del negocio, sus servicios y horarios, las citas y su historial de estados, los datos de contacto y las respuestas que proporciones al reservar. También se guardan los datos de planes, pagos y consumo del servicio.</p>
-            <p className="mt-3">Las imágenes de los comprobantes de transferencia se almacenan en Cloudflare R2 privado y se consultan mediante accesos autorizados. El negocio necesita los datos de sus reservas para atender a sus clientes; la administración de Sarin dispone de acceso administrativo para operar la plataforma y revisar pagos.</p>
+            <p className="mt-3">Las imágenes de los comprobantes de transferencia se almacenan en Cloudflare R2 privado y se consultan mediante accesos autorizados. Los logos del negocio se guardan por separado y su versión publicada es accesible desde el perfil. El negocio necesita los datos de sus reservas para atender a sus clientes; la administración de Sarin dispone de acceso administrativo para operar la plataforma y revisar pagos.</p>
           </section>
           <section aria-labelledby="publico">
             <h2 id="publico" className="text-lg font-semibold">Información pública del negocio</h2>
@@ -36,20 +36,21 @@ export default function PrivacyPage() {
           </section>
           <section aria-labelledby="ia">
             <h2 id="ia" className="text-lg font-semibold">Qué recibe la inteligencia artificial</h2>
-            <p className="mt-2">Tus mensajes pasan por la aplicación alojada en Cloudflare. Para responder, el asistente puede recibir mensajes anteriores de la conversación, información del negocio y los resultados necesarios de operaciones autorizadas. Ese contexto puede incluir datos de contacto o reserva que proporciones.</p>
+            <p className="mt-2">Tus mensajes pasan por la aplicación alojada en Cloudflare. Para interpretar tu solicitud, el asistente recibe tu mensaje actual, información del negocio y la selección de servicio, fecha o profesional necesaria para continuar. Si escribes datos personales dentro del mensaje, pueden llegar al proveedor de IA. Evita incluir datos sensibles, diagnósticos o información clínica.</p>
             <p className="mt-3">Con Ollama, el modelo se ejecuta en la Mac operada para Sarin. La conexión remota utiliza HTTPS/TLS, Cloudflare Tunnel y controles de Cloudflare Access. Esto no significa que los mensajes permanezcan únicamente en tu dispositivo.</p>
             <p className="mt-3">La administración puede seleccionar el proveedor de IA para los negocios. Si se habilita y selecciona DeepSeek o Gemini, los mensajes y el contexto necesario se envían a la API externa de ese proveedor. Tener una opción en el sistema no significa que esté activa: requiere configuración. No hay cambio automático de proveedor ante un error.</p>
-            <p className="mt-3">Sarin mantiene registros de uso, como contadores de respuestas y datos técnicos de las llamadas al proveedor. Puede conservar respuestas temporalmente en memoria para gestionar reintentos. No ofrece una garantía de cero registros ni de ausencia de conservación por los proveedores que intervienen.</p>
+            <p className="mt-3">Sarin mantiene registros de uso, como contadores de respuestas y datos técnicos de las llamadas al proveedor, y guarda la selección de la conversación y las propuestas de reserva para continuar o recuperar una operación. Puede conservar respuestas temporalmente en memoria para gestionar reintentos. No ofrece una garantía de cero registros ni de ausencia de conservación por los proveedores que intervienen.</p>
           </section>
           <section aria-labelledby="conservacion">
             <h2 id="conservacion" className="text-lg font-semibold">Conservación y solicitudes</h2>
             <p className="mt-2">Actualmente no hay borrado automático general por antigüedad de cuentas, reservas, datos de contacto, comprobantes y registros de uso. Se mantienen copias de recuperación. La política formal de plazos de conservación está pendiente de definición.</p>
+            <p className="mt-3">Una propuesta pendiente permite confirmar una nueva cita durante diez minutos y la selección de conversación se reinicia al consultarla después de veinticuatro horas sin actualizar. Esa vigencia funcional no elimina automáticamente los registros guardados; las propuestas confirmadas también se conservan para recuperar operaciones sin duplicarlas.</p>
             <p className="mt-3">Cancelar una cita cambia su estado y no elimina su registro. Cerrar sesión o cerrar una conversación tampoco borra las reservas o los comprobantes. No se promete eliminación inmediata de todos los sistemas, copias o proveedores.</p>
             <p className="mt-3">Para consultar, corregir o solicitar la revisión de la eliminación de tus datos, escribe al contacto de Sarin indicado abajo. Las solicitudes se revisan de forma manual; esta página no fija un plazo automático de atención.</p>
           </section>
           <section aria-labelledby="contacto">
-            <h2 id="contacto" className="text-lg font-semibold">Contacto de Sarin</h2>
-            <p className="mt-2">Andrés Santiago · Sarin</p>
+            <h2 id="contacto" className="text-lg font-semibold">Responsable y contacto de Sarin</h2>
+            <p className="mt-2">ALS Dev Studio</p>
             <a href="mailto:alsdevstudio@alsdevstudio.com" className={`inline-block min-h-11 break-all py-2 ${linkClass}`}>alsdevstudio@alsdevstudio.com</a>
             <p className="mt-2">Para cambios en el servicio reservado o en tu atención, contacta también al negocio correspondiente.</p>
           </section>

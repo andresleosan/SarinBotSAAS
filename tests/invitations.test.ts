@@ -18,8 +18,8 @@ describe('complimentary invitations', () => {
   it('redeems once without financial records and never persists or recovers the complete code', async () => {
     const { db, rows } = memoryFirestore();
     const created = await createInvitation(admin, input, db);
-    expect(created.code).toMatch(/^SARIN-[a-f0-9]{24}-[A-Za-z0-9_-]{32}$/);
-    expect(JSON.stringify([...rows])).not.toContain(created.code);
+    expect(created.code).toMatch(/^\d{6}$/);
+    for (const row of rows.values()) expect(Object.values(row.data)).not.toContain(created.code);
     expect(created.invitation).not.toHaveProperty('codeHash');
     expect(await createInvitation(admin, input, db)).toMatchObject({ code: null, replayed: true });
     await expect(createInvitation(admin, { ...input, recipientEmail: 'other@example.test' }, db)).rejects.toMatchObject({ code: 'INVITATION_REQUEST_CONFLICT' });
@@ -82,7 +82,7 @@ describe('complimentary invitations', () => {
     await expect(createInvitation(owner, input, db)).rejects.toMatchObject({ status: 403 });
     const created = await createInvitation(admin, input, db);
     for (const invalid of [{ ...owner, email_verified: false }, { ...owner, firebase: { sign_in_provider: 'password' } }]) await expect(redeemInvitation(invalid as DecodedIdToken, { ...redeem, code: created.code! }, db)).rejects.toMatchObject({ status: 403 });
-    for (const code of [created.code!.slice(0, -1) + (created.code!.endsWith('a') ? 'b' : 'a'), `SARIN-${'0'.repeat(24)}-${'a'.repeat(32)}`]) await expect(redeemInvitation(owner, { ...redeem, code }, db)).rejects.toMatchObject({ code: 'INVITATION_UNAVAILABLE' });
+    for (const code of [created.code!.slice(0, -1) + (created.code!.endsWith('0') ? '1' : '0'), `SARIN-${'0'.repeat(24)}-${'a'.repeat(32)}`]) await expect(redeemInvitation(owner, { ...redeem, code }, db)).rejects.toMatchObject({ code: 'INVITATION_UNAVAILABLE' });
     await expect(redeemInvitation({ ...owner, email: 'other@example.test' }, { ...redeem, code: created.code! }, db)).rejects.toMatchObject({ code: 'INVITATION_UNAVAILABLE' });
     await updateInvitation(admin, { action: 'revoke_code', invitationId: created.invitation.id, expectedVersion: 0, requestId: 'revoke-one', reason: 'Reemitir' }, db);
     await expect(redeemInvitation(owner, { ...redeem, code: created.code! }, db)).rejects.toMatchObject({ code: 'INVITATION_UNAVAILABLE' });

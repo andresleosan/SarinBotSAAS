@@ -9,7 +9,10 @@ const copy = <T>(value: T): T => structuredClone(value);
 // therefore double-book unless production also writes a shared resource lock.
 export function memoryFirestore(initial: Record<string, Data> = {}) {
   const rows = new Map(Object.entries(initial).map(([path, value]) => [path, { version: 1, data: copy(value) }]));
-  const read = (path: string): Snapshot => ({ exists: rows.has(path), id: path.split('/').at(-1)!, data: () => copy(rows.get(path)?.data) });
+  const read = (path: string, source = rows): Snapshot => {
+    const data = copy(source.get(path)?.data);
+    return { exists: source.has(path), id: path.split('/').at(-1)!, data: () => copy(data) };
+  };
   class Reference {
     constructor(public readonly path: string) {}
     get id() { return this.path.split('/').at(-1)!; }
@@ -24,9 +27,9 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
     where(field: string, operator: string, value: unknown) { return new Query(this.path, [...this.filters, [field, operator, value]], this.cap, this.ordering); }
     limit(cap: number) { return new Query(this.path, this.filters, cap, this.ordering); }
     orderBy(field: string, direction = 'asc') { return new Query(this.path, this.filters, this.cap, [field, direction]); }
-    async get() {
-      const paths = [...rows.keys()].filter((path) => path.startsWith(`${this.path}/`) && path.slice(this.path.length + 1).split('/').length === 1).filter((path) => this.filters.every(([field, operator, value]) => {
-        const data = rows.get(path)!.data;
+    async get(source = rows) {
+      const paths = [...source.keys()].filter((path) => path.startsWith(`${this.path}/`) && path.slice(this.path.length + 1).split('/').length === 1).filter((path) => this.filters.every(([field, operator, value]) => {
+        const data = source.get(path)!.data;
         const nested = field.split('.').reduce<unknown>((current, key) => current && typeof current === 'object' ? (current as Data)[key] : undefined, data);
         if (operator === '==') return nested === value;
         const comparison = typeof nested === 'number' && typeof value === 'number' ? nested - value : typeof nested === 'string' && typeof value === 'string' ? nested.localeCompare(value) : null;
@@ -40,12 +43,12 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
       if (this.ordering) {
         const [field, direction] = this.ordering;
         paths.sort((a, b) => {
-          const first = rows.get(a)!.data[field], second = rows.get(b)!.data[field];
+          const first = source.get(a)!.data[field], second = source.get(b)!.data[field];
           const comparison = typeof first === 'number' && typeof second === 'number' ? first - second : String(first).localeCompare(String(second));
           return direction === 'desc' ? -comparison : comparison;
         });
       }
-      const docs = paths.slice(0, this.cap).map(read);
+      const docs = paths.slice(0, this.cap).map(path => read(path, source));
       return { docs, empty: docs.length === 0, size: docs.length };
     }
   }
@@ -57,18 +60,19 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
     collection: (name: string) => new Query(name),
     runTransaction: async <T>(handler: (transaction: unknown) => Promise<T>) => {
       for (let attempt = 0; attempt < 10; attempt++) {
+        const view = new Map(rows);
         const reads = new Map<string, number>();
         const writes: { path: string; data?: Data; merge?: boolean; create?: boolean; deleted?: boolean }[] = [];
         const transaction = {
           get: async (target: Reference | Query) => {
             if (target instanceof Reference) {
-              reads.set(target.path, rows.get(target.path)?.version ?? 0);
-              return read(target.path);
+              reads.set(target.path, view.get(target.path)?.version ?? 0);
+              return read(target.path, view);
             }
-            const result = await target.get();
+            const result = await target.get(view);
             for (const document of result.docs) {
               const path = `${target.path}/${document.id}`;
-              reads.set(path, rows.get(path)?.version ?? 0);
+              reads.set(path, view.get(path)?.version ?? 0);
             }
             return result;
           },

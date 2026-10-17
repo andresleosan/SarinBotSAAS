@@ -6,12 +6,15 @@ describe('selected Agenda clara card', () => {
     const layout = getBookingCardLayout(details);
     expect(layout).toMatchObject({ width: 1241, height: 1749, background: '#ffffff', qr: { x: 325, y: 835, width: 591, height: 591 } });
     expect(layout.texts.map(box => box.text).join(' ')).toContain('Escanea y agenda tu cita');
-    expect(layout.texts.map(box => box.text).join(' ')).toContain('Reservas con Sarin');
+    expect(layout.texts.map(box => box.text).join(' ')).toContain('Desarrollado por www.alsdevstudio.com');
+    expect(layout.developerQr).toEqual({ x: 969, y: 1477, width: 213, height: 213 });
+    expect(layout.developerQr.width * 25.4 / 300).toBeGreaterThanOrEqual(18);
     expect(JSON.stringify(layout)).not.toMatch(/example\.com|@instagram|Oscura|Cálida/);
-    for (const box of [...layout.texts, layout.logo, layout.qr]) {
+    for (const box of [...layout.texts, layout.logo, layout.qr, layout.developerQr]) {
       expect(box.x).toBeGreaterThanOrEqual(59); expect(box.x + box.width).toBeLessThanOrEqual(1182);
       expect(box.y).toBeGreaterThanOrEqual(59); expect(box.y + box.height).toBeLessThanOrEqual(1690);
     }
+    for (const box of layout.texts.filter(box => box.y >= 1475)) expect(box.x + box.width).toBeLessThan(layout.developerQr.x);
   });
   it('fits_long_accented_and_unbroken_names without dropping characters or moving the QR', () => {
     for (const businessName of ['Peluquería y Estética María José '.repeat(4).slice(0, 120).trim(), 'W'.repeat(120), 'Á'.repeat(120), 'M'.repeat(70), 'a'.repeat(70)]) {

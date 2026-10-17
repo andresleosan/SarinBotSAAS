@@ -38,7 +38,7 @@ describe('Cloudflare data adapter', () => {
       store.loseNextResponse();
       const admin = { uid: 'admin' } as DecodedIdToken, input = { recipientEmail: 'synthetic@example.test', requestId: 'create-one' };
       const first = await createInvitation(admin, input, db);
-      expect(first.code).toMatch(/^SARIN-/);
+      expect(first.code).toMatch(/^\d{6}$/);
       expect([...store.rows.keys()].filter(path => path.startsWith('invitations/'))).toHaveLength(1);
       expect(await createInvitation(admin, input, db)).toMatchObject({ code: null, replayed: true });
     } finally { vi.unstubAllEnvs(); }

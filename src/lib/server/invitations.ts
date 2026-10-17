@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Database, Transaction } from '@/lib/storage/types';
 import type { Business } from '@/types/firestore';
@@ -43,47 +43,78 @@ export async function createInvitation(admin: DecodedIdToken, input: CreateInvit
   const parsed = createInvitationSchema.parse(input);
   const id = stableDocumentId(admin.uid, parsed.requestId, 'invitation').slice(0, 24);
   const fingerprint = sha256(JSON.stringify([parsed.recipientEmail, parsed.expiresInDays]));
-  const code = `SARIN-${id}-${randomBytes(24).toString('base64url')}`;
   const reference = db.collection('invitations').doc(id);
-  return db.runTransaction(async transaction => {
-    const existing = await transaction.get(reference);
-    if (existing.exists) {
-      const saved = existing.data() as InvitationRecord;
-      if (saved.createdBy !== admin.uid || saved.createFingerprint !== fingerprint) throw new HttpError(409, 'Esta solicitud pertenece a otra invitación.', 'INVITATION_REQUEST_CONFLICT');
-      return { invitation: await summary(saved, db, transaction), code: null, replayed: true };
-    }
-    const now = Date.now();
-    const record: InvitationRecord = { id, recipientEmail: parsed.recipientEmail, codeHash: sha256(code), maskedCode: `SARIN-…${code.slice(-6)}`, createdBy: admin.uid, createFingerprint: fingerprint,
-      createdAt: now, expiresAt: now + parsed.expiresInDays * 86400000, expiresInDays: parsed.expiresInDays, version: 0, state: 'issued' };
-    transaction.create(reference, record);
-    return { invitation: await summary(record, db), code, replayed: false };
-  });
+  for (let attempt = 0; attempt < 32; attempt++) {
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const codeHash = sha256(code);
+    const index = db.collection('serverSettings').doc(`invitation_code_${codeHash}`);
+    const result = await db.runTransaction(async transaction => {
+      const [existing, allocated] = await Promise.all([transaction.get(reference), transaction.get(index)]);
+      if (existing.exists) {
+        const saved = existing.data() as InvitationRecord;
+        if (saved.createdBy !== admin.uid || saved.createFingerprint !== fingerprint) throw new HttpError(409, 'Esta solicitud pertenece a otra invitación.', 'INVITATION_REQUEST_CONFLICT');
+        return { invitation: await summary(saved, db, transaction), code: null, replayed: true };
+      }
+      // Never reuse a code: expired/revoked/redeemed invitations must still be
+      // distinguishable during retries and recovery.
+      if (allocated.exists) return null;
+      const now = Date.now();
+      const record: InvitationRecord = { id, recipientEmail: parsed.recipientEmail, codeHash, maskedCode: `••••${code.slice(-2)}`, createdBy: admin.uid, createFingerprint: fingerprint,
+        createdAt: now, expiresAt: now + parsed.expiresInDays * 86400000, expiresInDays: parsed.expiresInDays, version: 0, state: 'issued' };
+      transaction.create(reference, record);
+      transaction.create(index, { version: 1, invitationId: id, codeHash });
+      return { invitation: await summary(record, db), code, replayed: false };
+    });
+    if (result) return result;
+  }
+  throw new HttpError(503, 'No pudimos generar un código disponible. Inténtalo de nuevo.', 'INVITATION_GENERATION_UNAVAILABLE');
 }
 
-export async function claimInvitationAttempt(uid: string, db: Database, now: number): Promise<void> {
-  const reference = db.collection('serverSettings').doc(`invitation_rate_${sha256(uid)}`);
+export async function claimInvitationAttempt(uid: string, db: Database, now: number, email?: string): Promise<void> {
+  const references = [db.collection('serverSettings').doc(`invitation_rate_${sha256(uid)}`), ...(email ? [db.collection('serverSettings').doc(`invitation_email_rate_${sha256(email)}`)] : [])];
+  const limits = email ? [[60000, 5], [3600000, 20], [86400000, 50]] : [[60000, 10]];
   await db.runTransaction(async transaction => {
-    const document = await transaction.get(reference);
-    const saved = document.data();
-    if (saved && (!Array.isArray(saved.timestamps) || saved.timestamps.length > 10 || !saved.timestamps.every((at: unknown) => Number.isSafeInteger(at) && (at as number) >= 0 && (at as number) <= now) || !Number.isSafeInteger(saved.version) || saved.version < 0)) throw new HttpError(503, 'No pudimos validar los intentos. Inténtalo más tarde.');
-    const timestamps: number[] = (saved?.timestamps ?? []).filter((at: number) => at > now - 60000);
-    if (timestamps.length >= 10) throw new HttpError(429, 'Demasiados intentos. Espera un minuto.', 'INVITATION_RATE_LIMITED');
-    transaction.set(reference, { timestamps: [...timestamps, now], version: (saved?.version ?? 0) + 1 });
+    const documents = await Promise.all(references.map(reference => transaction.get(reference)));
+    const states = documents.map(document => {
+      const saved = document.data();
+      if (saved && (!Array.isArray(saved.timestamps) || saved.timestamps.length > 50 || !saved.timestamps.every((at: unknown, index: number, all: number[]) => Number.isSafeInteger(at) && (at as number) >= 0 && (at as number) <= now && (index === 0 || (at as number) >= all[index - 1])) || !Number.isSafeInteger(saved.version) || saved.version < 0)) throw new HttpError(503, 'No pudimos validar los intentos. Inténtalo más tarde.');
+      return { timestamps: (saved?.timestamps ?? []).filter((at: number) => at > now - 86400000) as number[], version: saved?.version ?? 0 };
+    });
+    let retryAfter = 0;
+    for (const state of states) for (const [window, maximum] of limits) {
+      const recent = state.timestamps.filter(at => at > now - window);
+      if (recent.length >= maximum) retryAfter = Math.max(retryAfter, Math.ceil((recent[recent.length - maximum] + window - now) / 1000));
+    }
+    if (retryAfter) throw new HttpError(429, 'Demasiados intentos. Espera antes de volver a canjear.', 'INVITATION_RATE_LIMITED', retryAfter);
+    states.forEach((state, index) => transaction.set(references[index], { timestamps: [...state.timestamps, now], version: state.version + 1 }));
   });
 }
 
 export async function redeemInvitation(user: DecodedIdToken, input: RedeemInvitationInput, db: Database = getAdminDb()): Promise<InvitationRedemptionResult> {
   const email = verifiedEmail(user);
   const parsed = redeemInvitationSchema.parse(input);
-  const id = parsed.code.slice(6, 30);
-  const reference = db.collection('invitations').doc(id);
-  const preliminary = (await reference.get()).data() as InvitationRecord | undefined;
-  const recovering = matches(preliminary, parsed.code, email) && preliminary.redemption?.uid === user.uid && preliminary.redemption.requestId === parsed.requestId;
-  if (!recovering) await claimInvitationAttempt(user.uid, db, Date.now());
   const businessReference = db.collection('businesses').doc(businessIdForOwner(user.uid));
+  // Recovery is selected only by the authenticated owner, never by a guessed
+  // code. Every other attempt is admitted before reading the code index.
+  const recovery = await db.runTransaction(async transaction => {
+    const owned = await transaction.get(businessReference);
+    const business = owned.data() as Business | undefined;
+    const trial = business?.subscription.paidTrial;
+    if (!business || business.ownerUid !== user.uid || trial?.source !== 'invitation' || !invitationCursorSchema.safeParse(trial.invitationId).success) return null;
+    const record = (await transaction.get(db.collection('invitations').doc(trial.invitationId))).data() as InvitationRecord | undefined;
+    return matches(record, parsed.code, email) && record.redemption?.uid === user.uid && record.redemption.requestId === parsed.requestId ? { business, invitationId: record.id, replayed: true } : null;
+  });
+  if (recovery) return recovery;
+  await claimInvitationAttempt(user.uid, db, Date.now(), email);
+  const indexReference = /^\d{6}$/.test(parsed.code) ? db.collection('serverSettings').doc(`invitation_code_${sha256(parsed.code)}`) : null;
+  const index = indexReference ? (await indexReference.get()).data() : null;
+  if (indexReference && (index?.version !== 1 || index.codeHash !== sha256(parsed.code) || !invitationCursorSchema.safeParse(index.invitationId).success)) throw unavailable();
+  const id = indexReference ? index!.invitationId as string : parsed.code.slice(6, 30);
+  const reference = db.collection('invitations').doc(id);
   const profileReference = db.collection('users').doc(user.uid);
   return db.runTransaction(async transaction => {
-    const [document, businessDocument, profile] = await Promise.all([transaction.get(reference), transaction.get(businessReference), transaction.get(profileReference)]);
+    const [document, businessDocument, profile, lockedIndex] = await Promise.all([transaction.get(reference), transaction.get(businessReference), transaction.get(profileReference), indexReference ? transaction.get(indexReference) : null]);
+    if (indexReference && (lockedIndex?.data()?.invitationId !== id || lockedIndex.data()?.version !== 1 || lockedIndex.data()?.codeHash !== sha256(parsed.code))) throw unavailable();
     const invitation = document.data() as InvitationRecord | undefined;
     if (!matches(invitation, parsed.code, email)) throw unavailable();
     if (businessDocument.exists && businessDocument.data()?.ownerUid !== user.uid) throw new HttpError(403, 'No tienes acceso a este negocio.');

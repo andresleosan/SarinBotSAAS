@@ -10,7 +10,7 @@ import { InvitationRedeem } from '@/components/invitation-redeem';
 import { ResponseQuota } from '@/components/response-quota';
 const text = (node: ReactTestInstance | string): string => typeof node === 'string' ? node : node.children.map(text).join('');
 const invitation = { id: 'a'.repeat(24), recipientEmail: 'owner@example.test', maskedCode: 'SARIN-…secret', codeState: 'available', state: 'issued', createdAt: 1900000000000, expiresAt: 1900600000000, version: 0, usage: null };
-const code = `SARIN-${invitation.id}-${'s'.repeat(32)}`;
+const code = '000042';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 describe('invitation interfaces', () => {
   let renderer: ReactTestRenderer;
