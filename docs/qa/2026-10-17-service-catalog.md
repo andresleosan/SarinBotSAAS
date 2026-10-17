@@ -19,6 +19,7 @@ El dueño puede añadir descripción y categoría opcionales a cada servicio. La
 | `pnpm run build` final | Next 16.4.0 compiló y generó las rutas de producción. |
 | `pnpm run test:journey --port 3040` | **129 comprobaciones** con Auth y Firestore oficiales en loopback. Incluye 12 comprobaciones HTTP del catálogo, permisos, reservas, carrera concurrente, cancelación, comprobantes sintéticos e idempotencia. Limpieza del recorrido correcta. |
 | `pnpm audit --audit-level=high` | Sin vulnerabilidades conocidas. Dependencias y lockfile sin cambios. |
+| `pnpm --filter sarin-cloudflare-host run check` | 74 pruebas aprobadas, tipos y dry-run del Worker correctos. También pasó el dry-run de la configuración preparada con la imagen publicada de referencia. |
 | `git diff --check` | Sin errores. |
 
 Las regresiones HTTP se añadieron después de implementar el contrato. Su primera ejecución esperaba por error propiedades ausentes en el documento privado tras vaciar; el contrato aprobado conserva `''` privado y omite los campos en la ficha anónima. Se corrigieron esas expectativas y se repitió el recorrido completo, que pasó. No se cambió producción para verificarlo.
@@ -54,4 +55,19 @@ Este incremento todavía no está publicado. La versión activa sigue siendo el 
 
 La futura publicación debe conservar bindings, trece secretos, D1/R2, presupuesto y una única instancia; cerrar nuevas solicitudes y drenar la cola antes de sustituir el contenedor.
 
-La revisión de reversión encontró que **no se puede reabrir sin más la imagen `0ce3ac0a…` después de guardar los campos nuevos**: su esquema estricto puede rechazar tanto configuraciones como propuestas de reserva que los contengan. Se debe preparar y verificar una imagen compatible con la interfaz anterior y el contrato nuevo de servidor. No se borran metadatos ni se restauran documentos antiguos para hacer encajar una versión. Una reversión conserva mantenimiento hasta confirmar la imagen compatible, la única instancia efectiva y las lecturas/reservas. La construcción y comprobación de ese respaldo se registra al completarse.
+La revisión de reversión encontró que **no se puede reabrir sin más la imagen `0ce3ac0a…` después de guardar los campos nuevos**: su esquema estricto puede rechazar tanto configuraciones como propuestas de reserva que los contengan. Se preparó una imagen compatible con la interfaz anterior y el contrato nuevo de servidor. No se borran metadatos ni se restauran documentos antiguos para hacer encajar una versión. Una reversión conserva mantenimiento hasta confirmar la imagen compatible, la única instancia efectiva y las lecturas/reservas.
+
+### Artefactos preparados
+
+Se congelaron archivos Git exactos y se construyeron dos imágenes locales Linux/amd64, con los mismos cuatro argumentos públicos Firebase y sin credenciales de runtime. No se han enviado al registro ni desplegado.
+
+| Uso | Fuente | Imagen local |
+| --- | --- | --- |
+| Nuevo catálogo | `accab511b34863628b1ad5ebdb079e87e5a30657` | `sarin-bot:service-catalog-20261017`, ID `sha256:b2b925f5965b38e8eca40fccd31087648f97b245e27da9a0e9725c54ae431df0` |
+| Respaldo compatible | `929c43e99fae27ba1ef64fc4cdd7c5942efbe879` | `sarin-bot:service-catalog-fallback-20261017`, ID `sha256:8575a0074aa664043a5f81540e9409b752b113d9cd8fec62fba2bcc1cd158cb2` |
+
+El respaldo restaura exclusivamente las dos interfaces y sus dos archivos de pruebas a `d942e90`; todos los contratos de servidor, tipos y pruebas de metadatos/propuestas son idénticos al candidato. Pasó su suite de **919 pruebas y 26 omitidas**, TypeScript y build. La diferencia de ocho pruebas corresponde a los casos de la interfaz nueva, que no existe en ese respaldo.
+
+Ambas imágenes arrancaron con filesystem de solo lectura, red `none` y sin montar credenciales. El humo comprobó páginas 200, APIs protegidas anónimas 401, manifiesto, SHA-256 de ambos iconos y los bundles esperados de cada interfaz. No demuestra acceso real a D1/ADC: los contratos de datos se verificaron con los emuladores y el código de servidor es común a ambas imágenes. Los contenedores de humo se retiraron al terminar.
+
+Los paquetes están fuera de Git en `%LOCALAPPDATA%/SarinBot/service-catalog-release-20261017` y `service-catalog-fallback-release-20261017`, con archivos fuente, hashes, logs, registros de imagen/humo y configuración de referencia. `publication-plan.json` y `release-status.json` indican `awaiting_production_authorization`, `registryPushed: false` y `productionChanged: false`. Tras autorización se deben registrar los digests del registro de ambas imágenes antes del mantenimiento y fijarlos en sus configuraciones. Ningún ID local se presenta como digest de una imagen publicada.
