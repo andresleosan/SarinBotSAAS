@@ -1,6 +1,6 @@
 export type ConsentScope = 'account' | 'business_client';
 export type ConsentBusiness = { id: string; name: string; phoneWhatsApp: string };
-export const LEGAL_VERSION = '2026-10-16.1';
+export const LEGAL_VERSION = '2026-10-16.2';
 export const legalContact = {
   "name": "ALS Dev Studio",
   "holder": "Andrés Leonardo Santiago González",
@@ -10,6 +10,14 @@ export const legalContact = {
   "email": "alsdevstudio@alsdevstudio.com"
 } as const;
 export const privacySections = [
+  {
+    "id": "reservas-representadas",
+    "title": "Reservas de salud y para menores representados",
+    "paragraphs": [
+      "Los negocios habilitados utilizan un formulario sin IA para reservas de salud o para menores representados por un adulto. Antes de recoger sus datos se solicita una autorización específica para esa reserva; los permisos de cuenta y negocio no la sustituyen. Se guarda la referencia del caso, calidad declarada y decisiones; para un menor, solo un nombre breve en la cita privada, separado de la cuenta del adulto que la gestiona.",
+      "Google no acredita edad, parentesco o tutela. El negocio revisa dudas de representación por su procedimiento. No se recoge historia clínica ni consentimiento médico. Una selección de salud puede revelar datos sensibles aunque no incluya diagnósticos. La autorización sensible es facultativa: el contacto directo del negocio permite solicitar una alternativa. El formulario sin IA sigue utilizando la infraestructura de autenticación y almacenamiento descrita aquí."
+    ]
+  },
   {
     "id": "cuenta",
     "title": "Tu cuenta y tus reservas",
