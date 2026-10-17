@@ -2,6 +2,14 @@
 
 Diseño de producto del 16 de octubre de 2026. El propietario aprobó el piloto y la inclusión del logo y la tarjeta autogestionados antes de abrirlo mediante su respuesta «1 y 2» a las opciones presentadas. El objetivo es incorporar pronto a los primeros negocios interesados, controlar las pruebas regaladas y convertirlas en negocios que reciben citas y contratan un plan. Las propuestas y la evidencia de diseño originales se conservan abajo; el seguimiento posterior distingue implementación local de funciones publicadas.
 
+## Propuestas tras la revisión de Fresha — 17 de octubre de 2026
+
+Después de publicar ficha pública, catálogo, calendario directo y «Volver a reservar», la siguiente recomendación es **buscar la próxima fecha disponible** cuando un día no tenga horarios. El cliente conservaría servicio/profesional y elegiría una hora nueva antes de confirmar. Falta una consulta acotada entre días sobre el motor diario existente. Es una propuesta de producto; no se ha implementado ni publicado.
+
+Backlog ordenado mediante alcance, impacto, confianza y facilidad, todos estimados de 1 a 5: próxima fecha disponible **4,00**; añadir al calendario **3,75**; dirección/modalidad e indicaciones **3,50**; reglas temporales en servidor **3,50**; reprogramar una cita existente **3,25**; cierres por fecha/rango **3,25**. Las reglas temporales preceden a reprogramación por dependencia. Se busca reducir el trabajo de probar fechas, facilitar la conservación de una cita y evitar gestión manual; no hay todavía una mejora de conversión o asistencia medida.
+
+Recordatorios y espera se posponen por canales, programación persistente y nuevos estados; galerías por gestión de imágenes; perfiles del equipo hasta acreditar necesidad; varios servicios por secuencias/recursos; reseñas por cierre operativo/moderación y reasignación por cambios sobre citas confirmadas. El marketplace sigue sujeto a diez negocios reales y decisión manual. El [informe de investigación](../qa/2026-10-17-fresha-next-adaptations.md) conserva fuentes oficiales, observaciones reales, puntuaciones y límites; el estado de las versiones publicadas está en [tasks.md](../../tasks.md).
+
 ## Estado publicado — cierre del 16 de octubre de 2026 en Colombia
 
 El piloto comercial está publicado y abierto en [Sarin](https://sarinbotsaas.pages.dev), tras la instrucción del propietario «solucionalo». Push inicial de la rama y `main` en `bf76ee20`, seguido por configuración/harness en `4eed34f`; runtime de aplicación `6315379`, Containers versión 7 con la imagen de plataforma `sha256:a319ac8b2b8b4188746e0f00bcc41439b40fc5c807463ee6d798c5bedeaae90e`. Worker de reapertura `d5a704e7-5bc3-4484-bc58-3c3f334ee3a7`, aproximadamente a las 23:44:49 de Colombia (04:44:49 UTC del 17 de octubre). Ver [informe de producción y cierre de CI](../qa/2026-10-16-production-commercial-pilot.md).
