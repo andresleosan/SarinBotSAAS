@@ -18,6 +18,7 @@ firestore-debug*.log
 playwright-report
 test-results
 coverage
+qa/reports/
 *.vault.json
 sarin-vault-*.json
 cloudflare/.wrangler/

@@ -2,7 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import type { ChatActor } from '@/types/chat';
 import type { Database as Firestore } from '@/lib/storage/types';
-import type { Business, PublicBusiness } from '@/types/firestore';
+import type { Business, PublicBusiness, PublicBusinessProfile } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { HttpError } from './http';
 import { documentIdSchema, type BusinessConfig } from './schemas';
@@ -38,6 +38,27 @@ export function publicBusiness(business: Business): PublicBusiness {
     subscription: { status: business.subscription.status, trialEndsAt: business.subscription.trialEndsAt, currentPeriodEndsAt: business.subscription.currentPeriodEndsAt, ...(business.subscription.graceEndsAt !== undefined ? { graceEndsAt: business.subscription.graceEndsAt } : {}), ...(business.subscription.paidTrial ? { paidTrial: { activatedAt: business.subscription.paidTrial.activatedAt, appointmentLimit: business.subscription.paidTrial.appointmentLimit, appointmentsUsed: business.subscription.paidTrial.appointmentsUsed, ...(business.subscription.paidTrial.source ? { source: business.subscription.paidTrial.source } : {}), ...(business.subscription.paidTrial.source === 'invitation' ? { accessSuspended: business.subscription.paidTrial.accessSuspended } : {}) } } : {}) },
     sarinConfig: { onboardingCompleted: business.sarinConfig.onboardingCompleted, tone: business.sarinConfig.tone, customRules: business.sarinConfig.customRules, intakeFields: business.sarinConfig.intakeFields },
     resources: business.resources, services: business.services, weeklySchedule: business.weeklySchedule,
+  };
+}
+
+export function publicBusinessProfile(business: Business): PublicBusinessProfile {
+  const projection = publicBusiness(business);
+  const weeklySchedule = Object.fromEntries(Object.entries(projection.weeklySchedule)
+    .filter(([day]) => /^[0-6]$/.test(day))
+    .map(([day, schedule]) => [day, {
+      isOpen: schedule.isOpen,
+      intervals: schedule.intervals.map(({ start, end }) => ({ start, end })),
+    }]));
+  return {
+    slug: projection.slug, name: projection.name, category: projection.category,
+    phoneWhatsApp: projection.phoneWhatsApp, timezone: projection.timezone,
+    ...(projection.logo ? { logo: projection.logo } : {}),
+    ...(projection.socialLinks ? { socialLinks: projection.socialLinks } : {}),
+    services: projection.services.map(({ id, name, price, durationMinutes }) => ({ id, name, price, durationMinutes })),
+    weeklySchedule,
+    bookingAvailable: isSubscriptionAllowed(projection) && projection.sarinConfig.onboardingCompleted
+      && Object.values(weeklySchedule).some(day => day.isOpen && day.intervals.length > 0)
+      && projection.services.some(service => projection.resources.some(resource => resource.active && service.resourceIds.includes(resource.id))),
   };
 }
 

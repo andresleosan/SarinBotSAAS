@@ -15,7 +15,8 @@ import { useDebouncedChat } from '@/hooks/useDebouncedChat';
 import { useEngineHealth } from '@/hooks/useEngineHealth';
 import { useApiPoll } from '@/lib/client/use-api-poll';
 import { getBusinessAccess, isSubscriptionAllowed } from '@/lib/sarin/subscription';
-import type { PublicBusiness } from '@/types/firestore';
+import type { PublicBusiness, PublicBusinessProfile } from '@/types/firestore';
+import { BusinessPublicProfile } from '@/components/business-public-profile';
 import type { BookingCapability } from '@/lib/booking-subject';
 import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
 
@@ -74,4 +75,27 @@ function Island({ slug }: { slug: string }) {
     </div>
   </main>;
 }
-export default function ClientIslandPage({ params }: { params: Promise<{ slug: string }> }) { const { slug } = use(params); return <AuthGate><Island slug={slug} /></AuthGate>; }
+function AnonymousProfile({ slug, onContinue }: { slug: string; onContinue: () => void }) {
+  const projection = useApiPoll<PublicBusinessProfile | null>(slug, async signal => {
+    const response = await fetch(`/api/public/businesses/${encodeURIComponent(slug)}?view=profile`, { signal, cache: 'no-store' });
+    if (!response.ok) throw new Error('No pudimos consultar el negocio. Inténtalo de nuevo.');
+    return (await response.json() as { business: PublicBusinessProfile | null }).business;
+  });
+  if (projection.loading) return <main className="mx-auto max-w-2xl p-6"><Notice>Cargando negocio…</Notice></main>;
+  if (!projection.value) return <main className="mx-auto max-w-2xl space-y-4 p-6"><Notice error>{projection.error || 'No encontramos este negocio. Revisa el enlace o escanea nuevamente su QR.'}</Notice>{projection.error && <button className={buttonClass} onClick={projection.refresh}>Reintentar</button>}<Link href="/" className="inline-flex min-h-11 items-center text-sarin-blue underline">Volver al inicio</Link></main>;
+  return <><BusinessPublicProfile profile={projection.value} onContinue={onContinue} />{projection.error && <div className="mx-auto max-w-2xl p-6"><Notice error>{projection.error}</Notice><button className={buttonClass} onClick={projection.refresh}>Actualizar negocio</button></div>}</>;
+}
+
+function BusinessEntry({ slug }: { slug: string }) {
+  const { user } = useAuth();
+  const [requested, setRequested] = useState(false);
+  useEffect(() => { if (user) setRequested(false); }, [user]);
+  if (user) return <AuthGate><Island slug={slug} /></AuthGate>;
+  if (requested) return <><div className="mx-auto max-w-2xl px-5 pt-4"><button className="min-h-11 text-sm text-sarin-blue underline focus-visible:outline-2 focus-visible:outline-offset-4" onClick={() => setRequested(false)}>Volver al negocio</button></div><AuthGate><Island slug={slug} /></AuthGate></>;
+  return <AnonymousProfile slug={slug} onContinue={() => setRequested(true)} />;
+}
+
+export default function ClientIslandPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
+  return <BusinessEntry key={slug} slug={slug} />;
+}

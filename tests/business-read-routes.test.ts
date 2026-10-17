@@ -38,6 +38,39 @@ describe('business reads without browser database access', () => {
     const bad = await publicGet(new Request('https://public.invalid'), { params: Promise.resolve({ slug: '../private' }) });
     expect(bad.status).toBe(400);
   });
+  it('serves an anonymous profile with only customer-facing fields and a derived booking state', async () => {
+    state.rows.set('publicBusinesses/shop', {
+      id: 'private-business-id', slug: 'shop', name: 'Barbería de prueba', category: 'Barbería', phoneWhatsApp: '+573000000000', timezone: 'America/Bogota',
+      ownerUid: 'private-owner', ownerEmail: 'private@example.invalid', createdAt: 123,
+      subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 4102444800000 },
+      sarinConfig: { onboardingCompleted: true, tone: 'private-tone', customRules: 'private-rules', intakeFields: [{ key: 'private-question', label: 'Private intake', required: true }] },
+      resources: [{ id: 'private-resource', name: 'Private station', active: true }],
+      services: [{ id: 'haircut', name: 'Corte', price: 25000, durationMinutes: 30, bufferMinutes: 15, resourceIds: ['private-resource'], internalNote: 'private-service-note' }],
+      weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '17:00', internalNote: 'private-hours-note' }] } },
+    });
+    const response = await publicGet(new Request('https://public.invalid/api/public/businesses/shop?view=profile'), { params: Promise.resolve({ slug: 'shop' }) });
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(data.business).toEqual({ slug: 'shop', name: 'Barbería de prueba', category: 'Barbería', phoneWhatsApp: '+573000000000', timezone: 'America/Bogota', services: [{ id: 'haircut', name: 'Corte', price: 25000, durationMinutes: 30 }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] } }, bookingAvailable: true });
+    expect(JSON.stringify(data)).not.toMatch(/private-|subscription|sarinConfig|resources|bufferMinutes|internalNote/);
+  });
+  it('keeps a paused business profile visible without exposing payment or trial information', async () => {
+    state.rows.set('publicBusinesses/shop', { slug: 'shop', name: 'Negocio', category: 'Servicios', phoneWhatsApp: '', timezone: 'America/Bogota', subscription: { status: 'suspended', trialEndsAt: 0, currentPeriodEndsAt: 0, lastPaymentId: 'secret-payment' }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, services: [], resources: [], weeklySchedule: {} });
+    const response = await publicGet(new Request('https://public.invalid?view=profile'), { params: Promise.resolve({ slug: 'shop' }) });
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.business).toMatchObject({ name: 'Negocio', bookingAvailable: false });
+    expect(JSON.stringify(data)).not.toMatch(/suspended|secret-payment|subscription/);
+  });
+  it('rejects ambiguous profile views and never falls back to a private business', async () => {
+    state.rows.set('businesses/shop', { name: 'Private draft' });
+    const context = { params: Promise.resolve({ slug: 'shop' }) };
+    expect(await (await publicGet(new Request('https://public.invalid?view=profile'), context)).json()).toEqual({ business: null });
+    for (const query of ['view=private', 'view=profile&view=profile']) {
+      expect((await publicGet(new Request(`https://public.invalid?${query}`), context)).status).toBe(400);
+    }
+  });
   it('returns the entire client history and future appointments filtered by UID and tenant, never other clients or blocks', async () => {
     state.rows.set('businesses/business', { id: 'business' } as Business as unknown as Record<string, unknown>);
     for (let index = 0; index < 525; index++) state.rows.set(`businesses/business/appointments/own${index}`, { id: `own${index}`, tenantId: 'business', type: 'appointment', client: { uid: 'client' }, startAt: index } as Appointment as unknown as Record<string, unknown>);

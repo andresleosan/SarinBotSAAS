@@ -121,6 +121,20 @@ export type PublicBusiness = Omit<Business, 'ownerUid' | 'ownerEmail' | 'created
   };
 };
 
+/** Anonymous browsing only: no assistant configuration, client data or billing details. */
+export interface PublicBusinessProfile {
+  slug: string;
+  name: string;
+  category: string;
+  phoneWhatsApp: string;
+  timezone: 'America/Bogota';
+  logo?: BusinessLogo;
+  socialLinks?: BusinessSocialLink[];
+  services: Pick<TenantService, 'id' | 'name' | 'price' | 'durationMinutes'>[];
+  weeklySchedule: Business['weeklySchedule'];
+  bookingAvailable: boolean;
+}
+
 export interface TenantClientMemory {
   uid: string;
   displayName: string;
