@@ -96,9 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const credential = await signInWithPopup(getFirebaseClient().auth, new GoogleAuthProvider());
       if (preauthorization) {
         if (getFirebaseClient().auth.currentUser?.uid !== credential.user.uid) return;
-        const consent = await apiFetch<ConsentStatus>('/api/consent?scope=account');
+        const consent = await apiFetch<ConsentStatus>('/api/consent?scope=account', {}, credential.user.uid);
         if (getFirebaseClient().auth.currentUser?.uid !== credential.user.uid) return;
-        await apiFetch('/api/consent', { method: 'POST', body: JSON.stringify({ scope: 'account', action: 'accept', requestId: crypto.randomUUID(), expectedRevision: consent.revision, fingerprint: consent.documents.fingerprint, termsAccepted: true, dataAuthorized: true, preauthorization }) });
+        await apiFetch('/api/consent', { method: 'POST', body: JSON.stringify({ scope: 'account', action: 'accept', requestId: crypto.randomUUID(), expectedRevision: consent.revision, fingerprint: consent.documents.fingerprint, termsAccepted: true, dataAuthorized: true, preauthorization }) }, credential.user.uid);
         if (getFirebaseClient().auth.currentUser?.uid === credential.user.uid) setConsentVersion(value => value + 1);
       }
     } catch (cause) {

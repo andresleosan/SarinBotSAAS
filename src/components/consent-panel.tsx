@@ -44,6 +44,7 @@ export function ConsentPanel({ controller, title = 'Privacidad y permisos', bloc
   const contents = <div className="space-y-4 pt-3">
     {controller.error && <p role="alert" className="text-sm text-rose-800">{controller.error}</p>}
     {controller.loading ? <p role="status" className="text-sm text-sarin-muted">Comprobando tus permisos…</p> : <>
+      {controller.withdrawalRequested && <div className="space-y-2 text-sm"><p role="status">Las nuevas operaciones están detenidas. Estamos pendientes de confirmar tu retirada de autorización.</p><button className="min-h-11 text-sarin-blue underline disabled:opacity-50" disabled={controller.busy} onClick={() => void controller.decide('revoke')}>Reintentar retirada de autorización</button></div>}
       {status && <><p className="text-sm leading-6 text-sarin-muted">{status.documents.notice}</p><Links />{!controller.active && <DecisionForm key={`${status.documents.fingerprint}:${status.revision}`} controller={controller} blockedReason={blockedReason} />}</>}
       {!status && <button className={button} onClick={controller.refresh}>Reintentar comprobación</button>}
       {status?.receipt && <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm"><span>Última decisión: {status.receipt.action === 'accept' ? 'aceptación' : 'revocación'} · {new Date(status.receipt.occurredAt).toLocaleString('es-CO')}</span><button className="min-h-11 text-sarin-blue underline" onClick={download}>Descargar mi constancia</button></div>}

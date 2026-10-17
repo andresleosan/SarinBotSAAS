@@ -23,6 +23,11 @@ describe('consent HTTP boundaries', () => {
     expect((await POST(request({ scope: 'account', action: 'accept', uid: 'other', occurredAt: 1 }))).status).toBe(400);
     expect((await GET(new Request('http://localhost/api/consent?scope=business_client', { headers: { Authorization: 'Bearer synthetic' } }))).status).toBe(400);
   });
+  it('accepts the browser Host origin when Next constructs an internal localhost URL', async () => {
+    const { documents: doc } = await (await documents()).json();
+    const request = new Request('http://localhost:3042/api/consent/preauthorize', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: '127.0.0.1:3042', Origin: 'http://127.0.0.1:3042' }, body: JSON.stringify({ fingerprint: doc.fingerprint, termsAccepted: true, dataAuthorized: true }) });
+    expect((await preauthorize(request)).status).toBe(200);
+  });
   it('session inspection never creates or modifies a profile before explicit acceptance', async () => {
     const db = state.db as ReturnType<typeof memoryFirestore>['db'];
     expect((await session(request())).status).toBe(200);

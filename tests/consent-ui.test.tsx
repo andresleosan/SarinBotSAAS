@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountConsentProvider, ConsentPanel, PreauthorizationChoices, useAccountConsent } from '@/components/consent-panel';
 import { consentContent, type ConsentStatus } from '@/lib/legal';
 import { apiFetch } from '@/lib/client/api';
-vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), errorMessage: (error: unknown) => error instanceof Error ? error.message : String(error) }));
+vi.mock('@/lib/client/api', async original => ({ ...await original<typeof import('@/lib/client/api')>(), apiFetch: vi.fn() }));
 const documents = { ...consentContent('account'), fingerprint: 'a'.repeat(64) };
 const initial: ConsentStatus = { active: false, revision: 0, receipt: null, documents };
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -44,6 +44,26 @@ describe('explicit consent controls', () => {
     await act(async () => renderer?.update(tree('two')));
     await act(async () => { resolve({ ...initial, active: true, revision: 1 }); await pending; });
     expect(controller.active).toBe(false); expect(controller.status?.revision).toBe(0);
+  });
+  it('keeps withdrawal closed during a pending or uncertain POST even when polling returns the previous accepted revision', async () => {
+    const accepted = { ...initial, active: true, revision: 1 };
+    let reject!: (error: Error) => void;
+    vi.mocked(apiFetch).mockImplementation((_, init) => init?.method === 'POST' ? new Promise((_done, fail) => { reject = fail; }) : Promise.resolve(accepted));
+    await mount(); expect(controller.active).toBe(true);
+    let withdrawal!: Promise<void>;
+    act(() => { withdrawal = controller.decide('revoke'); });
+    expect(controller.active).toBe(false);
+    await act(async () => controller.refresh());
+    expect(controller.active).toBe(false); expect(controller.busy).toBe(true);
+    await act(async () => { reject(new Error('Respuesta perdida')); await withdrawal; });
+    await act(async () => controller.refresh());
+    expect(controller.active).toBe(false); expect(controller.busy).toBe(false);
+    const original = vi.mocked(apiFetch).mock.calls.find(call => call[1]?.method === 'POST')?.[1]?.body;
+    vi.mocked(apiFetch).mockResolvedValueOnce({ ...initial, revision: 2 });
+    await act(async () => controller.decide('revoke'));
+    const posts = vi.mocked(apiFetch).mock.calls.filter(call => call[1]?.method === 'POST');
+    expect(posts.at(-1)?.[1]?.body).toBe(original);
+    expect(controller.active).toBe(false);
   });
   it('obtains signed proof before enabling the Google acceptance action and clears it when unchecked', async () => {
     const onContinue = vi.fn();

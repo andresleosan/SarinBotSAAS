@@ -17,13 +17,17 @@ export class ApiError extends Error {
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
+  expectedUid?: string,
 ): Promise<T> {
   const user = getFirebaseClient().auth.currentUser;
   if (!user) throw new ApiError("Inicia sesión para continuar.", 401);
+  const assertIdentity = () => { if (expectedUid && (user.uid !== expectedUid || getFirebaseClient().auth.currentUser?.uid !== expectedUid)) throw new ApiError('La cuenta cambió. Vuelve a revisar tus permisos.', 401, 'AUTH_IDENTITY_CHANGED'); };
+  assertIdentity();
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${await user.getIdToken()}`);
   if (init.body && !headers.has("Content-Type"))
     headers.set("Content-Type", "application/json");
+  assertIdentity();
   const response = await fetch(path, { ...init, headers, cache: "no-store" });
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
