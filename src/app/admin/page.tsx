@@ -22,6 +22,7 @@ import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useEngineHealth } from "@/hooks/useEngineHealth";
 import { AdminAiSettings } from "@/components/admin-ai-settings";
 import { AdminAiUsage } from "@/components/admin-ai-usage";
+import { AdminAiBudget } from "@/components/admin-ai-budget";
 import { AdminWhatsApp } from "@/components/admin-whatsapp";
 import { AdminInvitations } from "@/components/admin-invitations";
 import { BILLING_PLANS, getBillingPlan } from "@/lib/billing-plans";
@@ -248,6 +249,7 @@ function Console() {
         </div>
       </section>
       <AdminAiSettings onSaved={() => void engine.refresh()} />
+      <AdminAiBudget businesses={data.businesses} />
       <AdminAiUsage businesses={data.businesses} />
       <AdminWhatsApp businesses={data.businesses} />
       <AdminInvitations onAccessChanged={refresh} />

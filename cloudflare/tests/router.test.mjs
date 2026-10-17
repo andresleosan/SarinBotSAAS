@@ -31,6 +31,18 @@ test('all business, admin and local engine requests use one constant container',
   assert.deepEqual(names, Array(4).fill(SINGLETON_NAME));
   assert.equal(new Set(names).size, 1);
 });
+
+test('maintenance allows only one authenticated business budget read without opening other queries', async () => {
+  let forwarded = 0;
+  const get = () => ({ fetch: async () => { forwarded++; return new Response('ok'); } });
+  const send = (query, method = 'GET', authorized = true) => forwardToSingleton(new Request(`https://app.example.invalid/api/admin/abuse${query}`, { method, headers: authorized ? { Authorization: 'Bearer synthetic' } : {} }), get, { SARIN_MAINTENANCE: 'true' });
+  assert.equal((await send('?businessId=b_one')).status, 200);
+  assert.equal(forwarded, 1);
+  for (const query of ['?businessId=', '?businessId=one&businessId=two', '?businessId=../one', '?businessId=one&cursor=00000000-0000-4000-8000-000000000001', '?businessId=one&extra=1']) assert.equal((await send(query)).status, 503);
+  assert.equal((await send('?businessId=one', 'PATCH')).status, 503);
+  assert.equal((await send('?businessId=one', 'GET', false)).status, 503);
+  assert.equal(forwarded, 1);
+});
 test('forwards a POST exactly once and returns an unconsumed response stream', async () => {
   let calls = 0;
   const body = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('private result')); } });

@@ -17,6 +17,9 @@ export const aiBudgetLimitsSchema = z.object({ globalDayUsd: usd, globalMonthUsd
 export const DEFAULT_AI_BUDGET_LIMITS = { globalDayUsd: 0.5, globalMonthUsd: 8, businessDayUsd: 0.1, businessMonthUsd: 2, globalDayTokens: 20_000_000, globalMonthTokens: 300_000_000, businessDayTokens: 2_000_000, businessMonthTokens: 30_000_000 } as const;
 const reason = z.string().trim().min(1).max(300);
 export const aiBudgetSettingsInputSchema = z.object({ expectedVersion: count, paused: z.boolean(), limits: aiBudgetLimitsSchema, reason }).strict();
+const businessLimitsSchema = aiBudgetLimitsSchema.pick({ businessDayUsd: true, businessMonthUsd: true });
+export const businessAiBudgetInputSchema = z.object({ businessId: documentIdSchema, expectedVersion: count.max(Number.MAX_SAFE_INTEGER - 1), expectedSettingsVersion: count.min(1), limits: businessLimitsSchema.nullable(), reason }).strict();
+const businessSettingsSchema = z.object({ businessId: documentIdSchema, version: count.min(1), limits: businessLimitsSchema.nullable(), reason, updatedAt: count, updatedBy: z.string().min(1).max(128) }).strict();
 export const aiBudgetReconcileSchema = z.object({ callId: z.string().uuid(), resolution: z.enum(['keep_reserved', 'confirmed_not_charged']), reason, evidence: z.string().trim().min(1).max(500) }).strict();
 const settingsSchema = z.object({ version: count.min(1), paused: z.boolean(), limits: aiBudgetLimitsSchema, reason, updatedAt: count, updatedBy: z.string().min(1).max(128) }).strict();
 const periodSchema = z.object({ usedTokens: count, reservedTokens: count, usedCostNanoUsd: count, reservedCostNanoUsd: count }).strict();
@@ -32,6 +35,13 @@ const unavailable = () => new HttpError(503, 'La atención de IA está en pausa 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T { const result = schema.safeParse(value); if (!result.success) throw unavailable(); return result.data; }
 function period(value: unknown) { return value === undefined ? { usedTokens: 0, reservedTokens: 0, usedCostNanoUsd: 0, reservedCostNanoUsd: 0 } : parse(periodSchema, value); }
 function authorize(user: ChatActor) { if (!isSuperadmin(user.uid)) throw new HttpError(403, 'Forbidden'); }
+const businessSettingsKey = (businessId: string) => `pilotAiBudgetBusiness_${digest(businessId)}`;
+function businessSettings(value: unknown, businessId: string) {
+  if (value === undefined) return null;
+  const result = parse(businessSettingsSchema, value);
+  if (result.businessId !== businessId) throw unavailable();
+  return result;
+}
 function periodIds(businessId: string, now: number) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
   const part = (key: string) => parts.find(item => item.type === key)!.value;
@@ -44,6 +54,43 @@ export async function readAdminAiBudget(user: ChatActor, db: Database = getAdmin
   const collection = db.collection('aiBudgetCalls'), query = (cursor ? collection.where('id', '>', cursor) : collection).orderBy('id', 'asc').limit(51);
   const [settings, calls] = await Promise.all([db.collection('serverSettings').doc('pilotAiBudget').get(), query.get()]);
   return { configured: settings.exists, settings: settings.exists ? parse(settingsSchema, settings.data()) : null, proposedLimits: DEFAULT_AI_BUDGET_LIMITS, calls: calls.docs.slice(0, 50).map(document => parse(callSchema, document.data())), nextCursor: calls.docs.length > 50 ? calls.docs[49].id : null, gateEnabled: process.env.PILOT_AI_BUDGET_ENFORCED === 'true' };
+}
+export async function readBusinessAiBudget(user: ChatActor, businessId: string, db: Database = getAdminDb(), now = Date.now()) {
+  authorize(user); documentIdSchema.parse(businessId);
+  const ids = periodIds(businessId, now);
+  return db.runTransaction(async tx => {
+    const [business, settingsDoc, custom, ...states] = await Promise.all([
+      tx.get(db.collection('businesses').doc(businessId)), tx.get(db.collection('serverSettings').doc('pilotAiBudget')),
+      tx.get(db.collection('serverSettings').doc(businessSettingsKey(businessId))),
+      ...ids.map(id => tx.get(db.collection('aiBudgetPeriods').doc(id))),
+    ]);
+    if (!business.exists) throw new HttpError(404, 'El negocio no existe.');
+    const settings = settingsDoc.exists ? parse(settingsSchema, settingsDoc.data()) : null;
+    const override = businessSettings(custom.data(), businessId), base = settings?.limits ?? DEFAULT_AI_BUDGET_LIMITS;
+    const counters = states.map(document => period(document.data()));
+    return { businessId, name: typeof business.data()?.name === 'string' ? String(business.data()!.name) : '', settings,
+      proposedLimits: DEFAULT_AI_BUDGET_LIMITS, gateEnabled: process.env.PILOT_AI_BUDGET_ENFORCED === 'true',
+      periods: { day: ids[0].slice('global_day_'.length), month: ids[1].slice('global_month_'.length) },
+      global: { day: counters[0], month: counters[1] }, override,
+      limits: override?.limits ?? { businessDayUsd: base.businessDayUsd, businessMonthUsd: base.businessMonthUsd },
+      usage: { day: counters[2], month: counters[3] } };
+  });
+}
+export type BusinessAiBudgetView = Awaited<ReturnType<typeof readBusinessAiBudget>>;
+export type AiBudgetSettings = z.infer<typeof settingsSchema>;
+export type AiBudgetLimits = z.infer<typeof aiBudgetLimitsSchema>;
+export async function saveBusinessAiBudgetSettings(user: ChatActor, supplied: z.input<typeof businessAiBudgetInputSchema>, db: Database = getAdminDb(), now = Date.now()) {
+  authorize(user); const input = businessAiBudgetInputSchema.parse(supplied);
+  const ref = db.collection('serverSettings').doc(businessSettingsKey(input.businessId));
+  return db.runTransaction(async tx => {
+    const [business, settingsDoc, existing] = await Promise.all([tx.get(db.collection('businesses').doc(input.businessId)), tx.get(db.collection('serverSettings').doc('pilotAiBudget')), tx.get(ref)]);
+    if (!business.exists) throw new HttpError(404, 'El negocio no existe.');
+    if (!settingsDoc.exists) throw new HttpError(409, 'Configura primero el presupuesto general.', 'AI_BUDGET_SETTINGS_CONFLICT');
+    const settings = parse(settingsSchema, settingsDoc.data()), previous = businessSettings(existing.data(), input.businessId);
+    if (settings.version !== input.expectedSettingsVersion || (previous?.version ?? 0) !== input.expectedVersion) throw new HttpError(409, 'Los límites cambiaron. Actualiza antes de guardar.', 'AI_BUDGET_SETTINGS_CONFLICT');
+    const next = { businessId: input.businessId, version: input.expectedVersion + 1, limits: input.limits, reason: input.reason, updatedAt: now, updatedBy: user.uid };
+    tx.set(ref, next); return next;
+  });
 }
 export async function saveAiBudgetSettings(user: ChatActor, supplied: z.infer<typeof aiBudgetSettingsInputSchema>, db: Database = getAdminDb()) {
   authorize(user); const input = aiBudgetSettingsInputSchema.parse(supplied), ref = db.collection('serverSettings').doc('pilotAiBudget');
@@ -59,11 +106,12 @@ export async function reservePaidCallBudget(supplied: PaidCallContext & { callId
   if (input.model !== tariff.model || input.pricingVersion !== tariff.pricingVersion) throw unavailable();
   const ref = db.collection('aiBudgetCalls').doc(input.callId), settingsRef = db.collection('serverSettings').doc('pilotAiBudget'), ids = periodIds(input.businessId, now);
   return db.runTransaction(async tx => {
-    const [settingsDoc, previous, ...periods] = await Promise.all([tx.get(settingsRef), tx.get(ref), ...ids.map(id => tx.get(db.collection('aiBudgetPeriods').doc(id)))]);
+    const [settingsDoc, previous, custom, ...periods] = await Promise.all([tx.get(settingsRef), tx.get(ref), tx.get(db.collection('serverSettings').doc(businessSettingsKey(input.businessId))), ...ids.map(id => tx.get(db.collection('aiBudgetPeriods').doc(id)))]);
     if (previous.exists) throw new HttpError(409, 'La llamada ya tiene una reserva de presupuesto.', 'AI_BUDGET_CALL_EXISTS');
     const settings = parse(settingsSchema, settingsDoc.data()); if (settings.paused) throw unavailable();
+    const override = businessSettings(custom.data(), input.businessId);
     const tokenLimits = [settings.limits.globalDayTokens, settings.limits.globalMonthTokens, settings.limits.businessDayTokens, settings.limits.businessMonthTokens];
-    const costLimits = [settings.limits.globalDayUsd, settings.limits.globalMonthUsd, settings.limits.businessDayUsd, settings.limits.businessMonthUsd].map(value => Math.round(value * 1e9));
+    const costLimits = [settings.limits.globalDayUsd, settings.limits.globalMonthUsd, override?.limits?.businessDayUsd ?? settings.limits.businessDayUsd, override?.limits?.businessMonthUsd ?? settings.limits.businessMonthUsd].map(value => Math.round(value * 1e9));
     const states = periods.map(document => period(document.data()));
     for (const [index, state] of states.entries()) if (state.usedTokens + state.reservedTokens + input.maxTokens > tokenLimits[index] || state.usedCostNanoUsd + state.reservedCostNanoUsd + input.maxCostNanoUsd > costLimits[index]) throw new HttpError(503, 'La atención de IA alcanzó el presupuesto operativo. La agenda sigue disponible; contacta al negocio.', 'AI_BUDGET_EXHAUSTED');
     for (const [index, state] of states.entries()) tx.set(db.collection('aiBudgetPeriods').doc(ids[index]), parse(periodSchema, { ...state, reservedTokens: state.reservedTokens + input.maxTokens, reservedCostNanoUsd: state.reservedCostNanoUsd + input.maxCostNanoUsd }));

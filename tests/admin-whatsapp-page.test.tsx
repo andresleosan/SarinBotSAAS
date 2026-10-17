@@ -88,3 +88,4 @@ describe("administrative WhatsApp preparation", () => {
     expect(text(usage[0])).not.toContain("$0");
   });
 });
+vi.mock('@/components/admin-ai-budget', () => ({ AdminAiBudget: () => null }));
