@@ -1,5 +1,7 @@
 # Piloto comercial: aceptación integrada local
 
+> **Seguimiento posterior:** [crédito y QR de ALS, códigos de seis dígitos y revisión de datos](2026-10-16-pilot-followup.md), runtime `df2a1f2`. La candidata `ecec028` y sus cifras inferiores conservan la evidencia de la fase anterior. El presupuesto fue explicado al propietario; no se recibió autorización de publicación ni se activaron esos límites.
+
 Estado al 16 de octubre de 2026: los cuatro incrementos del piloto están implementados en el worktree separado `commercial-pilot`. **Candidata local verificada: `ecec02828feb474ffd0e6c46069a120697f9912c`. Los gates locales están cerrados; publicación y activación permanecen pendientes.** Producción permanece sin cambios, con marketplace y WhatsApp deshabilitados y el nuevo gate de presupuesto sin activar.
 
 ## Resultado funcional observado

@@ -1,0 +1,30 @@
+{
+  "status": "local-only-not-deployed",
+  "runtimeRevision": "df2a1f276ca17e34aa3f4ee38badfc59dfde3070",
+  "image": {
+    "tag": "sarin-bot:pilot-df2a1f2",
+    "id": "sha256:c1c863a5e32c7b4096d1bf7bed22df4bbc5e51641f68e5e834b67b7453e0762a",
+    "sizeBytes": 79578330,
+    "sourceArchiveSha256": "5b2e2210018eb8350426e53b202d17f210f43dd54faec11479e2f38f413caa4c",
+    "linuxSmoke": {
+      "ok": true,
+      "linuxNativeSharp": true,
+      "unauthenticatedSession": 401,
+      "network": "none",
+      "readOnly": true
+    }
+  },
+  "applicationTests": {
+    "passed": 794,
+    "skipped": 25
+  },
+  "firestoreTests": {
+    "passed": 23,
+    "skipped": 0
+  },
+  "build": true,
+  "aiBudgetGateActivated": false,
+  "productionAuthorizationReceived": false,
+  "legalConsentGateImplemented": false,
+  "publicPrivacyResponsible": "ALS Dev Studio"
+}

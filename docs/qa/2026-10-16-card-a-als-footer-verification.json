@@ -1,0 +1,22 @@
+{
+  "pngSize": [
+    1241,
+    1749
+  ],
+  "pdfPages": 1,
+  "pdfMm": [
+    105.0,
+    148.0
+  ],
+  "pngDecoded": [
+    "https://example.com/reservar",
+    "https://www.alsdevstudio.com/"
+  ],
+  "pdfDecoded": [
+    "https://example.com/reservar",
+    "https://www.alsdevstudio.com/"
+  ],
+  "developerQrMm": 18.03,
+  "physicalPrintVerified": false,
+  "synthetic": true
+}

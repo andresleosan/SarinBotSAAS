@@ -1,6 +1,6 @@
 {
   "date": "2026-10-16",
-  "status": "local-candidate-not-deployed",
+  "status": "historical-local-candidate-superseded",
   "branch": "codex/commercial-pilot-20261016",
   "baseline": "b8624ff",
   "runtimeRevision": "ecec02828feb474ffd0e6c46069a120697f9912c",
@@ -66,5 +66,6 @@
     "runtime-pricing",
     "business-logo-and-card-A",
     "server-enforced-chat-and-booking-controls"
-  ]
+  ],
+  "supersededBy": "2026-10-16-pilot-followup-release.json"
 }
