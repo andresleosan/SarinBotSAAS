@@ -1,5 +1,25 @@
 # Estado de implementación — 2026-10-17
 
+## Próxima fecha disponible — aprobado localmente
+
+- [x] Implementar búsqueda explícita de hasta catorce días, con servicio/profesional conservados y selección de hora manual.
+- [x] Corregir revisión de reloj y confirmación con regresiones RED/GREEN; mantener recuperación de la operación original.
+- [x] Pasar 1.105 pruebas/26 omitidas, tipos, audit y D1 local real; 29 controles CUA en móvil/escritorio. Corregir foco de teclado y limpiar diez documentos propios y todos los procesos de QA. [Aceptación](docs/qa/2026-10-17-next-available-date.md).
+- [ ] Publicar la versión autorizada después de auditar imagen y reversión compatible, drenar cola y verificar una instancia efectiva y la sesión administrativa.
+
+## Adaptaciones de Fresha — ejecución secuencial autorizada
+
+El propietario indicó «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». Cada incremento se implementa, prueba, publica y verifica antes de comenzar el siguiente; la autorización incluye las publicaciones en Sarin.
+
+- [ ] **Aprobado localmente:** buscar próxima fecha disponible después de un día sin cupos, conservando servicio/profesional y consultando hasta catorce días. Selección de hora y confirmación explícitas. [Protocolo de QA](qa/tests/next-available-date.md).
+- [ ] Añadir la cita al calendario mediante archivo importable, con identidad estable y límites claros de actualización.
+- [ ] Dirección/modalidad e indicaciones para llegar en la ficha del negocio.
+- [ ] Reprogramar una cita existente con reglas temporales validadas en servidor y cambio atómico.
+- [ ] Recordatorios automáticos mediante un canal configurado y programación persistente.
+- [ ] Lista de espera con preferencias y confirmación explícita del hueco ofrecido.
+
+Orden basado en la [investigación de Fresha](docs/qa/2026-10-17-fresha-next-adaptations.md). La implementación sigue en el worktree aislado `service-catalog`; el checkout original permanece conservado.
+
 ## Volver a reservar desde el historial — publicado
 
 - [x] Alcance acotado aceptado: recuperar solo el servicio vigente, consultar precio actual y elegir un horario nuevo con confirmación explícita. [Recorrido](docs/design/2026-10-17-rebook-from-history.md).

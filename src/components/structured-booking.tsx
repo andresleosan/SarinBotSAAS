@@ -10,6 +10,8 @@ import { serviceCatalogMetadata } from '@/lib/service-catalog';
 import { BookingSubjectConsent } from './booking-subject-consent';
 import { BookingProposal } from './booking-proposal';
 import { buttonClass, fieldClass, Notice } from './app-shell';
+const bookingDateFormatter = new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'long', year: 'numeric' });
+const formatBookingDate = (dateKey: string) => bookingDateFormatter.format(new Date(`${dateKey}T12:00:00Z`));
 export function StructuredBooking({ business, capability, enabled = true, initialSubjectKind, initialServiceId, onInitialServiceHandled, onConfirmed, onLockedChange }: { business: PublicBusiness; capability: BookingCapability; enabled?: boolean; initialSubjectKind?: BookingSubjectKind; initialServiceId?: string; onInitialServiceHandled?: () => void; onConfirmed: (appointment: Appointment) => void; onLockedChange?: (locked: boolean) => void }) {
   const { user } = useAuth();
   const scope = user ? JSON.stringify([user.uid, business.id, initialSubjectKind ?? 'default']) : null;
@@ -37,12 +39,15 @@ function SubjectSelector({ uid, business, capability, enabled, initialSubjectKin
 function CaseBooking({ uid, business, subjectCase, enabled, initialServiceId, onInitialServiceHandled, onConfirmed, onLocked }: { uid: string; business: PublicBusiness; subjectCase: BookingSubjectCase; enabled: boolean; initialServiceId?: string; onInitialServiceHandled?: () => void; onConfirmed: (appointment: Appointment) => void; onLocked: (locked: boolean) => void }) {
   const initialService = useRef({ requested: initialServiceId !== undefined, serviceId: business.services.some(item => item.id === initialServiceId) ? initialServiceId! : '' });
   const initialServiceHandled = useRef(false);
-  const subject = useBookingSubjectConsent(uid, business, subjectCase), booking = useStructuredBooking(uid, business, subjectCase, enabled && subject.active, initialService.current.serviceId), [name, setName] = useState(''), notified = useRef<string | null>(null);
+  const subject = useBookingSubjectConsent(uid, business, subjectCase), booking = useStructuredBooking(uid, business, subjectCase, enabled && subject.active && isSubscriptionAllowed(business), initialService.current.serviceId), [name, setName] = useState(''), notified = useRef<string | null>(null);
+  const nextAvailabilityResult = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (booking.nextAvailabilityStatus === 'found') nextAvailabilityResult.current?.focus(); }, [booking.nextAvailabilityStatus]);
   useEffect(() => { if (initialService.current.requested && !initialServiceHandled.current) { initialServiceHandled.current = true; onInitialServiceHandled?.(); } }, [onInitialServiceHandled]);
   useEffect(() => { onLocked(booking.busy || booking.uncertain); return () => onLocked(false); }, [booking.busy, booking.uncertain, onLocked]);
   useEffect(() => { if (booking.appointment && notified.current !== booking.appointment.id) { notified.current = booking.appointment.id; onConfirmed(booking.appointment); } }, [booking.appointment, onConfirmed]);
   const selected = booking.selection, represented = subjectCase.subjectKind === 'represented_minor', canBook = enabled && isSubscriptionAllowed(business), service = business.services.find(item => item.id === selected.serviceId);
   const metadata = service ? serviceCatalogMetadata(service) : {};
+  const emptyAvailability = booking.availabilityStatus === 'success' && !booking.availability.some(resource => resource.slots.length > 0), searchingNext = booking.nextAvailabilityStatus === 'loading';
   const beneficiary: BookingBeneficiary = represented ? { kind: 'represented_minor', displayName: name.trim(), representativeRole: subjectCase.representativeRole } : { kind: 'self' };
   return <div className="space-y-5">
     {(subject.loading || subject.error || subject.status?.required !== false) && <BookingSubjectConsent controller={subject} enabled={enabled} />}
@@ -63,13 +68,18 @@ function CaseBooking({ uid, business, subjectCase, enabled, initialServiceId, on
         </section>}
         <label className="block text-sm">Profesional o recurso<select aria-label="Recurso de la reserva" className={fieldClass} value={selected.resourceId} disabled={booking.frozen || !canBook || !service} onChange={event => booking.setSelection({ ...selected, resourceId: event.target.value, startTimeStr: '' })}><option value="">Cualquiera disponible</option>{business.resources.filter(item => item.active && service?.resourceIds.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label className="block text-sm">Día (Colombia)<input aria-label="Día de la reserva" type="date" className={`${fieldClass} min-w-0`} value={selected.dateKey} disabled={booking.frozen || !canBook} onChange={event => booking.setSelection({ ...selected, dateKey: event.target.value, startTimeStr: '' })} /></label>
-        <button className={buttonClass} disabled={!canBook || !selected.serviceId || !selected.dateKey || booking.loadingAvailability || booking.frozen || (represented && !name.trim())} onClick={() => void booking.loadAvailability()}>{booking.loadingAvailability ? 'Consultando horarios…' : 'Consultar horarios'}</button>
-        {booking.availabilityStatus === 'success' && !booking.availability.some(resource => resource.slots.length > 0) && <p role="status" className="text-sm text-sarin-muted">No hay horarios disponibles para esta selección. Prueba otro día o profesional.</p>}
+        <button className={buttonClass} disabled={!canBook || !selected.serviceId || !selected.dateKey || booking.loadingAvailability || searchingNext || booking.frozen || (represented && !name.trim())} onClick={() => void booking.loadAvailability()}>{booking.loadingAvailability ? 'Consultando horarios…' : 'Consultar horarios'}</button>
+        {emptyAvailability && <div className="min-w-0 space-y-3">
+          {(!booking.nextAvailabilityStatus || booking.nextAvailabilityStatus === 'idle') && <p role="status" className="text-sm text-sarin-muted">No hay horarios disponibles para esta selección. Prueba otro día o profesional.</p>}
+          {booking.nextAvailabilityStatus === 'empty' && booking.nextAvailabilityRange && <p role="status" className="text-sm text-sarin-muted">No encontramos horarios del {formatBookingDate(booking.nextAvailabilityRange.fromDateKey)} al {formatBookingDate(booking.nextAvailabilityRange.throughDateKey)}. Elige otro día manualmente o cambia de profesional.</p>}
+          <button className={`${buttonClass} max-w-full whitespace-normal text-left`} aria-live="polite" aria-busy={searchingNext} disabled={!canBook || !selected.serviceId || !selected.dateKey || booking.loadingAvailability || searchingNext || booking.frozen || booking.uncertain || (represented && !name.trim())} onClick={() => void booking.findNextAvailability()}>{searchingNext ? 'Buscando próxima fecha…' : 'Buscar próxima fecha disponible'}</button>
+        </div>}
+        {booking.nextAvailabilityStatus === 'found' && <p ref={nextAvailabilityResult} role="status" tabIndex={-1} className="rounded-lg text-sm text-sarin-muted focus:outline-2 focus:outline-offset-4 focus:outline-sarin-blue">Hay horarios el {formatBookingDate(selected.dateKey)}. Elige la hora que prefieras.</p>}
         {booking.availability.filter(resource => resource.slots.length > 0).map(resource => <fieldset key={resource.resourceId} className="min-w-0 space-y-2"><legend className="text-sm font-medium">{resource.resourceName}</legend><div className="flex flex-wrap gap-2">{resource.slots.map(slot => <button key={slot} className={`min-h-11 rounded-lg border px-3 text-sm tabular-nums ${selected.resourceId === resource.resourceId && selected.startTimeStr === slot ? 'border-sarin-blue bg-sarin-soft text-sarin-blue' : 'border-sarin-line'}`} aria-pressed={selected.resourceId === resource.resourceId && selected.startTimeStr === slot} onClick={() => booking.setSelection({ ...selected, resourceId: resource.resourceId, startTimeStr: slot })}>{slot}</button>)}</div></fieldset>)}
         {!booking.proposal && <button className={buttonClass} disabled={booking.busy || !canBook || !selected.startTimeStr || !selected.resourceId || (represented && !name.trim())} onClick={() => void booking.propose(beneficiary)}>{booking.busy ? 'Preparando propuesta…' : 'Revisar propuesta'}</button>}
       </div>
     </>}
-    {booking.proposal && !booking.appointment && <BookingProposal proposal={booking.proposal} beneficiary={beneficiary} confirming={booking.busy} recovering={booking.uncertain} disabled={!enabled || !subject.active || booking.uncertain} onConfirm={booking.confirm} />}
+    {booking.proposal && !booking.appointment && <BookingProposal proposal={booking.proposal} beneficiary={beneficiary} confirming={booking.busy} recovering={booking.uncertain} disabled={!canBook || !subject.active || booking.uncertain} onConfirm={booking.confirm} />}
     <a className="inline-flex min-h-11 items-center text-sm text-sarin-blue underline" href={`tel:+${business.phoneWhatsApp.replace(/\D/g, '')}`}>Contactar directamente al negocio</a>
   </div>;
 }

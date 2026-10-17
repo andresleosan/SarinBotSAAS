@@ -63,6 +63,7 @@ export const bookingSchema = z.object({
 export type BookingInput = z.infer<typeof bookingSchema>;
 export const bookingSelectionSchema = bookingSchema.pick({ dateKey: true, startTimeStr: true, serviceId: true, resourceId: true });
 export const structuredAvailabilitySchema = availabilitySchema.extend({ case: bookingSubjectCaseSchema }).strict();
+export const nextStructuredAvailabilitySchema = z.object({ case: bookingSubjectCaseSchema, afterDateKey: dateKeySchema, serviceId: documentIdSchema, resourceId: documentIdSchema.optional() }).strict();
 export const structuredProposalSchema = z.object({ case: bookingSubjectCaseSchema, beneficiary: bookingBeneficiarySchema, selection: bookingSelectionSchema }).strict().refine(value => value.case.subjectKind === value.beneficiary.kind && (value.case.subjectKind !== 'represented_minor' || (value.beneficiary.kind === 'represented_minor' && value.case.representativeRole === value.beneficiary.representativeRole)));
 export const blockSchema = z.object({ dateKey: dateKeySchema, startTimeStr: timeSchema, endTimeStr: timeSchema, resourceId: documentIdSchema, requestId: requestIdSchema, motivo: z.string().max(300).optional() }).strict().refine((body) => body.endTimeStr > body.startTimeStr, 'Rango inválido.');
 export const cancelSchema = z.object({ appointmentId: documentIdSchema }).strict();
