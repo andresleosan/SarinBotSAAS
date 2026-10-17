@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertConsent } from './consent';
 import type { Database as Firestore } from '@/lib/storage/types';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Business, PaymentReceipt, PlatformSettings } from '@/types/firestore';
@@ -88,6 +89,7 @@ export async function submitReceipt(user: DecodedIdToken, input: z.input<typeof 
     const now = Date.now();
     const business = businessDocument.exists ? businessDocument.data() as Business : privateBusinessDraft(user, now);
     if (existing.exists) return { receipt: existing.data() as PaymentReceipt, business };
+    await assertConsent(user.uid, 'account', undefined, db, transaction);
     if (parsed.kind === 'paid_trial' && !canPurchasePaidTrial(business.subscription)) throw new HttpError(409, 'La prueba pagada solo se puede comprar una vez.', 'PAID_TRIAL_UNAVAILABLE');
     if (plan?.id === 'whatsapp' && !(await getWhatsAppBusinessStatus(business.id)).ready) throw new HttpError(409, 'WhatsApp requiere una conexión verificada antes de contratar.', 'WHATSAPP_NOT_READY');
     const settings = { ...defaultSettings(), ...settingsDocument.data() } as PlatformSettings;

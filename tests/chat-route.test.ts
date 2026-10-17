@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Business } from '../src/types/firestore';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['client', 'owner', 'wa_verified']);
 const state = vi.hoisted(() => ({ db: undefined as unknown, complete: vi.fn(), whatsappReady: false }));
 vi.mock('../src/lib/firebase/admin', () => ({ getAdminDb: () => state.db }));
 vi.mock('../src/lib/server/whatsapp-config', () => ({ getWhatsAppBusinessStatus: async () => ({ ready: state.whatsappReady }) }));

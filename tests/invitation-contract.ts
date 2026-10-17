@@ -8,6 +8,7 @@ import { createAppointment, cancelAppointment, readAppointments } from '@/lib/se
 import { getResponseQuota } from '@/lib/server/response-quota';
 import { businessQuotaScope, responsePeriodReference } from '@/lib/server/response-periods';
 import { submitReceipt, reviewPayment } from '@/lib/server/billing';
+import { acceptSyntheticConsent } from './consent-fixtures';
 
 export async function verifyInvitationLifecycle(db: Database, config: BusinessConfig, dateKey: string) {
   const suffix = crypto.randomUUID();
@@ -15,6 +16,7 @@ export async function verifyInvitationLifecycle(db: Database, config: BusinessCo
   const owner = { uid: `invite-owner-${suffix}`, email: `owner-${suffix}@example.test`, email_verified: true, firebase: { sign_in_provider: 'google.com' } } as DecodedIdToken;
   vi.stubEnv('SUPERADMIN_UID', admin.uid);
   try {
+    await acceptSyntheticConsent(db, owner.uid);
     const one = await createInvitation(admin, { recipientEmail: owner.email!, requestId: 'create-one' }, db);
     const two = await createInvitation(admin, { recipientEmail: owner.email!, requestId: 'create-two' }, db);
     const results = await Promise.allSettled([one, two].map(value => redeemInvitation(owner, { code: value.code!, requestId: 'redeem-one' }, db)));
@@ -30,6 +32,7 @@ export async function verifyInvitationLifecycle(db: Database, config: BusinessCo
     const periodReference = responsePeriodReference(db, businessQuotaScope(business.id), usedRecord.redemption.trialPeriodId);
     await periodReference.set({ ...(await periodReference.get()).data(), usedResponses: 7 });
     const actor = { uid: `client-${suffix}` };
+    await acceptSyntheticConsent(db, actor.uid, business);
     const bookingInput = { dateKey, startTimeStr: '11:00', serviceId: config.services[0].id, resourceId: config.resources[0].id, clientPhone: '573001234567', intakeAnswers: {} };
     const appointment = await createAppointment(actor, business.id, bookingInput, 'booking-one', db);
     const command = { invitationId: issued.invitation.id, expectedVersion: 1, requestId: 'suspend-one', reason: 'Prueba sintética', action: 'suspend_access' as const };
@@ -51,6 +54,7 @@ export async function verifyInvitationLifecycle(db: Database, config: BusinessCo
     expect((await listInvitations(admin, undefined, db)).invitations.find(item => item.id === issued.invitation.id)?.usage).toMatchObject({ appointmentsUsed: 1, responsesUsed: 7 });
 
     const other = { ...owner, uid: `race-${suffix}`, email: `race-${suffix}@example.test` };
+    await acceptSyntheticConsent(db, other.uid);
     const racing = await createInvitation(admin, { recipientEmail: other.email, requestId: 'create-race' }, db);
     const race = await Promise.allSettled([redeemInvitation(other, { code: racing.code!, requestId: 'redeem-race' }, db), submitReceipt(other, { ...upload, kind: 'paid_trial', planId: undefined, requestId: 'receipt-race' }, db)]);
     expect(race.filter(result => result.status === 'fulfilled')).toHaveLength(1);

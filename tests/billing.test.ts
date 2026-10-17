@@ -4,7 +4,8 @@ import type { Business, PaymentReceipt } from '../src/types/firestore';
 import { getSettings, reviewPayment, saveSettings, submitReceipt } from '../src/lib/server/billing';
 import { businessIdForOwner } from '../src/lib/server/businesses';
 import { settingsSchema } from '../src/lib/server/schemas';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['owner']);
 import { getResponseQuota } from '@/lib/server/response-quota';
 const whatsapp = vi.hoisted(() => ({ ready: false }));
 vi.mock('@/lib/server/whatsapp-config', () => ({ getWhatsAppBusinessStatus: async () => ({ ready: whatsapp.ready }) }));
@@ -49,7 +50,7 @@ describe('billing plan settings and receipt snapshots', () => {
     expect((await submitReceipt(owner, { ...upload, kind: 'paid_trial' }, memoryFirestore({ 'platformSettings/main': { bankAccounts: [bank] } }).db)).receipt.amountCOP).toBe(5000);
   });
   it('returns all default tariffs without creating settings and preserves a legacy monthly tariff', async () => {
-    const memory = memoryFirestore();
+    const memory = consentedFirestore({}, []);
     expect(await getSettings(memory.db)).toMatchObject({ weeklyPriceCOP: 20000, fortnightlyPriceCOP: 35000, monthlyPriceCOP: 59900, graceHoursOnUpload: 24 });
     expect(await getSettings(memory.db)).not.toHaveProperty('trialDaysDefault');
     expect(memory.rows.size).toBe(0);

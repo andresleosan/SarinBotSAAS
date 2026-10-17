@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { normalizeBusinessSocialLinks, businessSocialLabel } from '@/lib/business-branding';
 import { businessConfigSchema } from '@/lib/server/schemas';
 import { businessIdForOwner, createBusiness, privateBusinessDraft, publicBusiness } from '@/lib/server/businesses';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['owner']);
 
 const user = { uid: 'owner', email: 'synthetic@example.test' };
 const config = businessConfigSchema.parse({ name: 'Negocio real', slug: 'negocio-real', category: 'Servicios', phoneWhatsApp: '573001234567', resources: [{ id: 'one', name: 'Uno', active: true }], services: [{ id: 'cut', name: 'Corte', durationMinutes: 30, bufferMinutes: 0, price: 20000, resourceIds: ['one'] }], intakeFields: [], weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] }])) });

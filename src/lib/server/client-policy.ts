@@ -7,6 +7,7 @@ import type { Database, Transaction } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { assertOwner, getBusiness } from './businesses';
 import { HttpError } from './http';
+import { assertConsent } from './consent';
 
 export type ClientPolicy = { blocked: boolean; futureAppointmentLimit: number; reason: string | null; inheritsLimit: boolean };
 export const clientUidSchema = z.string().min(1).max(128).regex(/^[^\x00-\x1f\x7f]+$/);
@@ -44,6 +45,7 @@ export async function updateClientPolicy(owner: ChatActor, businessId: string, i
     const [business, defaults, previous] = await Promise.all([tx.get(businessRef), tx.get(defaultsRef), tx.get(ref)]);
     if (!business.exists) throw new HttpError(404, 'El negocio no existe.');
     assertOwner(business.data() as Business, owner.uid);
+    await assertConsent(owner.uid, 'account', undefined, db, tx);
     const old = parseRecord(previous.data());
     resolvePolicy(defaults.data(), parsed.clientUid ? previous.data() : undefined);
     const next = { version: 1 as const, blocked: parsed.blocked ?? old?.blocked ?? false, futureAppointmentLimit: parsed.futureAppointmentLimit === undefined ? old?.futureAppointmentLimit ?? (parsed.clientUid ? null : 3) : parsed.futureAppointmentLimit ?? (parsed.clientUid ? null : 3), reason: parsed.reason, updatedBy: owner.uid, updatedAt: Date.now() };

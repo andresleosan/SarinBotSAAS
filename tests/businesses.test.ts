@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { businessIdForOwner, createBusiness, privateBusinessDraft, publicBusiness } from '../src/lib/server/businesses';
 import { businessConfigSchema } from '../src/lib/server/schemas';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['another', 'owner']);
 
 const user = { uid: 'owner', email: 'owner@example.test' } as unknown as DecodedIdToken;
 const config = businessConfigSchema.parse({ name: 'Negocio real', slug: 'negocio-real', category: 'Barbería', phoneWhatsApp: '573001234567', resources: [{ id: 'one', name: 'Uno', active: true }], services: [{ id: 'cut', name: 'Corte', durationMinutes: 30, bufferMinutes: 15, price: 20000, resourceIds: ['one'] }], intakeFields: [], weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [String(day), { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] }])) });

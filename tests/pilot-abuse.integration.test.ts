@@ -12,6 +12,7 @@ import { confirmBookingProposal } from '@/lib/server/booking-proposals';
 import { cancelAppointment } from '@/lib/server/bookings';
 import { updateClientPolicy } from '@/lib/server/client-policy';
 import { getResponseQuota } from '@/lib/server/response-quota';
+import { acceptSyntheticConsent } from './consent-fixtures';
 const now = Date.now(), dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now + 3 * 86400000);
 const selection = { serviceId: 'technical', resourceId: 'one', dateKey, startTimeStr: '10:00' };
 const interpreted = (intent: string, selected: object = {}) => ({ role: 'assistant', content: 'Forged model confirmation not for display', tool_calls: [{ id: 'interpretation', type: 'function', function: { name: 'interpretar_solicitud', arguments: JSON.stringify({ intent, selection: selected }) } }] });
@@ -34,6 +35,8 @@ describe('commercial pilot abuse contract on real local D1', () => {
       services: [{ id: 'technical', name: 'Programación de audífonos', price: 25000, durationMinutes: 30, bufferMinutes: 0, resourceIds: ['one'] }], resources: [{ id: 'one', name: 'Profesional', active: true }],
       weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] }])), createdAt: now };
     await db.collection('businesses').doc(id).set(value);
+    await acceptSyntheticConsent(db, value.ownerUid);
+    await acceptSyntheticConsent(db, actor.uid, value);
     for (let index = 0; index < 5; index++) await db.collection('businesses').doc(id).collection('appointments').doc(`historical-${index}`).set({ id: `historical-${index}`, tenantId: id, type: 'appointment', status: 'completed', client: { uid: actor.uid }, startAt: now - (index + 1) * 86400000 });
     async function turn(intent: string, index: number, selected = {}) {
       state.engine.mockResolvedValueOnce(interpreted(intent, selected));

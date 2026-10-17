@@ -6,7 +6,9 @@ import type { ChatActor, ChatResponse } from '@/types/chat';
 import type { Business, Appointment } from '@/types/firestore';
 import { runInSarinQueue } from '@/lib/sarin/queue';
 import { getBusinessAccess, isOwnerAiAllowed, isSubscriptionAllowed } from '@/lib/sarin/subscription';
-import { reserveResponseQuota, commitResponseQuota, releaseResponseQuota, getResponseQuota, type ResponseQuotaReservation } from './response-quota';
+import { reserveResponseQuota, commitResponseQuota, releaseResponseQuota, getResponseQuota, hasResponseQuotaReplay, type ResponseQuotaReservation } from './response-quota';
+import { assertConsent } from './consent';
+import type { Transaction } from '@/lib/storage/types';
 import { getWhatsAppBusinessStatus } from './whatsapp-config';
 import { HttpError } from './http';
 import { runUserInference } from './inference';
@@ -72,6 +74,22 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
   const cacheKey = stableDocumentId(body.mode === 'sarin_onboarding' ? 'onboarding' : business.id, user.uid, body.mode, body.requestId, channel);
   // Legacy payloads retain their exact historical fingerprint for durable replay.
   const fingerprint = createHash('sha256').update(JSON.stringify({ mode: body.mode, tenantId: body.tenantId, messages: body.stateVersion === undefined ? body.messages : [body.messages.at(-1)!], ...(body.stateVersion === undefined ? {} : { stateVersion: body.stateVersion }) })).digest('hex');
+  const quotaInput = { businessId: business.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel };
+  const assertNewProcessing = async (tx?: Transaction, current = business!) => {
+    await assertConsent(user.uid, 'account', undefined, db, tx);
+    if (body.mode === 'sarin_client') await assertConsent(user.uid, 'business_client', current, db, tx);
+  };
+  try { await assertNewProcessing(); }
+  catch (error) {
+    if (!(error instanceof HttpError) || error.code !== 'CONSENT_REQUIRED' || channel !== 'web') throw error;
+    const saved = cachedResponse(db, cacheKey);
+    if (saved && saved.fingerprint !== fingerprint) throw new HttpError(409, 'Este identificador ya se utilizó para otro mensaje.', 'AI_REQUEST_CONFLICT');
+    if (saved || await hasResponseQuotaReplay(quotaInput, db)) {
+      const recovered = await recoverLegacyMutation(user, body, business) ?? (saved ? structuredClone(saved.response) : null);
+      if (recovered) return recovered;
+    }
+    throw error;
+  }
   await enforceInferenceAdmission({ businessId: business.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel }, db);
   return runUserInference(user.uid, () => runInSarinQueue(async () => {
     business = await getBusiness(business!.id); await assertAccess();
@@ -86,7 +104,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     const scope = { actorUid: user.uid, businessId: business.id, mode: body.mode, channel };
     const state = await readChatState(scope, db);
     // Durable replay is recognized before comparing a version advanced by that turn.
-    const quota = await reserveResponseQuota({ businessId: business.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel });
+    const quota = await reserveResponseQuota(quotaInput, db, (tx, current) => assertNewProcessing(tx, current));
     if (quota.kind === 'replay') {
       const recovered = await recoverLegacyMutation(user, body, business);
       if (recovered) { await onResponse?.(recovered, quota.reservation); try { await commitResponseQuota(quota.reservation); } catch { /* keep held unit */ } return recovered; }
@@ -94,9 +112,11 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     }
     let response: ChatResponse;
     try {
+      await assertNewProcessing();
       if (body.stateVersion !== undefined && body.stateVersion !== state.version) throw new HttpError(409, 'La selección cambió. Reintenta para usar los datos actuales.', 'CHAT_STATE_CONFLICT');
       const interpreted = await interpretChat({ mode: body.mode, message: body.messages.at(-1)!.content, business, state, signal, requestId: body.requestId, actorUid: user.uid });
       business = await getBusiness(business.id); await assertAccess();
+      await assertNewProcessing();
       const selection = interpreted.selection, data: Record<string, unknown> = { ...selection };
       switch (interpreted.intent) {
         case 'booking':

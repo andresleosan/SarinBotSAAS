@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['admin', 'other', 'owner']);
 const state = vi.hoisted(() => ({ db: null as any, token: null as any }));
 vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => state.db, getAdminAuth: () => ({ verifyIdToken: async () => state.token }) }));
 import { GET, POST, PATCH } from '@/app/api/admin/invitations/route';

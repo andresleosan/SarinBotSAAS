@@ -9,6 +9,7 @@ import { HttpError } from './http';
 import { assertOwner, getBusiness, publicBusiness, stableDocumentId } from './businesses';
 import { documentIdSchema, type BookingInput } from './schemas';
 import { assertClientCanBook, clientPolicyKey } from './client-policy';
+import { assertConsent } from './consent';
 
 type BlockInput = { dateKey: string; startTimeStr: string; endTimeStr: string; resourceId: string; requestId: string; motivo?: string };
 function assertDate(dateKey: string) {
@@ -55,6 +56,8 @@ export async function createAppointmentInTransaction(transaction: Transaction, u
       if (appointment.client?.uid !== user.uid || appointment.startTimeStr !== input.startTimeStr || appointment.dateKey !== input.dateKey || appointment.resourceId !== input.resourceId || appointment.serviceId !== input.serviceId) throw new HttpError(409, 'Este identificador ya se utilizó para otra reserva.');
       return appointment;
     }
+    await assertConsent(user.uid, 'account', undefined, db, transaction);
+    await assertConsent(user.uid, 'business_client', business, db, transaction);
     if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar agendando.');
     assertDate(input.dateKey);
@@ -108,6 +111,7 @@ export async function createManualBlock(user: ChatActor, businessId: string, inp
       if (appointment.dateKey !== input.dateKey || appointment.startTimeStr !== input.startTimeStr || appointment.endTimeStr !== input.endTimeStr || appointment.resourceId !== input.resourceId) throw new HttpError(409, 'Este identificador ya se utilizó para otro bloqueo.');
       return appointment;
     }
+    await assertConsent(user.uid, 'account', undefined, db, transaction);
     if (!business.resources.some((resource) => resource.id === input.resourceId && resource.active)) throw new HttpError(400, 'El recurso no existe o está inactivo.');
     const startAt = toColombiaTimestamp(input.dateKey, input.startTimeStr);
     const endAt = toColombiaTimestamp(input.dateKey, input.endTimeStr);

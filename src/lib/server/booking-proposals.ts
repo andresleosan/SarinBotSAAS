@@ -12,6 +12,7 @@ import { assertClientCanBook } from './client-policy';
 import { createAppointmentInTransaction } from './bookings';
 import { businessConfigSchema, bookingSchema, documentIdSchema, requestIdSchema, type BookingInput } from './schemas';
 import { HttpError } from './http';
+import { assertConsent } from './consent';
 const selectionSchema = bookingSchema.pick({ dateKey: true, startTimeStr: true, serviceId: true, resourceId: true });
 const proposalSchema = z.object({ version: z.literal(1), id: documentIdSchema, businessId: documentIdSchema, actorUid: z.string().min(1).max(128), selection: selectionSchema,
   service: businessConfigSchema.shape.services.element, resource: businessConfigSchema.shape.resources.element, intakeFields: businessConfigSchema.shape.intakeFields,
@@ -40,6 +41,8 @@ export async function createBookingProposal(user: ChatActor, businessId: string,
     }
     if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDoc.data() as Business;
+    await assertConsent(user.uid, 'account', undefined, db, tx);
+    await assertConsent(user.uid, 'business_client', business, db, tx);
     if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar.');
     await assertClientCanBook(tx, business, user.uid, now, db);

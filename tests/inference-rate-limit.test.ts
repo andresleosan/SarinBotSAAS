@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['owner', 'synthetic-client']);
 import type { Database } from '../src/lib/storage/types';
 import { enforceClientInferenceRateLimit, enforceInferenceAdmission } from '../src/lib/server/inference-rate-limit';
 import { createCloudflareDatabase, StorageError } from '../src/lib/storage/database';

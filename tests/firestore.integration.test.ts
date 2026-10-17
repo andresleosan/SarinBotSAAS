@@ -17,6 +17,7 @@ import { readPublicBusinessLogo, saveBusinessLogo } from '@/lib/server/business-
 import sharp from 'sharp';
 import { createBookingProposal, confirmBookingProposal } from '@/lib/server/booking-proposals';
 import { updateClientPolicy } from '@/lib/server/client-policy';
+import { acceptSyntheticConsent } from './consent-fixtures';
 
 function user(uid: string): DecodedIdToken { return { uid, sub:uid, aud:'demo-sarin-bot', auth_time:0, exp:9999999999, iat:0, iss:'https://securetoken.google.com/demo-sarin-bot', firebase:{identities:{},sign_in_provider:'google.com'}, email:`${uid}@example.test`, name:uid }; }
 
@@ -34,6 +35,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     await db.doc('platformSettings/main').set({ bankAccounts: [{ id: 'bank', bankName: 'Synthetic bank', accountType: 'Test', accountNumber: 'fixture-only', holderName: 'Fixture' }] }, { merge: true });
   });
   async function paidBusiness(identity: DecodedIdToken, chosenConfig = config) {
+    await acceptSyntheticConsent(db, identity.uid);
     const existing = await getOwnedBusiness(identity.uid, db);
     if (!existing?.subscription.paidTrial && existing?.subscription.status !== 'active') {
       const uploaded = await submitReceipt(identity, { kind: 'paid_trial', bankSelected: 'bank', requestId: crypto.randomUUID(),
@@ -46,6 +48,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
   it('confirms proposals atomically with client policy and preserves replay on Firestore', async () => {
     const identity = user(`proposal-${crypto.randomUUID()}`), client = user(`client-${crypto.randomUUID()}`);
     const business = await paidBusiness(identity, { ...config, slug: `proposal-${crypto.randomUUID()}` });
+    await acceptSyntheticConsent(db, client.uid, business);
     const proposal = await createBookingProposal(client, business.id, { serviceId: 's', resourceId: 'r', dateKey, startTimeStr: '10:00' }, crypto.randomUUID(), db);
     await updateClientPolicy(identity, business.id, { clientUid: client.uid, blocked: true, reason: 'Synthetic review' }, db);
     await expect(confirmBookingProposal(client, business.id, proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }, db)).rejects.toMatchObject({ code: 'CLIENT_BLOCKED' });
@@ -139,6 +142,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
   it('requires approved introductory payment before configuration and never publishes its private receipt ID', async () => {
     const firstOwner = user(`first-${crypto.randomUUID()}`);
     const firstConfig = { ...config, slug: `first-${crypto.randomUUID()}` };
+    await acceptSyntheticConsent(db, firstOwner.uid);
     await expect(createBusiness(firstOwner, firstConfig, db)).rejects.toMatchObject({ status: 402 });
     const uploaded = await submitReceipt(firstOwner, { kind: 'paid_trial', bankSelected: 'bank', requestId: crypto.randomUUID(),
       receiptDataUrl: `data:image/webp;base64,${Buffer.from('RIFFxxxxWEBPfixture').toString('base64')}` }, db);
@@ -163,6 +167,8 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
   it('allows only one of two simultaneous reservations for an initially empty resource/day', async () => {
     const business = await paidBusiness(owner);
     const input={dateKey,startTimeStr:'10:00',resourceId:'r',serviceId:'s',clientPhone:'573001234567',intakeAnswers:{}};
+    await acceptSyntheticConsent(db, 'client-a', business);
+    await acceptSyntheticConsent(db, 'client-b', business);
     const results=await Promise.allSettled([createAppointment(user('client-a'),business.id,input,crypto.randomUUID(),db),createAppointment(user('client-b'),business.id,input,crypto.randomUUID(),db)]);
     expect(results.filter(result=>result.status==='fulfilled')).toHaveLength(1);
     const rejected=results.find(result=>result.status==='rejected');
@@ -180,6 +186,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     await db.doc(`businesses/${business.id}`).update({ subscription });
     const attempts = ['r', 'r2'].map(resourceId => ({ actor: user(`last-${resourceId}-${crypto.randomUUID()}`), requestId: crypto.randomUUID(),
       input: { dateKey, startTimeStr: '10:00', resourceId, serviceId: 's', clientPhone: '573001234567', intakeAnswers: {} } }));
+    for (const attempt of attempts) await acceptSyntheticConsent(db, attempt.actor.uid, business);
     const results = await Promise.allSettled(attempts.map(attempt => createAppointment(attempt.actor, business.id, attempt.input, attempt.requestId, db)));
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.find(result => result.status === 'rejected')).toMatchObject({ reason: { status: 402 } });
@@ -197,6 +204,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     expect((await getOwnedBusiness(cappedOwner.uid, db))?.subscription.paidTrial?.appointmentsUsed).toBe(10);
   }, 75000);
   it('keeps image content out of payment lists and extends only once under concurrent approvals', async () => {
+    await acceptSyntheticConsent(db, owner.uid);
     await db.doc('platformSettings/main').set({companyName:'Test',monthlyPriceCOP:49900,bankAccounts:[{id:'bank',bankName:'Configured test bank',accountType:'Savings',accountNumber:'fixture-only',holderName:'Fixture'}]});
     // A small raster signature fixture; production validation also imposes the byte cap.
     const input=receiptSchema.parse({bankSelected:'bank',requestId:crypto.randomUUID(),receiptDataUrl:`data:image/webp;base64,${Buffer.from('RIFFxxxxWEBPfixture').toString('base64')}`});

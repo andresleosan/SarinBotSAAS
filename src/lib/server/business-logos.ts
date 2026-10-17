@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertConsent } from './consent';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
 import { z } from 'zod';
@@ -42,6 +43,7 @@ export async function saveBusinessLogo(user: Pick<ChatActor, 'uid'>, input: { lo
   const initial = await getOwnedBusiness(user.uid, db);
   if (!initial) throw new HttpError(404, 'Primero configura tu negocio.');
   assertAccess(initial, user.uid);
+  await assertConsent(user.uid, 'account', undefined, db);
   const normalized = parsed.logoDataUrl === null ? null : await normalizeBusinessLogo(parsed.logoDataUrl);
   const reference = db.collection('businesses').doc(businessIdForOwner(user.uid));
   return db.runTransaction(async transaction => {
@@ -52,6 +54,7 @@ export async function saveBusinessLogo(user: Pick<ChatActor, 'uid'>, input: { lo
     const current = business.logo?.sha256 ?? null;
     const desired = normalized?.sha256 ?? null;
     if (current === desired) return business;
+    await assertConsent(user.uid, 'account', undefined, db, transaction);
     if (current !== parsed.expectedSha256) throw new HttpError(409, 'El logo cambió. Actualiza el negocio antes de reemplazarlo.', 'BRANDING_CHANGED');
     const { logo: _old, ...withoutLogo } = business;
     const updated: Business = { ...withoutLogo, ...(normalized ? { logo: { sha256: normalized.sha256 } } : {}) };

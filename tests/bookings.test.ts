@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Business } from '../src/types/firestore';
 import { cancelAppointment, createAppointment, createManualBlock, readAvailability } from '../src/lib/server/bookings';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['client', 'other', 'owner']);
 
 const now = Date.parse('2030-01-01T12:00:00Z');
 const business: Business = { id: 'business', ownerUid: 'owner', ownerEmail: 'owner@example.test', name: 'Real', slug: 'real', category: 'Barbería', timezone: 'America/Bogota', phoneWhatsApp: '573001234567', subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: now + 30 * 86400000 }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, resources: [{ id: 'chair', name: 'Silla', active: true }], services: [{ id: 'cut', name: 'Corte', durationMinutes: 30, bufferMinutes: 15, price: 20000, resourceIds: ['chair'] }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '11:00' }] } }, createdAt: now };

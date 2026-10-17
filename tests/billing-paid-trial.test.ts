@@ -7,7 +7,8 @@ import { businessConfigSchema } from '../src/lib/server/schemas';
 import { readResponsePeriodState } from '../src/lib/server/response-periods';
 import { PAID_TRIAL_PERIOD_END } from '../src/lib/paid-trial';
 import { isSubscriptionAllowed } from '../src/lib/sarin/subscription';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['first-owner']);
 
 const now = 1_900_000_000_000;
 const owner = { uid: 'first-owner', email: 'owner@example.test' } as DecodedIdToken;
@@ -21,9 +22,10 @@ afterEach(() => vi.useRealTimers());
 describe('paid introductory receipt lifecycle', () => {
   it('rejects unpaid configuration and invalid uploads without creating any draft', async () => {
     const { db, rows } = database();
+    const original = structuredClone([...rows]);
     await expect(createBusiness(owner, config, db)).rejects.toMatchObject({ status: 402 });
     await expect(submitReceipt(owner, { ...upload, bankSelected: 'missing' }, db)).rejects.toMatchObject({ status: 409 });
-    expect([...rows.keys()].filter(path => !path.startsWith('platformSettings/'))).toEqual([]);
+    expect([...rows]).toEqual(original);
   });
   it('creates only a private draft and fixed-price receipt before approval, idempotently', async () => {
     const { db, rows } = database();

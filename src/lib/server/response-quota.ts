@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { Database as Firestore } from '@/lib/storage/types';
+import type { Database as Firestore, Transaction } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { Appointment, Business, ResponseAllowance } from '@/types/firestore';
 import type { ChatResponse } from '@/types/chat';
@@ -29,7 +29,16 @@ export async function getResponseQuota(businessId: string, db: Firestore = getAd
     state: getBusinessAccess(business) === 'suspended' ? 'suspended' : !allowed ? 'expired' : period.remainingResponses === 0 ? 'exhausted' : period.usedResponses >= (period.includedResponses + period.extraResponses) * 0.8 ? 'warning' : 'active' };
 }
 
-export async function reserveResponseQuota(input: ResponseQuotaInput, db: Firestore = getAdminDb()): Promise<ResponseQuotaResult> {
+/** Read-only recovery; never reserves capacity or creates a new turn. */
+export async function hasResponseQuotaReplay(input: ResponseQuotaInput, db: Firestore = getAdminDb()): Promise<boolean> {
+  const request = requestSchema.parse(input);
+  const id = hash(request.mode === 'sarin_onboarding' ? null : request.businessId, request.actorUid, request.mode, request.channel, request.requestId);
+  const saved = (await db.collection('responseQuotaTurns').doc(id).get()).data();
+  if (!saved) return false;
+  if (saved.fingerprint !== request.fingerprint) throw new HttpError(409, 'Este identificador pertenece a otra consulta.', 'AI_REQUEST_CONFLICT');
+  return saved.status === 'completed' || saved.status === 'reserved';
+}
+export async function reserveResponseQuota(input: ResponseQuotaInput, db: Firestore = getAdminDb(), authorize?: (transaction: Transaction, business: Business) => Promise<void>): Promise<ResponseQuotaResult> {
   const request = requestSchema.parse(input);
   if (request.businessId === null && request.mode !== 'sarin_onboarding') throw new HttpError(403, 'Primero configura tu negocio.');
   if (request.businessId === null) throw new HttpError(402, 'Primero envía tu comprobante y espera la aprobación del pago.', 'PAYMENT_REQUIRED');
@@ -67,6 +76,7 @@ export async function reserveResponseQuota(input: ResponseQuotaInput, db: Firest
     const businessDocument = await transaction.get(db.collection('businesses').doc(request.businessId!));
     if (!businessDocument.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDocument.data() as Business;
+    await authorize?.(transaction, business);
     if (request.mode !== 'sarin_client' && business.ownerUid !== request.actorUid) throw new HttpError(403, 'Esta operación es exclusiva del dueño del negocio.');
     if (request.mode === 'sarin_client' && (!business.sarinConfig.onboardingCompleted || !business.slug)) throw new HttpError(403, 'El negocio todavía no está configurado.');
     if (request.mode === 'sarin_owner_copilot' && !isOwnerAiAllowed(business)) throw new HttpError(402, 'El copiloto requiere una suscripción vigente.', 'OWNER_AI_REQUIRES_SUBSCRIPTION');

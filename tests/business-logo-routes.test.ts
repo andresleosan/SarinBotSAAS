@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['owner']);
 import { privateBusinessDraft, publicBusiness } from '@/lib/server/businesses';
 const state = vi.hoisted(() => ({ db: null as any }));
 vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => state.db, getAdminAuth: () => ({ verifyIdToken: async () => ({ uid: 'owner' }) }) }));

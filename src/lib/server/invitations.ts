@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertConsent } from './consent';
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Database, Transaction } from '@/lib/storage/types';
@@ -105,6 +106,7 @@ export async function redeemInvitation(user: DecodedIdToken, input: RedeemInvita
     return matches(record, parsed.code, email) && record.redemption?.uid === user.uid && record.redemption.requestId === parsed.requestId ? { business, invitationId: record.id, replayed: true } : null;
   });
   if (recovery) return recovery;
+  await assertConsent(user.uid, 'account', undefined, db);
   await claimInvitationAttempt(user.uid, db, Date.now(), email);
   const indexReference = /^\d{6}$/.test(parsed.code) ? db.collection('serverSettings').doc(`invitation_code_${sha256(parsed.code)}`) : null;
   const index = indexReference ? (await indexReference.get()).data() : null;
@@ -125,6 +127,7 @@ export async function redeemInvitation(user: DecodedIdToken, input: RedeemInvita
     }
     const now = Date.now();
     if (invitation.state !== 'issued' || now >= invitation.expiresAt) throw unavailable();
+    await assertConsent(user.uid, 'account', undefined, db, transaction);
     const business = businessDocument.exists ? businessDocument.data() as Business : privateBusinessDraft(user, now);
     if (profile.data()?.ownedTenantId && profile.data()?.ownedTenantId !== business.id) throw new HttpError(409, 'La cuenta ya tiene otro negocio vinculado.');
     const payment = business.subscription.lastPaymentId ? await transaction.get(db.collection('paymentReceipts').doc(business.subscription.lastPaymentId)) : null;

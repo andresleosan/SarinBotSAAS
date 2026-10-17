@@ -19,6 +19,7 @@ import { readChatState, saveChatState } from '@/lib/server/chat-state';
 import { DEFAULT_AI_BUDGET_LIMITS, saveAiBudgetSettings, reservePaidCallBudget, settlePaidCallBudget } from '@/lib/server/ai-budget';
 import { quotePaidCall } from '@/lib/server/ai-pricing';
 import { randomUUID } from 'node:crypto';
+import { acceptSyntheticConsent } from './consent-fixtures';
 
 const now = Date.now();
 const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now + 3 * 86400000);
@@ -75,6 +76,8 @@ describe('commercial invariants on Cloudflare data', () => {
     const value = business('client-policy');
     await db.collection('businesses').doc(value.id).set(value);
     await db.collection('publicBusinesses').doc(value.slug).set(publicBusiness(value));
+    await acceptSyntheticConsent(db, value.ownerUid);
+    await acceptSyntheticConsent(db, 'limited-client', value);
     const secondDb = createCloudflareDatabase(async (command: DataCommand) => {
       const response = await runtime.fetch(command), body = await response.json() as DataReadResult | DataCommitResult;
       if (!response.ok) throw new StorageError(response.status, (body as unknown as { code: string }).code);
@@ -92,6 +95,7 @@ describe('commercial invariants on Cloudflare data', () => {
     const owner = { uid: 'logo-owner' }, id = businessIdForOwner(owner.uid);
     const value = { ...business(id), slug: 'logo-synthetic', ownerUid: owner.uid };
     await db.collection('businesses').doc(id).set(value);
+    await acceptSyntheticConsent(db, owner.uid);
     const png = await sharp({ create: { width: 120, height: 60, channels: 4, background: '#315ff3' } }).png().toBuffer();
     const input = `data:image/png;base64,${png.toString('base64')}`;
     const saved = await saveBusinessLogo(owner, { logoDataUrl: input, expectedSha256: null }, db);
@@ -129,6 +133,7 @@ describe('commercial invariants on Cloudflare data', () => {
     const value = business('conflict');
     await db.collection('businesses').doc(value.id).set(value);
     const actors = [{ uid: 'alice', email: 'alice@example.test' }, { uid: 'bob', email: 'bob@example.test' }];
+    for (const actor of actors) await acceptSyntheticConsent(db, actor.uid, value);
     const results = await Promise.allSettled(actors.map((actor, index) => createAppointment(actor, value.id, input, `parallel-${index}`, db)));
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.find(result => result.status === 'rejected')).toMatchObject({ reason: { status: 409 } });
@@ -147,6 +152,8 @@ describe('commercial invariants on Cloudflare data', () => {
   it('consumes the tenth trial unit once across different resources and preserves idempotent retries', async () => {
     const value = business('last-unit', 9);
     await db.collection('businesses').doc(value.id).set(value);
+    await acceptSyntheticConsent(db, 'first', value);
+    await acceptSyntheticConsent(db, 'second', value);
     const results = await Promise.allSettled([
       createAppointment({ uid: 'first' }, value.id, input, 'last-one', db),
       createAppointment({ uid: 'second' }, value.id, { ...input, resourceId: 'two' }, 'last-two', db),
@@ -166,6 +173,7 @@ describe('commercial invariants on Cloudflare data', () => {
 
   it('stores receipt bytes in private R2 and atomically approves the paid trial once', async () => {
     const owner = { uid: 'paying-owner', email: 'owner@example.test' } as DecodedIdToken;
+    await acceptSyntheticConsent(db, owner.uid);
     await db.collection('platformSettings').doc('main').set({ bankAccounts: [{ id: 'bank', bankName: 'Banco sintético', accountType: 'Ahorros', accountNumber: 'TEST-ONLY', holderName: 'Pruebas' }] });
     const image = `data:image/webp;base64,${Buffer.from('RIFFxxxxWEBPfixture').toString('base64')}`;
     const request = { kind: 'paid_trial' as const, bankSelected: 'bank', requestId: 'synthetic-paid-upload', receiptDataUrl: image };

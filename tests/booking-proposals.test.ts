@@ -3,7 +3,8 @@ import { createBookingProposal, confirmBookingProposal } from '@/lib/server/book
 import { cancelAppointment } from '@/lib/server/bookings';
 import { updateClientPolicy } from '@/lib/server/client-policy';
 import { privateBusinessDraft } from '@/lib/server/businesses';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['client', 'other', 'owner']);
 const now = Date.parse('2030-01-01T12:00:00Z');
 const business = { ...privateBusinessDraft({ uid: 'owner' }, now), id: 'proposal', slug: 'proposal', subscription: { status: 'trial' as const, trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: 'synthetic', activatedAt: now, appointmentLimit: 10, appointmentsUsed: 9 } }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [{ key: 'note', label: 'Preferencia', required: true }] }, resources: [{ id: 'one', name: 'Uno', active: true }], services: [{ id: 'cut', name: 'Corte', durationMinutes: 30, bufferMinutes: 0, price: 20000, resourceIds: ['one'] }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] } } };
 const selection = { serviceId: 'cut', resourceId: 'one', dateKey: '2030-01-07', startTimeStr: '09:00' };

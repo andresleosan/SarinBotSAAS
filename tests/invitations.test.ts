@@ -4,7 +4,8 @@ import { claimInvitationAttempt, createInvitation, listInvitations, redeemInvita
 import { businessIdForOwner } from '@/lib/server/businesses';
 import { submitReceipt, reviewPayment } from '@/lib/server/billing';
 import { businessQuotaScope, responsePeriodReference } from '@/lib/server/response-periods';
-import { memoryFirestore } from './memoryFirestore';
+import { consentedFirestore } from './consent-fixtures';
+const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['admin', 'owner', 'alice', 'bob']);
 
 const now = 1900000000000;
 const admin = { uid: 'admin' } as DecodedIdToken;
