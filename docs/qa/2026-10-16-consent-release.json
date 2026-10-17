@@ -1,0 +1,53 @@
+{
+  "status": "local-only-not-deployed",
+  "sourceRevision": "11315b71511eed436f012e64f64be830ece5317e",
+  "runtimeRevision": "89114cc",
+  "image": {
+    "tag": "sarin-bot:pilot-11315b7",
+    "id": "sha256:c43f10492b880c5abb56c8e10e6a60739a7eacec9d3bf4d4da7f634022093d00",
+    "platform": "linux/amd64",
+    "sizeBytes": 79685629,
+    "sourceArchiveSha256": "750d4d3485422b09d61da545c7b0f09ac83568b2ccf067ba0c8cde6c7a03de24",
+    "verifiedAt": "2026-10-17T02:08:05.983Z",
+    "linuxSmoke": {
+      "ok": true,
+      "linuxNativeSharp": true,
+      "unauthenticatedSession": 401,
+      "legalPages": 200,
+      "publicDocuments": 200,
+      "canonicalOriginPreauthorization": 200,
+      "rejectedForeignOrigin": 403,
+      "rejectedUncheckedDecision": 400,
+      "privateConsentWithoutAuth": 401,
+      "network": "none",
+      "readOnly": true,
+      "externalCredentials": false
+    }
+  },
+  "sourceValidation": {
+    "evidence": "2026-10-16-consent-acceptance.md",
+    "applicationPassed": 827,
+    "applicationSkipped": 25,
+    "firestorePassed": 23,
+    "typecheck": true,
+    "build": true,
+    "rerunForPackagingOnly": false
+  },
+  "legalConsentGateImplemented": true,
+  "productionAuthorizationReceived": false,
+  "productionDeploymentExecuted": false,
+  "aiBudgetLimitsAccepted": false,
+  "aiBudgetGateActivated": false,
+  "paidAiCallsThisPackaging": 0,
+  "marketplaceEnabled": false,
+  "whatsappEnabled": false,
+  "pending": [
+    "pilot-scope-and-retention-decisions",
+    "provider-contract-and-business-intake-review",
+    "final-legal-texts",
+    "ai-budget-decision",
+    "production-authorization",
+    "final-drained-recoverable-backup",
+    "production-rollout-and-acceptance"
+  ]
+}

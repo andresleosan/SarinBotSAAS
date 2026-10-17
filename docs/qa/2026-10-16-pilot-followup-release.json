@@ -1,5 +1,5 @@
 {
-  "status": "local-only-not-deployed",
+  "status": "historical-local-candidate-superseded",
   "runtimeRevision": "df2a1f276ca17e34aa3f4ee38badfc59dfde3070",
   "image": {
     "tag": "sarin-bot:pilot-df2a1f2",
@@ -26,5 +26,6 @@
   "aiBudgetGateActivated": false,
   "productionAuthorizationReceived": false,
   "legalConsentGateImplemented": false,
-  "publicPrivacyResponsible": "ALS Dev Studio"
+  "publicPrivacyResponsible": "ALS Dev Studio",
+  "supersededBy": "2026-10-16-consent-release.json"
 }

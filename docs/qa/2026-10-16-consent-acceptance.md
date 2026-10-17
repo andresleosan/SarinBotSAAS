@@ -2,7 +2,7 @@
 
 16 de octubre de 2026. Fuentes de runtime: `89114cc`, sobre `31456a3`, rama `codex/commercial-pilot-20261016`. [Plan](../superpowers/plans/2026-10-16-consent.md), [revisión jurídica y decisiones pendientes](../product/2026-10-16-legal-consent-review.md).
 
-**Resultado:** control implementado localmente y probado con datos sintéticos. No publicado. Las imágenes anteriores del piloto no incluyen este incremento; se requiere una imagen nueva antes de un despliegue. El funcionamiento técnico no cierra conservación, contratos de proveedores, identificación de cada establecimiento ni supuestos de salud/menores.
+**Resultado:** control implementado localmente y probado con datos sintéticos. No publicado. Las imágenes anteriores del piloto no incluyen este incremento; posteriormente se construyó y comprobó una [imagen actual de la revisión exacta](2026-10-16-consent-release.md). El funcionamiento técnico no cierra conservación, contratos de proveedores, identificación de cada establecimiento ni supuestos de salud/menores.
 
 ## Comportamiento verificado
 

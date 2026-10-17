@@ -2,6 +2,8 @@
 
 **Estado:** revisión de fuentes y control técnico **implementado y verificado localmente** tras la continuación del propietario. Los textos son borradores locales pendientes de cerrar conservación, contratos/roles de proveedores y datos de cada establecimiento antes de publicar este incremento. No constituye aprobación de cumplimiento ni descripción de una función ya publicada. [Plan ejecutado](../superpowers/plans/2026-10-16-consent.md) y [evidencia](../qa/2026-10-16-consent-acceptance.md).
 
+Seguimiento: [propuesta concreta de operación y conservación, ficha privada por negocio y matriz de proveedores](2026-10-16-pilot-operation.md). La [imagen nueva identificada y comprobada sin red externa](../qa/2026-10-16-consent-release.md) ya incluye este incremento. Es preparación local, no cierre de las decisiones ni una publicación.
+
 ## Identidad y situación comprobada
 
 El propietario pidió identificar a **ALS Dev Studio** como responsable de Sarin, confirmó **alsdevstudio@alsdevstudio.com** y remitió a su política existente para completar los datos de contacto. Se contrastaron directamente en Chrome el 16 de octubre de 2026 y se incorporaron a la página local de privacidad:
