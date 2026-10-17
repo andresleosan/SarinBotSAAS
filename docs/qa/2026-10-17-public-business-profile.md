@@ -67,7 +67,7 @@ Chrome real después de reabrir: consola administrativa con DeepSeek disponible 
 - [Ficha publicada en móvil](2026-10-17-public-profile-live-mobile.png).
 - [Ficha publicada en escritorio](2026-10-17-public-profile-live-desktop.png).
 
-Se restauró el viewport y se retiró la intercepción temporal de salud. Google dejó pendiente la selección manual de cuenta al restituir la sesión después de comprobar la vista anónima; se dejó su ventana y el negocio abiertos para el propietario. Esto no bloquea la publicación ni es una prueba de fallo de autorización del servidor: la consola y el historial autenticados ya se habían verificado en la imagen nueva.
+Se restauró el viewport y se retiró la intercepción temporal de salud. El propietario completó la selección manual de cuenta de Google después de comprobar la vista anónima. Chrome confirmó de nuevo «Control de Sarin» y «Mis citas»: sesión administrativa y de cliente restauradas, sin otro despliegue.
 
 Fuentes, configuración de reversión, build y verificaciones saneadas quedan fuera de Git en `%LOCALAPPDATA%/SarinBot/public-profile-release-20261017`. No se hicieron migraciones ni generaciones de IA. La [guía oficial de rollouts](https://developers.cloudflare.com/containers/configuration/rollouts/) respalda la espera hasta comprobar la sustitución efectiva.
 
