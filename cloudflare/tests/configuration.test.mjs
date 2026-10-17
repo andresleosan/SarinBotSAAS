@@ -49,6 +49,7 @@ test('launch uses workload identity and leaves background WhatsApp services disa
   assert.equal(config.vars?.GOOGLE_APPLICATION_CREDENTIALS, undefined);
   assert.equal(config.vars?.SARIN_DATA_BACKEND, 'd1');
   assert.equal(config.vars?.SARIN_MAINTENANCE, 'false');
+  assert.equal(config.vars?.PILOT_AI_BUDGET_ENFORCED, 'true');
   assert.equal(config.d1_databases?.[0].binding, 'SARIN_DB');
   assert.equal(config.r2_buckets?.[0].binding, 'SARIN_FILES');
 });

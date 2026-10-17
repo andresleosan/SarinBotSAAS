@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -98,6 +99,36 @@ describe('local journey isolation', () => {
     for (const rows of [[period], [scope], [parent, { ...period, path: 'responseQuotaScopes/business_other/periods/paid-period' }], [parent, { ...period, data: { id: 'other-period' } }]]) {
       const attempted: string[] = [];
       await expect(cleanupOwnedDocuments(rows, fixture, async path => { attempted.push(path); })).rejects.toThrow();
+      expect(attempted).toEqual([]);
+    }
+  });
+
+  it('cleans only consent records and client policies proven to belong to the synthetic run', async () => {
+    const fixture = createJourneyFixture(runId);
+    const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+    const requestId = `${runId}-account-client`, uid = fixture.clientUid;
+    const receiptId = `consent_receipt_${hash([uid, 'account', null, requestId])}`;
+    const receipt = { path: `serverSettings/${receiptId}`, data: { uid, scope: 'account', businessId: null, requestId } };
+    const state = { path: `serverSettings/consent_state_${hash([uid, 'account', null])}`, data: { uid, scope: 'account', businessId: null, receiptId } };
+    const claim = { path: `serverSettings/consent_claim_${'a'.repeat(64)}`, data: { uid, receiptId } };
+    const parent = { path: `businesses/${fixture.businessId}`, data: { ownerUid: fixture.ownerUid, slug: fixture.slug } };
+    const policy = { path: `${parent.path}/clientPolicies/${createHash('sha256').update(uid).digest('hex')}`, data: { updatedBy: fixture.ownerUid } };
+    const removed: string[] = [];
+    await cleanupOwnedDocuments([receipt, state, claim, policy, parent], fixture, async path => { removed.push(path); });
+    expect(removed).toEqual([receipt.path, state.path, claim.path, policy.path, parent.path]);
+    for (const records of [
+      [{ ...receipt, data: { ...receipt.data, uid: 'sarin-local-admin' } }],
+      [{ ...receipt, data: { ...receipt.data, requestId: 'manual-request' } }],
+      [{ ...state, path: `serverSettings/consent_state_${'f'.repeat(64)}` }],
+      [{ ...receipt, data: { ...receipt.data, scope: 'business_client', businessId: 'manual-business' } }],
+      [claim],
+      [receipt, { ...claim, data: { uid, receiptId: 'manual-receipt' } }],
+      [policy],
+      [parent, { ...policy, data: { updatedBy: 'manual-owner' } }],
+      [parent, { ...policy, path: `${parent.path}/clientPolicies/${'f'.repeat(64)}` }],
+    ]) {
+      const attempted: string[] = [];
+      await expect(cleanupOwnedDocuments(records, fixture, async path => { attempted.push(path); })).rejects.toThrow();
       expect(attempted).toEqual([]);
     }
   });

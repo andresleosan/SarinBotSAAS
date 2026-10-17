@@ -97,6 +97,10 @@ export async function cleanupOwnedDocuments(records, fixture, remove) {
   const parentPath = `businesses/${canonical.businessId}`;
   const quotaScopePath = `responseQuotaScopes/business_${canonical.businessId}`;
   const ownsParent = records.some(item => item.path === parentPath && item.data.ownerUid === canonical.ownerUid && item.data.slug === canonical.slug);
+  const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  const consentScope = data => uids.includes(data.uid) && (data.scope === 'account' ? data.businessId === null : data.scope === 'business_client' && ownsParent && data.businessId === canonical.businessId);
+  const consentReceipts = records.filter(({ path, data }) => consentScope(data) && typeof data.requestId === 'string' && data.requestId.startsWith(`${canonical.runId}-`) && path === `serverSettings/consent_receipt_${hash([data.uid, data.scope, data.businessId, data.requestId])}`);
+  const ownsReceipt = (uid, receiptId) => consentReceipts.some(item => item.path === `serverSettings/${receiptId}` && item.data.uid === uid);
   for (const { path, data } of records) {
     const parts = path.split('/');
     const allowed = parts.length === 2 && (
@@ -107,8 +111,14 @@ export async function cleanupOwnedDocuments(records, fixture, remove) {
       || (path === `businessSlugs/${canonical.slug}` && data.ownerUid === canonical.ownerUid && data.businessId === canonical.businessId)
       || (parts[0] === 'paymentReceipts' && data.ownerUid === canonical.ownerUid && data.tenantId === canonical.businessId)
       || (parts[0] === 'paymentImages' && data.ownerUid === canonical.ownerUid)
+      || (parts[0] === 'serverSettings' && (
+        consentReceipts.some(item => item.path === path)
+        || consentScope(data) && parts[1] === `consent_state_${hash([data.uid, data.scope, data.businessId])}` && ownsReceipt(data.uid, data.receiptId)
+        || /^consent_claim_[a-f0-9]{64}$/.test(parts[1]) && uids.includes(data.uid) && ownsReceipt(data.uid, data.receiptId)
+      ))
     ) || parts.length === 4 && ownsParent && `${parts[0]}/${parts[1]}` === parentPath && (
       parts[2] === 'bookingLocks' || parts[2] === 'appointments' && data.tenantId === canonical.businessId && (uids.includes(String(record(data.client).uid)) || data.type === 'manual_block' && data.createdBy === 'manual_panel')
+      || parts[2] === 'clientPolicies' && data.updatedBy === canonical.ownerUid && uids.some(uid => createHash('sha256').update(uid).digest('hex') === parts[3])
     ) || parts.length === 4 && ownsParent && `${parts[0]}/${parts[1]}` === quotaScopePath && parts[2] === 'periods' && data.id === parts[3];
     if (!allowed || parts.some(part => !/^[A-Za-z0-9_-]+$/.test(part))) throw new Error(`Limpieza rechazada para un documento ajeno: ${path}.`);
   }

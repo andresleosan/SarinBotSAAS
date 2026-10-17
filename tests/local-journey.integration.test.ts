@@ -8,6 +8,7 @@ import { createAppointment, readAvailability } from '@/lib/server/bookings';
 import { bookingSchema, businessConfigSchema } from '@/lib/server/schemas';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import type { Appointment, Business, PaymentReceipt, PlatformSettings, ResponseAllowance } from '@/types/firestore';
+import type { ConsentScope, ConsentStatus } from '@/lib/legal';
 import { LOCAL_TEST_ACCOUNTS, LOCAL_SUPERADMIN_UID } from '../src/lib/firebase/emulator-constants.mjs';
 import { assertJourneyEnvironment, assertJourneyUrl, cleanupOwnedDocuments, createJourneyFixture, removeJourneyBank } from '../scripts/lib/local-journey.mjs';
 
@@ -41,6 +42,23 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       assert.ok(path.startsWith('/api/') && !path.startsWith('/api/sarin/'), 'El ensayo no llama endpoints de inferencia.');
       return json<T>(`${base}${path}`, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
     }
+    async function acceptSyntheticConsent(identity: { token: string; decoded: { uid: string } }, scope: ConsentScope, businessId?: string) {
+      check(fixture.accounts.some(account => account.uid === identity.decoded.uid), 'Solo se autorizan identidades sintéticas de esta corrida.');
+      const query = new URLSearchParams({ scope, ...(businessId ? { businessId } : {}) });
+      const current = await api<ConsentStatus>(`/api/consent?${query}`, identity.token);
+      check(current.response.ok && !current.body.active && current.body.revision === 0, 'El permiso sintético no parte de un estado nuevo.');
+      let preauthorization: string | undefined;
+      if (scope === 'account') {
+        const proof = await api<{ token: string }>('/api/consent/preauthorize', undefined, 'POST', { fingerprint: current.body.documents.fingerprint, termsAccepted: true, dataAuthorized: true });
+        check(proof.response.ok && typeof proof.body.token === 'string', 'No se obtuvo la decisión previa sintética de cuenta.');
+        preauthorization = proof.body.token;
+      }
+      const accepted = await api<ConsentStatus>('/api/consent', identity.token, 'POST', { scope, ...(businessId ? { businessId } : {}), action: 'accept',
+        requestId: requestId(`consent-${scope}-${identity.decoded.uid.split('-').at(-1)}`), expectedRevision: current.body.revision,
+        fingerprint: current.body.documents.fingerprint, termsAccepted: true, dataAuthorized: true, ...(preauthorization ? { preauthorization } : {}),
+      });
+      check(accepted.response.ok && accepted.body.active && accepted.body.revision === 1 && accepted.body.receipt?.uid === identity.decoded.uid, 'La API no guardó la autorización sintética del ámbito solicitado.');
+    }
     async function login(account: { uid: string; providerUid: string; email: string; displayName: string }) {
       const signed = await json<{ idToken?: string; localId?: string }>('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=sarin-local-emulator-only', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestUri: base, returnSecureToken: true,
@@ -57,7 +75,7 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
     }
     async function ownDocuments() {
       const rows: { path: string; data: Record<string, unknown> }[] = [];
-      for (const collection of ['appointments', 'bookingLocks']) {
+      for (const collection of ['appointments', 'bookingLocks', 'clientPolicies']) {
         const snapshot = await db.collection(`businesses/${fixture.businessId}/${collection}`).get();
         for (const doc of snapshot.docs) rows.push({ path: doc.ref.path, data: doc.data() });
       }
@@ -65,6 +83,7 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
         const snapshot = await db.collection(collection).where('ownerUid', '==', fixture.ownerUid).get();
         for (const doc of snapshot.docs) rows.push({ path: doc.ref.path, data: doc.data() });
       }
+      for (const doc of (await db.collection('serverSettings').where('uid', 'in', fixture.accounts.map(account => account.uid)).get()).docs) rows.push({ path: doc.ref.path, data: doc.data() });
       const quotaScope = db.doc(`responseQuotaScopes/business_${fixture.businessId}`);
       for (const doc of (await quotaScope.collection('periods').get()).docs) rows.push({ path: doc.ref.path, data: doc.data() });
       const references = [quotaScope, db.doc(`publicBusinesses/${fixture.slug}`), db.doc(`businessSlugs/${fixture.slug}`), ...fixture.accounts.map(account => db.doc(`users/${account.uid}`)), db.doc(`businesses/${fixture.businessId}`)];
@@ -137,7 +156,10 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       check((await api('/api/businesses', owner.token, 'POST', config)).response.status === 402, 'La configuración se habilitó sin pagar.');
       const introductoryInput = { kind: 'paid_trial', bankSelected, receiptDataUrl, requestId: requestId('introductory') };
       check((await api('/api/billing', owner.token, 'POST', { ...introductoryInput, amountCOP: 1 })).response.status === 400, 'El cliente pudo alterar el precio de la prueba.');
+      check((await api('/api/billing', owner.token, 'POST', introductoryInput)).response.status === 428, 'Se aceptó un pago sin las decisiones de cuenta.');
+      for (const identity of [owner, client, outsider]) await acceptSyntheticConsent(identity, 'account');
       const introductory = await api<{ receipt: PaymentReceipt; business: Business }>('/api/billing', owner.token, 'POST', introductoryInput);
+      check(introductory.response.status === 201, `La compra sintética inicial devolvió HTTP ${introductory.response.status}; se esperaba 201.`);
       check(introductory.response.status === 201 && introductory.body.receipt.amountCOP === 5000 && introductory.body.receipt.appointmentAllowance === 10, 'El pago inicial no conserva 5.000 COP y diez citas.');
       check(introductory.body.business.subscription.status === 'pending_payment' && !introductory.body.business.subscription.graceEndsAt && !isSubscriptionAllowed(introductory.body.business), 'Subir un comprobante habilitó acceso gratuito.');
       check(!(await db.doc(`publicBusinesses/${fixture.slug}`).get()).exists, 'Un borrador de pago se publicó antes de configurar.');
@@ -163,10 +185,11 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       check((await firestoreRead(`businesses/${fixture.businessId}`, client.token)).response.status === 403, 'Un cliente accedió al documento privado del negocio.');
       const slots = await readAvailability(repeated.body.business, dateKey, 'service', 'room', db);
       check(slots[0]?.slots.includes('10:00') && slots[0]?.slots.includes('14:00'), 'No se calcularon horarios disponibles reales.');
+      for (const identity of [client, outsider]) await acceptSyntheticConsent(identity, 'business_client', fixture.businessId);
       console.log('Fase 2 OK: pago inicial aprobado, configuración, diez citas sin caducidad y proyección privada.');
 
-      // No client booking API exists: execute the same validated implementation
-      // used by tools, with an Auth-verified identity and real Admin transactions.
+      // This general-service journey executes the validated booking domain with
+      // an Auth-verified identity, explicit permissions and real Admin transactions.
       const booking = bookingSchema.parse({ dateKey, startTimeStr: '10:00', resourceId: 'room', serviceId: 'service', clientPhone: '573001234567', intakeAnswers: { reason: 'Ensayo sintético' } });
       const appointment = await createAppointment(client.decoded, fixture.businessId, booking, requestId('booking'), db);
       check(appointment.client?.uid === fixture.clientUid && appointment.reservedUntilAt - appointment.endAt === 15 * 60000, 'La cita no conserva identidad y buffer.');
