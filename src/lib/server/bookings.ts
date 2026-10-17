@@ -10,6 +10,9 @@ import { assertOwner, getBusiness, publicBusiness, stableDocumentId } from './bu
 import { documentIdSchema, type BookingInput } from './schemas';
 import { assertClientCanBook, clientPolicyKey } from './client-policy';
 import { assertConsent } from './consent';
+import type { ValidatedBookingSubject } from '@/lib/booking-subject';
+import { readBookingDataPolicy, assertBookingIntakePolicy } from './booking-data-policy';
+import { assertBookingSubjectConsent, bookingSubjectHash } from './booking-subject-consent';
 
 type BlockInput = { dateKey: string; startTimeStr: string; endTimeStr: string; resourceId: string; requestId: string; motivo?: string };
 function assertDate(dateKey: string) {
@@ -44,7 +47,7 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
     return createAppointmentInTransaction(transaction, user, document.data() as Business, input, requestId, db, Date.now());
   });
 }
-export async function createAppointmentInTransaction(transaction: Transaction, user: ChatActor, business: Business, input: BookingInput, requestId: string, db: Firestore, now: number): Promise<Appointment> {
+export async function createAppointmentInTransaction(transaction: Transaction, user: ChatActor, business: Business, input: BookingInput, requestId: string, db: Firestore, now: number, subject?: ValidatedBookingSubject): Promise<Appointment> {
   const businessId = business.id, businessReference = db.collection('businesses').doc(businessId);
   const id = stableDocumentId(user.uid, requestId, 'appointment');
   const appointmentReference = businessReference.collection('appointments').doc(id);
@@ -58,6 +61,14 @@ export async function createAppointmentInTransaction(transaction: Transaction, u
     }
     await assertConsent(user.uid, 'account', undefined, db, transaction);
     await assertConsent(user.uid, 'business_client', business, db, transaction);
+    const { capability } = await readBookingDataPolicy(businessId, db, transaction);
+    if (!subject && capability.dataMode === 'health') throw new HttpError(409, 'Utiliza el formulario para esta reserva.', 'STRUCTURED_BOOKING_REQUIRED');
+    await assertBookingIntakePolicy(transaction, businessId, business.sarinConfig.intakeFields, db);
+    if (subject) {
+      const authorization = await assertBookingSubjectConsent(transaction, user, business, subject.case, db);
+      if (bookingSubjectHash(authorization) !== bookingSubjectHash(subject.authorization)) throw new HttpError(409, 'La autorización cambió. Inicia una nueva reserva.');
+      if ((capability.dataMode === 'health' || subject.case.subjectKind === 'represented_minor') && Object.keys(input.intakeAnswers).length) throw new HttpError(400, 'Este formulario no admite respuestas de texto libre.');
+    }
     if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar agendando.');
     assertDate(input.dateKey);
@@ -78,6 +89,7 @@ export async function createAppointmentInTransaction(transaction: Transaction, u
       type: 'appointment', resourceId: input.resourceId, serviceId: service.id, serviceName: service.name, price: service.price,
       client: { uid: user.uid, name: typeof user.name === 'string' ? user.name : user.email ?? 'Cliente', email: user.email ?? '', phone: input.clientPhone, intakeAnswers: input.intakeAnswers },
       status: 'confirmed', createdBy: business.ownerUid === user.uid ? 'sarin_owner' : 'sarin_client', createdAt: now,
+      ...(subject ? { beneficiary: subject.beneficiary, ...(subject.authorization ? { subjectAuthorization: { receiptId: subject.authorization.receiptId, bookingRequestId: subject.case.bookingRequestId, policyRevision: subject.authorization.policyRevision } } : {}), ...(subject.beneficiary.kind === 'represented_minor' ? { representationReview: { revision: 0, status: 'declared' as const, reviewedBy: null, reviewedAt: null } } : {}) } : {}),
     };
     // The shared per-resource/day document prevents empty-query phantom races.
     // Every mutation of that resource/date must participate in the same lock.

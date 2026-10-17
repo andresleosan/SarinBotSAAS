@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isDateKey, isTimeString } from '@/lib/sarin/availability';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/billing-plans';
 import { businessSocialLinksSchema } from '@/lib/business-branding';
+import { bookingSubjectCaseSchema, bookingBeneficiarySchema } from '@/lib/booking-subject';
 
 export const documentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 export const requestIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,128}$/);
@@ -57,6 +58,9 @@ export const bookingSchema = z.object({
   intakeAnswers: z.record(documentIdSchema, z.string().trim().max(500)).refine((answers) => Object.keys(answers).length <= 20),
 }).strict();
 export type BookingInput = z.infer<typeof bookingSchema>;
+export const bookingSelectionSchema = bookingSchema.pick({ dateKey: true, startTimeStr: true, serviceId: true, resourceId: true });
+export const structuredAvailabilitySchema = availabilitySchema.extend({ case: bookingSubjectCaseSchema }).strict();
+export const structuredProposalSchema = z.object({ case: bookingSubjectCaseSchema, beneficiary: bookingBeneficiarySchema, selection: bookingSelectionSchema }).strict().refine(value => value.case.subjectKind === value.beneficiary.kind && (value.case.subjectKind !== 'represented_minor' || (value.beneficiary.kind === 'represented_minor' && value.case.representativeRole === value.beneficiary.representativeRole)));
 export const blockSchema = z.object({ dateKey: dateKeySchema, startTimeStr: timeSchema, endTimeStr: timeSchema, resourceId: documentIdSchema, requestId: requestIdSchema, motivo: z.string().max(300).optional() }).strict().refine((body) => body.endTimeStr > body.startTimeStr, 'Rango inválido.');
 export const cancelSchema = z.object({ appointmentId: documentIdSchema }).strict();
 

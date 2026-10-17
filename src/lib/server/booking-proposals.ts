@@ -13,11 +13,16 @@ import { createAppointmentInTransaction } from './bookings';
 import { businessConfigSchema, bookingSchema, documentIdSchema, requestIdSchema, type BookingInput } from './schemas';
 import { HttpError } from './http';
 import { assertConsent } from './consent';
+import { bookingSubjectCaseSchema, bookingBeneficiarySchema, type StructuredProposalContext, type ValidatedBookingSubject } from '@/lib/booking-subject';
+import { readBookingDataPolicy, assertBookingIntakePolicy } from './booking-data-policy';
+import { assertBookingSubjectConsent, bookingSubjectHash } from './booking-subject-consent';
 const selectionSchema = bookingSchema.pick({ dateKey: true, startTimeStr: true, serviceId: true, resourceId: true });
-const proposalSchema = z.object({ version: z.literal(1), id: documentIdSchema, businessId: documentIdSchema, actorUid: z.string().min(1).max(128), selection: selectionSchema,
+const legacyProposalSchema = z.object({ version: z.literal(1), id: documentIdSchema, businessId: documentIdSchema, actorUid: z.string().min(1).max(128), selection: selectionSchema,
   service: businessConfigSchema.shape.services.element, resource: businessConfigSchema.shape.resources.element, intakeFields: businessConfigSchema.shape.intakeFields,
   createdAt: z.number().int().nonnegative(), expiresAt: z.number().int().nonnegative(), appointmentId: documentIdSchema.nullable(),
 }).strict();
+const authorizationSchema = z.object({ receiptId: documentIdSchema, fingerprint: z.string().regex(/^[a-f0-9]{64}$/), policyRevision: z.number().int().nonnegative().safe() }).strict();
+const proposalSchema = z.discriminatedUnion('version', [legacyProposalSchema, legacyProposalSchema.extend({ version: z.literal(2), subjectCase: bookingSubjectCaseSchema, beneficiaryHash: z.string().regex(/^[a-f0-9]{64}$/), policyRevision: z.number().int().nonnegative().safe(), authorization: authorizationSchema.nullable() }).strict()]);
 type Proposal = z.infer<typeof proposalSchema>;
 export const proposalRequestKey = (uid: string, businessId: string, requestId: string) => `request_${stableDocumentId('proposal-request', businessId, uid, requestId)}`;
 function parse(value: unknown): Proposal {
@@ -25,24 +30,37 @@ function parse(value: unknown): Proposal {
 }
 function view(proposal: Proposal): BookingProposalView {
   return { id: proposal.id, businessId: proposal.businessId, serviceName: proposal.service.name, resourceName: proposal.resource.name, dateKey: proposal.selection.dateKey, startTimeStr: proposal.selection.startTimeStr,
-    endTimeStr: toTimeStr(toMinutes(proposal.selection.startTimeStr) + proposal.service.durationMinutes), priceCOP: proposal.service.price, expiresAt: proposal.expiresAt, intakeFields: proposal.intakeFields };
+    endTimeStr: toTimeStr(toMinutes(proposal.selection.startTimeStr) + proposal.service.durationMinutes), priceCOP: proposal.service.price, expiresAt: proposal.expiresAt, intakeFields: proposal.intakeFields, ...(proposal.version === 2 ? { subjectCase: proposal.subjectCase } : {}) };
 }
-export async function createBookingProposal(user: ChatActor, businessId: string, input: Pick<BookingInput, 'dateKey' | 'startTimeStr' | 'serviceId' | 'resourceId'>, requestId: string, db: Database = getAdminDb()): Promise<BookingProposalView> {
+export async function createBookingProposal(user: ChatActor, businessId: string, input: Pick<BookingInput, 'dateKey' | 'startTimeStr' | 'serviceId' | 'resourceId'>, requestId: string, db: Database = getAdminDb(), suppliedSubject?: StructuredProposalContext): Promise<BookingProposalView> {
   documentIdSchema.parse(businessId); requestIdSchema.parse(requestId);
   const selection = selectionSchema.parse(input), now = Date.now(), id = randomBytes(24).toString('base64url');
+  const subject = suppliedSubject ? { case: bookingSubjectCaseSchema.parse(suppliedSubject.case), beneficiary: bookingBeneficiarySchema.parse(suppliedSubject.beneficiary) } : undefined;
+  if (subject && (subject.case.bookingRequestId !== requestId || subject.case.subjectKind !== subject.beneficiary.kind || (subject.case.subjectKind === 'represented_minor' && (subject.beneficiary.kind !== 'represented_minor' || subject.case.representativeRole !== subject.beneficiary.representativeRole)))) throw new HttpError(400, 'El beneficiario no corresponde a este caso.');
   if (toColombiaTimestamp(selection.dateKey, '00:00') > now + 366 * 86400000) throw new HttpError(400, 'Puedes reservar hasta un año por adelantado.');
   const businessRef = db.collection('businesses').doc(businessId), collection = db.collection('bookingProposals'), requestRef = collection.doc(proposalRequestKey(user.uid, businessId, requestId));
   return db.runTransaction(async tx => {
     const [businessDoc, mapping] = await Promise.all([tx.get(businessRef), tx.get(requestRef)]);
+    let previous: Proposal | null = null;
     if (mapping.exists) {
       const saved = mapping.data()!;
-      if (saved.actorUid !== user.uid || saved.businessId !== businessId || JSON.stringify(saved.selection) !== JSON.stringify(selection)) throw new HttpError(409, 'La solicitud pertenece a otra propuesta.');
-      return view(parse((await tx.get(collection.doc(documentIdSchema.parse(saved.proposalId)))).data()));
+      if (saved.actorUid !== user.uid || saved.businessId !== businessId || bookingSubjectHash(saved.selection) !== bookingSubjectHash(selection)) throw new HttpError(409, 'La solicitud pertenece a otra propuesta.');
+      previous = parse((await tx.get(collection.doc(documentIdSchema.parse(saved.proposalId)))).data());
+      if (previous.actorUid !== user.uid || previous.businessId !== businessId || bookingSubjectHash(previous.selection) !== bookingSubjectHash(selection) || (subject ? previous.version !== 2 || bookingSubjectHash(previous.subjectCase) !== bookingSubjectHash(subject.case) || previous.beneficiaryHash !== bookingSubjectHash(subject.beneficiary) : previous.version !== 1)) throw new HttpError(409, 'La referencia ya está vinculada a otro beneficiario o propuesta.', 'BOOKING_SUBJECT_CONFLICT');
+      if (previous.appointmentId) return view(previous);
     }
     if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDoc.data() as Business;
     await assertConsent(user.uid, 'account', undefined, db, tx);
     await assertConsent(user.uid, 'business_client', business, db, tx);
+    const { capability } = await readBookingDataPolicy(businessId, db, tx);
+    if (!subject && capability.dataMode === 'health') throw new HttpError(409, 'Utiliza el formulario para esta reserva.', 'STRUCTURED_BOOKING_REQUIRED');
+    const authorization = subject ? await assertBookingSubjectConsent(tx, user, business, subject.case, db) : null;
+    await assertBookingIntakePolicy(tx, businessId, business.sarinConfig.intakeFields, db);
+    if (previous) {
+      if (previous.version === 2 && (previous.policyRevision !== capability.revision || bookingSubjectHash(previous.authorization) !== bookingSubjectHash(authorization))) throw new HttpError(409, 'La política o autorización cambió. Inicia una nueva reserva.', 'BOOKING_PROPOSAL_CHANGED');
+      return view(previous);
+    }
     if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar.');
     await assertClientCanBook(tx, business, user.uid, now, db);
@@ -50,12 +68,13 @@ export async function createBookingProposal(user: ChatActor, businessId: string,
     if (!service || !resource || !service.resourceIds.includes(resource.id)) throw new HttpError(400, 'Selecciona un servicio y profesional del negocio.');
     const appointments = await tx.get(businessRef.collection('appointments').where('dateKey', '==', selection.dateKey).where('resourceId', '==', selection.resourceId).where('status', '==', 'confirmed'));
     if (!getAvailableSlots({ tenant: business, ...selection, existingAppointments: appointments.docs.map(doc => doc.data() as Appointment) }).some(item => item.slots.includes(selection.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible.');
-    const proposal: Proposal = proposalSchema.parse({ version: 1, id, businessId, actorUid: user.uid, selection, service, resource, intakeFields: business.sarinConfig.intakeFields, createdAt: now, expiresAt: now + 600000, appointmentId: null });
+    const proposal: Proposal = proposalSchema.parse({ version: subject ? 2 : 1, id, businessId, actorUid: user.uid, selection, service, resource, intakeFields: subject && (capability.dataMode === 'health' || subject.case.subjectKind === 'represented_minor') ? [] : business.sarinConfig.intakeFields, createdAt: now, expiresAt: now + 600000, appointmentId: null,
+      ...(subject ? { subjectCase: subject.case, beneficiaryHash: bookingSubjectHash(subject.beneficiary), policyRevision: capability.revision, authorization } : {}) });
     tx.create(collection.doc(id), proposal); tx.create(requestRef, { actorUid: user.uid, businessId, selection, proposalId: id });
     return view(proposal);
   });
 }
-export async function confirmBookingProposal(user: ChatActor, businessId: string, proposalId: string, contact: Pick<BookingInput, 'clientPhone' | 'intakeAnswers'>, db: Database = getAdminDb()): Promise<Appointment> {
+export async function confirmBookingProposal(user: ChatActor, businessId: string, proposalId: string, contact: Pick<BookingInput, 'clientPhone' | 'intakeAnswers'> & { beneficiary?: unknown }, db: Database = getAdminDb()): Promise<Appointment> {
   documentIdSchema.parse(businessId); documentIdSchema.parse(proposalId);
   const ref = db.collection('bookingProposals').doc(proposalId), businessRef = db.collection('businesses').doc(businessId);
   return db.runTransaction(async tx => {
@@ -73,12 +92,25 @@ export async function confirmBookingProposal(user: ChatActor, businessId: string
     if (proposal.expiresAt <= now) throw new HttpError(409, 'La propuesta venció. Consulta otra vez la disponibilidad.', 'BOOKING_PROPOSAL_EXPIRED');
     if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDoc.data() as Business;
+    const { capability } = await readBookingDataPolicy(businessId, db, tx);
+    if (proposal.version === 1 && capability.dataMode === 'health') throw new HttpError(409, 'Utiliza el formulario para esta reserva.', 'STRUCTURED_BOOKING_REQUIRED');
+    let subject: ValidatedBookingSubject | undefined;
+    if (proposal.version === 2) {
+      const beneficiary = bookingBeneficiarySchema.parse(contact.beneficiary);
+      if (bookingSubjectHash(beneficiary) !== proposal.beneficiaryHash || beneficiary.kind !== proposal.subjectCase.subjectKind || (beneficiary.kind === 'represented_minor' && (proposal.subjectCase.subjectKind !== 'represented_minor' || beneficiary.representativeRole !== proposal.subjectCase.representativeRole))) throw new HttpError(409, 'El beneficiario cambió. Inicia una nueva reserva.', 'BOOKING_SUBJECT_CONFLICT');
+      const authorization = await assertBookingSubjectConsent(tx, user, business, proposal.subjectCase, db);
+      if (proposal.policyRevision !== capability.revision || bookingSubjectHash(authorization) !== bookingSubjectHash(proposal.authorization)) throw new HttpError(409, 'La política o autorización cambió. Inicia una nueva reserva.', 'BOOKING_PROPOSAL_CHANGED');
+      const mapping = (await tx.get(db.collection('bookingProposals').doc(proposalRequestKey(user.uid, businessId, proposal.subjectCase.bookingRequestId)))).data();
+      if (!mapping || mapping.actorUid !== user.uid || mapping.businessId !== businessId || mapping.proposalId !== proposal.id || bookingSubjectHash(mapping.selection) !== bookingSubjectHash(proposal.selection)) throw new HttpError(503, 'No se pudo validar la referencia de reserva.');
+      subject = { case: proposal.subjectCase, beneficiary, authorization, proposalId: proposal.id };
+    }
+    await assertBookingIntakePolicy(tx, businessId, business.sarinConfig.intakeFields, db);
     const service = businessConfigSchema.shape.services.element.safeParse(business.services.find(item => item.id === proposal.selection.serviceId)), resource = businessConfigSchema.shape.resources.element.safeParse(business.resources.find(item => item.id === proposal.selection.resourceId));
     const current = { service: service.success ? service.data : null, resource: resource.success ? resource.data : null, intakeFields: businessConfigSchema.shape.intakeFields.parse(business.sarinConfig.intakeFields) };
-    if (JSON.stringify(current) !== JSON.stringify({ service: proposal.service, resource: proposal.resource, intakeFields: proposal.intakeFields })) throw new HttpError(409, 'El catálogo cambió. Solicita una propuesta actualizada.', 'BOOKING_PROPOSAL_CHANGED');
+    if (bookingSubjectHash(current) !== bookingSubjectHash({ service: proposal.service, resource: proposal.resource, intakeFields: proposal.intakeFields })) throw new HttpError(409, 'El catálogo cambió. Solicita una propuesta actualizada.', 'BOOKING_PROPOSAL_CHANGED');
     const input = bookingSchema.parse({ ...proposal.selection, clientPhone: contact.clientPhone, intakeAnswers: contact.intakeAnswers });
     if (Object.keys(input.intakeAnswers).some(key => !proposal.intakeFields.some(field => field.key === key))) throw new HttpError(400, 'Las respuestas no corresponden a los campos de esta propuesta.');
-    const appointment = await createAppointmentInTransaction(tx, user, business, input, `proposal-${proposal.id}`, db, now);
+    const appointment = await createAppointmentInTransaction(tx, user, business, input, `proposal-${proposal.id}`, db, now, subject);
     tx.set(ref, { ...proposal, appointmentId: appointment.id });
     return appointment;
   });

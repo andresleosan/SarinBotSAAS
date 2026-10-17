@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { deleteApp, getApps } from 'firebase-admin/app';
+import { deleteApp, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { subjectAdmin, verifyStructuredCases, verifySubjectBindingAndWithdrawal, verifySubjectRaces, verifyLegacyPolicyCompatibility } from './represented-booking-contract';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
@@ -45,6 +47,16 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     return createBusiness(identity, chosenConfig, db);
   }
   afterAll(async () => { if (db) { await db.terminate(); const app = getApps().find(value => value.name === 'sarin-admin'); if (app) await deleteApp(app); } });
+  it('confirms the three subject cases with scoped authorization across independent Firestore handles', async () => {
+    const prior = process.env.SUPERADMIN_UID; process.env.SUPERADMIN_UID = subjectAdmin.uid;
+    const app = initializeApp({ projectId: 'demo-sarin-bot' }, `demo-subject-${crypto.randomUUID()}`), secondDb = getFirestore(app);
+    try {
+      await verifyStructuredCases(db, secondDb);
+      await verifySubjectBindingAndWithdrawal(db, secondDb);
+      await verifySubjectRaces(db, secondDb);
+      await verifyLegacyPolicyCompatibility(db, secondDb);
+    } finally { if (prior === undefined) delete process.env.SUPERADMIN_UID; else process.env.SUPERADMIN_UID = prior; await secondDb.terminate(); await deleteApp(app); }
+  }, 120000);
   it('confirms proposals atomically with client policy and preserves replay on Firestore', async () => {
     const identity = user(`proposal-${crypto.randomUUID()}`), client = user(`client-${crypto.randomUUID()}`);
     const business = await paidBusiness(identity, { ...config, slug: `proposal-${crypto.randomUUID()}` });

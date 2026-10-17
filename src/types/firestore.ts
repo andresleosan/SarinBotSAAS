@@ -133,6 +133,9 @@ export interface TenantClientMemory {
 }
 
 export interface Appointment {
+  beneficiary?: import('@/lib/booking-subject').BookingBeneficiary;
+  subjectAuthorization?: { receiptId: string; bookingRequestId: string; policyRevision: number };
+  representationReview?: import('@/lib/booking-subject').RepresentationReview;
   id: string;
   tenantId: string;
   dateKey: string; // "YYYY-MM-DD"

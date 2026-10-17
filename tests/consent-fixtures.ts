@@ -3,6 +3,19 @@ import type { Database } from '@/lib/storage/types';
 import { consentDocuments, consentStateKey, preauthorizeAccount, readConsent, updateConsent } from '@/lib/server/consent';
 import type { ConsentBusiness, ConsentScope } from '@/lib/legal';
 import { memoryFirestore } from './memoryFirestore';
+import type { ChatActor } from '@/types/chat';
+import type { BookingSubjectCase, BookingDataPolicy } from '@/lib/booking-subject';
+import { readBookingSubjectConsent, updateBookingSubjectConsent } from '@/lib/server/booking-subject-consent';
+
+export async function acceptSyntheticSubjectConsent(db: Database, actor: ChatActor, business: ConsentBusiness, subjectCase: BookingSubjectCase, policy: BookingDataPolicy): Promise<void> {
+  if (!actor.uid.startsWith('demo-')) throw new Error('Subject fixtures require an explicit demo actor');
+  await acceptSyntheticConsent(db, actor.uid, business);
+  const status = await readBookingSubjectConsent(actor, business.id, subjectCase, db);
+  if (!status.required || status.active) return;
+  await updateBookingSubjectConsent(actor, { businessId: business.id, case: subjectCase, action: 'accept', requestId: `demo-subject-${crypto.randomUUID()}`, expectedRevision: status.revision, fingerprint: status.documents.fingerprint,
+    decisions: { dataAuthorized: true, sensitiveDataAuthorized: policy.dataMode === 'health', representationDeclared: subjectCase.subjectKind === 'represented_minor' },
+  }, db);
+}
 
 /** Explicit synthetic authorization for tests of other commercial behavior. */
 export async function acceptSyntheticConsent(db: Database, uid: string, business?: ConsentBusiness): Promise<void> {
