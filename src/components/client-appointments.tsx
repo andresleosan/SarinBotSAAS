@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download } from "lucide-react";
+import { CalendarPlus, Download } from "lucide-react";
 import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useApiPoll } from "@/lib/client/use-api-poll";
 import { createAppointmentImage, type AppointmentImageDetails } from "@/lib/client/appointment-image";
+import { createAppointmentCalendar, type AppointmentCalendarDetails } from "@/lib/client/appointment-calendar";
+import { downloadICSFile } from "@/lib/utils/icsGenerator";
 import type { Appointment, TenantResource, TenantService } from "@/types/firestore";
 
 type View = "upcoming" | "history" | "calendar";
+type ExportAction = { id: string; kind: "image" | "calendar" };
 const views: { id: View; label: string }[] = [
   { id: "upcoming", label: "Próximas" },
   { id: "history", label: "Historial" },
@@ -52,15 +55,16 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const pending = useRef<string | null>(null);
-  const exporting = useRef<string | null>(null);
-  const [exportingId, setExportingId] = useState<string | null>(null);
+  const exporting = useRef<ExportAction | null>(null);
+  const [exportAction, setExportAction] = useState<ExportAction | null>(null);
+  const exportingId = exportAction?.id ?? null;
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     currentScope.current = actionScope;
     setConfirmationId(null); setPendingId(null); pending.current = null;
-    exporting.current = null; setExportingId(null);
+    exporting.current = null; setExportAction(null);
     setActionError(null); setNotice(null);
     return () => { if (currentScope.current === actionScope) currentScope.current = { key: '' }; };
   }, [scope]);
@@ -89,7 +93,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
     if (service) current.onRebook(service.id);
   }
   async function cancel(appointment: Appointment) {
-    if (pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
+    if (currentScope.current !== actionScope || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
     pending.current = appointment.id;
     setPendingId(appointment.id);
     setActionError(null);
@@ -111,9 +115,9 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
     finally { if (currentScope.current === actionScope) { pending.current = null; setPendingId(null); } }
   }
   async function download(appointment: Appointment) {
-    if (pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
-    exporting.current = appointment.id;
-    setExportingId(appointment.id); setActionError(null); setNotice(null);
+    if (currentScope.current !== actionScope || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
+    exporting.current = { id: appointment.id, kind: "image" };
+    setExportAction(exporting.current); setActionError(null); setNotice(null);
     const generatedAt = Date.now();
     function details(item: Appointment): AppointmentImageDetails {
       return { businessName: latest.current.businessName, serviceName: item.serviceName || "Cita",
@@ -137,7 +141,41 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       finally { anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }
       setNotice("Imagen de la cita descargada. Consulta Mis citas para ver cambios o cancelaciones.");
     } catch (cause) { if (currentScope.current === actionScope) setActionError(errorMessage(cause)); }
-    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportingId(null); } }
+    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); } }
+  }
+  async function downloadCalendar(appointment: Appointment) {
+    if (currentScope.current !== actionScope || pending.current || exporting.current) return;
+    const current = latest.current;
+    if (current.loading || current.readError) return;
+    const saved = current.appointments.find(item => item.id === appointment.id);
+    if (!saved || !canChange(saved, Date.now())) return;
+    // A retained handler must still describe the current appointment and card metadata.
+    if (saved.startAt !== appointment.startAt || saved.endAt !== appointment.endAt || saved.serviceId !== appointment.serviceId
+      || saved.serviceName !== appointment.serviceName || saved.resourceId !== appointment.resourceId || current.businessName !== businessName
+      || current.resources.find(item => item.id === saved.resourceId)?.name !== resources.find(item => item.id === appointment.resourceId)?.name) return;
+    function details(item: Appointment): AppointmentCalendarDetails {
+      return { businessId, appointmentId: item.id, businessName: latest.current.businessName, serviceName: item.serviceName || "Cita",
+        resourceName: latest.current.resources.find(resource => resource.id === item.resourceId)?.name,
+        startAt: item.startAt, endAt: item.endAt };
+    }
+    const snapshot = details(saved);
+    const serviceId = saved.serviceId, resourceId = saved.resourceId;
+    exporting.current = { id: saved.id, kind: "calendar" };
+    setExportAction(exporting.current); setActionError(null); setNotice(null);
+    try {
+      const content = await createAppointmentCalendar(snapshot);
+      if (currentScope.current !== actionScope) return;
+      const latestRead = latest.current;
+      const actual = latestRead.appointments.find(item => item.id === saved.id);
+      if (latestRead.loading || latestRead.readError || !actual || !canChange(actual, Date.now())
+        || actual.serviceId !== serviceId || actual.resourceId !== resourceId || JSON.stringify(details(actual)) !== JSON.stringify(snapshot)) {
+        setActionError("La cita cambió mientras preparábamos el calendario. Revisa Mis citas antes de intentarlo de nuevo.");
+        return;
+      }
+      downloadICSFile(content, `cita-${dateKey(actual.startAt)}.ics`);
+      setNotice("Archivo de calendario descargado. Los cambios y cancelaciones se consultan en Mis citas.");
+    } catch (cause) { if (currentScope.current === actionScope) setActionError(errorMessage(cause)); }
+    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); } }
   }
 
   return (
@@ -174,9 +212,13 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
             <p className="text-xs font-semibold text-sarin-blue">{statusLabel(appointment, now)}</p>
           </div>
           {view === "history" && onRebook && currentService && <button type="button" aria-label={`Volver a reservar: ${currentService.name}`} disabled={!rebookingEnabled || loading || Boolean(readError || pendingId || exportingId)} onClick={() => rebook(appointment)} className="min-h-11 max-w-full rounded-[10px] border border-sarin-line px-3 py-2 text-left text-sm font-semibold text-sarin-blue hover:border-sarin-blue hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:cursor-not-allowed disabled:opacity-50">Volver a reservar</button>}
-          {canChange(appointment, now) && <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <button type="button" disabled={Boolean(pendingId || exportingId)} className="flex min-h-11 items-center gap-2 text-sm font-medium text-sarin-blue disabled:opacity-50" onClick={() => download(appointment)}><Download className="h-4 w-4 shrink-0" />{exportingId === appointment.id ? "Preparando imagen…" : "Guardar imagen de la cita"}</button>
-            {confirmationId !== appointment.id && <button type="button" disabled={Boolean(pendingId || exportingId)} className="min-h-11 text-sm text-sarin-muted underline disabled:opacity-50" onClick={() => { setConfirmationId(appointment.id); setActionError(null); setNotice(null); }}>Cancelar cita</button>}
+          {canChange(appointment, now) && <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              <button type="button" disabled={Boolean(pendingId || exportingId)} className="flex min-h-11 max-w-full items-center gap-2 rounded text-left text-sm font-medium text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => download(appointment)}><Download className="h-4 w-4 shrink-0" />{exportAction?.id === appointment.id && exportAction.kind === "image" ? "Preparando imagen…" : "Guardar imagen de la cita"}</button>
+              <button type="button" disabled={loading || Boolean(readError || pendingId || exportingId)} className="flex min-h-11 max-w-full items-center gap-2 rounded text-left text-sm font-medium text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => downloadCalendar(appointment)}><CalendarPlus className="h-4 w-4 shrink-0" />{exportAction?.id === appointment.id && exportAction.kind === "calendar" ? "Preparando calendario…" : "Añadir al calendario"}</button>
+              {confirmationId !== appointment.id && <button type="button" disabled={Boolean(pendingId || exportingId)} className="min-h-11 rounded text-sm text-sarin-muted underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => { setConfirmationId(appointment.id); setActionError(null); setNotice(null); }}>Cancelar cita</button>}
+            </div>
+            <p className="text-xs text-sarin-muted">Se descarga un archivo para importar. No se actualiza automáticamente: consulta Mis citas para ver cambios o cancelaciones.</p>
           </div>}
           {confirmationId === appointment.id && canChange(appointment, now) && <div role="group" aria-label={`Confirmar cancelación de ${appointment.serviceName || "cita"}`} className="space-y-3 border-t border-sarin-line pt-3">
             <p className="text-sm text-sarin-ink">¿Quieres cancelar esta cita? El horario quedará libre.</p>

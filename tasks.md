@@ -1,5 +1,12 @@
 # Estado de implementación — 2026-10-17
 
+## Añadir cita al calendario — aprobado localmente
+
+- [x] Añadir descarga ICS explícita a las citas futuras confirmadas de Mis citas, con identidad estable, horario UTC correcto y datos permitidos; conservar PNG e indicar el límite de actualización.
+- [x] Cerrar TDD y revisión independiente sin P1/P2: 1.183 pruebas aprobadas/26 omitidas, tipos y audit limpios; 28 controles de navegador y archivos reales verificados.
+- [x] Limpiar diez documentos propios y procesos de QA; restaurar viewport y comprobar seis puertos libres. [Aceptación local](docs/qa/2026-10-17-calendar-export.md).
+- [ ] Publicar la versión autorizada después de auditar imagen y reversión compatible, drenar cola y verificar una instancia efectiva y la sesión administrativa.
+
 ## Próxima fecha disponible — publicado
 
 - [x] Implementar búsqueda explícita de hasta catorce días, con servicio/profesional conservados y selección de hora manual.
@@ -15,7 +22,7 @@ El propietario indicó «ok vamos paso a paso, implementando probando y publican
 - [ ] Añadir la cita al calendario mediante archivo importable, con identidad estable y límites claros de actualización.
 - [ ] Dirección/modalidad e indicaciones para llegar en la ficha del negocio.
 - [ ] Reprogramar una cita existente con reglas temporales validadas en servidor y cambio atómico.
-- [ ] Recordatorios automáticos mediante un canal configurado y programación persistente.
+- [ ] Recordatorios dentro de Sarin, con programación persistente; el propietario indicó «todo dentro de la app de momento». Correo y WhatsApp fuera del alcance inicial.
 - [ ] Lista de espera con preferencias y confirmación explícita del hueco ofrecido.
 
 Orden basado en la [investigación de Fresha](docs/qa/2026-10-17-fresha-next-adaptations.md). La implementación sigue en el worktree aislado `service-catalog`; el checkout original permanece conservado.
