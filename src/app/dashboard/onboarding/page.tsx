@@ -24,6 +24,7 @@ import type { BusinessConfig } from "@/lib/server/schemas";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
 import { canPurchasePaidTrial } from "@/lib/paid-trial";
+import { preserveServiceCatalogMetadata, SERVICE_CATEGORY_MAX_LENGTH, SERVICE_DESCRIPTION_MAX_LENGTH } from "@/lib/service-catalog";
 import type {
   Business,
   DaySchedule,
@@ -212,7 +213,7 @@ function Configuration() {
     if (draft.socialLinks !== undefined) setSocialLinks(draft.socialLinks);
     proposedIntake.current = draft.intakeFields;
     setTone(draft.tone); setRules(draft.customRules); setIntake(draft.intakeFields.map(field => field.label).join('\n'));
-    setResources(draft.resources); setServices(draft.services); setSchedule(draft.weeklySchedule); setSaved(false);
+    setResources(draft.resources); setServices(previous => preserveServiceCatalogMetadata(draft.services, previous)); setSchedule(draft.weeklySchedule); setSaved(false);
   }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -450,6 +451,39 @@ function Configuration() {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
+                <label className="block min-w-0 text-xs text-sarin-muted">
+                  Descripción (opcional)
+                  <textarea
+                    aria-label={`Descripción del servicio ${index + 1}`}
+                    aria-describedby={`service-description-help-${service.id}`}
+                    className={fieldClass + " mt-1.5 min-h-20 resize-y"}
+                    rows={2}
+                    maxLength={SERVICE_DESCRIPTION_MAX_LENGTH}
+                    value={service.description ?? ""}
+                    onChange={(event) =>
+                      setServices((previous) => previous.map((item) =>
+                        item.id === service.id ? { ...item, description: event.target.value } : item,
+                      ))
+                    }
+                  />
+                  <span id={`service-description-help-${service.id}`} className="mt-1 block">Visible para tus clientes</span>
+                </label>
+                <label className="block min-w-0 text-xs text-sarin-muted">
+                  Categoría (opcional)
+                  <input
+                    aria-label={`Categoría del servicio ${index + 1}`}
+                    aria-describedby={`service-category-help-${service.id}`}
+                    className={fieldClass + " mt-1.5"}
+                    maxLength={SERVICE_CATEGORY_MAX_LENGTH}
+                    value={service.category ?? ""}
+                    onChange={(event) =>
+                      setServices((previous) => previous.map((item) =>
+                        item.id === service.id ? { ...item, category: event.target.value } : item,
+                      ))
+                    }
+                  />
+                  <span id={`service-category-help-${service.id}`} className="mt-1 block">Visible para tus clientes</span>
+                </label>
                 <div className="grid grid-cols-2 gap-3 @min-[24rem]:grid-cols-3">
                   {(
                     [
@@ -671,6 +705,7 @@ function Configuration() {
             <label className="block text-xs text-sarin-muted">
               Preguntas obligatorias para reservar (una por línea)
               <textarea
+                aria-label="Preguntas para reservar"
                 className={fieldClass + " mt-1.5 min-h-20"}
                 value={intake}
                 maxLength={2000}
@@ -707,6 +742,7 @@ function Configuration() {
             <label className="block text-xs text-sarin-muted">
               Indicaciones del negocio
               <textarea
+                aria-label="Indicaciones del negocio"
                 className={fieldClass + " mt-1.5 min-h-20"}
                 value={rules}
                 maxLength={3000}

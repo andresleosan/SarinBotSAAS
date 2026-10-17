@@ -1,5 +1,14 @@
 # Estado de implementación — 2026-10-17
 
+## Categorías y descripciones — aprobado en local
+
+- [x] Diseño acotado aprobado por el propietario: descripción y categoría opcionales por servicio, edición y agrupación en la ficha pública. [Decisión y fuentes](docs/design/2026-10-17-service-catalog.md).
+- [x] Validación 300/60, texto plano, omisión compatible por ID y borrado explícito; catálogo histórico plano, datos operativos de IA y citas confirmadas conservados. Sin migraciones ni dependencias.
+- [x] Corregir pérdida del borrado al aplicar borrador omiso con regresión RED/GREEN y revisión independiente sin bloqueantes. 927 pruebas aprobadas/26 omitidas, tipos y build; 129 comprobaciones locales. Chrome en 320/390/1280 px. [Evidencia](docs/qa/2026-10-17-service-catalog.md).
+- [ ] Publicar tras autorización específica del propietario y verificar la instancia efectiva y el catálogo real.
+
+Rama de este incremento: `codex/service-catalog-20261017`, worktree `F:/Proyectos/SarinBot-worktrees/service-catalog`, basada en `d942e90`. La producción y las fuentes del checkout original se conservan.
+
 ## Perfil público antes del acceso — publicado
 
 - [x] Continuar la investigación de Fresha contra las fuentes reales publicadas y registrar la elección del propietario: perfil del negocio antes de Google. [Hallazgos](docs/qa/2026-10-17-fresha-services-and-team.md).

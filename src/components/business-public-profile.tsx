@@ -14,9 +14,38 @@ const weekDays = [
 ];
 const contactClass = 'inline-flex min-h-11 min-w-0 max-w-full items-center py-2 text-sm text-sarin-blue underline underline-offset-4 [overflow-wrap:anywhere] hover:text-sarin-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue';
 
+type PublicService = PublicBusinessProfile['services'][number];
+
+function ServiceCards({ services, grouped = false }: { services: readonly PublicService[]; grouped?: boolean }) {
+  const Heading = grouped ? 'h4' : 'h3';
+  return <ul className="mt-4 space-y-3">
+    {services.map(service => <li key={service.id} className="min-w-0 rounded-xl border border-sarin-line p-4">
+      <Heading className="font-semibold leading-snug">{service.name}</Heading>
+      {service.description?.trim() && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-sarin-muted">{service.description}</p>}
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm tabular-nums">
+        <p className="font-semibold">{service.price.toLocaleString('es-CO')} COP</p>
+        <p className="text-sarin-muted">{service.durationMinutes} minutos</p>
+      </div>
+    </li>)}
+  </ul>;
+}
+
+function categoryGroups(services: readonly PublicService[]) {
+  const groups = new Map<string, { label: string; services: PublicService[] }>();
+  for (const service of services) {
+    const label = service.category?.trim() ?? '';
+    const key = label.normalize('NFC').toLocaleLowerCase('es-CO');
+    const group = groups.get(key);
+    if (group) group.services.push(service);
+    else groups.set(key, { label: label || 'Sin categoría', services: [service] });
+  }
+  return [...groups.entries()];
+}
+
 export function BusinessPublicProfile({ profile, onContinue }: { profile: PublicBusinessProfile; onContinue: () => void }) {
   const telephone = profile.phoneWhatsApp.replace(/\D/g, '');
   const hasContact = Boolean(telephone || profile.socialLinks?.length);
+  const hasCategories = profile.services.some(service => Boolean(service.category?.trim()));
 
   return <main className="mx-auto min-h-dvh w-full max-w-4xl space-y-4 bg-sarin-canvas px-4 py-5 text-sarin-ink [overflow-wrap:anywhere] sm:px-6 sm:py-8">
     <header className="rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
@@ -37,15 +66,12 @@ export function BusinessPublicProfile({ profile, onContinue }: { profile: Public
     <div className="grid min-w-0 items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
       <section aria-label="Servicios del negocio" className="min-w-0 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
         <h2 className="text-lg font-semibold">Servicios</h2>
-        {profile.services.length ? <ul className="mt-4 space-y-3">
-          {profile.services.map(service => <li key={service.id} className="min-w-0 rounded-xl border border-sarin-line p-4">
-            <h3 className="font-semibold leading-snug">{service.name}</h3>
-            <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm tabular-nums">
-              <p className="font-semibold">{service.price.toLocaleString('es-CO')} COP</p>
-              <p className="text-sarin-muted">{service.durationMinutes} minutos</p>
-            </div>
-          </li>)}
-        </ul> : <p className="mt-3 text-sm text-sarin-muted">El negocio aún no ha publicado sus servicios.</p>}
+        {profile.services.length ? hasCategories ? <div className="mt-5 space-y-6">
+          {categoryGroups(profile.services).map(([key, group]) => <div key={key} className="min-w-0">
+            <h3 className="font-semibold">{group.label}</h3>
+            <ServiceCards services={group.services} grouped />
+          </div>)}
+        </div> : <ServiceCards services={profile.services} /> : <p className="mt-3 text-sm text-sarin-muted">El negocio aún no ha publicado sus servicios.</p>}
       </section>
 
       <div className="min-w-0 space-y-4">

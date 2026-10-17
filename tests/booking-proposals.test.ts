@@ -25,6 +25,58 @@ describe('server-bound explicit booking confirmation', () => {
     vi.setSystemTime(now + 86400000);
     expect(await confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, {} as never, db)).toMatchObject({ id: confirmed[0].id, status: 'cancelled_by_client' });
   });
+  it('still confirms a historical proposal whose service snapshot has no descriptive metadata', async () => {
+    const { db, rows } = memoryFirestore({ 'businesses/proposal': business });
+    const proposal = await createBookingProposal({ uid: 'client' }, business.id, selection, 'historical-proposal', db);
+    const snapshot = rows.get(`bookingProposals/${proposal.id}`)?.data.service;
+    expect(snapshot).toEqual(business.services[0]);
+    expect(snapshot).not.toHaveProperty('description');
+    expect(snapshot).not.toHaveProperty('category');
+
+    const confirmed = await confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db);
+    expect(confirmed).toMatchObject({ serviceId: 'cut', serviceName: 'Corte', price: 20000, status: 'confirmed' });
+    expect(rows.get('businesses/proposal')?.data.subscription).toMatchObject({ paidTrial: { appointmentsUsed: 10 } });
+  });
+  it('creates and confirms a proposal with descriptive service metadata without copying it into the appointment', async () => {
+    const service = { ...business.services[0], description: 'Corte con lavado y peinado.', category: 'Cabello' };
+    const { db, rows } = memoryFirestore({ 'businesses/proposal': { ...business, services: [service] } });
+    const proposal = await createBookingProposal({ uid: 'client' }, business.id, selection, 'metadata-proposal', db);
+    expect(rows.get(`bookingProposals/${proposal.id}`)?.data.service).toEqual(service);
+
+    const confirmed = await confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db);
+    expect(confirmed).toMatchObject({ serviceId: 'cut', serviceName: 'Corte', price: 20000, status: 'confirmed' });
+    expect(confirmed).not.toHaveProperty('description');
+    expect(confirmed).not.toHaveProperty('category');
+    expect(rows.get(`bookingProposals/${proposal.id}`)?.data.appointmentId).toBe(confirmed.id);
+    expect(rows.get('businesses/proposal')?.data.subscription).toMatchObject({ paidTrial: { appointmentsUsed: 10 } });
+  });
+  it.each([
+    ['description', 'Corte y peinado sin lavado.'],
+    ['category', 'Estilismo'],
+  ] as const)('requires a new pending proposal after the service %s changes', async (field, value) => {
+    const service = { ...business.services[0], description: 'Corte con lavado y peinado.', category: 'Cabello' };
+    const { db, rows } = memoryFirestore({ 'businesses/proposal': { ...business, services: [service] } });
+    const proposal = await createBookingProposal({ uid: 'client' }, business.id, selection, `changed-${field}`, db);
+    await db.collection('businesses').doc(business.id).set({ ...business, services: [{ ...service, [field]: value }] });
+
+    await expect(confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db)).rejects.toMatchObject({ status: 409, code: 'BOOKING_PROPOSAL_CHANGED' });
+    expect(rows.get(`bookingProposals/${proposal.id}`)?.data.appointmentId).toBeNull();
+    expect([...rows.keys()].filter(path => path.includes('/appointments/'))).toHaveLength(0);
+    expect(rows.get('businesses/proposal')?.data.subscription).toMatchObject({ paidTrial: { appointmentsUsed: 9 } });
+  });
+  it('recovers a confirmed proposal unchanged after service metadata changes without consuming again', async () => {
+    const service = { ...business.services[0], description: 'Corte con lavado y peinado.', category: 'Cabello' };
+    const { db, rows } = memoryFirestore({ 'businesses/proposal': { ...business, services: [service] } });
+    const proposal = await createBookingProposal({ uid: 'client' }, business.id, selection, 'confirmed-metadata', db);
+    const confirmed = await confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, contact, db);
+    const current = rows.get('businesses/proposal')!.data;
+    await db.collection('businesses').doc(business.id).set({ ...current, services: [{ ...service, description: 'Descripción nueva.', category: 'Estilismo' }] });
+
+    expect(await confirmBookingProposal({ uid: 'client' }, business.id, proposal.id, {} as never, db)).toEqual(confirmed);
+    expect(rows.get(`businesses/proposal/appointments/${confirmed.id}`)?.data).toEqual(confirmed);
+    expect([...rows.keys()].filter(path => path.includes('/appointments/'))).toHaveLength(1);
+    expect(rows.get('businesses/proposal')?.data.subscription).toMatchObject({ paidTrial: { appointmentsUsed: 10 } });
+  });
   it('rejects cross-account, expiration, changed catalogue, invalid contact and blocking without consuming', async () => {
     const { db, rows } = memoryFirestore({ 'businesses/proposal': business });
     const proposal = await createBookingProposal({ uid: 'client' }, business.id, selection, 'proposal-request', db);

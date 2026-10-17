@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { businessIdForOwner, createBusiness, privateBusinessDraft, publicBusiness } from '../src/lib/server/businesses';
+import { businessIdForOwner, createBusiness, privateBusinessDraft, publicBusiness, publicBusinessProfile } from '../src/lib/server/businesses';
 import { businessConfigSchema } from '../src/lib/server/schemas';
 import { consentedFirestore } from './consent-fixtures';
 const memoryFirestore = (initial: Parameters<typeof consentedFirestore>[0] = {}) => consentedFirestore(initial, ['another', 'owner']);
@@ -13,6 +13,42 @@ function paidDraft(uid = user.uid) {
   return { ...draft, subscription: { ...draft.subscription, status: 'trial' as const, paidTrial: { paymentId: 'approved-receipt', activatedAt: draft.createdAt, appointmentLimit: 10 as const, appointmentsUsed: 4 } } };
 }
 describe('business isolation and paid entitlement', () => {
+  it('preserves omitted catalog texts by ID without copying them to a new service or changing appointments', async () => {
+    const existing = { ...paidDraft(), services: [
+      { ...config.services[0], description: 'Incluye lavado.', category: 'Cortes' },
+      { ...config.services[0], id: 'beard', name: 'Barba', description: 'Perfilado.', category: 'Barbas' },
+    ] };
+    const appointment = { id: 'confirmed', status: 'confirmed', serviceName: 'Corte', priceCOP: 20000 };
+    const path = `businesses/${existing.id}/appointments/confirmed`;
+    const { db, rows } = memoryFirestore({ [`businesses/${existing.id}`]: existing, [path]: appointment });
+    const updated = await createBusiness(user, { ...config, services: [
+      { ...config.services[0], id: 'beard', name: 'Barba' }, config.services[0], { ...config.services[0], id: 'new' },
+    ] }, db);
+    expect(updated.services[0]).toMatchObject({ id: 'beard', description: 'Perfilado.', category: 'Barbas' });
+    expect(updated.services[1]).toMatchObject({ id: 'cut', description: 'Incluye lavado.', category: 'Cortes' });
+    expect(updated.services[2]).not.toHaveProperty('description');
+    expect(updated.services[2]).not.toHaveProperty('category');
+    expect(rows.get(`publicBusinesses/${config.slug}`)?.data.services).toEqual(updated.services);
+    expect(rows.get(path)?.data).toEqual(appointment);
+  });
+  it('saves new service texts and clears them only when explicitly empty', async () => {
+    const { db } = memoryFirestore({ [`businesses/${businessIdForOwner(user.uid)}`]: paidDraft() });
+    const withTexts = businessConfigSchema.parse({ ...config, services: [{ ...config.services[0], description: '  Incluye lavado. ', category: ' Cortes ' }] });
+    const first = await createBusiness(user, withTexts, db);
+    expect(first.services[0]).toMatchObject({ description: 'Incluye lavado.', category: 'Cortes' });
+    const cleared = await createBusiness(user, businessConfigSchema.parse({ ...config, services: [{ ...config.services[0], description: '', category: '' }] }), db);
+    expect(cleared.services[0]).toMatchObject({ description: '', category: '' });
+    expect(publicBusinessProfile(cleared).services[0]).toEqual({ id: 'cut', name: 'Corte', price: 20000, durationMinutes: 30 });
+  });
+  it('publishes only valid optional service texts in the minimal profile', () => {
+    const base = { ...paidDraft(), ...config, services: [
+      { ...config.services[0], description: ' Incluye lavado. ', category: ' Cortes ', internalNote: 'private' },
+      { ...config.services[0], id: 'invalid', description: { secret: 'private' }, category: 'a'.repeat(61) },
+    ] };
+    const profile = publicBusinessProfile(base as never);
+    expect(profile.services[0]).toEqual({ id: 'cut', name: 'Corte', price: 20000, durationMinutes: 30, description: 'Incluye lavado.', category: 'Cortes' });
+    expect(profile.services[1]).toEqual({ id: 'invalid', name: 'Corte', price: 20000, durationMinutes: 30 });
+  });
   it('preserves the purchased entitlement and consumed appointments while saving configuration', async () => {
     vi.useFakeTimers(); vi.setSystemTime('2030-01-01');
     const { db } = memoryFirestore({ [`businesses/${businessIdForOwner(user.uid)}`]: paidDraft() });

@@ -34,6 +34,7 @@ describe('onboarding editable examples', () => {
   beforeEach(() => { state.business = structuredClone(business); state.draft = undefined; state.send.mockReset(); vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockResolvedValue({ business }); });
   afterEach(async () => { await act(async () => renderer?.unmount()); });
   async function mount() { await act(async () => { renderer = create(createElement(OnboardingPage)); }); }
+  function questionsAndInstructions() { return ['Preguntas para reservar', 'Indicaciones del negocio'].map(label => renderer.root.findByProps({ 'aria-label': label }).props.value as string); }
   it('health owner can configure manually without mounting AI or free intake', async () => {
     state.health = true; await mount(); expect(state.chatMount).not.toHaveBeenCalled();
     expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
@@ -51,9 +52,88 @@ describe('onboarding editable examples', () => {
     expect(payload.name).toBe('Propuesta nueva'); expect(payload.intakeFields).toEqual(draft.intakeFields);
   });
 
+  it('edits optional public service details locally and includes them only in an explicit save', async () => {
+    state.business!.services = [{ ...business.services[0], description: 'Descripción publicada', category: 'Cortes' } as Business['services'][number]];
+    await mount();
+    const description = () => renderer.root.findByProps({ 'aria-label': 'Descripción del servicio 1' });
+    const category = () => renderer.root.findByProps({ 'aria-label': 'Categoría del servicio 1' });
+    expect(description().props.value).toBe('Descripción publicada');
+    expect(category().props.value).toBe('Cortes');
+    expect(description().props).toMatchObject({ maxLength: 300 });
+    expect(category().props).toMatchObject({ maxLength: 60 });
+    expect(description().props.required).not.toBe(true);
+    expect(category().props.required).not.toBe(true);
+    for (const field of [description(), category()]) {
+      const help = renderer.root.findByProps({ id: field.props['aria-describedby'] });
+      expect(help.children.join('')).toBe('Visible para tus clientes');
+    }
+    await act(async () => description().props.onChange({ target: { value: 'Lavado y peinado; incluye <texto literal>.' } }));
+    await act(async () => category().props.onChange({ target: { value: 'Cuidado del cabello' } }));
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Datos de tu negocio' }).props.onSubmit({ preventDefault() {} }));
+    const payload = JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body));
+    expect(payload.services).toEqual([{ ...business.services[0], description: 'Lavado y peinado; incluye <texto literal>.', category: 'Cuidado del cabello' }]);
+  });
+
+  it('allows the owner to clear service metadata while keeping the service bookable', async () => {
+    state.business!.services = [{ ...business.services[0], description: 'Descripción publicada', category: 'Cortes' } as Business['services'][number]];
+    await mount();
+    for (const label of ['Descripción del servicio 1', 'Categoría del servicio 1']) {
+      await act(async () => renderer.root.findByProps({ 'aria-label': label }).props.onChange({ target: { value: '' } }));
+    }
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Datos de tu negocio' }).props.onSubmit({ preventDefault() {} }));
+    const payload = JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body));
+    expect(payload.services).toEqual([{ ...business.services[0], description: '', category: '' }]);
+  });
+
+  it('keeps explicit metadata clears in the saved payload after applying an assistant proposal that omits them', async () => {
+    state.business!.services = [{ ...business.services[0], description: 'Descripción publicada', category: 'Cortes' }];
+    state.draft = businessConfigSchema.parse({ name: business.name, category: business.category, slug: business.slug, phoneWhatsApp: business.phoneWhatsApp, tone: 'Claro', customRules: '',
+      services: [{ ...business.services[0], name: 'Servicio renombrado' }], resources: business.resources, weeklySchedule: business.weeklySchedule, intakeFields: [] });
+    await mount();
+    for (const label of ['Descripción del servicio 1', 'Categoría del servicio 1']) {
+      await act(async () => renderer.root.findByProps({ 'aria-label': label }).props.onChange({ target: { value: '' } }));
+    }
+    await act(async () => renderer.root.findAllByType('button').find(button => button.children.join('') === 'Usar propuesta en el formulario')!.props.onClick());
+    expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Datos de tu negocio' }).props.onSubmit({ preventDefault() {} }));
+    const payload = JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body));
+    expect(payload.services).toEqual([{ ...business.services[0], name: 'Servicio renombrado', description: '', category: '' }]);
+  });
+
+  it('preserves stored service metadata by ID when an assistant proposal omits it', async () => {
+    state.business!.services = [{ ...business.services[0], description: 'Conserva la descripción', category: 'Cortes' } as Business['services'][number]];
+    state.draft = businessConfigSchema.parse({ name: business.name, category: business.category, slug: business.slug, phoneWhatsApp: business.phoneWhatsApp, tone: 'Claro', customRules: '',
+      services: [{ ...business.services[0], name: 'Servicio renombrado', price: 35000 }], resources: business.resources, weeklySchedule: business.weeklySchedule, intakeFields: [] });
+    await mount();
+    await act(async () => renderer.root.findAllByType('button').find(button => button.children.join('') === 'Usar propuesta en el formulario')!.props.onClick());
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Datos de tu negocio' }).props.onSubmit({ preventDefault() {} }));
+    const payload = JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body));
+    expect(payload.services).toEqual([{ ...business.services[0], name: 'Servicio renombrado', price: 35000, description: 'Conserva la descripción', category: 'Cortes' }]);
+  });
+
+  it('keeps local metadata edits when applying a proposal with reordered services and no metadata', async () => {
+    const otherService = { ...business.services[0], id: 'secondary', name: 'Servicio secundario', description: 'Segunda descripción', category: 'Otros' };
+    state.business!.services = [{ ...business.services[0], description: 'Primera descripción', category: 'Cortes' } as Business['services'][number], otherService];
+    state.draft = businessConfigSchema.parse({ name: business.name, category: business.category, slug: business.slug, phoneWhatsApp: business.phoneWhatsApp, tone: 'Claro', customRules: '',
+      services: [{ ...business.services[0], id: 'secondary', name: 'Segundo actualizado' }, { ...business.services[0], name: 'Primero actualizado' }], resources: business.resources, weeklySchedule: business.weeklySchedule, intakeFields: [] });
+    await mount();
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Descripción del servicio 1' }).props.onChange({ target: { value: 'Descripción local sin guardar' } }));
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Categoría del servicio 1' }).props.onChange({ target: { value: 'Edición local' } }));
+    await act(async () => renderer.root.findAllByType('button').find(button => button.children.join('') === 'Usar propuesta en el formulario')!.props.onClick());
+    expect(renderer.root.findByProps({ 'aria-label': 'Descripción del servicio 2' }).props.value).toBe('Descripción local sin guardar');
+    expect(renderer.root.findByProps({ 'aria-label': 'Categoría del servicio 2' }).props.value).toBe('Edición local');
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Datos de tu negocio' }).props.onSubmit({ preventDefault() {} }));
+    const payload = JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body));
+    expect(payload.services.map((service: { id: string; description: string; category: string }) => [service.id, service.description, service.category])).toEqual([
+      ['secondary', 'Segunda descripción', 'Otros'], ['principal', 'Descripción local sin guardar', 'Edición local'],
+    ]);
+    expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps existing questions and instructions on load without an automatic save', async () => {
     await mount();
-    expect(renderer.root.findAllByType('textarea').map(input => input.props.value)).toEqual(['Pregunta propia', 'Indicaciones propias sin cambiar.']);
+    expect(questionsAndInstructions()).toEqual(['Pregunta propia', 'Indicaciones propias sin cambiar.']);
     expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
   });
   it('does_not_reset_dirty_form_after_logo_poll and saves socials only explicitly', async () => {
@@ -70,7 +150,7 @@ describe('onboarding editable examples', () => {
     await mount();
     await act(async () => renderer.root.findByProps({ 'aria-label': 'Añadir ejemplo: Primera visita' }).props.onClick());
     await act(async () => renderer.root.findByProps({ 'aria-label': 'Añadir ejemplo: Confirmar detalles' }).props.onClick());
-    expect(renderer.root.findAllByType('textarea').map(input => input.props.value)).toEqual([
+    expect(questionsAndInstructions()).toEqual([
       'Pregunta propia\n¿Es tu primera visita?',
       'Indicaciones propias sin cambiar.\nConfirma el servicio y el horario antes de reservar.',
     ]);
@@ -107,7 +187,7 @@ describe('onboarding editable examples', () => {
         await act(async () => group().findByType('select').props.onChange({ target: { value: choice } }));
       }
     }
-    const [questions, instructions] = renderer.root.findAllByType('textarea').map(input => input.props.value as string);
+    const [questions, instructions] = questionsAndInstructions();
     expect(questions.split('\n')[0]).toBe('Pregunta propia');
     expect(instructions.split('\n')[0]).toBe('Indicaciones propias sin cambiar.');
     for (const value of [questions, instructions]) {

@@ -7,7 +7,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { createAppointment, readAvailability } from '@/lib/server/bookings';
 import { bookingSchema, businessConfigSchema } from '@/lib/server/schemas';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
-import type { Appointment, Business, PaymentReceipt, PlatformSettings, ResponseAllowance } from '@/types/firestore';
+import type { Appointment, Business, PaymentReceipt, PlatformSettings, PublicBusinessProfile, ResponseAllowance } from '@/types/firestore';
 import type { ConsentScope, ConsentStatus } from '@/lib/legal';
 import { LOCAL_TEST_ACCOUNTS, LOCAL_SUPERADMIN_UID } from '../src/lib/firebase/emulator-constants.mjs';
 import { assertJourneyEnvironment, assertJourneyUrl, cleanupOwnedDocuments, createJourneyFixture, removeJourneyBank } from '../scripts/lib/local-journey.mjs';
@@ -175,6 +175,48 @@ describe.skipIf(process.env.SARIN_LOCAL_JOURNEY !== '1')('opt-in real local SaaS
       check(trialBilling.response.ok && trialBilling.body.allowance.currentPeriod?.includedResponses === 700 && trialBilling.body.allowance.currentPeriod.source === 'trial', 'La prueba no tiene su bolsa de 700 respuestas.');
       const repeated = await api<{ business: Business }>('/api/businesses', owner.token, 'POST', { ...config, name: 'Negocio sintético actualizado' });
       check(repeated.response.status === 201 && isDeepStrictEqual(repeated.body.business.subscription.paidTrial, business.subscription.paidTrial) && repeated.body.business.name === 'Negocio sintético actualizado', 'Guardar configuración reinició la prueba o no aplicó cambios.');
+      // Integration regressions added after the catalog implementation: exercise
+      // the real HTTP/auth/storage boundaries without changing later fixtures.
+      const legacyConfig = { ...config, name: repeated.body.business.name };
+      const catalogConfig = { ...legacyConfig, services: legacyConfig.services.map(service => ({
+        ...service, description: '  Consulta de prueba con orientacion inicial.  ', category: '  Consultas  ',
+      })) };
+      const catalogSaved = await api<{ business: Business }>('/api/businesses', owner.token, 'POST', catalogConfig);
+      check(catalogSaved.response.status === 201 && catalogSaved.body.business.services[0]?.description === 'Consulta de prueba con orientacion inicial.'
+        && catalogSaved.body.business.services[0]?.category === 'Consultas', 'El catalogo no guardo la descripcion y categoria sin espacios exteriores.');
+      const catalogOwned = await api<{ business: Business }>('/api/businesses', owner.token);
+      check(catalogOwned.response.ok && isDeepStrictEqual(catalogOwned.body.business.services, catalogSaved.body.business.services), 'La lectura del dueno perdio los metadatos del catalogo.');
+      const profilePath = `/api/public/businesses/${fixture.slug}?view=profile`;
+      const publicCatalog = await api<{ business: PublicBusinessProfile }>(profilePath);
+      check(publicCatalog.response.ok && publicCatalog.response.headers.get('cache-control') === 'no-store'
+        && publicCatalog.body.business.slug === fixture.slug && publicCatalog.body.business.bookingAvailable, 'El perfil anonimo del catalogo no esta disponible sin sesion o permite cache.');
+      check(Object.keys(publicCatalog.body.business).every(key => ['slug', 'name', 'category', 'phoneWhatsApp', 'timezone', 'logo', 'socialLinks', 'services', 'weeklySchedule', 'bookingAvailable'].includes(key)), 'El perfil anonimo expuso configuracion interna del negocio.');
+      check(isDeepStrictEqual(publicCatalog.body.business.services, [{
+        id: config.services[0].id, name: config.services[0].name, price: config.services[0].price, durationMinutes: config.services[0].durationMinutes,
+        description: 'Consulta de prueba con orientacion inicial.', category: 'Consultas',
+      }]), 'El perfil anonimo perdio metadatos del catalogo o expuso campos internos del servicio.');
+      const legacySaved = await api<{ business: Business }>('/api/businesses', owner.token, 'POST', legacyConfig);
+      const publicAfterLegacy = await api<{ business: PublicBusinessProfile }>(profilePath);
+      check(legacySaved.response.status === 201 && isDeepStrictEqual(legacySaved.body.business.services, catalogSaved.body.business.services)
+        && publicAfterLegacy.response.ok && isDeepStrictEqual(publicAfterLegacy.body.business.services, publicCatalog.body.business.services), 'Un cliente antiguo sin campos de catalogo borro los metadatos existentes.');
+      for (const oversized of [{ description: 'd'.repeat(301) }, { category: 'c'.repeat(61) }]) {
+        const invalid = { ...legacyConfig, services: legacyConfig.services.map(service => ({ ...service, ...oversized })) };
+        check((await api('/api/businesses', owner.token, 'POST', invalid)).response.status === 400, 'El catalogo acepto una descripcion de 301 o categoria de 61 caracteres.');
+      }
+      check((await api('/api/businesses', undefined, 'POST', catalogConfig)).response.status === 401, 'El catalogo admitio escritura sin sesion.');
+      const catalogAfterRejected = await api<{ business: Business }>('/api/businesses', owner.token);
+      check(catalogAfterRejected.response.ok && isDeepStrictEqual(catalogAfterRejected.body.business.services, catalogSaved.body.business.services), 'Una escritura rechazada altero los metadatos del catalogo.');
+      const clearedCatalog = await api<{ business: Business }>('/api/businesses', owner.token, 'POST', {
+        ...legacyConfig, services: legacyConfig.services.map(service => ({ ...service, description: '', category: '' })),
+      });
+      const publicAfterClear = await api<{ business: PublicBusinessProfile }>(profilePath);
+      check(clearedCatalog.response.status === 201 && clearedCatalog.body.business.services.every(service => service.description === '' && service.category === '')
+        && publicAfterClear.response.ok && publicAfterClear.body.business.services.every(service => !('description' in service) && !('category' in service)), 'Vaciar los campos no retiro los metadatos del negocio y del perfil publico.');
+      const catalogRestored = await api<{ business: Business }>('/api/businesses', owner.token, 'POST', legacyConfig);
+      check(catalogRestored.response.status === 201 && isDeepStrictEqual(catalogRestored.body.business.services, config.services.map(service => ({ ...service, description: '', category: '' })))
+        && isDeepStrictEqual(catalogRestored.body.business.subscription.paidTrial, business.subscription.paidTrial), 'El ensayo del catalogo no restauro los servicios o altero la prueba pagada antes de reservar.');
+      console.log('Catalogo HTTP OK: trim, perfil anonimo minimo, compatibilidad, limites, autorizacion y borrado explicito.');
+
       const collision = await api('/api/businesses', outsider.token, 'POST', config);
       check(collision.response.status === 402, 'Un segundo dueño sin pago pudo configurar un negocio.');
       const projection = await firestoreRead(`publicBusinesses/${fixture.slug}`, client.token);

@@ -45,14 +45,14 @@ describe('business reads without browser database access', () => {
       subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 4102444800000 },
       sarinConfig: { onboardingCompleted: true, tone: 'private-tone', customRules: 'private-rules', intakeFields: [{ key: 'private-question', label: 'Private intake', required: true }] },
       resources: [{ id: 'private-resource', name: 'Private station', active: true }],
-      services: [{ id: 'haircut', name: 'Corte', price: 25000, durationMinutes: 30, bufferMinutes: 15, resourceIds: ['private-resource'], internalNote: 'private-service-note' }],
+      services: [{ id: 'haircut', name: 'Corte', price: 25000, durationMinutes: 30, description: 'Incluye lavado.', category: 'Cortes', bufferMinutes: 15, resourceIds: ['private-resource'], internalNote: 'private-service-note' }],
       weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '17:00', internalNote: 'private-hours-note' }] } },
     });
     const response = await publicGet(new Request('https://public.invalid/api/public/businesses/shop?view=profile'), { params: Promise.resolve({ slug: 'shop' }) });
     const data = await response.json();
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(data.business).toEqual({ slug: 'shop', name: 'Barbería de prueba', category: 'Barbería', phoneWhatsApp: '+573000000000', timezone: 'America/Bogota', services: [{ id: 'haircut', name: 'Corte', price: 25000, durationMinutes: 30 }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] } }, bookingAvailable: true });
+    expect(data.business).toEqual({ slug: 'shop', name: 'Barbería de prueba', category: 'Barbería', phoneWhatsApp: '+573000000000', timezone: 'America/Bogota', services: [{ id: 'haircut', name: 'Corte', price: 25000, durationMinutes: 30, description: 'Incluye lavado.', category: 'Cortes' }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] } }, bookingAvailable: true });
     expect(JSON.stringify(data)).not.toMatch(/private-|subscription|sarinConfig|resources|bufferMinutes|internalNote/);
   });
   it('keeps a paused business profile visible without exposing payment or trial information', async () => {

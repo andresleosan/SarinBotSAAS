@@ -3,6 +3,7 @@ import { isDateKey, isTimeString } from '@/lib/sarin/availability';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/billing-plans';
 import { businessSocialLinksSchema } from '@/lib/business-branding';
 import { bookingSubjectCaseSchema, bookingBeneficiarySchema } from '@/lib/booking-subject';
+import { SERVICE_CATEGORY_MAX_LENGTH, SERVICE_DESCRIPTION_MAX_LENGTH } from '@/lib/service-catalog';
 
 export const documentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 export const requestIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,128}$/);
@@ -30,6 +31,8 @@ export const businessConfigSchema = z.object({
   resources: z.array(z.object({ id: documentIdSchema, name: shortText, active: z.boolean().default(true) }).strict()).min(1).max(30),
   services: z.array(z.object({
     id: documentIdSchema, name: shortText,
+    description: z.string().trim().max(SERVICE_DESCRIPTION_MAX_LENGTH).optional(),
+    category: z.string().trim().max(SERVICE_CATEGORY_MAX_LENGTH).optional(),
     durationMinutes: z.number().int().min(5).max(720), bufferMinutes: z.number().int().min(0).max(180),
     price: z.number().finite().min(0).max(100000000), resourceIds: z.array(documentIdSchema).min(1).max(30),
   }).strict()).min(1).max(60),

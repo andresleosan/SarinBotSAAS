@@ -10,6 +10,7 @@ import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { normalizeBusinessSocialLinks, type BusinessSocialLink } from '@/lib/business-branding';
 import { assertConsent } from './consent';
 import { assertBookingIntakePolicy } from './booking-data-policy';
+import { preserveServiceCatalogMetadata, serviceCatalogMetadata } from '@/lib/service-catalog';
 
 export const businessIdForOwner = (uid: string) => `b_${createHash('sha256').update(uid).digest('hex').slice(0, 32)}`;
 export const stableDocumentId = (...parts: string[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
@@ -54,7 +55,7 @@ export function publicBusinessProfile(business: Business): PublicBusinessProfile
     phoneWhatsApp: projection.phoneWhatsApp, timezone: projection.timezone,
     ...(projection.logo ? { logo: projection.logo } : {}),
     ...(projection.socialLinks ? { socialLinks: projection.socialLinks } : {}),
-    services: projection.services.map(({ id, name, price, durationMinutes }) => ({ id, name, price, durationMinutes })),
+    services: projection.services.map(service => ({ id: service.id, name: service.name, price: service.price, durationMinutes: service.durationMinutes, ...serviceCatalogMetadata(service) })),
     weeklySchedule,
     bookingAvailable: isSubscriptionAllowed(projection) && projection.sarinConfig.onboardingCompleted
       && Object.values(weeklySchedule).some(day => day.isOpen && day.intervals.length > 0)
@@ -96,7 +97,7 @@ export async function createBusiness(user: ChatActor, config: BusinessConfig, db
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa un plan para configurar tu negocio.', 'PAYMENT_REQUIRED');
     if (business.slug && business.slug !== config.slug) throw new HttpError(409, 'El enlace del negocio es permanente para conservar tu código QR.');
     if (!business.slug && slug.exists) throw new HttpError(409, 'Este enlace ya está ocupado. Escoge otro slug.');
-    const updated: Business = { ...business, slug: config.slug, name: config.name, category: config.category, phoneWhatsApp: config.phoneWhatsApp, ...(config.socialLinks !== undefined ? { socialLinks: normalizeBusinessSocialLinks(config.socialLinks) } : {}), sarinConfig: { onboardingCompleted: true, tone: config.tone, customRules: config.customRules, intakeFields: config.intakeFields }, resources: config.resources, services: config.services, weeklySchedule: config.weeklySchedule };
+    const updated: Business = { ...business, slug: config.slug, name: config.name, category: config.category, phoneWhatsApp: config.phoneWhatsApp, ...(config.socialLinks !== undefined ? { socialLinks: normalizeBusinessSocialLinks(config.socialLinks) } : {}), sarinConfig: { onboardingCompleted: true, tone: config.tone, customRules: config.customRules, intakeFields: config.intakeFields }, resources: config.resources, services: preserveServiceCatalogMetadata(config.services, business.services), weeklySchedule: config.weeklySchedule };
     if (!business.slug) transaction.create(slugReference, { businessId: id, ownerUid: user.uid });
     transaction.set(reference, updated);
     transaction.set(db.collection('publicBusinesses').doc(config.slug), publicBusiness(updated));

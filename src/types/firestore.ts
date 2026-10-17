@@ -58,6 +58,8 @@ export interface TenantResource {
 export interface TenantService {
   id: string;
   name: string;
+  description?: string;
+  category?: string;
   durationMinutes: number;
   bufferMinutes: number;
   price: number;
@@ -130,7 +132,7 @@ export interface PublicBusinessProfile {
   timezone: 'America/Bogota';
   logo?: BusinessLogo;
   socialLinks?: BusinessSocialLink[];
-  services: Pick<TenantService, 'id' | 'name' | 'price' | 'durationMinutes'>[];
+  services: Pick<TenantService, 'id' | 'name' | 'price' | 'durationMinutes' | 'description' | 'category'>[];
   weeklySchedule: Business['weeklySchedule'];
   bookingAvailable: boolean;
 }

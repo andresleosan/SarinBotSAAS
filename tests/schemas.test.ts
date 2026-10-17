@@ -10,6 +10,16 @@ describe('untrusted inputs', () => {
     for (const quotedPriceCOP of [0, -1, 1.5, 100000001, '65000', NaN, null]) expect(receiptSchema.safeParse({ ...receiptInput, quotedPriceCOP }).success).toBe(false);
   });
   it('accepts a complete onboarding config', () => expect(businessConfigSchema.safeParse(config).success).toBe(true));
+  it('accepts optional public service texts, trims them and permits explicit clearing', () => {
+    const parseService = (metadata: Record<string, unknown>) => businessConfigSchema.parse({ ...config, services: [{ ...config.services[0], ...metadata }] }).services[0];
+    expect(parseService({ description: '  Incluye lavado y peinado.  ', category: '  Cortes  ' })).toMatchObject({ description: 'Incluye lavado y peinado.', category: 'Cortes' });
+    expect(parseService({ description: ' '.repeat(3), category: '' })).toMatchObject({ description: '', category: '' });
+    expect(parseService({ description: 'a'.repeat(300), category: 'b'.repeat(60) })).toMatchObject({ description: 'a'.repeat(300), category: 'b'.repeat(60) });
+    expect(parseService({})).not.toHaveProperty('description');
+  });
+  it.each([{ description: 'a'.repeat(301) }, { category: 'b'.repeat(61) }, { description: null }, { category: ['Cortes'] }, { description: { html: 'untrusted' } }])('rejects invalid service texts %j', metadata => {
+    expect(businessConfigSchema.safeParse({ ...config, services: [{ ...config.services[0], ...metadata }] }).success).toBe(false);
+  });
   it('rejects overlapping work intervals', () => expect(businessConfigSchema.safeParse({ ...config, weeklySchedule: { ...schedule, 1: { isOpen: true, intervals: [{ start: '09:00', end: '12:00' }, { start: '11:00', end: '15:00' }] } } }).success).toBe(false));
   it('rejects references to an unknown booking resource', () => expect(businessConfigSchema.safeParse({ ...config, services: [{ ...config.services[0], resourceIds: ['other'] }] }).success).toBe(false));
   it('rejects client-supplied tenants and system messages', () => {
