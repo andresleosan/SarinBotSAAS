@@ -1,14 +1,14 @@
 # Estado de implementación — 2026-10-17
 
-## Volver a reservar desde el historial — aprobado localmente
+## Volver a reservar desde el historial — publicado
 
 - [x] Alcance acotado aceptado: recuperar solo el servicio vigente, consultar precio actual y elegir un horario nuevo con confirmación explícita. [Recorrido](docs/design/2026-10-17-rebook-from-history.md).
 - [x] Añadir acción en Historial, validación de catálogo e identidad y caso nuevo sin copiar datos históricos; conservar permisos y recuperación.
 - [x] Cerrar revisión independiente tras corregir guard StrictMode con dos regresiones RED/GREEN. 1.026 pruebas aprobadas/26 omitidas, tipos y audit limpios; CUA con 32 controles en 320/390/1280, sin propuestas/citas automáticas. Diez documentos propios limpiados. [Evidencia](docs/qa/2026-10-17-rebook-from-history.md).
 - [x] Congelar `0b3bf05`, construir imagen Linux `d75c6c8e…` y pasar humo aislado sin red/credenciales. Fuente auditada: 657 archivos idénticos. Reversión compatible a `2440af5`/`3c8e555d…`, sin migraciones; paquete privado preparado.
-- [ ] Publicar únicamente después de la autorización específica de esta versión.
+- [x] Publicar tras autorización específica: imagen `d75c6c8e…`, Worker `f0695392…`, Containers v14; instancia conectada única y cero antiguas. Cuatro colas default/engine/engine/default vacías, HTTP/bundles/iconos correctos y autenticación administrativa reverificada. Acción/flujo visibles en producción: sí/no; recorrido completo acreditado con 32 controles locales, sin inferir UI desde el bundle. Sin aceptar consentimientos ni crear o alterar datos reales. [Cierre y reversión](docs/qa/2026-10-17-rebook-from-history.md).
 
-Rama `codex/rebook-from-history-20261017`, worktree existente del catálogo; producción y checkout original conservados durante la preparación.
+Rama `codex/rebook-from-history-20261017`, worktree existente del catálogo. Runtime publicado `0b3bf0558b48ded61f9869374bee75c80d29d22a`; checkout original conservado y documentación posterior separada del artefacto congelado.
 
 ## Entrada por servicio y disponibilidad vacía — publicado
 
