@@ -6,7 +6,7 @@ Documento preparado el 16 de octubre de 2026. Complementa la [revisión de datos
 
 Proponer una incorporación por invitación y revisión humana para los primeros negocios. Registrar una persona de contacto, verificar el correo Google destinatario y acompañar una primera reserva. El código regala diez citas y 700 respuestas; no vence la capacidad por días. La caducidad del código sin canjear es otra cosa.
 
-El propietario necesita también salud o reservas de menores y pidió elegir casos reales. Se definieron adulto que reserva para sí, adulto representante que reserva un corte infantil y padre/madre/representante que agenda pediatría. El [diseño específico](../superpowers/specs/2026-10-16-health-and-represented-booking-design.md) separa reservante y beneficiario, incorpora autorización correspondiente y propone un formulario sin IA para salud/menores. **Está diseñado, todavía no implementado.** El control de preguntas empresariales no clasifica infaliblemente datos sensibles ni verifica edad o parentesco. No reinterpretar la autorización general existente para cubrir estos supuestos.
+El propietario necesita también salud o reservas de menores y pidió elegir casos reales. Se definieron adulto que reserva para sí, adulto representante que reserva un corte infantil y padre/madre/representante que agenda pediatría. Aprobó el [diseño específico](../superpowers/specs/2026-10-16-health-and-represented-booking-design.md), el [plan](../superpowers/plans/2026-10-16-health-and-represented-booking.md) y su ejecución directa. **Las tareas 1–8 están implementadas y aceptadas técnicamente de forma local**, con tres hallazgos importantes corregidos y dos mejoras menores diferidas. Runtime `6315379`; 887 pruebas aprobadas/26 omitidas, Firestore 24/24, navegador e imagen Linux verificados. Ver [evidencia y pendientes](../qa/2026-10-16-health-and-represented-booking.md). No está publicado. El control de preguntas empresariales no clasifica infaliblemente datos sensibles ni verifica edad o parentesco. No reinterpretar la autorización general existente para cubrir estos supuestos.
 
 Para cada negocio, guardar una ficha privada fuera de Git, vinculada a su ID:
 
@@ -23,6 +23,17 @@ Para cada negocio, guardar una ficha privada fuera de Git, vinculada a su ID:
 La agenda se trata por instrucciones del negocio; ALS gestiona además cuenta, acceso, pagos y seguridad para sus propias finalidades. Esta separación debe reflejar el acuerdo real. La autorización del dueño no equivale a la de sus clientes. [Ley 1581, definiciones y deber de informar](https://www.cancilleria.gov.co/normograma/compilacion/docs/ley_1581_2012.htm).
 
 La ficha y el acompañamiento son un procedimiento propuesto. El producto actual muestra nombre y teléfono del negocio en la autorización, pero todavía no dispone de un formulario ni de una compuerta para verificar toda esta ficha. No afirmar que la mera existencia de una invitación acredita esa revisión.
+
+Para incorporar salud o menores con la nueva versión, el procedimiento debe incluir además:
+
+1. Revisar actividad y servicios y configurar la política privada del negocio desde superadministración. Ausencia de política significa capacidad nueva no habilitada, no negocio revisado. Un negocio de salud debe clasificarse antes de usar Sarin; no esperar a que el chat lo deduzca.
+2. Retirar preguntas libres de reserva antes de activar salud o menores. El servidor rechaza activación o reintroducción incompatibles. La configuración manual del negocio sigue disponible sin asistente de IA en salud.
+3. Verificar el aviso con identidad/contacto del establecimiento y explicar las decisiones adicionales por caso. El adulto conserva la gestión; el menor no recibe cuenta ni acceso familiar por coincidencia de nombre o teléfono.
+4. Acordar quién atiende dudas de representación y cómo solicita la información mínima necesaria. La declaración de padre/madre o representante no verifica por sí misma legitimación. La marca «revisada» registra actuación humana; «necesita contacto» no cancela automáticamente la cita ni sustituye el procedimiento del prestador.
+5. Explicar que la reserva es agenda, no historia clínica ni consentimiento informado médico. No cargar síntomas, diagnósticos, documentos o imágenes clínicas en campos, chat o fixtures de pruebas.
+6. Mantener el canal de derechos, constancias y retiradas. No pedir una nueva aceptación para consultar/cancelar citas ya guardadas ni para recuperar una confirmación existente. No reactivar permisos desde recibos históricos.
+
+Estas acciones son preparación operativa para una versión técnicamente aceptada de forma local y pendiente de preparación operativa para datos reales. No se han ejecutado incorporaciones reales de salud/menores mediante este trabajo ni se han completado acuerdos por el hecho de implementar la pantalla.
 
 ## Conservación: propuesta para decidir, antes de prometer borrado
 

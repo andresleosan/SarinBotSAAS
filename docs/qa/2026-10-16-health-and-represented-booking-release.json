@@ -1,0 +1,83 @@
+{
+  "status": "local-only-not-deployed",
+  "sourceRevision": "6315379b8c0482af57fea20abd8e2e1af0c00ff1",
+  "runtimeRevision": "6315379b8c0482af57fea20abd8e2e1af0c00ff1",
+  "image": {
+    "tag": "sarin-bot:health-6315379",
+    "id": "sha256:d890c075238e3c5e0d8cdc10a6037625dba2b243a61143b583f54e40d62f8d25",
+    "platform": "linux/amd64",
+    "sizeBytes": 79947538,
+    "ociRevision": "6315379b8c0482af57fea20abd8e2e1af0c00ff1",
+    "sourceArchiveSha256": "d3aeb8ed66e124a07fd5633c5d1a216e7521a0114eefbf7c47e41d2b48bb6a3b",
+    "verifiedAt": "2026-10-17T04:22:59.602Z",
+    "linuxSmoke": {
+      "ok": true,
+      "platform": "linux",
+      "sharp": {
+        "format": "webp",
+        "width": 512,
+        "height": 512,
+        "channels": 3,
+        "premultiplied": false,
+        "hasAlpha": false,
+        "size": 550
+      },
+      "statuses": {
+        "/terminos": 200,
+        "/privacidad": 200,
+        "/ayuda": 200,
+        "/api/session": 401,
+        "/api/consent?scope=account": 401,
+        "/api/booking-subject-consent": 401,
+        "/api/admin/booking-data-policy?businessId=demo-business": 401,
+        "/api/businesses/demo-business/booking-policy": 401,
+        "/api/businesses/demo-business/availability": 401,
+        "/api/businesses/demo-business/booking-proposals": 401
+      },
+      "publicDocuments": 200,
+      "canonicalPreauthorization": 200,
+      "foreignOrigin": 403,
+      "uncheckedDecision": 400,
+      "network": "none",
+      "readOnly": true,
+      "externalCredentials": false
+    }
+  },
+  "checks": {
+    "applicationPassed": 887,
+    "applicationSkipped": 26,
+    "applicationFilesPassed": 112,
+    "applicationFilesSkipped": 4,
+    "firestoreAndRulesPassed": 24,
+    "workerPassed": 74,
+    "gatewayPassed": 25,
+    "typecheck": true,
+    "applicationBuild": true,
+    "workerDryRun": true,
+    "dependencyAudit": "no-known-vulnerabilities",
+    "review": "three-important-fixed-with-red-green;two-minor-deferred",
+    "browserAdultHistoryCancel": true,
+    "browserMinorHaircut": true,
+    "browserPediatrics": true,
+    "browserWithdrawalAndCancel": true,
+    "browserOwnerReview": true,
+    "browserOwnerManualSave": true,
+    "browser390": true,
+    "browser320": true,
+    "independentEmulatorReadback": true
+  },
+  "healthAndRepresentedBooking": {
+    "designApproved": true,
+    "planApproved": true,
+    "implemented": true,
+    "localAcceptance": true,
+    "legalOperationalReadiness": false
+  },
+  "aiBudgetLimitsAccepted": true,
+  "aiBudgetGateActivated": false,
+  "productionAuthorizationReceived": false,
+  "productionDeploymentExecuted": false,
+  "paidAiCallsThisIncrement": 0,
+  "marketplaceEnabled": false,
+  "whatsappEnabled": false
+}

@@ -1,8 +1,8 @@
 # Diseño de citas de salud y reservas con representación
 
-Fecha: 16 de octubre de 2026. **Diseño local para revisión, no implementado ni publicado.** No acredita cumplimiento jurídico, parentesco, habilitación sanitaria ni condiciones contractuales de proveedores. No modifica producción ni autoriza borrar datos. Complementa la [revisión legal](../../product/2026-10-16-legal-consent-review.md) y la [propuesta de operación](../../product/2026-10-16-pilot-operation.md).
+Fecha: 16 de octubre de 2026. **Diseño aprobado e implementado localmente; aceptación técnica completada, sin publicación.** No acredita cumplimiento jurídico, parentesco, habilitación sanitaria ni condiciones contractuales de proveedores. No modifica producción ni autoriza borrar datos. Complementa la [revisión legal](../../product/2026-10-16-legal-consent-review.md) y la [propuesta de operación](../../product/2026-10-16-pilot-operation.md).
 
-**Seguimiento:** el propietario aprobó expresamente este diseño y solicitó preparar el [plan de implementación](../plans/2026-10-16-health-and-represented-booking.md). El plan está preparado para revisar, conservando la ejecución directa ya elegida; no se ha iniciado la implementación de este flujo.
+**Seguimiento:** el propietario aprobó expresamente este diseño y solicitó preparar el [plan de implementación](../plans/2026-10-16-health-and-represented-booking.md). El propietario aprobó el plan y su ejecución directa. Runtime `6315379`, verificado según la [aceptación local](../../qa/2026-10-16-health-and-represented-booking.md); no habilita por sí solo datos reales.
 
 ## Propósito, decisión recibida y límites
 

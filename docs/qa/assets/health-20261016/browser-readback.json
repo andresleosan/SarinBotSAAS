@@ -1,0 +1,41 @@
+{
+  "ok": true,
+  "project": "demo-sarin-bot",
+  "synthetic": true,
+  "counts": [
+    {
+      "slug": "demo-corte-adulto",
+      "appointments": 2,
+      "trialUsed": 2,
+      "states": [
+        "cancelled_by_client",
+        "confirmed"
+      ],
+      "clientUidPreserved": true
+    },
+    {
+      "slug": "demo-corte-menor",
+      "appointments": 1,
+      "trialUsed": 1,
+      "states": [
+        "confirmed"
+      ],
+      "clientUidPreserved": true
+    },
+    {
+      "slug": "demo-pediatria",
+      "appointments": 1,
+      "trialUsed": 1,
+      "states": [
+        "cancelled_by_client"
+      ],
+      "clientUidPreserved": true
+    }
+  ],
+  "paidCalls": 0,
+  "responseQuotaTurns": 0,
+  "pediatricWithdrawalRevision": 2,
+  "ownerReviewRevision": 2,
+  "manualConfigurationSaved": true,
+  "checkedAt": "2026-10-17T04:21:12.711Z"
+}
