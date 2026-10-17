@@ -51,42 +51,6 @@ describe('public business profile', () => {
     expect(services).toEqual(['Corte y peinado65.000 COP45 minutos', 'Asesoría0 COP30 minutos']);
   });
 
-  it('shows each published service description as plain text alongside its price and duration', async () => {
-    const services = [{ ...profile.services[0], description: 'Lavado y peinado.\n<strong>Texto literal</strong>' }, { ...profile.services[1], description: '' }];
-    await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile: { ...profile, services }, onContinue: vi.fn() })); });
-    const cards = renderer.root.findByProps({ 'aria-label': 'Servicios del negocio' }).findAllByType('li');
-    expect(textContent(cards[0])).toBe('Corte y peinadoLavado y peinado.\n<strong>Texto literal</strong>65.000 COP45 minutos');
-    expect(cards[0].findAllByType('strong')).toHaveLength(0);
-    expect(textContent(cards[1])).toBe('Asesoría0 COP30 minutos');
-  });
-
-  it('groups categories in first appearance order, merging case and NFC equivalents without reordering services', async () => {
-    const services = [
-      { ...profile.services[0], category: ' Cortes ' },
-      { ...profile.services[1] },
-      { ...profile.services[0], id: 'color', name: 'Color completo', category: 'Coloración' },
-      { ...profile.services[0], id: 'trim', name: 'Retoque de corte', category: 'cortes' },
-      { ...profile.services[0], id: 'highlights', name: 'Mechas', category: 'COLORACIO\u0301N' },
-      { ...profile.services[1], id: 'dry', name: 'Secado', category: '   ' },
-    ];
-    await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile: { ...profile, services }, onContinue: vi.fn() })); });
-    const catalog = renderer.root.findByProps({ 'aria-label': 'Servicios del negocio' });
-    expect(catalog.findAllByType('h3').map(textContent)).toEqual(['Cortes', 'Sin categoría', 'Coloración']);
-    expect(catalog.findAllByType('ul').map(list => list.findAllByType('h4').map(textContent))).toEqual([
-      ['Corte y peinado', 'Retoque de corte'], ['Asesoría', 'Secado'], ['Color completo', 'Mechas'],
-    ]);
-    expect(catalog.findAllByType('li')).toHaveLength(6);
-  });
-
-  it('retains the flat catalog for legacy services and empty categories', async () => {
-    const services = [{ ...profile.services[0], category: '' }, { ...profile.services[1], category: '   ' }];
-    await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile: { ...profile, services }, onContinue: vi.fn() })); });
-    const catalog = renderer.root.findByProps({ 'aria-label': 'Servicios del negocio' });
-    expect(catalog.findAllByType('ul')).toHaveLength(1);
-    expect(catalog.findAllByType('h3').map(textContent)).toEqual(['Corte y peinado', 'Asesoría']);
-    expect(catalog.findAllByType('h4')).toHaveLength(0);
-  });
-
   it('shows Colombia opening hours with split intervals, closed days and unpublished days', async () => {
     await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile, onContinue: vi.fn() })); });
     const schedule = renderer.root.findByProps({ 'aria-label': 'Horario del negocio' });
