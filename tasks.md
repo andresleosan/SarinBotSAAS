@@ -1,12 +1,12 @@
 # Estado de implementación — 2026-10-17
 
-## Perfil público antes del acceso — aprobado localmente
+## Perfil público antes del acceso — publicado
 
 - [x] Continuar la investigación de Fresha contra las fuentes reales publicadas y registrar la elección del propietario: perfil del negocio antes de Google. [Hallazgos](docs/qa/2026-10-17-fresha-services-and-team.md).
 - [x] Mostrar identidad, servicios con precio/duración, horario Colombia y contacto público desde el enlace/QR actual; contrato mínimo `view=profile`, sin migraciones ni datos de clientes.
 - [x] Conservar acceso y consentimientos vigentes al pulsar Reservar; mantener Mis citas cuando las nuevas reservas están en pausa. Volver al negocio, salida de sesión, cambio de slug y reintento verificados.
 - [x] Seguridad y revisión independiente sin bloqueantes; 904 pruebas aprobadas/26 omitidas, tipos y build correctos; 117 comprobaciones del recorrido local con emuladores. Navegador limpio en 320/390/1280 px. [Evidencia](docs/qa/2026-10-17-public-business-profile.md).
-- [ ] Publicar esta ficha en producción tras confirmación específica del propietario; preservar la configuración, datos, presupuesto y favicon ya publicados.
+- [x] Publicar tras autorización específica del propietario: imagen `0ce3ac0a…`, Worker `bd604e53…`, Containers v9; cola drenada, una instancia y cero antiguas. Perfil/API públicos y navegador real correctos; configuración, trece secretos, presupuesto y favicon conservados. [Publicación y reversión](docs/qa/2026-10-17-public-business-profile.md).
 
 Se trabaja en `codex/public-business-profile-20261017`, basado en el piloto `9e21f6d`, en `F:/Proyectos/SarinBot-worktrees/public-business-profile`. El checkout mixto original se conserva sin sustituir sus fuentes.
 
