@@ -20,11 +20,13 @@ import { BusinessPublicProfile } from '@/components/business-public-profile';
 import type { BookingCapability } from '@/lib/booking-subject';
 import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
 
-function GeneralBookingChat({ business, uid, permitted, now, onConfirmed }: { business: PublicBusiness; uid: string; permitted: boolean; now: number; onConfirmed: () => void }) {
+function GeneralBookingChat({ business, uid, permitted, now, onConfirmed, onLockedChange }: { business: PublicBusiness; uid: string; permitted: boolean; now: number; onConfirmed: () => void; onLockedChange: (locked: boolean) => void }) {
   const [input, setInput] = useState(''), end = useRef<HTMLDivElement>(null), engine = useEngineHealth();
   const chat = useDebouncedChat({ mode: 'sarin_client', tenantId: business.id, actorUid: uid, enabled: permitted, onToolExecuted: name => { if (name === 'cita_confirmada') onConfirmed(); } });
+  const locked = chat.isWaitingBatch || chat.isGenerating || chat.confirming || chat.confirmationUncertain;
+  useEffect(() => { onLockedChange(locked); return () => onLockedChange(false); }, [locked, onLockedChange]);
   useEffect(() => { void end.current?.scrollIntoView({ behavior: 'auto', block: 'nearest' }); }, [chat.messages, chat.isGenerating]);
-  const allowed = isSubscriptionAllowed(business, now), available = allowed && !chat.quotaExhausted, canSend = permitted && available && !chat.confirming;
+  const allowed = isSubscriptionAllowed(business, now), available = allowed && !chat.quotaExhausted, canSend = permitted && available && !chat.confirming && !chat.confirmationUncertain;
   function submit(event: FormEvent) { event.preventDefault(); if (!canSend || !input.trim()) return; chat.sendMessage(input); setInput(''); }
   return <section aria-label="Asistente de reservas" className="space-y-4">
     {!available && <Notice>La atención de IA está temporalmente en pausa. Puedes consultar y cancelar tus citas o contactar directamente al establecimiento.</Notice>}
@@ -33,8 +35,9 @@ function GeneralBookingChat({ business, uid, permitted, now, onConfirmed }: { bu
     <div aria-live="polite" className="space-y-4">
       {chat.messages.map(message => <div key={message.id} className={`whitespace-pre-wrap break-words rounded-2xl p-4 text-sm leading-relaxed ${message.role === 'user' ? 'ml-8 bg-sarin-blue text-white' : 'mr-5 border border-sarin-line bg-sarin-canvas text-sarin-ink'}`}>{message.content}</div>)}
       {(chat.isWaitingBatch || chat.isGenerating) && <p role="status" className="text-xs text-sarin-blue">{chat.isGenerating ? 'Sarin está revisando tu solicitud…' : 'Preparando tu mensaje…'}</p>}
-      {chat.error && <div className="space-y-3">{!chat.quotaExhausted && <Notice error={!chat.requestAlreadyCompleted}>{chat.error}</Notice>}{!chat.requestAlreadyCompleted && <button className="min-h-11 text-sm text-sarin-blue underline" onClick={chat.retry} disabled={chat.isGenerating || !permitted || !(allowed || getBusinessAccess(business, now) === 'trial_exhausted')}>{chat.quotaExhausted ? 'Comprobar disponibilidad' : 'Reintentar mensaje'}</button>}</div>}
-      {permitted && chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming || chat.isGenerating || chat.isWaitingBatch} onConfirm={chat.confirmProposal} />}
+      {chat.error && <div className="space-y-3">{!chat.quotaExhausted && <Notice error={!chat.requestAlreadyCompleted}>{chat.error}</Notice>}{!chat.requestAlreadyCompleted && !chat.confirmationUncertain && <button className="min-h-11 text-sm text-sarin-blue underline" onClick={chat.retry} disabled={chat.isGenerating || !permitted || !(allowed || getBusinessAccess(business, now) === 'trial_exhausted')}>{chat.quotaExhausted ? 'Comprobar disponibilidad' : 'Reintentar mensaje'}</button>}</div>}
+      {chat.confirmationUncertain && !chat.confirming && <Notice>Falta comprobar tu cita. Recupera la confirmación con los datos que enviaste antes de cambiar de recorrido.</Notice>}
+      {(permitted || chat.confirmationUncertain) && chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming || chat.isGenerating || chat.isWaitingBatch} recovering={chat.confirmationUncertain && !chat.confirming} onConfirm={chat.confirmProposal} />}
       <div ref={end} />
     </div>
     <form onSubmit={submit} className="sticky bottom-0 flex min-w-0 gap-2 border-t border-sarin-line bg-sarin-canvas py-3">
@@ -44,13 +47,18 @@ function GeneralBookingChat({ business, uid, permitted, now, onConfirmed }: { bu
   </section>;
 }
 function BookingJourney({ business, capability, uid, permitted, policyReady, now, onConfirmed }: { business: PublicBusiness; capability: BookingCapability; uid: string; permitted: boolean; policyReady: boolean; now: number; onConfirmed: () => void }) {
-  const [represented, setRepresented] = useState(false), [locked, setLocked] = useState(false), structuredStarted = useRef(capability.dataMode === 'health');
-  if (capability.dataMode === 'health' || represented) structuredStarted.current = true;
-  const restricted = structuredStarted.current || represented, enabled = permitted && policyReady && (!represented || capability.representedMinorsEnabled);
+  const [represented, setRepresented] = useState(false), [locked, setLocked] = useState(false), [mode, setMode] = useState<'calendar' | 'chat'>('calendar'), structuredStarted = useRef(capability.dataMode === 'health');
+  const keepChat = mode === 'chat' && locked;
+  const structured = !keepChat && (capability.dataMode === 'health' || represented || mode === 'calendar');
+  if (capability.dataMode === 'health' || represented || (structured && permitted && policyReady)) structuredStarted.current = true;
+  useEffect(() => { if (!locked && (capability.dataMode === 'health' || represented)) setMode('calendar'); }, [capability.dataMode, represented, locked]);
+  const enabled = permitted && policyReady && (!represented || capability.representedMinorsEnabled), switchLocked = locked || !policyReady || !permitted;
+  function selectMode(next: 'calendar' | 'chat') { if (!switchLocked && capability.dataMode === 'general' && !represented) setMode(next); }
   return <div className="space-y-5">
-    {capability.dataMode === 'general' && capability.representedMinorsEnabled && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Para quién reservas?</legend><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm" aria-pressed={!represented} disabled={locked || !policyReady} onClick={() => { structuredStarted.current = false; setRepresented(false); }}>Para mí</button><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm" aria-pressed={represented} disabled={locked || !policyReady} onClick={() => setRepresented(true)}>Para un menor a quien represento</button></fieldset>}
+    {capability.dataMode === 'general' && capability.representedMinorsEnabled && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Para quién reservas?</legend><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" aria-pressed={!represented} disabled={switchLocked} onClick={() => { if (!switchLocked) { setMode('calendar'); setRepresented(false); } }}>Para mí</button><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" aria-pressed={represented} disabled={switchLocked} onClick={() => { if (!switchLocked) setRepresented(true); }}>Para un menor a quien represento</button></fieldset>}
+    {capability.dataMode === 'general' && !represented && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Cómo prefieres reservar?</legend>{([['calendar', 'Reservar con calendario'], ['chat', 'Hablar con Sarin']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} disabled={switchLocked} onClick={() => selectMode(value)} className={`min-h-11 max-w-full rounded-lg border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue disabled:opacity-50 ${mode === value ? 'border-sarin-blue bg-sarin-soft text-sarin-blue' : 'border-sarin-line'}`}>{label}</button>)}</fieldset>}
     {!enabled && <Notice>Revisa los permisos y las opciones del negocio antes de comenzar una nueva reserva. Puedes recuperar una confirmación pendiente y consultar Mis citas.</Notice>}
-    {restricted ? <StructuredBooking business={business} capability={capability} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} /> : policyReady && <GeneralBookingChat business={business} uid={uid} permitted={permitted} now={now} onConfirmed={onConfirmed} />}
+    {structured ? (structuredStarted.current && <StructuredBooking business={business} capability={capability} initialSubjectKind={represented ? 'represented_minor' : 'self'} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} />) : <GeneralBookingChat business={business} uid={uid} permitted={enabled && capability.dataMode === 'general' && !represented} now={now} onConfirmed={onConfirmed} onLockedChange={setLocked} />}
   </div>;
 }
 function Island({ slug }: { slug: string }) {

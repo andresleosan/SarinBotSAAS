@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch, errorMessage } from "@/lib/client/api";
+import { apiFetch, ApiError, errorMessage } from "@/lib/client/api";
 import type { ChatMessage, ChatToolResult, ChatResponse } from "@/types/chat";
 
 interface ChatParams {
@@ -18,6 +18,7 @@ interface Batch {
   stateVersion?: number;
 }
 type Turn = { role: "user" | "assistant"; content: string };
+type ConfirmationOperation = { proposalId: string; body: string; uncertain: boolean };
 
 // Keep the full conversation on screen while respecting the model API's
 // per-turn and context limits. More messages always become a later turn.
@@ -54,7 +55,9 @@ export function useDebouncedChat({
   const [configurationDraft, setConfigurationDraft] = useState<ChatResponse['configurationDraft']>();
   const [proposal, setProposal] = useState<ChatResponse['proposal']>();
   const [confirming, setConfirming] = useState(false);
+  const [confirmationUncertain, setConfirmationUncertain] = useState(false);
   const confirmation = useRef<AbortController | null>(null);
+  const confirmationOperation = useRef<ConfirmationOperation | null>(null);
   const stateVersion = useRef<number | undefined>(undefined);
   const pending = useRef<string[]>([]);
   const failed = useRef<Batch | null>(null);
@@ -72,9 +75,13 @@ export function useDebouncedChat({
     if (enabled) return;
     generation.current++;
     controller.current?.abort(); confirmation.current?.abort(); confirmation.current = null;
+    const operation = confirmationOperation.current;
+    if (operation) operation.uncertain = true;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null; pending.current = []; failed.current = null; busy.current = false; ready.current = false;
-    setIsWaitingBatch(false); setIsGenerating(false); setConfirming(false); setProposal(undefined); setConfigurationDraft(undefined);
+    setIsWaitingBatch(false); setIsGenerating(false); setConfirming(false); setConfirmationUncertain(Boolean(operation));
+    if (!operation) setProposal(undefined);
+    setConfigurationDraft(undefined);
   }, [enabled]);
 
   useEffect(() => {
@@ -83,7 +90,7 @@ export function useDebouncedChat({
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     setConfigurationDraft(undefined);
-    setProposal(undefined); setConfirming(false); confirmation.current?.abort(); confirmation.current = null;
+    setProposal(undefined); setConfirming(false); setConfirmationUncertain(false); confirmation.current?.abort(); confirmation.current = null; confirmationOperation.current = null;
     stateVersion.current = undefined;
     pending.current = [];
     failed.current = null;
@@ -103,7 +110,7 @@ export function useDebouncedChat({
   }, [mode, tenantId, actorUid]);
 
   const flush = useCallback(async () => {
-    if (!operational.current || busy.current || !tenantId) return;
+    if (!operational.current || busy.current || confirmationOperation.current || !tenantId) return;
     const batch = failed.current ?? takeBatch(pending.current);
     if (!batch) return;
     if (!failed.current) batch.stateVersion = stateVersion.current;
@@ -170,7 +177,7 @@ export function useDebouncedChat({
   const sendMessage = useCallback(
     (text: string) => {
       const content = text.trim();
-      if (!operational.current || !content || !tenantId || confirmation.current || errorCode === "AI_QUOTA_EXHAUSTED") return;
+      if (!operational.current || !content || !tenantId || confirmationOperation.current || errorCode === "AI_QUOTA_EXHAUSTED") return;
       if (errorCode === "REQUEST_ALREADY_COMPLETED") {
         setError(null);
         setErrorCode(null);
@@ -201,19 +208,31 @@ export function useDebouncedChat({
     if (operational.current && !busy.current && failed.current) void flushRef.current();
   }, []);
   const confirmProposal = useCallback(async (proposalId: string, contact: Pick<import('@/lib/server/schemas').BookingInput, 'clientPhone' | 'intakeAnswers'>) => {
-    if (!operational.current || confirmation.current || busy.current || pending.current.length || proposal?.id !== proposalId || proposal.businessId !== tenantId) return;
+    const previous = confirmationOperation.current;
+    if ((!operational.current && !previous) || confirmation.current || busy.current || pending.current.length || proposal?.id !== proposalId || proposal.businessId !== tenantId) return;
+    if (previous && previous.proposalId !== proposalId) return;
+    const operation = previous ?? { proposalId, body: JSON.stringify({ confirm: true, clientPhone: contact.clientPhone, intakeAnswers: contact.intakeAnswers }), uncertain: false };
+    confirmationOperation.current = operation;
     const abort = confirmation.current = new AbortController(), current = generation.current;
-    setConfirming(true); setError(null);
+    setConfirming(true); setConfirmationUncertain(true); setError(null);
     try {
-      const result = await apiFetch<{ appointment: import('@/types/firestore').Appointment }>(`/api/businesses/${encodeURIComponent(tenantId)}/booking-proposals/${encodeURIComponent(proposalId)}/confirm`, { method: 'POST', signal: abort.signal, body: JSON.stringify({ confirm: true, clientPhone: contact.clientPhone, intakeAnswers: contact.intakeAnswers }) });
+      const result = await apiFetch<{ appointment: import('@/types/firestore').Appointment }>(`/api/businesses/${encodeURIComponent(tenantId)}/booking-proposals/${encodeURIComponent(proposalId)}/confirm`, { method: 'POST', signal: abort.signal, body: operation.body }, actorUid || undefined);
       if (generation.current !== current || abort.signal.aborted) return;
       const appointment = result.appointment;
-      if (appointment.tenantId !== tenantId || (actorUid && appointment.client?.uid !== actorUid)) throw new Error('No se pudo validar la cita recibida.');
+      if (!appointment?.id || appointment.tenantId !== tenantId || (actorUid && appointment.client?.uid !== actorUid)) throw new Error('No se pudo validar la cita recibida.');
+      confirmationOperation.current = null; setConfirmationUncertain(false);
       setProposal(currentProposal => currentProposal?.id === proposalId ? undefined : currentProposal);
       setMessages(previous => [...previous, { id: crypto.randomUUID(), role: 'assistant', content: `${appointment.status === 'confirmed' ? 'Tu cita está confirmada.' : 'Esta cita ya fue atendida o cancelada. Revisa su estado en Mis citas.'}\n${appointment.serviceName} · ${appointment.dateKey} ${appointment.startTimeStr}–${appointment.endTimeStr} (Colombia).`, timestamp: Date.now() }]);
       callback.current?.('cita_confirmada', { appointment });
-    } catch (cause) { if (generation.current === current && !abort.signal.aborted) setError(errorMessage(cause)); }
+    } catch (cause) {
+      if (generation.current === current && !abort.signal.aborted) {
+        setError(errorMessage(cause));
+        const definitive = cause instanceof ApiError && [400, 401, 402, 403, 404, 409, 413, 415, 422, 428, 429].includes(cause.status);
+        if (!operation.uncertain && definitive) { confirmationOperation.current = null; setConfirmationUncertain(false); }
+        else operation.uncertain = true;
+      }
+    }
     finally { if (generation.current === current && !abort.signal.aborted) setConfirming(false); if (confirmation.current === abort) confirmation.current = null; }
   }, [proposal, tenantId, actorUid]);
-  return { messages, sendMessage, isWaitingBatch, isGenerating, error, retry, configurationDraft, proposal, confirming, confirmProposal, quotaExhausted: errorCode === "AI_QUOTA_EXHAUSTED", requestAlreadyCompleted: errorCode === "REQUEST_ALREADY_COMPLETED" };
+  return { messages, sendMessage, isWaitingBatch, isGenerating, error, retry, configurationDraft, proposal, confirming, confirmationUncertain, confirmProposal, quotaExhausted: errorCode === "AI_QUOTA_EXHAUSTED", requestAlreadyCompleted: errorCode === "REQUEST_ALREADY_COMPLETED" };
 }

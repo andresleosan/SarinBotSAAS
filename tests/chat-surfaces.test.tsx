@@ -7,23 +7,26 @@ import DashboardPage from "@/app/dashboard/page";
 vi.mock('@/components/client-policy-controls', () => ({ ClientPolicyControls: () => null }));
 import { apiFetch } from "@/lib/client/api";
 import type { Business } from "@/types/firestore";
+import type { ChatResponse } from '@/types/chat';
 
 const state = vi.hoisted(() => ({
   user: { uid: "fixture-client", displayName: "Fixture" },
   accountConsent: true, businessConsent: true,
-  policyReady: true, policyKnown: true, minors: true, dataMode: 'general' as 'general' | 'health', chatMount: vi.fn(), structuredMount: vi.fn(), structuredUnmount: vi.fn(),
+  policyReady: true, policyKnown: true, minors: true, dataMode: 'general' as 'general' | 'health', chatMount: vi.fn(), engineMount: vi.fn(), structuredMount: vi.fn(), structuredUnmount: vi.fn(),
+  structuredProps: null as { onLockedChange: (locked: boolean) => void; initialSubjectKind?: string } | null,
   send: vi.fn(), retry: vi.fn(),
+  proposal: undefined as ChatResponse['proposal'], confirmProposal: vi.fn(async () => {}),
   business: null as Business | null,
   publicSubscription: { status: "active", currentPeriodEndsAt: 2200000000000 } as Business["subscription"],
-  chat: { messages: [], isWaitingBatch: false, isGenerating: false, error: null as string | null, quotaExhausted: false, requestAlreadyCompleted: false },
+  chat: { messages: [], isWaitingBatch: false, isGenerating: false, confirming: false, confirmationUncertain: false, error: null as string | null, quotaExhausted: false, requestAlreadyCompleted: false },
 }));
-vi.mock("@/hooks/useDebouncedChat", () => ({ useDebouncedChat: () => { state.chatMount(); return { ...state.chat, sendMessage: state.send, retry: state.retry }; } }));
+vi.mock("@/hooks/useDebouncedChat", () => ({ useDebouncedChat: () => { state.chatMount(); return { ...state.chat, proposal: state.proposal, confirmProposal: state.confirmProposal, sendMessage: state.send, retry: state.retry }; } }));
 vi.mock('@/hooks/useBookingDataPolicy', () => ({ useBookingDataPolicy: () => ({ ready: state.policyReady, loading: !state.policyReady, error: !state.policyReady && state.policyKnown ? 'Error temporal' : null, refresh: vi.fn(), capability: state.policyKnown ? { configured: true, revision: 1, dataMode: state.dataMode, representedMinorsEnabled: state.minors } : null }) }));
-vi.mock('@/components/structured-booking', () => ({ StructuredBooking: ({ enabled }: { enabled: boolean }) => { useEffect(() => { state.structuredMount(); return () => { state.structuredUnmount(); }; }, []); return createElement('div', { 'data-enabled': enabled }, 'Reserva sin IA'); } }));
+vi.mock('@/components/structured-booking', () => ({ StructuredBooking: (props: { enabled: boolean; initialSubjectKind?: string; onLockedChange: (locked: boolean) => void }) => { state.structuredProps = props; useEffect(() => { state.structuredMount(); return () => { state.structuredUnmount(); }; }, []); return createElement('div', { 'data-enabled': props.enabled, 'data-kind': props.initialSubjectKind }, 'Reserva sin IA'); } }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: state.accountConsent }), ConsentPanel: () => null }));
 vi.mock('@/hooks/useConsent', () => ({ useConsent: () => ({ active: state.businessConsent }) }));
 vi.mock("@/hooks/useBusiness", () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null }) }));
-vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => ({ health: { status: "online" }, checking: false, refresh: vi.fn() }) }));
+vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => { state.engineMount(); return { health: { status: "online" }, checking: false, refresh: vi.fn() }; } }));
 vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user, signOut: vi.fn() }) }));
 vi.mock("@/components/app-shell", () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, buttonClass: "button", fieldClass: "field" }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: vi.fn(), errorMessage: (error: Error) => error.message }));
@@ -33,16 +36,71 @@ const text = (node: ReactTestInstance | string): string => typeof node === "stri
 
 describe("chat pause surfaces", () => {
   let renderer: ReactTestRenderer;
-  beforeEach(() => { state.policyReady = true; state.policyKnown = true; state.minors = true; state.dataMode = 'general'; state.chatMount.mockClear(); state.structuredMount.mockClear(); state.structuredUnmount.mockClear(); });
-  beforeEach(() => { state.accountConsent = true; state.businessConsent = true; state.chat = { messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false }; state.send.mockReset(); state.retry.mockReset(); state.publicSubscription = { status: "active", trialEndsAt: 0, currentPeriodEndsAt: 2200000000000 }; state.business = { id: "fixture-business", name: "Negocio", slug: "negocio", subscription: state.publicSubscription, category: "Servicios", phoneWhatsApp: "", resources: [], services: [], sarinConfig: { onboardingCompleted: true, tone: "Claro", customRules: "", intakeFields: [] }, weeklySchedule: {} } as unknown as Business; vi.mocked(apiFetch).mockReset();
+  beforeEach(() => { state.user = { uid: 'fixture-client', displayName: 'Fixture' }; state.proposal = undefined; state.confirmProposal.mockClear(); state.policyReady = true; state.policyKnown = true; state.minors = true; state.dataMode = 'general'; state.chatMount.mockClear(); state.engineMount.mockClear(); state.structuredMount.mockClear(); state.structuredUnmount.mockClear(); state.structuredProps = null; });
+  beforeEach(() => { state.accountConsent = true; state.businessConsent = true; state.chat = { messages: [], isWaitingBatch: false, isGenerating: false, confirming: false, confirmationUncertain: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false }; state.send.mockReset(); state.retry.mockReset(); state.publicSubscription = { status: "active", trialEndsAt: 0, currentPeriodEndsAt: 2200000000000 }; state.business = { id: "fixture-business", name: "Negocio", slug: "negocio", subscription: state.publicSubscription, category: "Servicios", phoneWhatsApp: "", resources: [], services: [], sarinConfig: { onboardingCompleted: true, tone: "Claro", customRules: "", intakeFields: [] }, weeklySchedule: {} } as unknown as Business; vi.mocked(apiFetch).mockReset();
     vi.mocked(apiFetch).mockImplementation(async (path, init) => init?.method ? {} : { appointments: [{ id: "appointment", tenantId: "fixture-business", serviceName: "Cita conservada", type: "appointment", status: "confirmed", dateKey: new URL(path, "https://example.invalid").searchParams.get("date") ?? "2039-01-01", startAt: 2177485200000, endAt: 2177487000000, startTimeStr: "09:00", endTimeStr: "09:30", client: { uid: state.user.uid, name: "Fixture", email: "fixture@example.invalid", intakeAnswers: {} } }] });
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ business: { id: "fixture-business", name: "Negocio sintetico", phoneWhatsApp: "", services: [], subscription: state.publicSubscription } })));
   });
   afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); });
+  const modeButton = (label: string) => renderer.root.findAllByType('button').find(button => text(button) === label);
+  async function chooseChat() { const button = modeButton('Hablar con Sarin'); expect(button).toBeDefined(); await act(async () => button!.props.onClick()); }
+  it.each([false, true])('starts with the self calendar without chat or engine calls when minors=%s', async minors => {
+    state.minors = minors;
+    await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
+    expect(renderer.root.findAllByProps({ 'data-kind': 'self', 'data-enabled': true })).toHaveLength(1);
+    expect(modeButton('Reservar con calendario')?.props['aria-pressed']).toBe(true);
+    expect(modeButton('Hablar con Sarin')?.props['aria-pressed']).toBe(false);
+    expect(state.chatMount).not.toHaveBeenCalled(); expect(state.engineMount).not.toHaveBeenCalled();
+    expect(text(renderer.root)).toContain('Cita conservada');
+  });
+  it('offers chat explicitly and allows returning to the self calendar', async () => {
+    await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
+    await chooseChat(); expect(state.chatMount).toHaveBeenCalled();
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(1);
+    await act(async () => modeButton('Reservar con calendario')!.props.onClick());
+    expect(renderer.root.findAllByProps({ 'data-kind': 'self' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
+  });
+  it.each(['isWaitingBatch', 'isGenerating', 'confirming', 'confirmationUncertain'] as const)('locks route and subject changes while chat %s', async flag => {
+    const params = Promise.resolve({ slug: 'fixture' }); const view = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
+    await act(async () => { renderer = create(view()); }); await chooseChat();
+    state.chat[flag] = true; await act(async () => renderer.update(view()));
+    expect(modeButton('Reservar con calendario')?.props.disabled).toBe(true);
+    expect(modeButton('Para un menor a quien represento')?.props.disabled).toBe(true);
+    if (flag === 'confirmationUncertain') expect(renderer.root.findByProps({ 'aria-label': 'Mensaje para Sarin' }).props.disabled).toBe(true);
+  });
+  it('preserves the calendar controller and locks route changes while confirmation needs recovery', async () => {
+    const params = Promise.resolve({ slug: 'fixture' }); const view = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
+    await act(async () => { renderer = create(view()); });
+    expect(state.structuredProps?.initialSubjectKind).toBe('self');
+    await act(async () => state.structuredProps!.onLockedChange(true));
+    expect(modeButton('Hablar con Sarin')?.props.disabled).toBe(true);
+    state.businessConsent = false; await act(async () => renderer.update(view()));
+    expect(state.structuredUnmount).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByProps({ 'data-kind': 'self', 'data-enabled': false })).toHaveLength(1);
+  });
+  it('selects a represented case explicitly and returns to the self calendar', async () => {
+    await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
+    await act(async () => modeButton('Para un menor a quien represento')!.props.onClick());
+    expect(renderer.root.findAllByProps({ 'data-kind': 'represented_minor' })).toHaveLength(1);
+    expect(modeButton('Hablar con Sarin')).toBeUndefined();
+    await act(async () => modeButton('Para mí')!.props.onClick());
+    expect(renderer.root.findAllByProps({ 'data-kind': 'self' })).toHaveLength(1);
+  });
+  it('keeps calendar unavailable before consent and never mounts chat for health', async () => {
+    state.businessConsent = false;
+    const params = Promise.resolve({ slug: 'fixture' }); const view = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
+    await act(async () => { renderer = create(view()); });
+    expect(modeButton('Hablar con Sarin')?.props.disabled).toBe(true);
+    expect(state.structuredMount).not.toHaveBeenCalled(); expect(state.chatMount).not.toHaveBeenCalled();
+    state.dataMode = 'health'; await act(async () => renderer.update(view()));
+    expect(modeButton('Hablar con Sarin')).toBeUndefined(); expect(state.chatMount).not.toHaveBeenCalled();
+  });
   it('keeps appointments and cancellation visible while new chat and booking contact require consent', async () => {
     state.businessConsent = false;
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
-    expect(renderer.root.findByProps({ 'aria-label': 'Mensaje para Sarin' }).props.disabled).toBe(true);
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
+    expect(modeButton('Hablar con Sarin')?.props.disabled).toBe(true);
     expect(text(renderer.root)).toContain('Cita conservada');
     state.businessConsent = true;
   });
@@ -66,10 +124,33 @@ describe("chat pause surfaces", () => {
     }
     expect(state.structuredMount).toHaveBeenCalledTimes(1); expect(state.chatMount).not.toHaveBeenCalled();
   });
+  it.each(['consent', 'policy', 'health'])('keeps the original chat recovery mounted after %s changes', async change => {
+    const params = Promise.resolve({ slug: 'fixture' });
+    const render = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
+    await act(async () => { renderer = create(render()); }); await chooseChat();
+    state.proposal = { id: 'pending', businessId: 'fixture-business', serviceName: 'Corte', resourceName: 'Uno', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, expiresAt: 2200000000000, intakeFields: [] };
+    state.chat.confirmationUncertain = true;
+    await act(async () => renderer.update(render()));
+    state.structuredMount.mockClear();
+    if (change === 'consent') state.businessConsent = false;
+    if (change === 'policy') state.policyReady = false;
+    if (change === 'health') state.dataMode = 'health';
+    await act(async () => renderer.update(render()));
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Asistente de reservas' })).toHaveLength(1);
+    expect(renderer.root.findByProps({ 'aria-label': 'Mensaje para Sarin' }).props.disabled).toBe(true);
+    expect(renderer.root.findByProps({ 'aria-label': 'Teléfono para la cita' }).props.disabled).toBe(true);
+    const recovery = renderer.root.findAllByType('button').find(node => text(node) === 'Recuperar confirmación')!;
+    expect(recovery.props.disabled).toBe(false);
+    expect(state.structuredMount).not.toHaveBeenCalled();
+    state.chat.confirmationUncertain = false; state.proposal = undefined;
+    await act(async () => renderer.update(render()));
+    if (change === 'health') expect(state.structuredMount).toHaveBeenCalledTimes(1);
+  });
   it('does not return a browser scrolling promise as an effect cleanup', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) })), { createNodeMock: element => element.type === 'div' ? { scrollIntoView: () => Promise.resolve() } : null }); });
+      await chooseChat();
       expect(errors.mock.calls.some(call => String(call[0]).includes('useEffect must not return'))).toBe(false);
     } finally { errors.mockRestore(); }
   });
@@ -88,6 +169,7 @@ describe("chat pause surfaces", () => {
     state.chat.quotaExhausted = true;
     const params = Promise.resolve({ slug: "fixture" });
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }))); });
+    await chooseChat();
     const input = renderer.root.findAllByType("input").find((node) => node.props["aria-label"] === "Mensaje para Sarin")!;
     expect(input.props.disabled).toBe(true);
     expect(text(renderer.root)).toContain("Cita conservada");
@@ -115,6 +197,7 @@ describe("chat pause surfaces", () => {
   it("pauses new public messages after ten introductory appointments while preserving the confirmed appointment", async () => {
     state.publicSubscription = { status: "trial", trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: "intro", activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 10 } };
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: "fixture" }) }))); });
+    await chooseChat();
     expect(renderer.root.findByProps({ "aria-label": "Mensaje para Sarin" }).props.disabled).toBe(true);
     expect(text(renderer.root)).toContain("Cita conservada");
     expect(text(renderer.root)).not.toContain("Elige un plan");
@@ -125,6 +208,7 @@ describe("chat pause surfaces", () => {
     state.publicSubscription = { status: "trial", trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: "intro", activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 10 } };
     state.chat.error = "Conexión interrumpida";
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: "fixture" }) }))); });
+    await chooseChat();
     const retry = renderer.root.findAllByType("button").find(node => text(node) === "Reintentar mensaje")!;
     expect(retry.props.disabled).toBe(false);
     expect(renderer.root.findByProps({ "aria-label": "Mensaje para Sarin" }).props.disabled).toBe(true);

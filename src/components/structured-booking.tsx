@@ -9,17 +9,18 @@ import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { BookingSubjectConsent } from './booking-subject-consent';
 import { BookingProposal } from './booking-proposal';
 import { buttonClass, fieldClass, Notice } from './app-shell';
-export function StructuredBooking({ business, capability, enabled = true, onConfirmed, onLockedChange }: { business: PublicBusiness; capability: BookingCapability; enabled?: boolean; onConfirmed: (appointment: Appointment) => void; onLockedChange?: (locked: boolean) => void }) {
+export function StructuredBooking({ business, capability, enabled = true, initialSubjectKind, onConfirmed, onLockedChange }: { business: PublicBusiness; capability: BookingCapability; enabled?: boolean; initialSubjectKind?: BookingSubjectKind; onConfirmed: (appointment: Appointment) => void; onLockedChange?: (locked: boolean) => void }) {
   const { user } = useAuth();
-  return user ? <SubjectSelector key={`${user.uid}:${business.id}`} uid={user.uid} business={business} capability={capability} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={onLockedChange} /> : null;
+  return user ? <SubjectSelector key={`${user.uid}:${business.id}:${initialSubjectKind ?? 'default'}`} uid={user.uid} business={business} capability={capability} enabled={enabled} initialSubjectKind={initialSubjectKind} onConfirmed={onConfirmed} onLockedChange={onLockedChange} /> : null;
 }
-function SubjectSelector({ uid, business, capability, enabled, onConfirmed, onLockedChange }: { uid: string; business: PublicBusiness; capability: BookingCapability; enabled: boolean; onConfirmed: (appointment: Appointment) => void; onLockedChange?: (locked: boolean) => void }) {
-  const [kind, setKind] = useState<BookingSubjectKind>(capability.dataMode === 'health' ? 'self' : 'represented_minor'), [role, setRole] = useState<RepresentativeRole>('parent'), [caseId, setCaseId] = useState(() => crypto.randomUUID());
+function SubjectSelector({ uid, business, capability, enabled, initialSubjectKind, onConfirmed, onLockedChange }: { uid: string; business: PublicBusiness; capability: BookingCapability; enabled: boolean; initialSubjectKind?: BookingSubjectKind; onConfirmed: (appointment: Appointment) => void; onLockedChange?: (locked: boolean) => void }) {
+  const [kind, setKind] = useState<BookingSubjectKind>(initialSubjectKind ?? (capability.dataMode === 'health' ? 'self' : 'represented_minor')), [role, setRole] = useState<RepresentativeRole>('parent'), [caseId, setCaseId] = useState(() => crypto.randomUUID());
   const [locked, setLocked] = useState(false);
   useEffect(() => { onLockedChange?.(locked); return () => onLockedChange?.(false); }, [locked, onLockedChange]);
   const subjectCase: BookingSubjectCase = kind === 'self' ? { bookingRequestId: caseId, subjectKind: kind } : { bookingRequestId: caseId, subjectKind: kind, representativeRole: role };
-  return <section aria-label="Reserva sin IA" className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
-    <div><h2 className="text-xl font-semibold">Reserva sin IA</h2><p className="mt-2 text-sm text-sarin-muted">Elige servicio y horario. No incluyas síntomas, diagnósticos ni documentos.</p></div>
+  const generalSelf = capability.dataMode === 'general' && kind === 'self', title = generalSelf ? 'Reserva con calendario' : 'Reserva sin IA';
+  return <section aria-label={title} className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
+    <div><h2 className="text-xl font-semibold">{title}</h2><p className="mt-2 text-sm text-sarin-muted">{generalSelf ? 'Elige el servicio, el profesional y el horario que prefieras.' : 'Elige servicio y horario. No incluyas síntomas, diagnósticos ni documentos.'}</p></div>
     {capability.dataMode === 'health' && capability.representedMinorsEnabled && <label className="block text-sm">¿Para quién reservas?<select aria-label="Destinatario de la reserva" className={fieldClass} value={kind} disabled={locked || !enabled} onChange={event => { setKind(event.target.value as BookingSubjectKind); setCaseId(crypto.randomUUID()); }}><option value="self">Para mí</option><option value="represented_minor">Para un menor a quien represento</option></select></label>}
     {kind === 'represented_minor' && <label className="block text-sm">Calidad del representante<select aria-label="Calidad del representante" className={fieldClass} value={role} disabled={locked || !enabled} onChange={event => { setRole(event.target.value as RepresentativeRole); setCaseId(crypto.randomUUID()); }}><option value="parent">Padre o madre</option><option value="legal_guardian">Representante legal</option></select></label>}
     {kind === 'represented_minor' && !capability.representedMinorsEnabled && <Notice>Este negocio no ha habilitado reservas para menores. Contacta directamente al establecimiento.</Notice>}
@@ -34,7 +35,7 @@ function CaseBooking({ uid, business, subjectCase, enabled, onConfirmed, onLocke
   const selected = booking.selection, represented = subjectCase.subjectKind === 'represented_minor', canBook = enabled && isSubscriptionAllowed(business), service = business.services.find(item => item.id === selected.serviceId);
   const beneficiary: BookingBeneficiary = represented ? { kind: 'represented_minor', displayName: name.trim(), representativeRole: subjectCase.representativeRole } : { kind: 'self' };
   return <div className="space-y-5">
-    <BookingSubjectConsent controller={subject} enabled={enabled} />
+    {(subject.loading || subject.error || subject.status?.required !== false) && <BookingSubjectConsent controller={subject} enabled={enabled} />}
     {booking.error && <Notice error>{booking.error}</Notice>}
     {booking.uncertain && <div className="space-y-2 rounded-xl border border-sarin-line p-4"><p className="text-sm">Falta comprobar la confirmación. Reintenta esta misma operación para recuperar lo que se guardó, incluso si retiraste el permiso.</p><button className={buttonClass} disabled={booking.busy} onClick={() => void booking.retryConfirmation()}>Recuperar confirmación</button></div>}
     {booking.appointment ? <Notice>Cita guardada. Consulta su estado y cancela si lo necesitas en Mis citas.</Notice> : enabled && subject.active && <>
@@ -49,7 +50,7 @@ function CaseBooking({ uid, business, subjectCase, enabled, onConfirmed, onLocke
         {!booking.proposal && <button className={buttonClass} disabled={booking.busy || !canBook || !selected.startTimeStr || !selected.resourceId || (represented && !name.trim())} onClick={() => void booking.propose(beneficiary)}>{booking.busy ? 'Preparando propuesta…' : 'Revisar propuesta'}</button>}
       </div>
     </>}
-    {booking.proposal && !booking.appointment && <BookingProposal proposal={booking.proposal} beneficiary={beneficiary} confirming={booking.busy} disabled={!enabled || !subject.active || booking.uncertain} onConfirm={booking.confirm} />}
+    {booking.proposal && !booking.appointment && <BookingProposal proposal={booking.proposal} beneficiary={beneficiary} confirming={booking.busy} recovering={booking.uncertain} disabled={!enabled || !subject.active || booking.uncertain} onConfirm={booking.confirm} />}
     <a className="inline-flex min-h-11 items-center text-sm text-sarin-blue underline" href={`tel:+${business.phoneWhatsApp.replace(/\D/g, '')}`}>Contactar directamente al negocio</a>
   </div>;
 }

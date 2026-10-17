@@ -2,10 +2,11 @@ import { act, createElement } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDebouncedChat } from "@/hooks/useDebouncedChat";
-import { apiFetch } from "@/lib/client/api";
+import { apiFetch, ApiError } from "@/lib/client/api";
 import type { ChatResponse } from "@/types/chat";
 
-vi.mock("@/lib/client/api", () => ({
+vi.mock("@/lib/client/api", async original => ({
+  ...await original<typeof import("@/lib/client/api")>(),
   apiFetch: vi.fn(),
   errorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error),
@@ -242,7 +243,91 @@ describe("debounced authenticated chat lifecycle", () => {
     expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[1][1]?.body))).toEqual({ confirm: true, clientPhone: '573001234567', intakeAnswers: {} });
     await act(async () => renderer?.update(createElement(Harness, { actorUid: 'another-client' })));
     await act(async () => confirmation.resolve({ appointment: { tenantId: 'business-1', client: { uid: 'client' }, status: 'confirmed', serviceName: 'Corte', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30' } }));
-    expect(chat.messages).toEqual([]); expect(chat.confirming).toBe(false);
+    expect(chat.messages).toEqual([]); expect(chat.confirming).toBe(false); expect(chat.confirmationUncertain).toBe(false);
+  });
+  it('locks an ambiguous confirmation until the same proposal recovers one saved appointment', async () => {
+    const proposal = { id: 'proposal-uncertain', businessId: 'business-1', serviceName: 'Corte', resourceName: 'Uno', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, expiresAt: Date.now() + 600000, intakeFields: [] };
+    const appointment = { id: 'saved-appointment', tenantId: 'business-1', client: { uid: 'client' }, status: 'confirmed', serviceName: 'Corte', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30' };
+    const confirmation = deferred<{ appointment: typeof appointment }>();
+    const recovered = deferred<{ appointment: typeof appointment }>();
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Revisa el resumen', proposal, stateVersion: 1 }).mockReturnValueOnce(confirmation.promise).mockReturnValueOnce(recovered.promise);
+    await mount(); act(() => chat.sendMessage('Prepara cita')); await advance();
+    expect(chat.confirmationUncertain).toBe(false);
+    await act(async () => { void chat.confirmProposal(proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }); });
+    expect(chat.confirming).toBe(true); expect(chat.confirmationUncertain).toBe(true);
+    await act(async () => confirmation.reject(new Error('Respuesta perdida después de enviar')));
+    expect(chat.confirming).toBe(false); expect(chat.confirmationUncertain).toBe(true);
+    expect(chat.proposal).toEqual(proposal);
+    const messages = chat.messages;
+    act(() => { chat.sendMessage('No reemplazar la propuesta incierta'); chat.retry(); }); await advance();
+    expect(chat.messages).toEqual(messages); expect(apiFetch).toHaveBeenCalledTimes(2);
+    await act(async () => chat.confirmProposal('another-proposal', { clientPhone: '573001234567', intakeAnswers: {} }));
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    await act(async () => { void chat.confirmProposal(proposal.id, { clientPhone: '573009876543', intakeAnswers: { changed: 'ignored during recovery' } }); });
+    expect(vi.mocked(apiFetch).mock.calls[2][0]).toBe('/api/businesses/business-1/booking-proposals/proposal-uncertain/confirm');
+    expect(vi.mocked(apiFetch).mock.calls[2][1]?.body).toBe(vi.mocked(apiFetch).mock.calls[1][1]?.body);
+    await act(async () => recovered.resolve({ appointment }));
+    expect(chat.confirming).toBe(false); expect(chat.confirmationUncertain).toBe(false);
+    expect(chat.proposal).toBeUndefined();
+    expect(chat.messages.filter(message => message.content.startsWith('Tu cita está confirmada.'))).toHaveLength(1);
+  });
+  it('unlocks a definitive first confirmation rejection without blocking a new turn', async () => {
+    const proposal = { id: 'proposal-rejected', businessId: 'business-1', serviceName: 'Corte', resourceName: 'Uno', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, expiresAt: Date.now() + 600000, intakeFields: [] };
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Revisa el resumen', proposal }).mockRejectedValueOnce(new ApiError('El catálogo cambió', 409, 'BOOKING_PROPOSAL_CHANGED')).mockResolvedValueOnce({ reply: 'Consulta otra fecha' });
+    await mount(); act(() => chat.sendMessage('Prepara cita')); await advance();
+    await act(async () => chat.confirmProposal(proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }));
+    expect(chat.confirmationUncertain).toBe(false); expect(chat.confirming).toBe(false);
+    expect(chat.error).toBe('El catálogo cambió');
+    act(() => chat.sendMessage('Otra fecha')); await advance();
+    expect(apiFetch).toHaveBeenCalledTimes(3); expect(chat.messages.at(-1)?.content).toBe('Consulta otra fecha');
+  });
+  it('keeps a server failure uncertain even if a later retry returns a definitive rejection', async () => {
+    const proposal = { id: 'proposal-server-error', businessId: 'business-1', serviceName: 'Corte', resourceName: 'Uno', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, expiresAt: Date.now() + 600000, intakeFields: [] };
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Revisa el resumen', proposal }).mockRejectedValueOnce(new ApiError('Servidor sin respuesta válida', 503)).mockRejectedValueOnce(new ApiError('Permiso retirado', 428, 'CONSENT_REQUIRED'));
+    await mount(); act(() => chat.sendMessage('Prepara cita')); await advance();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await act(async () => chat.confirmProposal(proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }));
+      expect(chat.confirmationUncertain).toBe(true); expect(chat.confirming).toBe(false);
+    }
+    expect(vi.mocked(apiFetch).mock.calls[2][0]).toBe(vi.mocked(apiFetch).mock.calls[1][0]);
+  });
+  it.each([{ actorUid: 'another-client' }, { tenantId: 'business-2' }])('clears ambiguous confirmation state when its privacy scope changes %j', async scope => {
+    const proposal = { id: 'proposal-reset', businessId: 'business-1', serviceName: 'Corte', resourceName: 'Uno', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, expiresAt: Date.now() + 600000, intakeFields: [] };
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Revisa el resumen', proposal }).mockRejectedValueOnce(new Error('Sin respuesta'));
+    await mount(); act(() => chat.sendMessage('Prepara cita')); await advance();
+    await act(async () => chat.confirmProposal(proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }));
+    expect(chat.confirmationUncertain).toBe(true);
+    await act(async () => renderer?.update(createElement(Harness, scope)));
+    expect(chat.confirmationUncertain).toBe(false); expect(chat.proposal).toBeUndefined(); expect(chat.confirming).toBe(false);
+  });
+  it.each([false, true])('retains only the original confirmation for recovery without new permissions, in-flight=%s', async inFlight => {
+    const proposal = { id: 'proposal-permission', businessId: 'business-1', serviceName: 'Corte', resourceName: 'Uno', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, expiresAt: Date.now() + 600000, intakeFields: [] };
+    const first = deferred<{ appointment: object }>();
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Revisa el resumen', proposal }).mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce({ appointment: { id: 'saved', tenantId: 'business-1', client: { uid: 'client' }, status: 'confirmed' } });
+    await mount(); act(() => chat.sendMessage('Prepara cita')); await advance();
+    await act(async () => { void chat.confirmProposal(proposal.id, { clientPhone: '573001234567', intakeAnswers: { style: 'original' } }); });
+    if (!inFlight) await act(async () => first.reject(new Error('Respuesta perdida')));
+    const signal = vi.mocked(apiFetch).mock.calls[1][1]?.signal;
+    await act(async () => renderer?.update(createElement(Harness, { enabled: false })));
+    if (inFlight) expect(signal?.aborted).toBe(true);
+    expect(chat.confirmationUncertain).toBe(true); expect(chat.confirming).toBe(false); expect(chat.proposal).toEqual(proposal);
+    act(() => { chat.sendMessage('No enviar'); chat.retry(); }); await advance();
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    await act(async () => chat.confirmProposal(proposal.id, { clientPhone: '573009876543', intakeAnswers: { style: 'changed' } }));
+    expect(vi.mocked(apiFetch).mock.calls[2][1]?.body).toBe(vi.mocked(apiFetch).mock.calls[1][1]?.body);
+    expect(vi.mocked(apiFetch).mock.calls[2][2]).toBe('client');
+    expect(chat.confirmationUncertain).toBe(false); expect(chat.proposal).toBeUndefined();
+    if (inFlight) await act(async () => first.resolve({ appointment: { id: 'late', tenantId: 'business-1', client: { uid: 'client' } } }));
+    expect(chat.messages.filter(message => message.content.startsWith('Tu cita está confirmada.'))).toHaveLength(1);
+  });
+  it('cannot begin a confirmation after permissions are withdrawn', async () => {
+    const proposal = { id: 'not-sent', businessId: 'business-1', intakeFields: [] };
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Revisa el resumen', proposal });
+    await mount(); act(() => chat.sendMessage('Prepara cita')); await advance();
+    await act(async () => renderer?.update(createElement(Harness, { enabled: false })));
+    await act(async () => chat.confirmProposal(proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }));
+    expect(apiFetch).toHaveBeenCalledTimes(1); expect(chat.proposal).toBeUndefined(); expect(chat.confirmationUncertain).toBe(false);
   });
   it('preserves a retry version and starts a fresh request after state conflict', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Elegido', stateVersion: 7 }).mockRejectedValueOnce(Object.assign(new Error('State changed'), { code: 'CHAT_STATE_CONFLICT' })).mockResolvedValueOnce({ reply: 'Actualizado', stateVersion: 9 });
