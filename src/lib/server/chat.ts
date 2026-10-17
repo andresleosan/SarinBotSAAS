@@ -21,6 +21,7 @@ import { assertOwner, getBusiness, getOwnedBusiness, stableDocumentId } from './
 import { readAppointments, readAvailability } from './bookings';
 import { chatSchema } from './schemas';
 import { createBookingProposal, recoverBookingProposal } from './booking-proposals';
+import { assertBusinessAllowsInference } from './booking-data-policy';
 
 interface CachedResponse { fingerprint: string; response: ChatResponse; reservation: ResponseQuotaReservation; expiresAt: number; }
 const responses = new WeakMap<ReturnType<typeof getAdminDb>, Map<string, CachedResponse>>();
@@ -38,9 +39,10 @@ function rememberResponse(db: ReturnType<typeof getAdminDb>, key: string, value:
 }
 // Read-only recovery for mutations saved by the previous published contract.
 // This path never creates another appointment and preserves its current status.
-async function recoverLegacyMutation(user: ChatActor, body: z.infer<typeof chatSchema>, business: Business): Promise<ChatResponse | null> {
+async function recoverLegacyMutation(user: ChatActor, body: z.infer<typeof chatSchema>, business: Business, confirmedOnly = false): Promise<ChatResponse | null> {
   if (body.mode === 'sarin_onboarding') return null;
   const recovered = await recoverBookingProposal(user, business.id, body.requestId);
+  if (confirmedOnly && recovered && !recovered.appointment) return null;
   if (recovered) return recovered.appointment ? { reply: `Cita: ${appointmentStatusLabel(recovered.appointment.status)}. Consulta los datos en Mis citas.`, toolResults: [{ name: 'cita_confirmada', result: { appointment: recovered.appointment } }] } : { reply: 'Revisa esta propuesta. La reserva requiere pulsar Confirmar cita.', proposal: recovered.proposal };
   const name = body.mode === 'sarin_owner_copilot' ? 'bloquear_horario' : 'crear_cita';
   const id = stableDocumentId(user.uid, stableDocumentId(body.requestId, name), name === 'crear_cita' ? 'appointment' : 'block');
@@ -59,28 +61,36 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
   if (channel === 'whatsapp' && !onResponse) throw new HttpError(503, 'La entrega de WhatsApp no está preparada.');
   let business = body.mode === 'sarin_onboarding' ? await getOwnedBusiness(user.uid) : await getBusiness(body.tenantId);
   if (!business) throw new HttpError(402, 'Activa tu acceso para continuar.', 'PAYMENT_REQUIRED');
-  const assertAccess = async () => {
+  const assertAccess = async (checkChannel = true) => {
     if (body.mode !== 'sarin_client') assertOwner(business!, user.uid);
     if (body.mode === 'sarin_client' && (!business!.sarinConfig.onboardingCompleted || !business!.slug)) throw new HttpError(403, 'El negocio todavía no está configurado.');
     if (body.mode === 'sarin_owner_copilot' && !isOwnerAiAllowed(business)) throw new HttpError(402, 'El copiloto requiere una suscripción vigente.', 'OWNER_AI_REQUIRES_SUBSCRIPTION');
     if (!isSubscriptionAllowed(business) && !(body.mode === 'sarin_client' && getBusinessAccess(business) === 'trial_exhausted')) throw new HttpError(402, 'Activa el acceso de pago para continuar.', 'PAYMENT_REQUIRED');
     if (body.mode === 'sarin_client' && (await readClientPolicy(business!.id, user.uid, db)).blocked) throw new HttpError(403, 'Este negocio ha pausado tus nuevas consultas. Puedes consultar y cancelar tus citas.', 'CLIENT_BLOCKED');
-    if (channel === 'whatsapp') {
+    if (checkChannel && channel === 'whatsapp') {
       const [allowance, binding] = await Promise.all([getResponseQuota(business!.id), getWhatsAppBusinessStatus(business!.id)]);
       if (!binding.ready || !allowance.currentPeriod || allowance.currentPeriod.planId !== 'whatsapp' || allowance.currentPeriod.endsAt <= Date.now()) throw new HttpError(402, 'WhatsApp requiere un número conectado y su plan vigente.', 'WHATSAPP_UNAVAILABLE');
     }
   };
-  await assertAccess();
+  await assertAccess(false);
   const cacheKey = stableDocumentId(body.mode === 'sarin_onboarding' ? 'onboarding' : business.id, user.uid, body.mode, body.requestId, channel);
   // Legacy payloads retain their exact historical fingerprint for durable replay.
   const fingerprint = createHash('sha256').update(JSON.stringify({ mode: body.mode, tenantId: body.tenantId, messages: body.stateVersion === undefined ? body.messages : [body.messages.at(-1)!], ...(body.stateVersion === undefined ? {} : { stateVersion: body.stateVersion }) })).digest('hex');
   const quotaInput = { businessId: business.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel };
   const assertNewProcessing = async (tx?: Transaction, current = business!) => {
+    await assertBusinessAllowsInference(current.id, db, tx);
     await assertConsent(user.uid, 'account', undefined, db, tx);
     if (body.mode === 'sarin_client') await assertConsent(user.uid, 'business_client', current, db, tx);
   };
+  const recoverHealth = async (error: unknown) => {
+    if (!(error instanceof HttpError) || error.code !== 'STRUCTURED_BOOKING_REQUIRED' || channel !== 'web') return null;
+    const saved = cachedResponse(db, cacheKey);
+    if (saved && saved.fingerprint !== fingerprint) throw new HttpError(409, 'Este identificador ya se utilizó para otro mensaje.', 'AI_REQUEST_CONFLICT');
+    return recoverLegacyMutation(user, body, business!, true);
+  };
   try { await assertNewProcessing(); }
   catch (error) {
+    const confirmed = await recoverHealth(error); if (confirmed) return confirmed;
     if (!(error instanceof HttpError) || error.code !== 'CONSENT_REQUIRED' || channel !== 'web') throw error;
     const saved = cachedResponse(db, cacheKey);
     if (saved && saved.fingerprint !== fingerprint) throw new HttpError(409, 'Este identificador ya se utilizó para otro mensaje.', 'AI_REQUEST_CONFLICT');
@@ -90,9 +100,12 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     }
     throw error;
   }
+  await assertAccess();
   await enforceInferenceAdmission({ businessId: business.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel }, db);
   return runUserInference(user.uid, () => runInSarinQueue(async () => {
-    business = await getBusiness(business!.id); await assertAccess();
+    business = await getBusiness(business!.id); await assertAccess(false);
+    try { await assertNewProcessing(); } catch (error) { const confirmed = await recoverHealth(error); if (confirmed) return confirmed; throw error; }
+    await assertAccess();
     const cached = cachedResponse(db, cacheKey);
     if (cached) {
       if (cached.fingerprint !== fingerprint) throw new HttpError(409, 'Este identificador ya se utilizó para otro mensaje.', 'AI_REQUEST_CONFLICT');
@@ -114,7 +127,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     try {
       await assertNewProcessing();
       if (body.stateVersion !== undefined && body.stateVersion !== state.version) throw new HttpError(409, 'La selección cambió. Reintenta para usar los datos actuales.', 'CHAT_STATE_CONFLICT');
-      const interpreted = await interpretChat({ mode: body.mode, message: body.messages.at(-1)!.content, business, state, signal, requestId: body.requestId, actorUid: user.uid });
+      const interpreted = await interpretChat({ mode: body.mode, message: body.messages.at(-1)!.content, business, state, signal, requestId: body.requestId, actorUid: user.uid, beforeInference: () => assertNewProcessing() });
       business = await getBusiness(business.id); await assertAccess();
       await assertNewProcessing();
       const selection = interpreted.selection, data: Record<string, unknown> = { ...selection };

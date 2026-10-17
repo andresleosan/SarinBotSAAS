@@ -14,8 +14,9 @@ export type ChatIntent = z.infer<typeof chatIntentSchema>;
 const interpretedSchema = z.object({ intent: chatIntentSchema, selection: chatSelectionSchema, configurationDraft: businessConfigSchema.optional() }).strict();
 export type InterpretedChat = z.infer<typeof interpretedSchema>;
 export const INTERPRETATION_TOOLS: readonly ToolDefinition[] = [{ type: 'function', function: { name: 'interpretar_solicitud', description: 'Clasifica la solicitud y extrae exclusivamente identificadores y fechas. No ejecuta operaciones ni confirma reservas.', parameters: z.toJSONSchema(interpretedSchema) } }];
-export async function interpretChat(input: { mode: ChatMode; message: string; business: Business; state: ChatState; signal?: AbortSignal; requestId: string; actorUid: string }): Promise<InterpretedChat> {
+export async function interpretChat(input: { mode: ChatMode; message: string; business: Business; state: ChatState; signal?: AbortSignal; requestId: string; actorUid: string; beforeInference?: () => Promise<void> }): Promise<InterpretedChat> {
   const { provider } = await getAiProviderSelection();
+  await input.beforeInference?.();
   const assistant = await completeChat([{ role: 'system', content: buildBusinessIntentPrompt(input.business, input.mode, input.state.selection) }, { role: 'user', content: input.message }], INTERPRETATION_TOOLS, { signal: input.signal, provider, billingContext: { businessId: input.business.id, actorUid: input.actorUid, mode: input.mode, requestId: input.requestId },
     ...(provider !== 'ollama' ? { onUsage: observation => recordAiUsage(observation, { businessId: input.business.id, mode: input.mode }) } : {}),
   });

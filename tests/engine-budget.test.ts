@@ -8,6 +8,7 @@ import { DEFAULT_AI_BUDGET_LIMITS, saveAiBudgetSettings } from '@/lib/server/ai-
 import { privateBusinessDraft } from '@/lib/server/businesses';
 import { runSarinChat } from '@/lib/server/chat';
 import { getResponseQuota } from '@/lib/server/response-quota';
+import { saveBookingDataPolicy } from '@/lib/server/booking-data-policy';
 const context = { businessId: 'business', actorUid: 'client', mode: 'sarin_client' as const, requestId: 'synthetic-request' };
 const messages = [{ role: 'user' as const, content: 'Synthetic service question' }];
 const reply = () => Response.json({ model: 'deepseek-flash', choices: [{ message: { content: 'Synthetic interpretation' } }], usage: { prompt_tokens: 12, prompt_cache_hit_tokens: 0, prompt_cache_miss_tokens: 12, completion_tokens: 8, total_tokens: 20 } });
@@ -18,6 +19,14 @@ describe('mandatory cloud budget before network', () => {
     await expect(completeChat(messages)).rejects.toMatchObject({ status: 503, code: 'AI_BUDGET_UNAVAILABLE' });
     await expect(completeChat(messages, undefined, { billingContext: context })).rejects.toMatchObject({ status: 503, code: 'AI_BUDGET_UNAVAILABLE' });
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it('never fetches or reserves money for health chat even with an available paid budget', async () => {
+    const business = { ...privateBusinessDraft({ uid: 'owner' }, Date.now()), id: 'business', slug: 'business', subscription: { status: 'active' as const, trialEndsAt: 0, currentPeriodEndsAt: Date.now() + 86400000 }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] } };
+    const { db, rows } = memoryFirestore({ 'businesses/business': business }); state.db = db;
+    await saveAiBudgetSettings({ uid: 'admin' }, { expectedVersion: 0, paused: false, limits: DEFAULT_AI_BUDGET_LIMITS, reason: 'Demo' }, db);
+    await saveBookingDataPolicy({ uid: 'admin' }, { businessId: 'business', expectedRevision: 0, dataMode: 'health', representedMinorsEnabled: false, reason: 'Demo' }, db);
+    await expect(runSarinChat({ user: { uid: 'client' }, body: { mode: 'sarin_client', tenantId: 'business', requestId: 'demo-health-budget', messages } })).rejects.toMatchObject({ code: 'STRUCTURED_BOOKING_REQUIRED' });
+    expect(fetch).not.toHaveBeenCalled(); expect([...rows.keys()].filter(path => /aiBudgetCalls|aiBudgetPeriods|responseQuotaTurns/.test(path))).toHaveLength(0);
   });
   it('settles without optional telemetry and does not repeat a result if telemetry fails', async () => {
     const { db, rows } = memoryFirestore(); state.db = db;

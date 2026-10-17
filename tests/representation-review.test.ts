@@ -1,0 +1,22 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { updateRepresentationReview } from '@/lib/server/representation-review';
+import { memoryFirestore } from './memoryFirestore';
+import { subjectFixture, subjectAdmin } from './represented-booking-contract';
+import { acceptSyntheticConsent, acceptSyntheticSubjectConsent } from './consent-fixtures';
+import { createStructuredBookingProposal } from '@/lib/server/structured-booking';
+import { confirmBookingProposal } from '@/lib/server/booking-proposals';
+afterEach(() => vi.unstubAllEnvs());
+it('owner cannot review another business or nonrepresented appointment and stale review preserves status', async () => {
+  vi.stubEnv('SUPERADMIN_UID', subjectAdmin.uid); const { db, rows } = memoryFirestore(), f = await subjectFixture(db);
+  await acceptSyntheticConsent(db, f.owner.uid); await acceptSyntheticSubjectConsent(db, f.actor, f.business, f.subjectCase, f.policy);
+  const p = await createStructuredBookingProposal(f.actor, f.business.id, { case: f.subjectCase, beneficiary: f.beneficiary, selection: f.selection }, db), appointment = await confirmBookingProposal(f.actor, f.business.id, p.id, { clientPhone: '573001234567', intakeAnswers: {}, beneficiary: f.beneficiary }, db);
+  const input = { expectedRevision: 0, status: 'needs_contact' as const };
+  await expect(updateRepresentationReview(f.actor, f.business.id, appointment.id, input, db)).rejects.toMatchObject({ status: 403 });
+  await expect(updateRepresentationReview(f.owner, 'demo-another-business', appointment.id, input, db)).rejects.toMatchObject({ status: 404 });
+  const updated = await updateRepresentationReview(f.owner, f.business.id, appointment.id, input, db);
+  expect(updated).toEqual({ ...appointment, representationReview: { revision: 1, status: 'needs_contact', reviewedBy: f.owner.uid, reviewedAt: expect.any(Number) } });
+  await expect(updateRepresentationReview(f.owner, f.business.id, appointment.id, input, db)).rejects.toMatchObject({ status: 409 });
+  expect(rows.get(`businesses/${f.business.id}`)?.data.subscription).toMatchObject({ paidTrial: { appointmentsUsed: 1 } });
+  await db.collection('businesses').doc(f.business.id).collection('appointments').doc('demo-self').set({ ...appointment, id: 'demo-self', beneficiary: { kind: 'self' } });
+  await expect(updateRepresentationReview(f.owner, f.business.id, 'demo-self', input, db)).rejects.toMatchObject({ status: 409 });
+});

@@ -25,6 +25,9 @@ export async function assertBookingIntakePolicy(tx: Transaction, businessId: str
   const { capability } = await readBookingDataPolicy(businessId, db, tx);
   if ((capability.dataMode === 'health' || capability.representedMinorsEnabled) && intakeFields.length) throw new HttpError(409, 'Retira los campos de texto libre para habilitar salud o reservas para menores.', 'BOOKING_FREE_INTAKE_NOT_ALLOWED');
 }
+export async function assertBusinessAllowsInference(businessId: string, db: Database = getAdminDb(), tx?: Transaction): Promise<void> {
+  if ((await readBookingDataPolicy(businessId, db, tx)).capability.dataMode === 'health') throw new HttpError(409, 'Este negocio gestiona reservas mediante formulario. Usa la agenda o contacta directamente al negocio.', 'STRUCTURED_BOOKING_REQUIRED');
+}
 export async function saveBookingDataPolicy(admin: ChatActor, supplied: z.input<typeof bookingDataPolicyInputSchema>, db: Database = getAdminDb()): Promise<BookingDataPolicy> {
   if (!isSuperadmin(admin.uid)) throw new HttpError(403, 'Forbidden');
   const input = bookingDataPolicyInputSchema.parse(supplied);
