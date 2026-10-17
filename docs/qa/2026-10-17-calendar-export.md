@@ -1,6 +1,6 @@
-# Añadir cita al calendario: aceptación local
+# Añadir cita al calendario: publicado
 
-Estado: aprobado localmente. Publicación autorizada pendiente de ejecutar y verificar.
+Estado: publicado con autorización específica. Runtime publicado `ba34b408024c97c909a774f07c5dde6263644f91`.
 
 Segundo incremento de la secuencia indicada por el propietario: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». Se comenzó después de publicar y verificar la búsqueda de próxima fecha (runtime `1b81385`, Containers v15).
 
@@ -46,6 +46,25 @@ Limpieza transaccional por IDs, propietario y huellas: diez documentos propios e
 
 La sesión real no se alteró durante QA local; su autenticación final se verificará por separado tras la publicación. No se aceptaron consentimientos ni se editaron datos reales para fabricar cobertura.
 
-Publicación autorizada pendiente: congelar esta revisión, construir y auditar imagen, activar mantenimiento, drenar cola, sustituir la instancia única, reabrir y verificar producción.
+Publicado después de la autorización registrada: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». El artefacto congelado es `ba34b408024c97c909a774f07c5dde6263644f91`; los commits posteriores de documentación se distinguen del runtime.
 
 Reversión compatible prevista: runtime `1b8138582a2784748537a7f1905db29368c9e57e`, imagen `sha256:d7ee223446ef4609137056572e3adbfdecb2233828a402afbc1ab46e8d42f617`, Worker `2e25bd87-70ab-4f7d-bcdb-9eed349ec8d0`, Containers v15. Sin migraciones ni borrado de datos.
+
+## Publicación verificada
+
+![Producción: Mis citas sin próximas reservas; la descarga no se ofrece para citas finalizadas](2026-10-17-calendar-export-production.jpg)
+
+Cierre: `2026-10-17T23:37:33.724Z`. Autorización: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro», limitada a esta exportación de calendario. Worker `6bd8b289-f1e1-4bfa-9961-05afcc16ad41`, Containers v16, allocation `d0311c48-cedb-4113-95be-7f11bab8811d`, imagen `sha256:188cbc13955f154678498930e89203e7e5fcfeae957974ac70bc74c898edb4ad`. Una instancia running/connected, cero antiguas y paginación completa; mantenimiento desactivado, bindings/variables/13 secretos/presupuesto y Pages `a461b670-5130-41e7-8c75-957f5439cfd7` conservados.
+
+| Etapa | Hora | Scope | HTTP | Activas/cola/críticas/normales |
+| --- | --- | --- | --- | --- |
+| Antes | 2026-10-17T23:33:49.303Z | default | 200 | 0/0/0/0 |
+| Drenaje | 2026-10-17T23:35:07.833Z | engine | 200 | 0/0/0/0 |
+| Rollout | 2026-10-17T23:36:21.357Z | engine | 200 | 0/0/0/0 |
+| Reapertura | 2026-10-17T23:37:00.095Z | default | 200 | 0/0/0/0 |
+
+HTTP: `/` 200; `/ayuda` 200; `/privacidad` 200; `/b/sarin-pruebas-20261015` 200; `/dashboard/onboarding` 200; `/manifest.webmanifest` 200; `/api/session` 401; `/api/businesses` 401. Perfil público con allowlist verificada; iconos: `/brand/sarin-face-192.png` SHA-256 `bec2324dd74f8d0dbc476b5b580c5b2eca65aff171426574706071a40724541e`; `/brand/sarin-face-512.png` SHA-256 `bfe3c69878d4089d14076be0394acb67bc42fc879a0111e1bbfb855b70e85482`. El nuevo marcador y los anteriores se verificaron como bundle_only; no se infiere UI visible.
+
+Acción visible: no; flujo no atribuido como observado. Límite real: La cuenta real no tiene próximas citas en el negocio de prueba. Historial contiene únicamente una cita cuyo horario finalizó y no muestra exportación, como corresponde. No se crearon ni alteraron citas reales para probar la descarga. UI completa validada localmente con 28 controles. La autenticación administrativa final se reverificó; los límites de observación durante la preparación local conservan su propia fecha en el paquete. No se aceptaron consentimientos ni se crearon/alteraron citas o datos reales para QA.
+
+Reversión compatible: `1b8138582a2784748537a7f1905db29368c9e57e`, imagen `registry.cloudflare.com/05fb22c155667de064b55c4e287b21d8/sarin-bot@sha256:d7ee223446ef4609137056572e3adbfdecb2233828a402afbc1ab46e8d42f617`, Worker `2e25bd87-70ab-4f7d-bcdb-9eed349ec8d0`, Containers v15; sin migraciones ni borrado.

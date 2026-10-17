@@ -4,7 +4,7 @@ Diseño de producto del 16 de octubre de 2026. El propietario aprobó el piloto 
 
 ## Propuestas tras la revisión de Fresha — 17 de octubre de 2026
 
-Después de publicar ficha pública, catálogo, calendario directo y «Volver a reservar», se publicó **buscar la próxima fecha disponible** cuando un día no tenga horarios. Conserva servicio/profesional y consulta hasta catorce días; el cliente elige la hora y confirma explícitamente. Runtime `1b81385`, Containers v15, verificados el 17 de octubre de 2026. El siguiente incremento autorizado es añadir la cita al calendario con descarga ICS.
+Después de publicar ficha pública, catálogo, calendario directo y «Volver a reservar», se publicó **buscar la próxima fecha disponible** cuando un día no tenga horarios. Conserva servicio/profesional y consulta hasta catorce días; el cliente elige la hora y confirma explícitamente. También se publicó **Añadir al calendario**, con descarga ICS de citas futuras confirmadas, identidad estable y aviso de copia sin actualización automática. Runtime actual `ba34b40`, Containers v16, verificados el 17 de octubre de 2026. El siguiente incremento autorizado es dirección/modalidad e indicaciones para llegar en la ficha del negocio.
 
 Backlog ordenado mediante alcance, impacto, confianza y facilidad, todos estimados de 1 a 5: próxima fecha disponible **4,00**; añadir al calendario **3,75**; dirección/modalidad e indicaciones **3,50**; reglas temporales en servidor **3,50**; reprogramar una cita existente **3,25**; cierres por fecha/rango **3,25**. Las reglas temporales preceden a reprogramación por dependencia. Se busca reducir el trabajo de probar fechas, facilitar la conservación de una cita y evitar gestión manual; no hay todavía una mejora de conversión o asistencia medida.
 

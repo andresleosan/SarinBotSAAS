@@ -1,11 +1,11 @@
 # Estado de implementación — 2026-10-17
 
-## Añadir cita al calendario — aprobado localmente
+## Añadir cita al calendario — publicado
 
 - [x] Añadir descarga ICS explícita a las citas futuras confirmadas de Mis citas, con identidad estable, horario UTC correcto y datos permitidos; conservar PNG e indicar el límite de actualización.
 - [x] Cerrar TDD y revisión independiente sin P1/P2: 1.183 pruebas aprobadas/26 omitidas, tipos y audit limpios; 28 controles de navegador y archivos reales verificados.
 - [x] Limpiar diez documentos propios y procesos de QA; restaurar viewport y comprobar seis puertos libres. [Aceptación local](docs/qa/2026-10-17-calendar-export.md).
-- [ ] Publicar la versión autorizada después de auditar imagen y reversión compatible, drenar cola y verificar una instancia efectiva y la sesión administrativa.
+- [x] Publicar la exportación de calendario autorizada: runtime `ba34b40`, imagen `188cbc13…`, Worker `6bd8b289-f1e1-4bfa-9961-05afcc16ad41`, Containers v16; una instancia conectada, cero antiguas, cuatro colas vacías y HTTP/bundles/iconos verificados. Autenticación administrativa reverificada; acción/flujo visibles: no/no, con límites y controles locales separados. [Publicación y reversión](docs/qa/2026-10-17-calendar-export.md).
 
 ## Próxima fecha disponible — publicado
 
@@ -19,7 +19,7 @@
 El propietario indicó «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». Cada incremento se implementa, prueba, publica y verifica antes de comenzar el siguiente; la autorización incluye las publicaciones en Sarin.
 
 - [x] **Publicado:** buscar próxima fecha disponible después de un día sin cupos, conservando servicio/profesional y consultando hasta catorce días. Runtime `1b81385`, imagen `d7ee2234…`; selección de hora y confirmación explícitas. [Cierre de QA y publicación](docs/qa/2026-10-17-next-available-date.md).
-- [ ] Añadir la cita al calendario mediante archivo importable, con identidad estable y límites claros de actualización.
+- [x] **Publicado:** añadir la cita al calendario mediante archivo importable, con identidad estable y límites claros de actualización. Runtime `ba34b40`, imagen `188cbc13…`, Containers v16. [QA y publicación](docs/qa/2026-10-17-calendar-export.md).
 - [ ] Dirección/modalidad e indicaciones para llegar en la ficha del negocio.
 - [ ] Reprogramar una cita existente con reglas temporales validadas en servidor y cambio atómico.
 - [ ] Recordatorios dentro de Sarin, con programación persistente; el propietario indicó «todo dentro de la app de momento». Correo y WhatsApp fuera del alcance inicial.
