@@ -166,7 +166,7 @@ Si Ollama está fuera de línea, Next responde 503. Únicamente para esa consult
 
 ## Piloto: presupuesto y operación de la candidata local
 
-Contrato de `003f5ab` y posteriores, todavía local. El presupuesto monetario es independiente de las respuestas compradas y de los avisos de Cloudflare. `PILOT_AI_BUDGET_ENFORCED=false` o ausente mantiene la compatibilidad anterior; no reserva dinero. Su activación para el piloto requiere mantenimiento, configuración privada válida y verificación explícita. La cola continúa en una sola instancia.
+Contrato de `003f5ab` y posteriores, publicado con la compuerta activa el 16 de octubre de 2026 a las 23:44 de Colombia. [Aceptación productiva](qa/2026-10-16-production-commercial-pilot.md). El presupuesto monetario es independiente de las respuestas compradas y de los avisos de Cloudflare. `PILOT_AI_BUDGET_ENFORCED=false` o ausente mantiene la compatibilidad anterior; no reserva dinero. Su activación para el piloto requiere mantenimiento, configuración privada válida y verificación explícita. La cola continúa en una sola instancia.
 
 ### Administración privada
 

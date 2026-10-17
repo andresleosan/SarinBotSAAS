@@ -1,5 +1,5 @@
 {
-  "status": "local-only-not-deployed",
+  "status": "deployed",
   "sourceRevision": "6315379b8c0482af57fea20abd8e2e1af0c00ff1",
   "runtimeRevision": "6315379b8c0482af57fea20abd8e2e1af0c00ff1",
   "image": {
@@ -71,12 +71,64 @@
     "planApproved": true,
     "implemented": true,
     "localAcceptance": true,
-    "legalOperationalReadiness": false
+    "legalOperationalReadiness": false,
+    "readinessScope": "Pending real-business onboarding review; installed runtime is not legal or operational approval for health/minor data."
   },
   "aiBudgetLimitsAccepted": true,
-  "aiBudgetGateActivated": false,
-  "productionAuthorizationReceived": false,
-  "productionDeploymentExecuted": false,
+  "aiBudgetGateActivated": true,
+  "productionAuthorizationReceived": true,
+  "productionDeploymentExecuted": true,
+  "production": {
+    "origin": "https://sarinbotsaas.pages.dev",
+    "openedAt": "2026-10-17T04:44:49Z",
+    "workerVersion": "d5a704e7-5bc3-4484-bc58-3c3f334ee3a7",
+    "pagesDeploymentId": "a461b670-5130-41e7-8c75-957f5439cfd7",
+    "pagesDeploymentUrl": "https://a461b670.sarinbotsaas.pages.dev",
+    "containerApplicationVersion": 7,
+    "containerImageTag": "health-6315379-platform",
+    "containerImageDigest": "sha256:a319ac8b2b8b4188746e0f00bcc41439b40fc5c807463ee6d798c5bedeaae90e",
+    "localCandidateRootFsAndConfigUnchanged": true,
+    "maintenance": false,
+    "aiBudgetGateEnforced": true,
+    "administrativeReadback": {
+      "observedAtUtc": "2026-10-17 04:47 UTC",
+      "backend": "d1",
+      "appRevision": 36,
+      "aiBudgetSettingsVersion": 1,
+      "aiBudgetPaused": false,
+      "aiBudgetLimits": {
+        "globalDayUsd": 0.5,
+        "globalMonthUsd": 8,
+        "businessDayUsd": 0.1,
+        "businessMonthUsd": 2,
+        "globalDayTokens": 20000000,
+        "globalMonthTokens": 300000000,
+        "businessDayTokens": 2000000,
+        "businessMonthTokens": 30000000
+      },
+      "qaBusinessClassifications": {
+        "count": 2,
+        "revision": 1,
+        "dataMode": "general",
+        "representedMinorsEnabled": false
+      }
+    },
+    "ciStatus": "success",
+    "evidence": "2026-10-16-production-commercial-pilot.md",
+    "ci": {
+      "status": "success",
+      "sourceRevision": "4eed34f7ff6ba30573d381d675580a04b9987f9e",
+      "runId": 39003955233,
+      "url": "https://github.com/andresleosan/SarinBotSAAS/actions/runs/39003955233",
+      "completedAt": "2026-10-17T04:51:19Z",
+      "jobsPassed": 3,
+      "applicationPassed": 888,
+      "applicationSkipped": 26,
+      "firestorePassed": 24,
+      "journeyChecks": 117,
+      "workerPassed": 74
+    }
+  },
   "paidAiCallsThisIncrement": 0,
   "marketplaceEnabled": false,
   "whatsappEnabled": false

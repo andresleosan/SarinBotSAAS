@@ -2,6 +2,16 @@
 
 Diseño de producto del 16 de octubre de 2026. El propietario aprobó el piloto y la inclusión del logo y la tarjeta autogestionados antes de abrirlo mediante su respuesta «1 y 2» a las opciones presentadas. El objetivo es incorporar pronto a los primeros negocios interesados, controlar las pruebas regaladas y convertirlas en negocios que reciben citas y contratan un plan. Las propuestas y la evidencia de diseño originales se conservan abajo; el seguimiento posterior distingue implementación local de funciones publicadas.
 
+## Estado publicado — cierre del 16 de octubre de 2026 en Colombia
+
+El piloto comercial está publicado y abierto en [Sarin](https://sarinbotsaas.pages.dev), tras la instrucción del propietario «solucionalo». Push inicial de la rama y `main` en `bf76ee20`, seguido por configuración/harness en `4eed34f`; runtime de aplicación `6315379`, Containers versión 7 con la imagen de plataforma `sha256:a319ac8b2b8b4188746e0f00bcc41439b40fc5c807463ee6d798c5bedeaae90e`. Worker de reapertura `d5a704e7-5bc3-4484-bc58-3c3f334ee3a7`, aproximadamente a las 23:44:49 de Colombia (04:44:49 UTC del 17 de octubre). Ver [informe de producción y cierre de CI](../qa/2026-10-16-production-commercial-pilot.md).
+
+Invitaciones gratuitas, precios conectados, logo/tarjeta A con crédito y QR de ALS, autorizaciones y controles de reservas/chat forman parte del runtime publicado. La oferta pública devolvió la prueba COP 5.000 con diez citas/700 respuestas y paquetes COP 20.000, 35.000 y 59.900, sin caché. No se reiniciaron cupos ni contadores.
+
+El presupuesto está activo y configurado: USD 0,50/día y USD 8/mes globales; USD 0,10/día y USD 2/mes predeterminados por negocio, con consulta/ajuste individual. Lectura D1 de las 04:47 UTC: configuración versión 1, sin pausa; límites de tokens conservados en 20 millones/300 millones globales y 2 millones/30 millones por negocio, por día/mes respectivamente. Ambos negocios de QA quedaron clasificados explícitamente como generales para adultos, menores deshabilitados, revisión 1. Las tres escrituras administrativas llevaron la revisión de aplicación de 33 a 36.
+
+Salud/representación están instalados, pero su incorporación real sigue pendiente de revisión por establecimiento, conforme al [procedimiento operativo](2026-10-16-production-pilot-operation.md). WhatsApp y marketplace continúan deshabilitados. La CI `39003955233` de `4eed34f` terminó con tres jobs verdes: 888 pruebas de aplicación, 24 Firestore, 117 comprobaciones del recorrido y 74 Worker; tipos, builds y auditoría aprobados. El harness usa ahora las autorizaciones expresas de cuentas sintéticas mediante la API real. Los apartados locales siguientes son históricos y no describen el estado actual de publicación.
+
 ## Decisiones expresas del propietario
 
 - El paquete de prueba cuesta **5.000 pesos colombianos**. Los códigos de invitación deben **regalar esa prueba** a los invitados.
@@ -13,7 +23,7 @@ Diseño de producto del 16 de octubre de 2026. El propietario aprobó el piloto 
 - La idea de marketplace se conserva para cuando haya al menos diez negocios registrados. No se muestra ni activa en la producción actual.
 - La prioridad es empezar a operar y producir ingresos. DeepSeek está autorizado para pruebas cuando sean necesarias.
 
-## Seguimiento de implementación local — 16 de octubre de 2026
+## Histórico: seguimiento de implementación local — 16 de octubre de 2026
 
 La ejecución fue autorizada y se realiza en el worktree separado `commercial-pilot`. La candidata de runtime es `ecec028`, con los cuatro incrementos y recuperación de logos. **No se ha publicado este incremento ni cambiado datos, tarifas o configuración de producción.** Los apartados siguientes conservan el contexto de diseño inicial; su redacción en futuro no describe el estado local de esta sección.
 

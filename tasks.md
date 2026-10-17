@@ -1,5 +1,15 @@
 # Estado de implementación — 2026-10-16
 
+## Cierre actual: piloto comercial publicado
+
+- [x] Push de rama y `main` inicialmente en `bf76ee20`, después `main` en `4eed34f`; publicación y reapertura autorizadas tras «solucionalo». Runtime `6315379`, Containers versión 7, imagen de plataforma `sha256:a319ac8b…aae90e`, Worker `d5a704e7-5bc3-4484-bc58-3c3f334ee3a7` y Pages `a461b670-5130-41e7-8c75-957f5439cfd7`. [Informe de producción](docs/qa/2026-10-16-production-commercial-pilot.md).
+- [x] Mantenimiento/drenaje, respaldo final comprobado y proceso anterior terminado; instancia efectiva versión 7, origen público 200 y sesión anónima 401.
+- [x] Presupuesto activo guardado y leído: USD 0,50/día y USD 8/mes globales, USD 0,10/día y USD 2/mes por negocio. D1 a las 04:47 UTC: versión 1 sin pausa, límites de tokens conservados; dos políticas QA explícitas general/adultos, menores deshabilitados, revisión 1; aplicación revisión 36 tras tres escrituras administrativas, sin reiniciar consumos.
+- [x] Corregir el harness para las nuevas autorizaciones sin debilitar runtime: `4eed34f`, CI 39003955233 con tres jobs verdes; 888 pruebas de aplicación, 24 Firestore, 117 comprobaciones del recorrido y 74 Worker.
+- [x] Completar evidencia final de UI/API, comprobación posterior y commit/push documental de cierre. [Operación por negocio](docs/product/2026-10-16-production-pilot-operation.md).
+
+Salud/representación están instalados; su incorporación real requiere revisión por establecimiento. WhatsApp y marketplace siguen deshabilitados. Los apartados siguientes conservan estados históricos de sus fases; sus menciones de producción pendiente no sustituyen este estado actual.
+
 ## Seguimiento: crédito ALS, códigos cortos y datos
 
 - [x] Runtime local `df2a1f2`: pie «Desarrollado por www.alsdevstudio.com» y QR secundario de 18 mm; QR de reservas de 50 mm conservado. PDF/PNG reales con ambos destinos decodificados.
@@ -11,7 +21,7 @@
 - [x] Verificar consentimiento: 827 pruebas aprobadas/25 omitidas, 23 Firestore oficiales, TypeScript y build correctos; navegador en escritorio/móvil. Correcciones de retirada concurrente, identidad, origen Pages y huellas verificadas con regresiones.
 - [x] Construir imagen Linux de `11315b7` con el runtime de consentimiento y comprobar sin red externa páginas legales, decisión afirmativa/origen y rutas privadas; [artefacto y secuencia del corte](docs/qa/2026-10-16-consent-release.md). Sin publicar ni activar presupuesto. [Propuesta de operación, conservación y proveedores](docs/product/2026-10-16-pilot-operation.md) preparada para concretar decisiones.
 - [ ] Completar decisiones de conservación/proveedores, datos/roles de cada negocio y revisión final de textos antes de publicar el control de aceptación. No atribuir consentimiento a cuentas anteriores.
-- [x] Aclarar y acordar el presupuesto: el propietario acepta USD 0,50/día y USD 8/mes globales; USD 0,10/día y USD 2/mes por negocio, con consumo individual y aumento de topes desde administración. Panel, herencia/restauración y reserva transaccional verificados localmente: 838 pruebas de aplicación, 73 Worker, tipos y build. [Evidencia](docs/qa/2026-10-16-business-ai-budget.md). Gate de producción aún sin activar; no es autorización de publicación.
+- [x] Aclarar y acordar el presupuesto: el propietario acepta USD 0,50/día y USD 8/mes globales; USD 0,10/día y USD 2/mes por negocio, con consumo individual y aumento de topes desde administración. Panel, herencia/restauración y reserva transaccional verificados localmente: 838 pruebas de aplicación, 73 Worker, tipos y build. [Evidencia](docs/qa/2026-10-16-business-ai-budget.md). En aquella fase el gate no estaba activado y no había autorización de publicación; el [corte posterior](docs/qa/2026-10-16-production-commercial-pilot.md) registra autorización, configuración y gate activo actuales.
 - [x] Diseño y plan de salud/menores aprobados, ejecutados y aceptados localmente: runtime `6315379`, 887 pruebas aprobadas/26 omitidas, Firestore 24/24, build e imagen Linux correctos; tres importantes corregidos y dos mejoras menores diferidas. [Evidencia y pendientes operativos](docs/qa/2026-10-16-health-and-represented-booking.md). Sin publicación ni habilitación de datos reales; autorizaciones específicas independientes de las generales.
 
 [Evidencia de seguimiento](docs/qa/2026-10-16-pilot-followup.md). Las candidatas y publicaciones descritas más abajo conservan el estado de sus respectivas fases.
@@ -23,7 +33,7 @@ Trabajo en `F:/Proyectos/SarinBot-worktrees/commercial-pilot`, separado del chec
 - [x] Implementar invitaciones de cortesía con canje sin comprobante, diez citas y 700 respuestas, trazabilidad y suspensión/reactivación sin reiniciar consumo. Verificado localmente **1/10 citas y 3/700 respuestas** después de cancelar y suspender/reactivar.
 - [x] Conectar la landing con la oferta administrada y conservar cotización/validación de importes. Landing sintética abierta: **65.000 → 68.000 COP sin recarga**; no son tarifas cambiadas en producción.
 - [x] Implementar logo/contactos y kit autogestionado **A / Agenda clara**, sin selector de estilos. PDF/PNG/SVG reales descargados; A6 y QR local verificados, kit/perfil a 320 px sin desbordamiento. B/C siguen como referencias; impresión física pendiente.
-- [x] Implementar política de cliente, límites persistentes antes de cola, estado autoritativo, plantillas de servidor, propuesta y confirmación explícita, y presupuesto operativo privado. El gate **`PILOT_AI_BUDGET_ENFORCED=false`** sigue sin activar; no equivale a un tope monetario ya operativo en producción.
+- [x] Implementar política de cliente, límites persistentes antes de cola, estado autoritativo, plantillas de servidor, propuesta y confirmación explícita, y presupuesto operativo privado. En esta fase histórica el gate estaba en **`PILOT_AI_BUDGET_ENFORCED=false`**; el [estado actual de producción](docs/qa/2026-10-16-production-commercial-pilot.md) tiene compuerta activa y presupuesto guardado.
 - [x] Verificar contratos D1 de prueba pagada/cortesía preservando cinco citas históricas; recorrido local de 97 comprobaciones y limpieza del runner; 23 pruebas Firestore. Chrome real con **motor fixture local**, separado del ensayo DeepSeek.
 - [x] Registrar ocho llamadas DeepSeek sintéticas con base en memoria: benchmark estricto **6/8**, dos `clarify` contenidos por plantillas. Regresión de `clarify`/`out_of_scope` corregida sin repetir la prueba pagada; no se declara 8/8 ni conversación DeepSeek integrada con el navegador.
 - [x] Cerrar checks: **783 pruebas de aplicación aprobadas/25 omitidas**, tipos, builds de aplicación/landing/Pages, **72 Worker**, **25 gateway** y auditoría con **0 vulnerabilidades**. Revisión independiente sin P1/P2.
@@ -58,7 +68,7 @@ La [aceptación comercial vigente](docs/qa/2026-10-16-commercial-e2e.md) prevale
 - [x] Activar alertas Cloudflare de USD 5/USD 8 y alerta DeepSeek de saldo de USD 2. No constituyen un tope automático garantizado de USD 15.
 - [x] Conservar copia privada de 123 archivos de las fuentes publicadas.
 - [x] Cancelar las dos citas nuevas y cerrar los siete días del negocio QA mediante la interfaz. Lectura independiente D1: cero confirmadas, dos canceladas y cita original del otro negocio intacta.
-- [ ] Integrar en Git el checkout mixto publicado; la copia privada no equivale a un commit o CI de esta revisión.
+- [x] Integrar en Git las fuentes del checkout mixto publicado; incorporadas en la rama del piloto y en `main`, actualmente `4eed34f`. La CI y el runtime exactos se distinguen en el [informe de producción](docs/qa/2026-10-16-production-commercial-pilot.md).
 - [ ] Decidir y documentar plazos formales de conservación/eliminación y condiciones de devolución.
 - [ ] Realizar y conciliar una transferencia bancaria real si se acuerda ese ensayo; el comprobante sintético no la sustituye.
 - [ ] Ampliar validación de capacidad/latencia y controles contra abuso según el tráfico del piloto; no se acreditó una capacidad comercial por número de negocios.
@@ -81,7 +91,7 @@ La [aceptación comercial vigente](docs/qa/2026-10-16-commercial-e2e.md) prevale
 - [x] Activar imagen nueva en una instancia Cloudflare y verificar sesión, administración, cita existente, historial, calendario e ICS. Aplicación: 675 pruebas pasan y 20 omitidas en ese comando; Worker 67; CLI 18; tipos y builds correctos. [Evidencia](docs/qa/2026-10-16-cloudflare-data-migration.md).
 - [x] Completar inferencia comercial real en la aceptación posterior: E2E Ollama con cliente externo y DeepSeek con sesión del propietario; WhatsApp permanece deshabilitado. [Evidencia vigente](docs/qa/2026-10-16-commercial-e2e.md).
 - [x] Configurar alertas de gasto Cloudflare y saldo DeepSeek; USD 15 no es un corte automático.
-- [ ] Integrar el checkout mixto en Git. La copia privada de fuentes y los respaldos de datos no sustituyen ese paso.
+- [x] Integrar el checkout mixto en Git; fuentes incorporadas posteriormente en la rama del piloto y en `main` (`4eed34f`). [Cierre de publicación](docs/qa/2026-10-16-production-commercial-pilot.md).
 
 ## Preparación pública, landing y cliente — 2026-10-16
 
@@ -181,7 +191,7 @@ La [aceptación comercial vigente](docs/qa/2026-10-16-commercial-e2e.md) prevale
 - [x] Completar inferencia, reserva y cancelación públicas con cliente externo en Ollama; DeepSeek con sesión del propietario verificado por separado. [Aceptación vigente](docs/qa/2026-10-16-commercial-e2e.md).
 - [x] Publicar privacidad/ayuda y activar alertas Cloudflare/DeepSeek; conservar respaldos. La aprobación sintética de comprobante valida el flujo, no el cobro.
 - [ ] Conciliar un pago bancario real y cerrar las decisiones formales de retención/devolución; ampliar abuso/capacidad según operación del piloto.
-- [ ] Integrar en Git las fuentes publicadas.
+- [x] Integrar en Git las fuentes publicadas; completado en la rama del piloto y en `main` (`4eed34f`). [Cierre de publicación](docs/qa/2026-10-16-production-commercial-pilot.md).
 - [ ] Observar renovación natural Google de una hora en el mismo proceso; no se marca resuelta por un nuevo despliegue.
 
 Evidencia: [migración del 16 de octubre](docs/qa/2026-10-16-cloudflare-migration.md).

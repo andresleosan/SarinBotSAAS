@@ -1,0 +1,119 @@
+{
+  "checkedAt": "2026-10-17T04:48:17.894Z",
+  "origin": "https://sarinbotsaas.pages.dev",
+  "workerRevision": "d5a704e7-5bc3-4484-bc58-3c3f334ee3a7",
+  "applicationRuntimeRevision": "6315379b8c0482af57fea20abd8e2e1af0c00ff1",
+  "containerVersion": 7,
+  "imageManifest": "sha256:a319ac8b2b8b4188746e0f00bcc41439b40fc5c807463ee6d798c5bedeaae90e",
+  "pagesDeploymentId": "a461b670-5130-41e7-8c75-957f5439cfd7",
+  "maintenance": false,
+  "aiBudgetGateEnabled": true,
+  "aiBudgetSettings": {
+    "version": 1,
+    "paused": false,
+    "globalDayUsd": 0.5,
+    "globalMonthUsd": 8,
+    "businessDayUsd": 0.1,
+    "businessMonthUsd": 2,
+    "globalDayTokens": 20000000,
+    "globalMonthTokens": 300000000,
+    "businessDayTokens": 2000000,
+    "businessMonthTokens": 30000000
+  },
+  "existingQaPolicies": {
+    "count": 2,
+    "revision": 1,
+    "mode": "general",
+    "representedMinorsEnabled": false
+  },
+  "d1RevisionBefore": 33,
+  "d1RevisionAfterThreeAdminChanges": 36,
+  "secretCountPreserved": 13,
+  "whatsappEnabled": false,
+  "marketplaceEnabled": false,
+  "newPaidAiCalls": 0,
+  "http": [
+    {
+      "method": "GET",
+      "path": "/",
+      "status": 200,
+      "cacheControl": "no-store"
+    },
+    {
+      "method": "GET",
+      "path": "/api/public/commercial-offer",
+      "status": 200,
+      "cacheControl": "no-store"
+    },
+    {
+      "method": "GET",
+      "path": "/terminos",
+      "status": 200,
+      "cacheControl": "no-store",
+      "responsibleAlsDevStudio": true
+    },
+    {
+      "method": "GET",
+      "path": "/privacidad",
+      "status": 200,
+      "cacheControl": "no-store",
+      "responsibleAlsDevStudio": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/session",
+      "status": 401,
+      "cacheControl": "no-store"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/abuse",
+      "status": 401,
+      "cacheControl": "no-store"
+    },
+    {
+      "method": "GET",
+      "path": "/api/booking-subject-consent",
+      "status": 401,
+      "cacheControl": "no-store"
+    },
+    {
+      "method": "POST",
+      "path": "/api/businesses/demo-business/booking-proposals",
+      "status": 401,
+      "cacheControl": "no-store"
+    }
+  ],
+  "ui": {
+    "adminBudgetSavedAndRefreshed": true,
+    "individualUsageAndLimitControls": true,
+    "invitationSixDigitButtonVisible": true,
+    "noProductionInvitationsIssued": true,
+    "accountTermsAndDataAuthorizationUnchecked": true,
+    "businessAuthorizationUnchecked": true,
+    "chatDisabledUntilConsent": true,
+    "existingAppointmentsAccessible": true,
+    "landingPricesMatchPublicOffer": true
+  },
+  "screenshots": [
+    "assets/production-20261016/admin-budget.jpg",
+    "assets/production-20261016/landing-plans.jpg"
+  ],
+  "limitations": [
+    "No new production booking, invitation redemption, or QR export was performed. These flows have local acceptance evidence.",
+    "Health and minors require each business operational review before enabling its capabilities."
+  ],
+  "ci": {
+    "status": "success",
+    "sourceRevision": "4eed34f7ff6ba30573d381d675580a04b9987f9e",
+    "runId": 39003955233,
+    "url": "https://github.com/andresleosan/SarinBotSAAS/actions/runs/39003955233",
+    "completedAt": "2026-10-17T04:51:19Z",
+    "jobsPassed": 3,
+    "applicationPassed": 888,
+    "applicationSkipped": 26,
+    "firestorePassed": 24,
+    "journeyChecks": 117,
+    "workerPassed": 74
+  }
+}
