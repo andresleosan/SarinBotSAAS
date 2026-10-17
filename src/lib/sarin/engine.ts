@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { HttpError } from '@/lib/server/http';
 import type { AiProvider, CloudAiProvider } from '@/types/ai';
-import { reservePaidCallBudget, settlePaidCallBudget, type PaidCallContext, type BudgetReservation } from '@/lib/server/ai-budget';
+import { reservePaidCallBudget, releaseUndispatchedPaidCallBudget, settlePaidCallBudget, type PaidCallContext, type BudgetReservation } from '@/lib/server/ai-budget';
 import { quotePaidCall } from '@/lib/server/ai-pricing';
 
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
@@ -179,7 +179,7 @@ function geminiAssistant(data: unknown): EngineAssistantMessage {
   return assistant;
 }
 
-export async function completeChat(messages: EngineMessage[], tools?: readonly ToolDefinition[], options: { vision?: boolean; signal?: AbortSignal; provider?: EngineProvider; billingContext?: PaidCallContext; onUsage?: (observation: EngineUsageObservation) => void | Promise<void> } = {}): Promise<EngineAssistantMessage> {
+export async function completeChat(messages: EngineMessage[], tools?: readonly ToolDefinition[], options: { vision?: boolean; signal?: AbortSignal; provider?: EngineProvider; billingContext?: PaidCallContext; beforeDispatch?: () => Promise<void>; onUsage?: (observation: EngineUsageObservation) => void | Promise<void> } = {}): Promise<EngineAssistantMessage> {
   const config = engineConfig(options.vision, options.provider);
   if (config.provider !== 'ollama' && messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url'))) {
     throw new HttpError(503, 'Las imágenes requieren el motor local de la Mac.');
@@ -208,6 +208,15 @@ export async function completeChat(messages: EngineMessage[], tools?: readonly T
     const quote = quotePaidCall({ provider: config.provider as CloudAiProvider, model: config.model, requestBytes: Buffer.byteLength(requestBody, 'utf8'), maxOutputTokens: 4096 });
     reservation = await reservePaidCallBudget({ ...options.billingContext, ...quote, callId: observation!.callId, provider: config.provider as CloudAiProvider, model: config.model });
     observation!.model = null;
+  }
+  // No provider request has been dispatched here. A denied policy check can
+  // release this reservation; failures after fetch must retain normal accounting.
+  try {
+    if (options.beforeDispatch) await options.beforeDispatch();
+    if (options.signal?.aborted) throw new DOMException('Solicitud cancelada.', 'AbortError');
+  } catch (error) {
+    if (reservation) { try { await releaseUndispatchedPaidCallBudget(reservation); } catch { /* retain maximum on storage outage */ } }
+    throw error;
   }
   try {
     const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(config.timeoutMs)]) : AbortSignal.timeout(config.timeoutMs);

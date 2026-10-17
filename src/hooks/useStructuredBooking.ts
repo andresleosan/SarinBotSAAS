@@ -13,7 +13,7 @@ export function useStructuredBooking(uid: string | undefined, business: { id: st
   const initial = () => ({ identity: current, selection: { serviceId: '', resourceId: '', dateKey: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(Date.now()), startTimeStr: '' }, availability: [] as Slots, proposal: null as BookingProposalView | null, appointment: null as Appointment | null, busy: false, loadingAvailability: false, frozen: false, uncertain: false, error: null as string | null });
   const [stored, setStored] = useState(initial), state = stored.identity === current ? stored : initial();
   const selection = useRef(state.selection); selection.current = state.selection;
-  const availabilityRequest = useRef<AbortController | null>(null), mutation = useRef<AbortController | null>(null), proposalRequest = useRef<{ identity: object; body: string; beneficiary: BookingBeneficiary } | null>(null), confirmation = useRef<{ identity: object; path: string; body: string } | null>(null);
+  const availabilityRequest = useRef<AbortController | null>(null), mutation = useRef<AbortController | null>(null), proposalRequest = useRef<{ identity: object; body: string; beneficiary: BookingBeneficiary } | null>(null), confirmation = useRef<{ identity: object; path: string; body: string; uncertain: boolean } | null>(null);
   const update = (patch: Partial<ReturnType<typeof initial>>) => { if (identity.current === current) setStored(previous => ({ ...(previous.identity === current ? previous : initial()), ...patch, identity: current })); };
   useEffect(() => () => { availabilityRequest.current?.abort(); mutation.current?.abort(); availabilityRequest.current = null; mutation.current = null; proposalRequest.current = null; confirmation.current = null; }, [key]);
   function setSelection(value: Selection) {
@@ -56,14 +56,16 @@ export function useStructuredBooking(uid: string | undefined, business: { id: st
     } catch (cause) {
       if (identity.current === current && !abort.signal.aborted) {
         update({ error: errorMessage(cause) });
-        if (cause instanceof ApiError && [400, 403, 404, 409, 428].includes(cause.status)) { confirmation.current = null; update({ uncertain: false }); }
+        const terminal = cause instanceof ApiError && (cause.code === 'BOOKING_PROPOSAL_CLOSED' || (!operation.uncertain && [400, 403, 404, 409, 428].includes(cause.status)));
+        if (terminal) { confirmation.current = null; update({ uncertain: false }); }
+        else operation.uncertain = true;
       }
     } finally { if (identity.current === current && !abort.signal.aborted) update({ busy: false }); if (mutation.current === abort) mutation.current = null; }
   }
   async function confirm(id: string, contact: { clientPhone: string; intakeAnswers: Record<string, string> }) {
     if (confirmation.current?.identity === current) return sendConfirmation(confirmation.current);
     if (!subjectActive || !state.proposal || state.proposal.id !== id || proposalRequest.current?.identity !== current || state.appointment) return;
-    const operation = { identity: current, path: `/api/businesses/${encodeURIComponent(business.id)}/booking-proposals/${encodeURIComponent(id)}/confirm`, body: JSON.stringify({ confirm: true, ...contact, beneficiary: proposalRequest.current.beneficiary }) };
+    const operation = { identity: current, path: `/api/businesses/${encodeURIComponent(business.id)}/booking-proposals/${encodeURIComponent(id)}/confirm`, body: JSON.stringify({ confirm: true, ...contact, beneficiary: proposalRequest.current.beneficiary }), uncertain: false };
     confirmation.current = operation; return sendConfirmation(operation);
   }
   return { ...state, setSelection, loadAvailability, propose, confirm, retryConfirmation: async () => { if (confirmation.current?.identity === current) await sendConfirmation(confirmation.current); } };

@@ -58,6 +58,14 @@ export async function verifyStructuredCases(db: Database, secondDb = db) {
     expect((await confirmBookingProposal(f.actor, f.business.id, proposal.id, {} as never, db)).status).toBe('cancelled_by_client');
   }
   for (const collection of ['responseQuotaTurns', 'aiBudgetCalls', 'aiBudgetPeriods']) expect((await db.collection(collection).get()).empty).toBe(true);
+  const f = await subjectFixture(db);
+  await acceptSyntheticSubjectConsent(db, f.actor, f.business, f.subjectCase, f.policy);
+  const proposal = await createStructuredBookingProposal(f.actor, f.business.id, { case: f.subjectCase, beneficiary: f.beneficiary, selection: f.selection }, db);
+  const ref = db.collection('bookingProposals').doc(proposal.id), beforeClose = Date.now();
+  await ref.set({ ...(await ref.get()).data(), expiresAt: beforeClose - 1 });
+  for (const handle of [db, secondDb]) await expect(confirmBookingProposal(f.actor, f.business.id, proposal.id, { ...contact, beneficiary: f.beneficiary }, handle)).rejects.toMatchObject({ code: 'BOOKING_PROPOSAL_CLOSED' });
+  expect((await secondDb.collection('bookingProposals').doc(proposal.id).get()).data()?.closedAt).toBeGreaterThanOrEqual(beforeClose);
+  expect((await secondDb.collection('businesses').doc(f.business.id).collection('appointments').get()).empty).toBe(true);
 }
 export async function verifySubjectBindingAndWithdrawal(db: Database, secondDb = db) {
   const f = await subjectFixture(db); await acceptSyntheticSubjectConsent(db, f.actor, f.business, f.subjectCase, f.policy);

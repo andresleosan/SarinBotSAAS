@@ -1,4 +1,4 @@
-import { act, createElement, Suspense, type ReactNode } from "react";
+import { act, createElement, Suspense, useEffect, type ReactNode } from "react";
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OnboardingPage from "@/app/dashboard/onboarding/page";
@@ -11,15 +11,15 @@ import type { Business } from "@/types/firestore";
 const state = vi.hoisted(() => ({
   user: { uid: "fixture-client", displayName: "Fixture" },
   accountConsent: true, businessConsent: true,
-  policyReady: true, dataMode: 'general' as 'general' | 'health', chatMount: vi.fn(),
+  policyReady: true, policyKnown: true, minors: true, dataMode: 'general' as 'general' | 'health', chatMount: vi.fn(), structuredMount: vi.fn(), structuredUnmount: vi.fn(),
   send: vi.fn(), retry: vi.fn(),
   business: null as Business | null,
   publicSubscription: { status: "active", currentPeriodEndsAt: 2200000000000 } as Business["subscription"],
   chat: { messages: [], isWaitingBatch: false, isGenerating: false, error: null as string | null, quotaExhausted: false, requestAlreadyCompleted: false },
 }));
 vi.mock("@/hooks/useDebouncedChat", () => ({ useDebouncedChat: () => { state.chatMount(); return { ...state.chat, sendMessage: state.send, retry: state.retry }; } }));
-vi.mock('@/hooks/useBookingDataPolicy', () => ({ useBookingDataPolicy: () => ({ ready: state.policyReady, loading: !state.policyReady, error: null, refresh: vi.fn(), capability: state.policyReady ? { configured: true, revision: 1, dataMode: state.dataMode, representedMinorsEnabled: true } : null }) }));
-vi.mock('@/components/structured-booking', () => ({ StructuredBooking: () => createElement('div', null, 'Reserva sin IA') }));
+vi.mock('@/hooks/useBookingDataPolicy', () => ({ useBookingDataPolicy: () => ({ ready: state.policyReady, loading: !state.policyReady, error: !state.policyReady && state.policyKnown ? 'Error temporal' : null, refresh: vi.fn(), capability: state.policyKnown ? { configured: true, revision: 1, dataMode: state.dataMode, representedMinorsEnabled: state.minors } : null }) }));
+vi.mock('@/components/structured-booking', () => ({ StructuredBooking: ({ enabled }: { enabled: boolean }) => { useEffect(() => { state.structuredMount(); return () => { state.structuredUnmount(); }; }, []); return createElement('div', { 'data-enabled': enabled }, 'Reserva sin IA'); } }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: state.accountConsent }), ConsentPanel: () => null }));
 vi.mock('@/hooks/useConsent', () => ({ useConsent: () => ({ active: state.businessConsent }) }));
 vi.mock("@/hooks/useBusiness", () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null }) }));
@@ -33,7 +33,7 @@ const text = (node: ReactTestInstance | string): string => typeof node === "stri
 
 describe("chat pause surfaces", () => {
   let renderer: ReactTestRenderer;
-  beforeEach(() => { state.policyReady = true; state.dataMode = 'general'; state.chatMount.mockClear(); });
+  beforeEach(() => { state.policyReady = true; state.policyKnown = true; state.minors = true; state.dataMode = 'general'; state.chatMount.mockClear(); state.structuredMount.mockClear(); state.structuredUnmount.mockClear(); });
   beforeEach(() => { state.accountConsent = true; state.businessConsent = true; state.chat = { messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false }; state.send.mockReset(); state.retry.mockReset(); state.publicSubscription = { status: "active", trialEndsAt: 0, currentPeriodEndsAt: 2200000000000 }; state.business = { id: "fixture-business", name: "Negocio", slug: "negocio", subscription: state.publicSubscription, category: "Servicios", phoneWhatsApp: "", resources: [], services: [], sarinConfig: { onboardingCompleted: true, tone: "Claro", customRules: "", intakeFields: [] }, weeklySchedule: {} } as unknown as Business; vi.mocked(apiFetch).mockReset();
     vi.mocked(apiFetch).mockImplementation(async (path, init) => init?.method ? {} : { appointments: [{ id: "appointment", tenantId: "fixture-business", serviceName: "Cita conservada", type: "appointment", status: "confirmed", dateKey: new URL(path, "https://example.invalid").searchParams.get("date") ?? "2039-01-01", startAt: 2177485200000, endAt: 2177487000000, startTimeStr: "09:00", endTimeStr: "09:30", client: { uid: state.user.uid, name: "Fixture", email: "fixture@example.invalid", intakeAnswers: {} } }] });
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ business: { id: "fixture-business", name: "Negocio sintetico", phoneWhatsApp: "", services: [], subscription: state.publicSubscription } })));
@@ -47,13 +47,24 @@ describe("chat pause surfaces", () => {
     state.businessConsent = true;
   });
   it('never mounts chat while policy is loading or in a restricted booking flow', async () => {
-    state.policyReady = false; state.chatMount.mockClear();
+    state.policyReady = false; state.policyKnown = false; state.chatMount.mockClear();
     const params = Promise.resolve({ slug: 'fixture' });
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }))); });
     expect(state.chatMount).not.toHaveBeenCalled(); expect(text(renderer.root)).toContain('Cita conservada');
-    state.policyReady = true; state.dataMode = 'health';
+    state.policyReady = true; state.policyKnown = true; state.dataMode = 'health';
     await act(async () => renderer.update(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }))));
     expect(state.chatMount).not.toHaveBeenCalled(); expect(text(renderer.root)).toContain('Reserva sin IA'); state.dataMode = 'general';
+  });
+  it('keeps the restricted controller mounted across outer withdrawals and policy errors', async () => {
+    state.dataMode = 'health';
+    const params = Promise.resolve({ slug: 'fixture' }), render = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
+    await act(async () => { renderer = create(render()); });
+    for (const change of [() => { state.accountConsent = false; }, () => { state.businessConsent = false; }, () => { state.policyReady = false; }, () => { state.minors = false; }]) {
+      change(); await act(async () => renderer.update(render()));
+      expect(state.structuredUnmount).not.toHaveBeenCalled();
+      expect(renderer.root.findByProps({ 'data-enabled': false })).toBeTruthy();
+    }
+    expect(state.structuredMount).toHaveBeenCalledTimes(1); expect(state.chatMount).not.toHaveBeenCalled();
   });
   it("allows a new configuration message after the server reports the earlier turn completed", async () => {
     state.chat.error = "Solicitud ya atendida";

@@ -119,6 +119,20 @@ export async function reservePaidCallBudget(supplied: PaidCallContext & { callId
     return { id: input.callId, callId: input.callId, maxTokens: input.maxTokens, maxCostNanoUsd: input.maxCostNanoUsd };
   });
 }
+/** Internal engine-only release: invoke exclusively before dispatching fetch. */
+export async function releaseUndispatchedPaidCallBudget(reservation: BudgetReservation, db: Database = getAdminDb()): Promise<void> {
+  const ref = db.collection('aiBudgetCalls').doc(z.string().uuid().parse(reservation.callId));
+  await db.runTransaction(async tx => {
+    const call = parse(callSchema, (await tx.get(ref)).data());
+    if (call.id !== reservation.id || call.callId !== reservation.callId || call.maxTokens !== reservation.maxTokens || call.maxCostNanoUsd !== reservation.maxCostNanoUsd) throw unavailable();
+    if (call.status === 'released') return;
+    if (call.status !== 'reserved') throw unavailable();
+    const states = await Promise.all(call.periodIds.map(async id => parse(periodSchema, (await tx.get(db.collection('aiBudgetPeriods').doc(id))).data())));
+    const next = states.map(state => parse(periodSchema, { ...state, reservedTokens: state.reservedTokens - call.heldTokens, reservedCostNanoUsd: state.reservedCostNanoUsd - call.maxCostNanoUsd }));
+    for (const [index, state] of next.entries()) tx.set(db.collection('aiBudgetPeriods').doc(call.periodIds[index]), state);
+    tx.set(ref, { ...call, status: 'released', actualTokens: 0, actualCostNanoUsd: 0, settledAt: Date.now() });
+  });
+}
 export async function settlePaidCallBudget(reservation: BudgetReservation, observation: EngineUsageObservation, db: Database = getAdminDb()): Promise<void> {
   const ref = db.collection('aiBudgetCalls').doc(z.string().uuid().parse(reservation.callId)), settingsRef = db.collection('serverSettings').doc('pilotAiBudget');
   await db.runTransaction(async tx => {

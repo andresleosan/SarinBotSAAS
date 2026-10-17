@@ -159,7 +159,8 @@ describe('manual paid Gemini native transport', () => {
     const controller = new AbortController(); controller.abort();
     vi.mocked(fetch).mockRejectedValueOnce(new Error('synthetic-abort'));
     await expect(completeChat(input, undefined, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
-    expect(fetch).toHaveBeenCalledTimes(2);
+    // A caller already cancelled before dispatch must not start another fetch.
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('blocks cloud images and keeps an explicitly selected local model local', async () => {

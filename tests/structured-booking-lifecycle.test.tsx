@@ -2,7 +2,7 @@ import { act, createElement } from 'react';
 import { create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useStructuredBooking } from '@/hooks/useStructuredBooking';
-import { apiFetch } from '@/lib/client/api';
+import { apiFetch, ApiError } from '@/lib/client/api';
 vi.mock('@/lib/client/api', async original => ({ ...await original<typeof import('@/lib/client/api')>(), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let renderer: ReactTestRenderer | undefined, controller!: ReturnType<typeof useStructuredBooking>;
@@ -29,4 +29,16 @@ it('lost confirmation retries original proposal and contact after permission wit
   await act(async () => controller.confirm(p.id, { clientPhone: '573001234567', intakeAnswers: {} })); expect(controller.uncertain).toBe(true);
   const original = vi.mocked(apiFetch).mock.calls[1]; await act(async () => renderer!.update(createElement(Harness, { active: false })));
   await act(async () => controller.retryConfirmation()); const replay = vi.mocked(apiFetch).mock.calls[2]; expect(replay[0]).toBe(original[0]); expect(replay[1]?.body).toBe(original[1]?.body); expect(replay[2]).toBe('demo-user'); expect(controller.appointment).toEqual(appointment);
+});
+it('keeps an uncertain original through generic conflicts until a durable terminal close', async () => {
+  const proposal = { id: 'demo-proposal', businessId: business.id };
+  vi.mocked(apiFetch).mockResolvedValueOnce({ proposal }).mockRejectedValueOnce(new Error('lost response')).mockRejectedValueOnce(new ApiError('conflict', 409, 'DATA_CONFLICT')).mockRejectedValueOnce(new ApiError('closed', 409, 'BOOKING_PROPOSAL_CLOSED'));
+  await act(async () => { renderer = create(createElement(Harness)); });
+  await act(async () => controller.propose({ kind: 'represented_minor', displayName: 'Demo', representativeRole: 'parent' }));
+  await act(async () => controller.confirm(proposal.id, { clientPhone: '573001234567', intakeAnswers: {} }));
+  await act(async () => controller.retryConfirmation());
+  expect(controller.uncertain).toBe(true);
+  await act(async () => controller.retryConfirmation());
+  expect(controller.uncertain).toBe(false);
+  expect(vi.mocked(apiFetch).mock.calls.slice(1).every(call => call[1]?.body === vi.mocked(apiFetch).mock.calls[1][1]?.body)).toBe(true);
 });

@@ -8,7 +8,7 @@ import { DEFAULT_AI_BUDGET_LIMITS, saveAiBudgetSettings } from '@/lib/server/ai-
 import { privateBusinessDraft } from '@/lib/server/businesses';
 import { runSarinChat } from '@/lib/server/chat';
 import { getResponseQuota } from '@/lib/server/response-quota';
-import { saveBookingDataPolicy } from '@/lib/server/booking-data-policy';
+import { saveBookingDataPolicy, assertBusinessAllowsInference } from '@/lib/server/booking-data-policy';
 const context = { businessId: 'business', actorUid: 'client', mode: 'sarin_client' as const, requestId: 'synthetic-request' };
 const messages = [{ role: 'user' as const, content: 'Synthetic service question' }];
 const reply = () => Response.json({ model: 'deepseek-flash', choices: [{ message: { content: 'Synthetic interpretation' } }], usage: { prompt_tokens: 12, prompt_cache_hit_tokens: 0, prompt_cache_miss_tokens: 12, completion_tokens: 8, total_tokens: 20 } });
@@ -35,6 +35,27 @@ describe('mandatory cloud budget before network', () => {
     await completeChat(messages, undefined, { billingContext: context, onUsage: async () => { throw new Error('telemetry outage'); } });
     expect(fetch).toHaveBeenCalledTimes(2);
     expect([...rows].filter(([path]) => path.startsWith('aiBudgetCalls/')).every(([, row]) => row.data.status === 'settled')).toBe(true);
+  });
+  it('checks policy after the paid reservation and releases a call that was never dispatched', async () => {
+    const business = { ...privateBusinessDraft({ uid: 'owner' }, Date.now()), id: 'business', slug: 'business', subscription: { status: 'active' as const, trialEndsAt: 0, currentPeriodEndsAt: Date.now() + 86400000 }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] } };
+    const { db, rows } = memoryFirestore({ 'businesses/business': business }); state.db = db;
+    await saveAiBudgetSettings({ uid: 'admin' }, { expectedVersion: 0, paused: false, limits: DEFAULT_AI_BUDGET_LIMITS, reason: 'Demo' }, db);
+    const transact = db.runTransaction.bind(db); let switched = false;
+    vi.spyOn(db, 'runTransaction').mockImplementation(async handler => {
+      const result = await transact(handler);
+      if (!switched && [...rows.keys()].some(path => path.startsWith('aiBudgetCalls/'))) {
+        switched = true;
+        await saveBookingDataPolicy({ uid: 'admin' }, { businessId: business.id, expectedRevision: 0, dataMode: 'health', representedMinorsEnabled: false, reason: 'Demo reclassification' }, db);
+      }
+      return result;
+    });
+    const onUsage = vi.fn();
+    await expect(runSarinChat({ user: { uid: 'client' }, body: { mode: 'sarin_client', tenantId: business.id, requestId: 'demo-budget-policy-race', messages } })).rejects.toMatchObject({ code: 'STRUCTURED_BOOKING_REQUIRED' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect([...rows].filter(([path]) => path.startsWith('aiBudgetCalls/')).map(([, row]) => row.data)).toMatchObject([{ status: 'released', actualTokens: 0, actualCostNanoUsd: 0 }]);
+    expect([...rows].filter(([path]) => path.startsWith('aiBudgetPeriods/')).every(([, row]) => row.data.reservedTokens === 0 && row.data.reservedCostNanoUsd === 0)).toBe(true);
+    await expect(completeChat(messages, undefined, { billingContext: context, beforeDispatch: () => assertBusinessAllowsInference(business.id, db), onUsage } as Parameters<typeof completeChat>[2])).rejects.toMatchObject({ code: 'STRUCTURED_BOOKING_REQUIRED' });
+    expect(onUsage).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
   });
   it('retains the maximum on timeout and on a settlement outage, with no automatic fetch retry', async () => {
     const { db, rows } = memoryFirestore(); state.db = db;

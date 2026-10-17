@@ -23,7 +23,7 @@ const legacyProposalSchema = z.object({ version: z.literal(1), id: documentIdSch
   createdAt: z.number().int().nonnegative(), expiresAt: z.number().int().nonnegative(), appointmentId: documentIdSchema.nullable(),
 }).strict();
 const authorizationSchema = z.object({ receiptId: documentIdSchema, fingerprint: z.string().regex(/^[a-f0-9]{64}$/), policyRevision: z.number().int().nonnegative().safe() }).strict();
-const proposalSchema = z.discriminatedUnion('version', [legacyProposalSchema, legacyProposalSchema.extend({ version: z.literal(2), subjectCase: bookingSubjectCaseSchema, beneficiaryHash: z.string().regex(/^[a-f0-9]{64}$/), policyRevision: z.number().int().nonnegative().safe(), authorization: authorizationSchema.nullable() }).strict()]);
+const proposalSchema = z.discriminatedUnion('version', [legacyProposalSchema, legacyProposalSchema.extend({ version: z.literal(2), subjectCase: bookingSubjectCaseSchema, beneficiaryHash: z.string().regex(/^[a-f0-9]{64}$/), policyRevision: z.number().int().nonnegative().safe(), authorization: authorizationSchema.nullable(), closedAt: z.number().int().nonnegative().safe().optional() }).strict()]);
 type Proposal = z.infer<typeof proposalSchema>;
 export const proposalRequestKey = (uid: string, businessId: string, requestId: string) => `request_${stableDocumentId('proposal-request', businessId, uid, requestId)}`;
 function parse(value: unknown): Proposal {
@@ -79,7 +79,7 @@ export async function createBookingProposal(user: ChatActor, businessId: string,
 export async function confirmBookingProposal(user: ChatActor, businessId: string, proposalId: string, contact: Pick<BookingInput, 'clientPhone' | 'intakeAnswers'> & { beneficiary?: unknown }, db: Database = getAdminDb()): Promise<Appointment> {
   documentIdSchema.parse(businessId); documentIdSchema.parse(proposalId);
   const ref = db.collection('bookingProposals').doc(proposalId), businessRef = db.collection('businesses').doc(businessId);
-  return db.runTransaction(async tx => {
+  const result = await db.runTransaction(async tx => {
     const [document, businessDoc] = await Promise.all([tx.get(ref), tx.get(businessRef)]);
     if (!document.exists) throw new HttpError(404, 'La propuesta no existe.');
     const proposal = parse(document.data());
@@ -91,6 +91,12 @@ export async function confirmBookingProposal(user: ChatActor, businessId: string
       return appointment;
     }
     const now = Date.now();
+    if (proposal.version === 2 && (proposal.closedAt !== undefined || proposal.expiresAt <= now)) {
+      // Commit a terminal state that conflicts with an older confirmation.
+      // Throwing inside the transaction would roll this closure back.
+      if (proposal.closedAt === undefined) tx.set(ref, { ...proposal, closedAt: now });
+      return null;
+    }
     if (proposal.expiresAt <= now) throw new HttpError(409, 'La propuesta venció. Consulta otra vez la disponibilidad.', 'BOOKING_PROPOSAL_EXPIRED');
     if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDoc.data() as Business;
@@ -116,6 +122,8 @@ export async function confirmBookingProposal(user: ChatActor, businessId: string
     tx.set(ref, { ...proposal, appointmentId: appointment.id });
     return appointment;
   });
+  if (!result) throw new HttpError(409, 'La propuesta está cerrada. Inicia otra reserva.', 'BOOKING_PROPOSAL_CLOSED');
+  return result;
 }
 export async function recoverBookingProposal(user: ChatActor, businessId: string, requestId: string, db: Database = getAdminDb()): Promise<{ proposal: BookingProposalView; appointment?: Appointment } | null> {
   const mapping = (await db.collection('bookingProposals').doc(proposalRequestKey(user.uid, businessId, requestId)).get()).data();

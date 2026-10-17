@@ -17,7 +17,7 @@ export const INTERPRETATION_TOOLS: readonly ToolDefinition[] = [{ type: 'functio
 export async function interpretChat(input: { mode: ChatMode; message: string; business: Business; state: ChatState; signal?: AbortSignal; requestId: string; actorUid: string; beforeInference?: () => Promise<void> }): Promise<InterpretedChat> {
   const { provider } = await getAiProviderSelection();
   await input.beforeInference?.();
-  const assistant = await completeChat([{ role: 'system', content: buildBusinessIntentPrompt(input.business, input.mode, input.state.selection) }, { role: 'user', content: input.message }], INTERPRETATION_TOOLS, { signal: input.signal, provider, billingContext: { businessId: input.business.id, actorUid: input.actorUid, mode: input.mode, requestId: input.requestId },
+  const assistant = await completeChat([{ role: 'system', content: buildBusinessIntentPrompt(input.business, input.mode, input.state.selection) }, { role: 'user', content: input.message }], INTERPRETATION_TOOLS, { signal: input.signal, provider, beforeDispatch: input.beforeInference, billingContext: { businessId: input.business.id, actorUid: input.actorUid, mode: input.mode, requestId: input.requestId },
     ...(provider !== 'ollama' ? { onUsage: observation => recordAiUsage(observation, { businessId: input.business.id, mode: input.mode }) } : {}),
   });
   const clarify = (): InterpretedChat => ({ intent: 'clarify', selection: input.state.selection });
