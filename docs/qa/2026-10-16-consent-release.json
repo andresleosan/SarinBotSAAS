@@ -1,5 +1,5 @@
 {
-  "status": "local-only-not-deployed",
+  "status": "historical-local-candidate-superseded",
   "sourceRevision": "11315b71511eed436f012e64f64be830ece5317e",
   "runtimeRevision": "89114cc",
   "image": {
@@ -49,5 +49,6 @@
     "production-authorization",
     "final-drained-recoverable-backup",
     "production-rollout-and-acceptance"
-  ]
+  ],
+  "supersededBy": "2026-10-16-business-ai-budget-release.json"
 }

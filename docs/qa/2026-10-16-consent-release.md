@@ -1,5 +1,7 @@
 # Candidata con consentimiento: artefacto y publicación pendiente
 
+Seguimiento posterior: la [candidata con presupuesto individual](2026-10-16-business-ai-budget.md) incluye este consentimiento y lo sustituye como artefacto local más reciente. La imagen descrita abajo se conserva como evidencia de su fase; no se publicó.
+
 Imagen local construida desde el archivo Git íntegro de **`11315b71511eed436f012e64f64be830ece5317e`**. El último cambio de runtime incluido es `89114cc`; los commits posteriores anteriores al build son documentación. Incluye contactos ALS, invitaciones de seis dígitos, tarjeta A y el incremento de aceptación. No se ha publicado ni activado el presupuesto monetario.
 
 ## Artefacto comprobado

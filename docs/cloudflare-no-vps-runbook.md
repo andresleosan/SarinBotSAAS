@@ -201,6 +201,8 @@ Cada llamada conserva la tarifa versionada y los coeficientes usados para su est
 
 ### Activación y reversión
 
+Seguimiento de presupuesto individual: [contrato y QA](qa/2026-10-16-business-ai-budget.md). `GET /api/admin/abuse?businessId=<id>` permite comprobar un negocio durante mantenimiento con autenticación de superadmin. `PATCH action: configure_business` requiere `businessId`, `expectedVersion` de excepción, `expectedSettingsVersion` general, `limits: {businessDayUsd,businessMonthUsd} | null` y motivo. Usar versiones recién leídas; `null` restaura herencia manteniendo versión. No reiniciar períodos ni conciliar llamadas desconocidas para aumentar margen. La excepción cambia USD del negocio, conserva tokens heredados y topes globales. No reabrir un Worker/runtime anterior que ignore estos contratos.
+
 1. Identificar la candidata y sus checks. Verificar backup recuperable de D1/R2 y, por separado, Auth y configuración; D1/R2 no respalda por sí solo identidades o secretos.
 2. Activar `SARIN_MAINTENANCE=true` y observar cola con `activeSlots=0` y `queuedRequests=0`. Conservar una sola instancia y ambos flags WhatsApp desactivados.
 3. Publicar la candidata con la entrada pública cerrada y compuerta presupuestaria en `false`. Validar sesión administrativa y las dos excepciones exactas de mantenimiento; no reabrir aún.

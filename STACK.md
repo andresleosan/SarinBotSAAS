@@ -77,14 +77,14 @@ Escenario de referencia: **3.000 respuestas mensuales por negocio**, con un prom
 
 Estimación sin aciertos de caché, impuestos, créditos ni otros servicios. Historiales, llamadas fallidas facturables, más rondas o salida/pensamiento mayores cambian el costo. Alojamiento Workers/Containers, D1/R2, energía local y cualquier futuro consumo Meta se contabilizan aparte. **USD 8 al mes no garantiza cubrir los cupos comerciales de todos los negocios.** Incluso el límite inicial de USD 2 por negocio puede pausar la IA antes de 3.000 respuestas en este escenario.
 
-Los límites operativos previstos en el [plan del piloto](docs/superpowers/plans/2026-10-16-pilot-abuse-controls.md) y en `DEFAULT_AI_BUDGET_LIMITS` son:
+Los límites operativos del [plan del piloto](docs/superpowers/plans/2026-10-16-pilot-abuse-controls.md) y `DEFAULT_AI_BUDGET_LIMITS`, aceptados por el propietario con control individual desde administración, son:
 
 | Ámbito | USD / día | USD / mes | Tokens / día | Tokens / mes |
 | --- | ---: | ---: | ---: | ---: |
 | Global Sarin | 0,50 | 8,00 | 20.000.000 | 300.000.000 |
 | Cada negocio | 0,10 | 2,00 | 2.000.000 | 30.000.000 |
 
-Son límites del operador propuestos para la configuración privada, separados del precio y del cupo comprado; no constituyen una promesa de factura ni de capacidad financiada. Las ventanas del código usan `America/Bogota`. Revisar y financiar esos valores según consumo y negocios activos, sin presentar una pausa operativa como agotamiento del plan del cliente.
+Son límites del operador para la configuración privada, separados del precio y del cupo comprado; no constituyen una promesa de factura ni de capacidad financiada. Las ventanas del código usan `America/Bogota`. Revisar y financiar esos valores según consumo y negocios activos, sin presentar una pausa operativa como agotamiento del plan del cliente. La [extensión individual](docs/qa/2026-10-16-business-ai-budget.md) permite subir/restaurar USD diarios/mensuales por negocio, sin cambiar los límites globales ni los de tokens heredados y sin reiniciar consumo o liberar incertidumbres. Todavía es una versión local.
 
 Estado: implementación todavía local, con la compuerta `PILOT_AI_BUDGET_ENFORCED` desactivada por compatibilidad; `false` o ausencia no activa reservas monetarias. Para el release del piloto se debe verificar la configuración privada versionada `serverSettings/pilotAiBudget` y activar explícitamente la compuerta, comprobando el corte antes de fetch. El mecanismo local reserva una estimación conservadora por llamada y concilia uso; costo/uso desconocido conserva la reserva. Al agotarse un límite pausa nuevas llamadas de IA y mantiene consulta/cancelación de citas existentes; las reservas nuevas mediante chat pueden interrumpirse. Un rechazo presupuestario antes de inferir no consume una respuesta comercial, sin garantizar recepción de cada respuesta HTTP. No se ha verificado su activación en producción ni sustituye la conciliación con la factura externa.
 

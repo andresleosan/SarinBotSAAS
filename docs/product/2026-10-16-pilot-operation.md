@@ -1,12 +1,12 @@
 # Operación del primer piloto de Sarin
 
-Propuesta preparada el 16 de octubre de 2026. Complementa la [revisión de datos](2026-10-16-legal-consent-review.md) y la [aceptación técnica](../qa/2026-10-16-consent-acceptance.md). **No es una política publicada ni una decisión del propietario.** No cambia datos, contratos, proveedores, tarifas ni límites de producción.
+Documento preparado el 16 de octubre de 2026. Complementa la [revisión de datos](2026-10-16-legal-consent-review.md) y la [aceptación técnica](../qa/2026-10-16-consent-acceptance.md). **La conservación sigue siendo una propuesta, no una política publicada.** El propietario aceptó los límites iniciales de IA con control individual desde el panel y pidió incluir salud/menores, delegando la elección de casos. No cambia datos, contratos, proveedores, tarifas ni límites de producción.
 
 ## Inicio acompañado
 
 Proponer una incorporación por invitación y revisión humana para los primeros negocios. Registrar una persona de contacto, verificar el correo Google destinatario y acompañar una primera reserva. El código regala diez citas y 700 respuestas; no vence la capacidad por días. La caducidad del código sin canjear es otra cosa.
 
-El alcance recomendado es citas de servicios generales para adultos, sin historias clínicas, diagnósticos, formularios de salud ni reservas de menores. Se solicitó la decisión del propietario; no se presenta como una restricción técnica ya aplicada. El control de preguntas empresariales no clasifica infaliblemente datos sensibles ni verifica edad. No basta escribir esta limitación en condiciones para acreditar que se impide ese tratamiento.
+El propietario necesita también salud o reservas de menores y pidió elegir casos reales. Se definieron adulto que reserva para sí, adulto representante que reserva un corte infantil y padre/madre/representante que agenda pediatría. El [diseño específico](../superpowers/specs/2026-10-16-health-and-represented-booking-design.md) separa reservante y beneficiario, incorpora autorización correspondiente y propone un formulario sin IA para salud/menores. **Está diseñado, todavía no implementado.** El control de preguntas empresariales no clasifica infaliblemente datos sensibles ni verifica edad o parentesco. No reinterpretar la autorización general existente para cubrir estos supuestos.
 
 Para cada negocio, guardar una ficha privada fuera de Git, vinculada a su ID:
 
@@ -75,7 +75,7 @@ La [tarifa oficial](https://api-docs.deepseek.com/quick_start/pricing/) actual c
 
 El [ensayo sintético previo](../qa/2026-10-16-deepseek-synthetic-results.json) estimó USD 0,0068931 por ocho llamadas y 21.633 tokens. Extrapolando el mismo perfil, una llamada por respuesta: `700 × 0,0068931 ÷ 8 ≈ USD 0,60`. Con dos llamadas por respuesta sería aproximadamente USD 1,21. Muestra pequeña, sin garantía de costo/volumen; no es una factura ni se recalculó independientemente el desglose entrada/salida del proveedor.
 
-Propuesta pendiente de respuesta: **USD 8/mes y USD 0,50/día globales; USD 2/mes y USD 0,10/día por negocio**, más los límites de tokens existentes. Son techos simultáneos: si tres negocios gastan USD 2 y otro USD 2, los USD 8 globales se agotan y los demás no reciben una bolsa adicional. Las reservas conservadoras y límites diarios pueden pausar antes. La muestra no garantiza que alcancen para los paquetes vendidos.
+Límites iniciales aceptados por el propietario, condicionados a observar el consumo y poder subir límites individuales en administración: **USD 8/mes y USD 0,50/día globales; USD 2/mes y USD 0,10/día por negocio**, más los límites de tokens existentes. El [panel y las excepciones individuales ya están implementados y verificados localmente](../qa/2026-10-16-business-ai-budget.md). Son techos simultáneos: si tres negocios gastan USD 2 y otro USD 2, los USD 8 globales se agotan y los demás no reciben una bolsa adicional. Las reservas conservadoras y límites diarios pueden pausar antes. La muestra no garantiza que alcancen para los paquetes vendidos. Esta aprobación no es autorización de publicación.
 
 El alojamiento se contabiliza aparte. El cálculo de USD 11,93 de infraestructura para 30 días encendida continuamente es un escenario anterior, antes de CPU/otros consumos, no una lectura de factura. Ver [presupuesto de infraestructura](../cloudflare-no-vps-runbook.md#presupuesto-operativo) y [STACK](../../STACK.md). El límite de IA no corta el alojamiento ni garantiza un tope de factura total.
 

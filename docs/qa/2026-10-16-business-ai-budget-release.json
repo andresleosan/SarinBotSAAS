@@ -1,0 +1,53 @@
+{
+  "status": "local-only-not-deployed",
+  "sourceRevision": "205a7717b06981210e18751bad63d22e724a8ff9",
+  "runtimeRevision": "205a7717b06981210e18751bad63d22e724a8ff9",
+  "image": {
+    "tag": "sarin-bot:pilot-205a771",
+    "id": "sha256:6a7101665c2388e80d18e925f73169b27581ce5097c4210cdb7c669c9026a7ad",
+    "platform": "linux/amd64",
+    "sizeBytes": 79692719,
+    "sourceArchiveSha256": "b261c8533ab8f76fb656406f922eab0c10fbbfed409e2b2c55bf02abc3444572",
+    "verifiedAt": "2026-10-17T02:33:06.394Z",
+    "linuxSmoke": {
+      "ok": true,
+      "linuxNativeSharp": true,
+      "unauthenticatedSession": 401,
+      "legalPages": 200,
+      "publicDocuments": 200,
+      "canonicalOriginPreauthorization": 200,
+      "rejectedForeignOrigin": 403,
+      "rejectedUncheckedDecision": 400,
+      "privateConsentWithoutAuth": 401,
+      "network": "none",
+      "readOnly": true,
+      "externalCredentials": false
+    }
+  },
+  "checks": {
+    "applicationPassed": 838,
+    "applicationSkipped": 25,
+    "workerPassed": 73,
+    "typecheck": true,
+    "applicationBuild": true,
+    "workerDryRun": true,
+    "businessBudgetD1Tests": 2,
+    "independentReview": "no-actionable-findings",
+    "browserDesktop": true,
+    "browser390": true
+  },
+  "aiBudgetLimitsAccepted": true,
+  "aiBudgetGateActivated": false,
+  "productionAuthorizationReceived": false,
+  "productionDeploymentExecuted": false,
+  "paidAiCallsThisIncrement": 0,
+  "healthAndRepresentedBooking": {
+    "casesSelected": true,
+    "designPrepared": true,
+    "implemented": false,
+    "designApproved": true,
+    "planPrepared": true
+  },
+  "marketplaceEnabled": false,
+  "whatsappEnabled": false
+}
