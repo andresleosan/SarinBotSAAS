@@ -1,5 +1,15 @@
 # Estado de implementación — 2026-10-17
 
+## Volver a reservar desde el historial — aprobado localmente
+
+- [x] Alcance acotado aceptado: recuperar solo el servicio vigente, consultar precio actual y elegir un horario nuevo con confirmación explícita. [Recorrido](docs/design/2026-10-17-rebook-from-history.md).
+- [x] Añadir acción en Historial, validación de catálogo e identidad y caso nuevo sin copiar datos históricos; conservar permisos y recuperación.
+- [x] Cerrar revisión independiente tras corregir guard StrictMode con dos regresiones RED/GREEN. 1.026 pruebas aprobadas/26 omitidas, tipos y audit limpios; CUA con 32 controles en 320/390/1280, sin propuestas/citas automáticas. Diez documentos propios limpiados. [Evidencia](docs/qa/2026-10-17-rebook-from-history.md).
+- [ ] Congelar artefacto probado y preparar reversión compatible a `2440af5`/`3c8e555d…` antes de solicitar publicación concreta.
+- [ ] Publicar únicamente después de la autorización específica de esta versión.
+
+Rama `codex/rebook-from-history-20261017`, worktree existente del catálogo; producción y checkout original conservados durante la preparación.
+
 ## Entrada por servicio y disponibilidad vacía — publicado
 
 - [x] Implementar las dos mejoras aceptadas: mensaje único para consultas correctas sin horarios y «Reservar este servicio» conservando la elección después del acceso y permisos. [Diseño](docs/design/2026-10-17-booking-service-entry.md).

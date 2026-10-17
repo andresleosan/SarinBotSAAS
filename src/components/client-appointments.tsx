@@ -6,7 +6,7 @@ import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useApiPoll } from "@/lib/client/use-api-poll";
 import { createAppointmentImage, type AppointmentImageDetails } from "@/lib/client/appointment-image";
-import type { Appointment, TenantResource } from "@/types/firestore";
+import type { Appointment, TenantResource, TenantService } from "@/types/firestore";
 
 type View = "upcoming" | "history" | "calendar";
 const views: { id: View; label: string }[] = [
@@ -25,6 +25,9 @@ function dateKey(timestamp: number): string {
 function canChange(appointment: Appointment, now: number): boolean {
   return appointment.status === "confirmed" && appointment.startAt > now;
 }
+function isHistorical(appointment: Appointment, now: number): boolean {
+  return appointment.status !== "confirmed" || appointment.endAt <= now;
+}
 function statusLabel(appointment: Appointment, now: number): string {
   switch (appointment.status) {
     case "cancelled_by_client": return "Cancelada por ti";
@@ -35,7 +38,7 @@ function statusLabel(appointment: Appointment, now: number): string {
   }
 }
 
-export function ClientAppointments({ businessId, businessName, resources = [], userId, now }: { businessId: string; businessName: string; resources?: TenantResource[]; userId: string; now: number }) {
+export function ClientAppointments({ businessId, businessName, resources = [], services = [], userId, now, onRebook, rebookingEnabled = false }: { businessId: string; businessName: string; resources?: TenantResource[]; services?: TenantService[]; userId: string; now: number; onRebook?: (serviceId: string) => void; rebookingEnabled?: boolean }) {
   const [retry, setRetry] = useState(0);
   const scope = `${businessId}:${userId}`;
   const currentScope = useRef({ key: scope });
@@ -55,6 +58,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], u
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
+    currentScope.current = actionScope;
     setConfirmationId(null); setPendingId(null); pending.current = null;
     exporting.current = null; setExportingId(null);
     setActionError(null); setNotice(null);
@@ -64,16 +68,25 @@ export function ClientAppointments({ businessId, businessName, resources = [], u
   // The query is scoped by the authenticated UID; recheck it before displaying or acting.
   const ownAppointments = appointments.filter(item => item.tenantId === businessId && item.type === "appointment" && item.client?.uid === userId && knownStatuses.includes(item.status)
     && Number.isFinite(item.startAt) && Number.isFinite(item.endAt) && item.endAt > item.startAt);
-  const latest = useRef({ appointments: ownAppointments, businessName, resources });
-  latest.current = { appointments: ownAppointments, businessName, resources };
+  const latest = useRef({ appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, view, loading, readError });
+  latest.current = { appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, view, loading, readError };
   const visible = ownAppointments.filter(item => view === "calendar" ? dateKey(item.startAt) === selectedDate
-    : view === "upcoming" ? item.status === "confirmed" && item.endAt > now : item.status !== "confirmed" || item.endAt <= now)
+    : view === "upcoming" ? item.status === "confirmed" && item.endAt > now : isHistorical(item, now))
     .sort((a, b) => view === "history" ? b.startAt - a.startAt : a.startAt - b.startAt);
 
   function changeView(next: View) {
     setView(next);
     setConfirmationId(null);
     setActionError(null);
+  }
+  function rebook(appointment: Appointment) {
+    if (currentScope.current !== actionScope || pending.current || exporting.current) return;
+    const current = latest.current;
+    if (current.view !== "history" || !current.onRebook || !current.rebookingEnabled || current.loading || current.readError) return;
+    const saved = current.appointments.find(item => item.id === appointment.id);
+    if (!saved || saved.serviceId !== appointment.serviceId || !isHistorical(saved, Date.now())) return;
+    const service = current.services.find(item => item.id === saved.serviceId);
+    if (service) current.onRebook(service.id);
   }
   async function cancel(appointment: Appointment) {
     if (pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
@@ -150,7 +163,9 @@ export function ClientAppointments({ businessId, businessName, resources = [], u
         {view === "upcoming" ? "No tienes próximas citas en este negocio." : view === "history" ? "Aún no tienes citas en tu historial." : selectedDate ? "No tienes citas para esta fecha." : "Elige una fecha para consultar tus citas."}
       </p>}
       <div className="space-y-3">
-        {visible.map(appointment => <article key={appointment.id} className="min-w-0 space-y-3 rounded-xl border border-sarin-line bg-sarin-canvas p-3 sm:p-4">
+        {visible.map(appointment => {
+          const currentService = services.find(service => service.id === appointment.serviceId);
+          return <article key={appointment.id} className="min-w-0 space-y-3 rounded-xl border border-sarin-line bg-sarin-canvas p-3 sm:p-4">
           <div className="space-y-1">
             <h3 className="break-words font-semibold [overflow-wrap:anywhere]">{appointment.serviceName || "Cita"}</h3>
             <p className="break-words text-sm [overflow-wrap:anywhere]">{appointment.beneficiary?.kind === 'represented_minor' ? <>Para: {appointment.beneficiary.displayName} · Gestionada por {appointment.client?.name || 'tu cuenta'}</> : appointment.beneficiary?.kind === 'self' ? 'Reserva para ti' : 'Registro anterior sin beneficiario declarado'}</p>
@@ -158,6 +173,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], u
             <p className="text-sm tabular-nums text-sarin-muted">{timeFormat.format(appointment.startAt)}–{timeFormat.format(appointment.endAt)} (Colombia)</p>
             <p className="text-xs font-semibold text-sarin-blue">{statusLabel(appointment, now)}</p>
           </div>
+          {view === "history" && onRebook && currentService && <button type="button" aria-label={`Volver a reservar: ${currentService.name}`} disabled={!rebookingEnabled || loading || Boolean(readError || pendingId || exportingId)} onClick={() => rebook(appointment)} className="min-h-11 max-w-full rounded-[10px] border border-sarin-line px-3 py-2 text-left text-sm font-semibold text-sarin-blue hover:border-sarin-blue hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:cursor-not-allowed disabled:opacity-50">Volver a reservar</button>}
           {canChange(appointment, now) && <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
             <button type="button" disabled={Boolean(pendingId || exportingId)} className="flex min-h-11 items-center gap-2 text-sm font-medium text-sarin-blue disabled:opacity-50" onClick={() => download(appointment)}><Download className="h-4 w-4 shrink-0" />{exportingId === appointment.id ? "Preparando imagen…" : "Guardar imagen de la cita"}</button>
             {confirmationId !== appointment.id && <button type="button" disabled={Boolean(pendingId || exportingId)} className="min-h-11 text-sm text-sarin-muted underline disabled:opacity-50" onClick={() => { setConfirmationId(appointment.id); setActionError(null); setNotice(null); }}>Cancelar cita</button>}
@@ -169,7 +185,8 @@ export function ClientAppointments({ businessId, businessName, resources = [], u
               <button type="button" className="min-h-11 rounded-xl border border-sarin-line px-3 text-sm text-sarin-ink disabled:opacity-50" disabled={Boolean(pendingId)} onClick={() => { setConfirmationId(null); setActionError(null); }}>Conservar cita</button>
             </div>
           </div>}
-        </article>)}
+        </article>;
+        })}
       </div>
     </section>
   );

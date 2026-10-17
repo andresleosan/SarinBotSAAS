@@ -46,8 +46,9 @@ function GeneralBookingChat({ business, uid, permitted, now, onConfirmed, onLock
     </form>
   </section>;
 }
-function BookingJourney({ business, capability, uid, permitted, policyReady, now, onConfirmed, initialServiceId, onInitialServiceHandled }: { business: PublicBusiness; capability: BookingCapability; uid: string; permitted: boolean; policyReady: boolean; now: number; onConfirmed: () => void; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
+function BookingJourney({ business, capability, uid, permitted, policyReady, now, onConfirmed, initialServiceId, onInitialServiceHandled, onLockedChange }: { business: PublicBusiness; capability: BookingCapability; uid: string; permitted: boolean; policyReady: boolean; now: number; onConfirmed: () => void; initialServiceId?: string; onInitialServiceHandled?: () => void; onLockedChange?: (locked: boolean) => void }) {
   const [represented, setRepresented] = useState(false), [locked, setLocked] = useState(false), [mode, setMode] = useState<'calendar' | 'chat'>('calendar'), structuredStarted = useRef(capability.dataMode === 'health');
+  useEffect(() => { onLockedChange?.(locked); return () => onLockedChange?.(false); }, [locked, onLockedChange]);
   const keepChat = mode === 'chat' && locked;
   const structured = !keepChat && (capability.dataMode === 'health' || represented || mode === 'calendar');
   if (capability.dataMode === 'health' || represented || (structured && permitted && policyReady)) structuredStarted.current = true;
@@ -61,6 +62,31 @@ function BookingJourney({ business, capability, uid, permitted, policyReady, now
     {structured ? (structuredStarted.current && <StructuredBooking business={business} capability={capability} initialSubjectKind={represented ? 'represented_minor' : 'self'} initialServiceId={initialServiceId} onInitialServiceHandled={onInitialServiceHandled} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} />) : <GeneralBookingChat business={business} uid={uid} permitted={enabled && capability.dataMode === 'general' && !represented} now={now} onConfirmed={onConfirmed} onLockedChange={setLocked} />}
   </div>;
 }
+function BookingWorkspace({ business, capability, uid, permitted, policyReady, catalogReady, now, initialServiceId, onInitialServiceHandled }: { business: PublicBusiness; capability: BookingCapability | null; uid: string; permitted: boolean; policyReady: boolean; catalogReady: boolean; now: number; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
+  const [version, setVersion] = useState(0), [locked, setLocked] = useState(false);
+  const [entry, setEntry] = useState<{ revision: number; serviceId?: string } | null>(null);
+  const start = useRef<HTMLDivElement>(null), mounted = useRef(true);
+  const rebookingEnabled = permitted && policyReady && catalogReady && Boolean(capability) && !locked && isSubscriptionAllowed(business, now);
+  const current = useRef({ rebookingEnabled, services: business.services, onInitialServiceHandled });
+  current.current = { rebookingEnabled, services: business.services, onInitialServiceHandled };
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => { if (entry) { start.current?.focus(); start.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [entry?.revision]);
+  function rebook(serviceId: string) {
+    if (!mounted.current || !current.current.rebookingEnabled || !current.current.services.some(service => service.id === serviceId)) return;
+    current.current.onInitialServiceHandled?.();
+    setEntry(previous => ({ revision: (previous?.revision ?? 0) + 1, serviceId }));
+  }
+  function handleInitialService() {
+    onInitialServiceHandled?.();
+    setEntry(previous => previous?.serviceId !== undefined ? { ...previous, serviceId: undefined } : previous);
+  }
+  return <>
+    {capability && <div ref={start} role="region" aria-label="Nueva reserva" tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue">
+      <BookingJourney key={entry?.revision ?? 0} business={business} capability={capability} uid={uid} permitted={permitted} policyReady={policyReady} now={now} initialServiceId={entry ? entry.serviceId : initialServiceId} onInitialServiceHandled={handleInitialService} onConfirmed={() => setVersion(value => value + 1)} onLockedChange={setLocked} />
+    </div>}
+    <ClientAppointments key={version} businessId={business.id} businessName={business.name} resources={business.resources} services={business.services} userId={uid} now={now} onRebook={rebook} rebookingEnabled={rebookingEnabled} />
+  </>;
+}
 function Island({ slug, initialServiceId, onInitialServiceHandled }: { slug: string; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
   const { user, signOut } = useAuth();
   const projection = useApiPoll<PublicBusiness | null>(slug, async signal => { const response = await fetch(`/api/public/businesses/${encodeURIComponent(slug)}`, { signal, cache: 'no-store' }); if (!response.ok) throw new Error('No pudimos consultar el negocio. Inténtalo de nuevo.'); return (await response.json() as { business: PublicBusiness | null }).business; });
@@ -69,7 +95,7 @@ function Island({ slug, initialServiceId, onInitialServiceHandled }: { slug: str
   if (business && initialServiceId !== undefined && intentBusinessId.current === null) intentBusinessId.current = business.id;
   const scopedServiceId = business?.id === intentBusinessId.current ? initialServiceId : undefined;
   useEffect(() => { if (business && initialServiceId !== undefined && intentBusinessId.current !== business.id) onInitialServiceHandled?.(); }, [business, initialServiceId, onInitialServiceHandled]);
-  const [version, setVersion] = useState(0), [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(timer); }, []);
   if (projection.loading) return <div className="mx-auto max-w-lg p-6"><Notice>Cargando negocio…</Notice></div>;
   if (!business) return <div className="mx-auto max-w-lg space-y-4 p-6"><Notice error>{projection.error || 'No encontramos este negocio. Revisa el enlace o escanea nuevamente su QR.'}</Notice><Link href="/" className="text-sarin-blue underline">Volver al inicio</Link></div>;
@@ -82,8 +108,7 @@ function Island({ slug, initialServiceId, onInitialServiceHandled }: { slug: str
       {projection.error && <Notice error>{projection.error}</Notice>}
       <section aria-label="Servicios del negocio" className="rounded-2xl border border-sarin-line bg-sarin-paper p-5"><h2 className="font-semibold">Servicios de {business.name}</h2><div className="mt-3 flex flex-wrap gap-2">{business.services.map(service => <span key={service.id} className="min-w-0 max-w-full break-words rounded-lg border border-sarin-line px-3 py-2 text-xs [overflow-wrap:anywhere]">{service.name} · {service.price.toLocaleString('es-CO')} COP</span>)}</div><nav className="mt-3 flex flex-wrap gap-x-5 text-xs text-sarin-blue" aria-label="Información del servicio"><Link href="/privacidad" className="inline-flex min-h-11 items-center underline">Privacidad</Link><Link href="/ayuda" className="inline-flex min-h-11 items-center underline">Ayuda</Link></nav></section>
       {!policy.ready && <div><Notice error={Boolean(policy.error)}>{policy.error || 'Comprobando las opciones de reserva…'}</Notice>{policy.error && <button className={buttonClass} onClick={policy.refresh}>Reintentar opciones de reserva</button>}</div>}
-      {user && policy.capability && <BookingJourney key={`${user.uid}:${business.id}`} business={business} capability={policy.capability} uid={user.uid} permitted={account.active && businessConsent.active} policyReady={policy.ready} now={now} initialServiceId={scopedServiceId} onInitialServiceHandled={onInitialServiceHandled} onConfirmed={() => setVersion(value => value + 1)} />}
-      {user && <ClientAppointments key={`${business.id}:${user.uid}:${version}`} businessId={business.id} businessName={business.name} resources={business.resources} userId={user.uid} now={now} />}
+      {user && <BookingWorkspace key={`${user.uid}:${business.id}`} business={business} capability={policy.capability} uid={user.uid} permitted={account.active && businessConsent.active} policyReady={policy.ready} catalogReady={!projection.error && !projection.loading} now={now} initialServiceId={scopedServiceId} onInitialServiceHandled={onInitialServiceHandled} />}
     </div>
   </main>;
 }
