@@ -34,7 +34,9 @@ Por instrucción del propietario, la página local identifica **ALS Dev Studio**
 
 La [revisión legal y propuesta de aceptación](../product/2026-10-16-legal-consent-review.md) usa fuentes oficiales colombianas. Recomienda separar términos contractuales y autorización informada, sin casillas premarcadas, y conservar constancia versionada en servidor. El cliente autoriza sus datos; el dueño no autoriza automáticamente a todos sus clientes.
 
-**El control de aceptación todavía no está implementado.** Faltan completar identificación/contactos aplicables a Sarin, política de conservación y revisión de contratos/roles de proveedores. La política actual de ALS identifica una persona natural bajo nombre comercial; ese hecho debe conciliarse con la identificación final solicitada para Sarin. No se publicó una política contractual incompleta ni se finge autorización de usuarios anteriores.
+**El control de aceptación todavía no está implementado.** La identificación y el contacto de ALS se completaron localmente con la política pública indicada por el propietario: nombre comercial ALS Dev Studio, titular Andrés Leonardo Santiago González, NIT, dirección en Medellín, teléfono y correo. Siguen pendientes la política de conservación, los contactos/roles de cada negocio y la revisión de contratos/roles de proveedores. No se publicó una política contractual incompleta ni se finge autorización de usuarios anteriores.
+
+Para esta actualización de datos de contacto se ejecutaron `pnpm test tests/service-information.test.tsx` (**2 aprobadas**) y `pnpm run typecheck` (salida **0**), además de `git diff --check`. Logs ignorados: `privacy-contact-tests.log` y `privacy-contact-types.log`. Es un cambio local posterior a la imagen de seguimiento; requiere reconstruirla antes de una publicación futura.
 
 ## Validación
 

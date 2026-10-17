@@ -6,7 +6,8 @@
 - [x] Códigos aleatorios de seis dígitos en servidor, asignación privada atómica, compatibilidad anterior, canje por correo verificado y límites por UID/correo de 5/min, 20/h y 50/día. Ceros, colisiones, concurrencia y replay verificados.
 - [x] Responsable de privacidad actualizado a ALS Dev Studio y correo confirmado; hechos de conservación/IA corregidos. [Revisión legal y textos propuestos](docs/product/2026-10-16-legal-consent-review.md).
 - [x] 794 pruebas de aplicación aprobadas/25 omitidas, 23 Firestore y build correctos; revisión independiente sin P1/P2 abiertos.
-- [ ] Completar identificación/contactos y decisiones de conservación/proveedores para cerrar términos, autorización y su control en servidor. El control de aceptación aún no está implementado.
+- [x] Completar identificación y contacto de ALS desde su política pública indicada por el propietario: titular del nombre comercial, NIT, dirección en Medellín, teléfono y correo. Versión local; sin publicación nueva.
+- [ ] Completar decisiones de conservación/proveedores para cerrar términos, autorización y su control en servidor. El control de aceptación aún no está implementado.
 - [ ] Aclarar y acordar el presupuesto antes de pedir publicación. La respuesta del propietario fue «esto no lo entiendo», no una aprobación de límites o producción. Gate monetario sin activar.
 
 [Evidencia de seguimiento](docs/qa/2026-10-16-pilot-followup.md). Las candidatas y publicaciones descritas más abajo conservan el estado de sus respectivas fases.

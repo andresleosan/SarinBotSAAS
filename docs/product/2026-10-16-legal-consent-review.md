@@ -4,9 +4,15 @@
 
 ## Identidad y situación comprobada
 
-El propietario confirmó **ALS Dev Studio** como empresa responsable de Sarin y **alsdevstudio@alsdevstudio.com** como correo de contacto. Están pendientes la dirección comercial/domicilio y el teléfono; no se inventan NIT, razón social registrada, dirección ni números. La identificación jurídica completa deberá corresponder a quien presta efectivamente el servicio.
+El propietario pidió identificar a **ALS Dev Studio** como responsable de Sarin, confirmó **alsdevstudio@alsdevstudio.com** y remitió a su política existente para completar los datos de contacto. Se contrastaron directamente en Chrome el 16 de octubre de 2026 y se incorporaron a la página local de privacidad:
 
-La [política pública actual de ALS](https://www.alsdevstudio.com/privacidad), abierta y revisada en Chrome, identifica a Andrés Leonardo Santiago González como persona natural que presta servicios bajo el nombre ALS DevStudio y publica contacto en Medellín. Es información de esa web, no una verificación registral. La versión final de Sarin debe aclarar si ALS es nombre comercial de esa persona o una persona jurídica distinta, y usar domicilio/teléfono vigentes para Sarin; no copiar automáticamente la política de un portafolio sin cuentas a una plataforma de citas con IA.
+- Nombre comercial: **ALS Dev Studio**; titular identificado en la política: **Andrés Leonardo Santiago González, persona natural**.
+- NIT publicado: **7005674733**.
+- Dirección publicada, conservada tal como aparece: **Carrera 34 Calle 38 # 38, Medellín, Colombia**.
+- Teléfono: **+57 314 643 2135**.
+- Correo: **alsdevstudio@alsdevstudio.com**.
+
+Fuente: [política pública de ALS](https://www.alsdevstudio.com/privacidad). Es información declarada en esa web, no una verificación registral. Sarin mantiene el nombre comercial solicitado y la identificación de su titular sin presentarlo como una sociedad distinta. No se copia automáticamente la política de un portafolio sin cuentas a una plataforma de citas con IA; los tratamientos, conservación y proveedores de Sarin deben describirse según su operación propia.
 
 La [página local de privacidad](../../src/app/privacidad/page.tsx) ya identifica a ALS Dev Studio, explica autenticación, reservas, comprobantes y logos, y distingue Ollama de las API externas configurables DeepSeek/Gemini. Declara que no hay borrado automático general por antigüedad y que la política formal de conservación sigue pendiente. Cancelar una cita conserva su registro. Estos hechos locales no acreditan una publicación nueva ni equivalen a recoger autorización.
 
@@ -69,7 +75,7 @@ Como valoración de riesgo, un servicio o mensaje de una cita puede revelar salu
 
 ## Pendientes antes de cerrar textos y aplicación
 
-- Confirmar dirección comercial/domicilio, teléfono e identificación jurídica completa de ALS Dev Studio; recopilar contactos y roles de cada negocio.
+- Identificación y contacto de ALS completados en la versión local con la política indicada por el propietario. Recopilar además contactos y roles de cada negocio; la autorización del dueño no cubre automáticamente a todos sus clientes.
 - Aprobar una política de conservación por categoría y finalidad, incluidos respaldos y proveedores, y un procedimiento de derechos con responsable de atención. La norma limita la conservación a lo razonable y necesario y contempla deberes legales/contractuales; la ausencia actual de TTL no autoriza conservación indefinida. No prometer un borrado automático o inmediato que hoy no existe. [Decreto 1074, art. 2.2.2.25.2.8](https://normativa.colpensiones.gov.co/colpens/docs/decreto_1074_2015_pr025.htm).
 - Verificar contratos/DPA, países y tratamiento efectivo de proveedores; resolver salud/datos sensibles y menores antes de autorizar esos usos.
 - Revisar los textos finales con asesoría jurídica pertinente y aprobar por separado su implementación y publicación. La actualización local de privacidad no acredita todavía autorización recogida ni funcionamiento del control propuesto.
