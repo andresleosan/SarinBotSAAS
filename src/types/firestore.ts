@@ -1,5 +1,6 @@
 import type { SubscriptionPlanId } from '@/lib/billing-plans';
 import type { BusinessLogo, BusinessSocialLink } from '@/lib/business-branding';
+import type { BusinessLocation } from '@/lib/business-location';
 export type { SubscriptionPlanId } from '@/lib/billing-plans';
 
 export interface PlatformSettings {
@@ -90,6 +91,7 @@ export interface Business {
   category: string;
   phoneWhatsApp: string;
   socialLinks?: BusinessSocialLink[];
+  location?: BusinessLocation;
   logo?: BusinessLogo;
   timezone: 'America/Bogota';
   subscription: {
@@ -132,6 +134,7 @@ export interface PublicBusinessProfile {
   timezone: 'America/Bogota';
   logo?: BusinessLogo;
   socialLinks?: BusinessSocialLink[];
+  location?: BusinessLocation;
   services: Pick<TenantService, 'id' | 'name' | 'price' | 'durationMinutes' | 'description' | 'category'>[];
   weeklySchedule: Business['weeklySchedule'];
   bookingAvailable: boolean;

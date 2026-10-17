@@ -11,6 +11,7 @@ import { normalizeBusinessSocialLinks, type BusinessSocialLink } from '@/lib/bus
 import { assertConsent } from './consent';
 import { assertBookingIntakePolicy } from './booking-data-policy';
 import { preserveServiceCatalogMetadata, serviceCatalogMetadata } from '@/lib/service-catalog';
+import { businessLocationSchema, normalizeBusinessLocation } from '@/lib/business-location';
 
 export const businessIdForOwner = (uid: string) => `b_${createHash('sha256').update(uid).digest('hex').slice(0, 32)}`;
 export const stableDocumentId = (...parts: string[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
@@ -27,6 +28,7 @@ export function privateBusinessDraft(user: Pick<ChatActor, 'uid' | 'email'>, now
 }
 
 export function publicBusiness(business: Business): PublicBusiness {
+  const location = normalizeBusinessLocation(business.location);
   let socialLinks: BusinessSocialLink[] | undefined;
   if (business.socialLinks !== undefined) {
     try { socialLinks = normalizeBusinessSocialLinks(business.socialLinks); } catch { /* Invalid historic contacts are not public. */ }
@@ -35,6 +37,7 @@ export function publicBusiness(business: Business): PublicBusiness {
     id: business.id, slug: business.slug, name: business.name, category: business.category,
     phoneWhatsApp: business.phoneWhatsApp, timezone: business.timezone,
     ...(socialLinks !== undefined ? { socialLinks } : {}),
+    ...(location ? { location } : {}),
     ...(business.logo && /^[a-f0-9]{64}$/.test(business.logo.sha256) ? { logo: { sha256: business.logo.sha256 } } : {}),
     subscription: { status: business.subscription.status, trialEndsAt: business.subscription.trialEndsAt, currentPeriodEndsAt: business.subscription.currentPeriodEndsAt, ...(business.subscription.graceEndsAt !== undefined ? { graceEndsAt: business.subscription.graceEndsAt } : {}), ...(business.subscription.paidTrial ? { paidTrial: { activatedAt: business.subscription.paidTrial.activatedAt, appointmentLimit: business.subscription.paidTrial.appointmentLimit, appointmentsUsed: business.subscription.paidTrial.appointmentsUsed, ...(business.subscription.paidTrial.source ? { source: business.subscription.paidTrial.source } : {}), ...(business.subscription.paidTrial.source === 'invitation' ? { accessSuspended: business.subscription.paidTrial.accessSuspended } : {}) } } : {}) },
     sarinConfig: { onboardingCompleted: business.sarinConfig.onboardingCompleted, tone: business.sarinConfig.tone, customRules: business.sarinConfig.customRules, intakeFields: business.sarinConfig.intakeFields },
@@ -55,6 +58,7 @@ export function publicBusinessProfile(business: Business): PublicBusinessProfile
     phoneWhatsApp: projection.phoneWhatsApp, timezone: projection.timezone,
     ...(projection.logo ? { logo: projection.logo } : {}),
     ...(projection.socialLinks ? { socialLinks: projection.socialLinks } : {}),
+    ...(projection.location ? { location: projection.location } : {}),
     services: projection.services.map(service => ({ id: service.id, name: service.name, price: service.price, durationMinutes: service.durationMinutes, ...serviceCatalogMetadata(service) })),
     weeklySchedule,
     bookingAvailable: isSubscriptionAllowed(projection) && projection.sarinConfig.onboardingCompleted
@@ -98,6 +102,10 @@ export async function createBusiness(user: ChatActor, config: BusinessConfig, db
     if (business.slug && business.slug !== config.slug) throw new HttpError(409, 'El enlace del negocio es permanente para conservar tu código QR.');
     if (!business.slug && slug.exists) throw new HttpError(409, 'Este enlace ya está ocupado. Escoge otro slug.');
     const updated: Business = { ...business, slug: config.slug, name: config.name, category: config.category, phoneWhatsApp: config.phoneWhatsApp, ...(config.socialLinks !== undefined ? { socialLinks: normalizeBusinessSocialLinks(config.socialLinks) } : {}), sarinConfig: { onboardingCompleted: true, tone: config.tone, customRules: config.customRules, intakeFields: config.intakeFields }, resources: config.resources, services: preserveServiceCatalogMetadata(config.services, business.services), weeklySchedule: config.weeklySchedule };
+    // Omission by older clients and assistant drafts preserves the saved value.
+    // Explicit null is the only request that removes the optional JSON field.
+    if (config.location === null) delete updated.location;
+    else if (config.location !== undefined) updated.location = businessLocationSchema.parse(config.location);
     if (!business.slug) transaction.create(slugReference, { businessId: id, ownerUid: user.uid });
     transaction.set(reference, updated);
     transaction.set(db.collection('publicBusinesses').doc(config.slug), publicBusiness(updated));

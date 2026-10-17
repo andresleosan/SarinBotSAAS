@@ -8,7 +8,9 @@ import { WhatsAppPhoneField } from "@/components/whatsapp-phone-field";
 import { TextSuggestions } from "@/components/text-suggestions";
 import { BusinessLogoField } from '@/components/business-logo-field';
 import { BusinessSocialFields } from '@/components/business-social-fields';
+import { BusinessLocationEditor } from '@/components/business-location-editor';
 import type { BusinessSocialLink } from '@/lib/business-branding';
+import { normalizeBusinessLocation, type BusinessLocation } from '@/lib/business-location';
 import { AuthGate, useAuth } from "@/components/auth-provider";
 import { useAccountConsent } from '@/components/consent-panel';
 import {
@@ -148,6 +150,7 @@ function Configuration() {
   const [category, setCategory] = useState("");
   const [phone, setPhone] = useState("");
   const [socialLinks, setSocialLinks] = useState<BusinessSocialLink[]>([]);
+  const [location, setLocation] = useState<BusinessLocation | null>(null);
   const [tone, setTone] = useState("Cercano y profesional");
   const [rules, setRules] = useState("");
   const [intake, setIntake] = useState("");
@@ -173,7 +176,7 @@ function Configuration() {
   const loadedBusiness = useRef('');
   const baseline = useRef('');
   const latestSnapshot = useRef('');
-  latestSnapshot.current = JSON.stringify([name, slug, category, phone, tone, rules, intake, resources, services, schedule, socialLinks]);
+  latestSnapshot.current = JSON.stringify([name, slug, category, phone, tone, rules, intake, resources, services, schedule, socialLinks, location]);
   useEffect(() => {
     if (!business?.sarinConfig.onboardingCompleted) return;
     const version = JSON.stringify([
@@ -187,18 +190,20 @@ function Configuration() {
       business.services,
       business.weeklySchedule,
       business.socialLinks,
+      business.location,
     ]);
     if (loadedVersion.current === version) return;
     if (loadedBusiness.current === business.id && baseline.current && baseline.current !== latestSnapshot.current) return;
     if (loadedBusiness.current !== business.id) proposedIntake.current = [];
     loadedBusiness.current = business.id;
-    baseline.current = JSON.stringify([business.name, business.slug, business.category, business.phoneWhatsApp, business.sarinConfig.tone, business.sarinConfig.customRules, business.sarinConfig.intakeFields.map(item => item.label).join('\n'), business.resources, business.services, business.weeklySchedule, business.socialLinks ?? []]);
+    baseline.current = JSON.stringify([business.name, business.slug, business.category, business.phoneWhatsApp, business.sarinConfig.tone, business.sarinConfig.customRules, business.sarinConfig.intakeFields.map(item => item.label).join('\n'), business.resources, business.services, business.weeklySchedule, business.socialLinks ?? [], normalizeBusinessLocation(business.location) ?? null]);
     loadedVersion.current = version;
     setName(business.name);
     setSlug(business.slug);
     setCategory(business.category);
     setPhone(business.phoneWhatsApp);
     setSocialLinks(business.socialLinks ?? []);
+    setLocation(normalizeBusinessLocation(business.location) ?? null);
     setTone(business.sarinConfig.tone);
     setRules(business.sarinConfig.customRules);
     setIntake(
@@ -211,6 +216,7 @@ function Configuration() {
   function applyConfigurationDraft(draft: BusinessConfig) {
     setName(draft.name); setSlug(business?.slug || draft.slug); setCategory(draft.category); setPhone(draft.phoneWhatsApp);
     if (draft.socialLinks !== undefined) setSocialLinks(draft.socialLinks);
+    if (draft.location !== undefined) setLocation(normalizeBusinessLocation(draft.location) ?? null);
     proposedIntake.current = draft.intakeFields;
     setTone(draft.tone); setRules(draft.customRules); setIntake(draft.intakeFields.map(field => field.label).join('\n'));
     setResources(draft.resources); setServices(previous => preserveServiceCatalogMetadata(draft.services, previous)); setSchedule(draft.weeklySchedule); setSaved(false);
@@ -231,6 +237,7 @@ function Configuration() {
           category,
           phoneWhatsApp: phone,
           socialLinks,
+          location,
           tone,
           customRules: rules,
           resources,
@@ -350,6 +357,7 @@ function Configuration() {
             <WhatsAppPhoneField value={phone} onChange={setPhone} />
           </div>
           <BusinessSocialFields value={socialLinks} onChange={setSocialLinks} />
+          <BusinessLocationEditor value={location} onChange={setLocation} />
           <section className="space-y-2">
             <h3 className="font-semibold">Profesionales o estaciones</h3>
             {resources.map((resource, index) => (

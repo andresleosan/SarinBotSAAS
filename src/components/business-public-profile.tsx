@@ -1,6 +1,7 @@
 "use client";
 
 import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
+import { BusinessLocation } from '@/components/business-location';
 import type { PublicBusinessProfile } from '@/types/firestore';
 
 const weekDays = [
@@ -76,6 +77,7 @@ export function BusinessPublicProfile({ profile, onContinue }: { profile: Public
       </section>
 
       <div className="min-w-0 space-y-4">
+        <BusinessLocation location={profile.location} />
         <section aria-label="Horario del negocio" className="rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
           <h2 className="text-lg font-semibold">Horario de atención</h2>
           <p className="mt-1 text-xs text-sarin-muted">Hora de Colombia</p>

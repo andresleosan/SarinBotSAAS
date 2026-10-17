@@ -17,6 +17,7 @@ import { useApiPoll } from '@/lib/client/use-api-poll';
 import { getBusinessAccess, isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import type { PublicBusiness, PublicBusinessProfile } from '@/types/firestore';
 import { BusinessPublicProfile } from '@/components/business-public-profile';
+import { BusinessLocation } from '@/components/business-location';
 import type { BookingCapability } from '@/lib/booking-subject';
 import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
 
@@ -105,6 +106,7 @@ function Island({ slug, initialServiceId, onInitialServiceHandled }: { slug: str
       <ConsentPanel controller={account} title="Permisos de mi cuenta" />
       <ConsentPanel controller={businessConsent} title={`Chat y reservas con ${business.name}`} blockedReason={!account.active ? 'Primero revisa los permisos de tu cuenta. Tus citas existentes siguen disponibles abajo.' : undefined} />
       <nav aria-label="Contacto del negocio" className="flex flex-wrap gap-x-4 text-sm text-sarin-blue">{business.phoneWhatsApp && <a href={`tel:+${business.phoneWhatsApp.replace(/\D/g, '')}`} className="inline-flex min-h-11 items-center underline">+{business.phoneWhatsApp.replace(/^\+/, '')}</a>}{(business.socialLinks ?? []).map(link => <a key={link.platform} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 max-w-full items-center break-all underline">{businessSocialPlatformLabels[link.platform]} · {businessSocialLabel(link)}</a>)}</nav>
+      <BusinessLocation location={business.location} />
       {projection.error && <Notice error>{projection.error}</Notice>}
       <section aria-label="Servicios del negocio" className="rounded-2xl border border-sarin-line bg-sarin-paper p-5"><h2 className="font-semibold">Servicios de {business.name}</h2><div className="mt-3 flex flex-wrap gap-2">{business.services.map(service => <span key={service.id} className="min-w-0 max-w-full break-words rounded-lg border border-sarin-line px-3 py-2 text-xs [overflow-wrap:anywhere]">{service.name} · {service.price.toLocaleString('es-CO')} COP</span>)}</div><nav className="mt-3 flex flex-wrap gap-x-5 text-xs text-sarin-blue" aria-label="Información del servicio"><Link href="/privacidad" className="inline-flex min-h-11 items-center underline">Privacidad</Link><Link href="/ayuda" className="inline-flex min-h-11 items-center underline">Ayuda</Link></nav></section>
       {!policy.ready && <div><Notice error={Boolean(policy.error)}>{policy.error || 'Comprobando las opciones de reserva…'}</Notice>{policy.error && <button className={buttonClass} onClick={policy.refresh}>Reintentar opciones de reserva</button>}</div>}

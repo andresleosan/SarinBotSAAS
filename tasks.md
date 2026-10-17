@@ -1,5 +1,12 @@
 # Estado de implementación — 2026-10-17
 
+## Ubicación y modalidad — aprobado localmente
+
+- [x] Añadir configuración pública opcional de modalidad, dirección e indicaciones, con enlace seguro y proyección validada; conservar valores omitidos por clientes anteriores.
+- [x] Cerrar TDD y revisión independiente: 1.270 pruebas aprobadas/26 omitidas, tipos/audit limpios y 31 controles manuales de navegador.
+- [x] Verificar cuatro guardados sintéticos con cambios exclusivos de ubicación, limpiar siete documentos propios y detener QA. [Aceptación local](docs/qa/2026-10-17-business-location.md).
+- [ ] Publicar la versión autorizada después de auditar imagen y reversión compatible, drenar cola y verificar una instancia efectiva y la sesión administrativa.
+
 ## Añadir cita al calendario — publicado
 
 - [x] Añadir descarga ICS explícita a las citas futuras confirmadas de Mis citas, con identidad estable, horario UTC correcto y datos permitidos; conservar PNG e indicar el límite de actualización.

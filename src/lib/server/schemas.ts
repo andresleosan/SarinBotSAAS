@@ -4,6 +4,7 @@ import { SUBSCRIPTION_PLAN_IDS } from '@/lib/billing-plans';
 import { businessSocialLinksSchema } from '@/lib/business-branding';
 import { bookingSubjectCaseSchema, bookingBeneficiarySchema } from '@/lib/booking-subject';
 import { SERVICE_CATEGORY_MAX_LENGTH, SERVICE_DESCRIPTION_MAX_LENGTH } from '@/lib/service-catalog';
+import { businessLocationSchema } from '@/lib/business-location';
 
 export const documentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 export const requestIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,128}$/);
@@ -25,6 +26,7 @@ export const businessConfigSchema = z.object({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(3).max(70),
   phoneWhatsApp: phoneSchema,
   socialLinks: businessSocialLinksSchema.optional(),
+  location: businessLocationSchema.nullable().optional(),
   tone: z.string().trim().max(500).default('Cercano, claro y servicial'),
   customRules: z.string().trim().max(4000).default(''),
   intakeFields: z.array(z.object({ key: documentIdSchema, label: shortText, required: z.boolean() }).strict()).max(20),
