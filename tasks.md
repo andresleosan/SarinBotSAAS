@@ -1,14 +1,14 @@
 # Estado de implementación — 2026-10-17
 
-## Detalles del servicio en calendario — aprobado localmente
+## Detalles del servicio en calendario — publicado
 
 - [x] Diseño acotado autorizado: categoría y descripción opcionales, duración sin buffer y precio COP debajo del servicio seleccionado. [Decisión](docs/design/2026-10-17-calendar-service-details.md).
 - [x] Reutilizar datos y normalización del catálogo; omitir metadatos inválidos, conservar permisos, propuesta, confirmación y recuperación. Revisión independiente PASS después de corregir datos históricos malformados.
 - [x] 12 pruebas focalizadas y 960 de aplicación aprobadas/26 omitidas; tipos, audit y diff-check correctos. CUA con 16 comprobaciones en 320/390/1280, sin errores ni inferencia; sin confirmar citas. [Evidencia](docs/qa/2026-10-17-calendar-service-details.md).
 - [x] Congelar runtime `f47daf4`, construir imagen Linux `6b9dacd5…` y pasar humo aislado sin red/credenciales. Reversión compatible al calendario publicado `98629e1`/`b6bc75f9…`; sin migraciones.
-- [ ] Autorizar específicamente y publicar la candidata; todavía sin push de imagen ni cambios de producción.
+- [x] Publicar después de «Sí, publicar esta versión»: imagen `6b9dacd5…`, Worker `795cd3ac…`, Containers v12. Cola drenada, instancia conectada única y cero antiguas; HTTP, bundles e iconos correctos. Permisos reales pendientes conservados, sin crear citas ni editar negocio; sesión administrativa preservada. [Publicación y reversión](docs/qa/2026-10-17-calendar-service-details.md).
 
-Rama `codex/calendar-service-details-20261017`, worktree existente del catálogo. La implementación está aprobada; el despliegue de este incremento permanece pendiente.
+Rama `codex/calendar-service-details-20261017`, worktree existente del catálogo. Runtime publicado `f47daf4`; reversión compatible a `98629e1`/`b6bc75f9…`. El checkout original permanece intacto.
 
 ## Calendario de reserva directa — publicado
 

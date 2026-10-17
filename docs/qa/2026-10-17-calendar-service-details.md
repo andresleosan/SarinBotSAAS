@@ -1,6 +1,6 @@
 # Detalles del servicio: aceptación local
 
-Fecha: 17 de octubre de 2026. Estado: aprobado localmente, pendiente de autorización específica de publicación. Runtime candidato `f47daf4955872bf007206413489b719e6787aa6c`, rama `codex/calendar-service-details-20261017`, basada en `4b0efb6` en el worktree existente del catálogo. El checkout original se conserva.
+Fecha: 17 de octubre de 2026. Estado: publicado y verificado después de autorización específica. Runtime `f47daf4955872bf007206413489b719e6787aa6c`, rama `codex/calendar-service-details-20261017`, basada en `4b0efb6` en el worktree existente del catálogo. El checkout original se conserva.
 
 ## Resultado
 
@@ -51,6 +51,26 @@ Paquete privado: `%LOCALAPPDATA%/SarinBot/calendar-service-details-release-20261
 
 El humo aislado verificó portada, ayuda, privacidad, onboarding y ruta de negocio con HTTP 200; sesión y negocios protegidos con 401; manifiesto e iconos 192/512 idénticos; y el marcador `Detalles del servicio` en el bundle. Este humo estático no sustituye la prueba de datos realizada con los emuladores.
 
-La base vigente y reversión compatible es `98629e1`, imagen `sha256:b6bc75f9f108e0f798dcb4f135e3cf281844060c2bd64e3181382b7cb785a39b`, Worker `08a0183f-997a-4b84-8c9a-803a78b47b3c`, Containers v11. No hay migraciones ni cambios de contratos. La reversión retira el nuevo bloque conservando citas y metadatos; debe mantener D1/R2, secretos, presupuesto activo y una sola instancia.
+La base anterior y reversión compatible es `98629e1`, imagen `sha256:b6bc75f9f108e0f798dcb4f135e3cf281844060c2bd64e3181382b7cb785a39b`, Worker `08a0183f-997a-4b84-8c9a-803a78b47b3c`, Containers v11. No hay migraciones ni cambios de contratos. La reversión retira el nuevo bloque conservando citas y metadatos; debe mantener D1/R2, secretos, presupuesto activo y una sola instancia.
 
-No se ha enviado esta imagen al registro ni modificado producción. El siguiente paso requiere autorización específica del propietario y el procedimiento vigente de mantenimiento, drenaje de cola, sustitución de instancia, reapertura y comprobación real. La sesión administrativa se conserva para ese paso.
+Antes de la autorización se congelaron el código y la imagen, se completaron las pruebas y se preparó la reversión sin modificar producción. El propietario respondió «Sí, publicar esta versión» a la pregunta específica de publicación del resumen en `sarinbotsaas.pages.dev`.
+
+## Publicación y aceptación real
+
+La imagen enviada al registro coincide con el digest local probado `6b9dacd5…`; el candidato se desplegó por digest fijo, sin reconstrucción. Wrangler 4.150.0 validó la configuración exacta mediante dry-run. La lectura independiente inicial confirmó la base v11, trece secretos, todos los bindings y variables, presupuesto activo y Pages sin cambios. Se renovó únicamente la autenticación habitual existente, sin ampliar permisos.
+
+| Etapa | Resultado real |
+| --- | --- |
+| Mantenimiento sobre imagen anterior | Worker `48b96f0e-0d78-4aea-8b2e-5facbc7b851d`; HTTP 503 público y cola administrativa drenada. |
+| Cambio de imagen con mantenimiento | Worker `3892d90d-134b-452b-a407-c7caee33be07`; app efectiva v12 verificada antes de reabrir. |
+| Instancia efectiva | Allocation `d0333291-f1f6-4701-95a4-19fe19bb67a7`, running, Durable Object conectado, singleton `sarin-global-app`; una instancia y cero antiguas con paginación completa. |
+| Reapertura | Worker `795cd3ac-670d-41d0-a026-3a954dc4e35f`, 100 %, mantenimiento desactivado; misma imagen y versión 12. |
+| Cola autenticada | Antes, drenada, después del rollout y después de reabrir: HTTP 200; active/queued/critical/normal en cero, capacidad cuatro. La lectura final usó el diagnóstico estándar del proveedor activo. |
+| HTTP y artefactos | Seis rutas públicas 200, sesión/negocios anónimos 401, perfil mínimo válido sin caché, iconos idénticos, marcadores de calendario/detalles/catálogo presentes en los bundles publicados. |
+| Auditoría independiente final | PASS, 16:49:27 UTC: imagen exacta, max/configured=1, cero antiguas, trece secretos, bindings/variables, D1/R2, presupuesto y Pages conservados. |
+
+El navegador real se recargó en el negocio de pruebas y conservó sesión, calendario seleccionado y «Mis citas». Los permisos de cuenta siguen vigentes y los del negocio siguen pendientes; calendario y chat permanecen deshabilitados y no se montan campos antes de esa decisión. No se aceptaron consentimientos, crearon citas ni editaron negocios reales para la comprobación. Por ese límite, el resumen completo se acredita con el bundle publicado y la prueba funcional aislada; no se afirma que se haya visto habilitado en esta cuenta de producción.
+
+La captura real `service-details-live-390.png`, el estado de navegador y los informes HTTP, de cola y auditoría quedan en el paquete privado, fuera de Git. Viewport restaurado y pestañas de cliente/administración conservadas; no hay sesión pendiente de restaurar. Cierre del paquete: **16:50:32 UTC / 11:50:32 de Bogotá**.
+
+La rama y su evidencia se enviaron a `origin`; no se atribuye un CI remoto al push de esta rama. La documentación posterior conserva el runtime congelado de la imagen. El paquete contiene `wrangler.rollback-rollout.json` y `wrangler.rollback-final.json` fijados a `b6bc75f9…`; una reversión debe repetir mantenimiento/drenaje, esperar la única instancia efectiva compatible y después reabrir, sin migraciones ni borrado de datos.
