@@ -1,6 +1,6 @@
 # Revisión de aceptación y tratamiento de datos — 16 de octubre de 2026
 
-**Estado:** investigación y propuesta de diseño para revisión. No constituye asesoría jurídica concluyente, aprobación de cumplimiento ni descripción de una función publicada. El control de consentimiento descrito aquí **no está implementado**. Este documento no autoriza despliegues ni modifica el alcance del piloto.
+**Estado:** revisión de fuentes y control técnico **implementado y verificado localmente** tras la continuación del propietario. Los textos son borradores locales pendientes de cerrar conservación, contratos/roles de proveedores y datos de cada establecimiento antes de publicar este incremento. No constituye aprobación de cumplimiento ni descripción de una función ya publicada. [Plan ejecutado](../superpowers/plans/2026-10-16-consent.md) y [evidencia](../qa/2026-10-16-consent-acceptance.md).
 
 ## Identidad y situación comprobada
 
@@ -14,7 +14,7 @@ El propietario pidió identificar a **ALS Dev Studio** como responsable de Sarin
 
 Fuente: [política pública de ALS](https://www.alsdevstudio.com/privacidad). Es información declarada en esa web, no una verificación registral. Sarin mantiene el nombre comercial solicitado y la identificación de su titular sin presentarlo como una sociedad distinta. No se copia automáticamente la política de un portafolio sin cuentas a una plataforma de citas con IA; los tratamientos, conservación y proveedores de Sarin deben describirse según su operación propia.
 
-La [página local de privacidad](../../src/app/privacidad/page.tsx) ya identifica a ALS Dev Studio, explica autenticación, reservas, comprobantes y logos, y distingue Ollama de las API externas configurables DeepSeek/Gemini. Declara que no hay borrado automático general por antigüedad y que la política formal de conservación sigue pendiente. Cancelar una cita conserva su registro. Estos hechos locales no acreditan una publicación nueva ni equivalen a recoger autorización.
+La [página local de privacidad](../../src/app/privacidad/page.tsx) identifica a ALS Dev Studio, explica autenticación, reservas, comprobantes y logos, y distingue Ollama de las API externas configurables DeepSeek/Gemini. Declara que no hay borrado automático general por antigüedad y que la política formal de conservación sigue pendiente. Cancelar una cita conserva su registro. Ahora también describe las constancias y su retirada; los textos públicos y sus snapshots usan la [misma fuente versionada](../../src/lib/legal.ts). La publicación de información por sí sola no equivale a recoger autorización.
 
 ## Qué exige la normativa y qué se recomienda
 
@@ -37,33 +37,34 @@ La distribución propuesta, pendiente de validar con la operación y los contrat
 
 Es una aplicación propuesta de las definiciones del [art. 3 de la Ley 1581](https://www.cancilleria.gov.co/normograma/compilacion/docs/ley_1581_2012.htm), no una atribución automática de responsabilidades por usar la plataforma. El aviso del cliente debe identificar al negocio concreto y la intervención de ALS Dev Studio; el negocio debe facilitar sus contactos y política aplicable.
 
-## Textos propuestos: dos casillas desmarcadas
+## Textos implementados localmente: dos casillas desmarcadas por ámbito
 
-Usar dos decisiones independientes, con enlaces visibles y textos adaptados al actor. Los enlaces y documentos de condiciones todavía deben redactarse y revisarse; no se inventan rutas públicas existentes.
+Hay dos decisiones independientes con enlaces visibles a `/terminos` y `/privacidad`. La autorización de cuenta sirve a clientes y dueños; la segunda incluye pagos y publicación comercial solo si la persona administra un negocio. No se pide aceptar una política o condiciones particulares inexistentes del establecimiento.
 
 | Casilla | Alta del dueño | Cliente que inicia una reserva/chat |
 | --- | --- | --- |
-| **1. Condiciones contractuales** | «Acepto los Términos y condiciones de Sarin, prestado por ALS Dev Studio, para administrar mi negocio.» | «Acepto las condiciones de reserva de **[nombre del negocio]** y las condiciones de uso de Sarin.» |
-| **2. Autorización de datos** | «Autorizo a ALS Dev Studio a tratar mis datos de identificación y contacto para crear y administrar mi cuenta comercial, prestar el servicio, gestionar pagos y atender solicitudes, según la Política de tratamiento de datos.» | «Autorizo a **[nombre del negocio]** a tratar mis datos de identificación, contacto y reserva para gestionar mis citas y atender mis solicitudes, con ALS Dev Studio como operador de Sarin, según la Política de tratamiento de datos.» |
+| **1. Condiciones contractuales** | «Acepto los Términos y condiciones de uso de Sarin, prestado por ALS Dev Studio.» | El mismo texto de condiciones de uso de Sarin. |
+| **2. Autorización de datos** | Identificación y contacto para autenticación, cuenta y solicitudes; pagos y publicación de datos comerciales decididos por el dueño cuando corresponda. | Identificación, contacto, mensajes y reserva para solicitudes y citas con el negocio nombrado, mediante Sarin, según el aviso y la política. |
 
-Junto a la segunda casilla, explicar en lenguaje breve que el chat usa IA y que los mensajes y el contexto necesario pueden procesarse con los proveedores habilitados, con enlace al detalle verificado. Si ALS Dev Studio realiza además finalidades propias con datos del cliente, identificarlas y ajustar la autorización; no ocultarlas bajo el término «operador».
+El aviso de cliente muestra el nombre y teléfono del negocio, su finalidad de atender citas y la intervención de ALS Dev Studio en operación, cuenta, seguridad y soporte. Explica que el chat usa IA y puede enviar mensaje/contexto al proveedor configurado, e invita a evitar datos sensibles. No afirma contratos, países, entrenamiento o retención de proveedores que no se hayan comprobado.
 
 Las condiciones deben describir servicio, límites, precio/prueba/invitación, suspensión, soporte y cancelaciones coherentes con el producto. No incorporar renuncias de derechos, exenciones generales de responsabilidad ni aceptación de cambios de finalidad indefinidos. La publicidad o comunicaciones comerciales requieren una decisión separada y opcional, nunca incluida tácitamente en estas dos casillas ni necesaria para reservar.
 
-## Propuesta de constancia y validación en servidor
+## Constancia y validación implementadas en servidor
 
 Conservar una **constancia de aceptación**, distinta de un comprobante de pago. El diseño mínimo propuesto registra cada decisión con: UID autenticado, actor dueño/cliente, negocio correspondiente, identificador y versión de cada documento, finalidades específicas versionadas, versión o huella del texto mostrado, acción afirmativa y fecha del servidor. La constancia debe poder consultarse y entregarse al titular. UID y fecha no deben confiarse al cuerpo enviado por el navegador; no es necesario guardar conversaciones o IP para este diseño mínimo.
 
 No sobrescribir la prueba histórica al cambiar un documento: registrar cambios y revocaciones. Un cambio de finalidad exige nueva autorización cuando corresponda; renovar el texto informativo no permite ampliar silenciosamente los usos. Reintentar la misma aceptación no debe fabricar decisiones adicionales ni alterar su fecha original.
 
-En una implementación futura:
+La implementación local:
 
-1. Mostrar aviso y recoger autorización de cuenta antes de iniciar la recolección mediante autenticación; diseñar cómo conservar esa prueba previa y vincularla al UID posterior. El [GET de sesión actual](../../src/app/api/session/route.ts) puede materializar el perfil: revisar esa secuencia, sin tratar el acceso a una cuenta existente como una aceptación nueva.
-2. Validar la constancia y las finalidades aplicables en servidor antes de procesar nuevos mensajes/contexto y antes de IA en [POST `/api/sarin/chat`](../../src/app/api/sarin/chat/route.ts). Cubrir todos los canales y entradas de dominio equivalentes; una casilla solo en el navegador no protege la API.
-3. Validar nuevamente antes de recoger contacto/formulario y crear una reserva en [POST `/api/businesses/[id]/booking-proposals/[proposalId]/confirm`](../../src/app/api/businesses/[id]/booking-proposals/[proposalId]/confirm/route.ts) y en el dominio compartido de creación. La comprobación de una reserva nueva debe ser coherente con la transacción y evitar carreras con una revocación. Una confirmación repetida que recupera una reserva ya existente no debe crear otra ni exigir aceptar una finalidad nueva para leerla.
-4. Mantener disponibles el historial y la cancelación mediante [GET/PATCH de citas](../../src/app/api/businesses/[id]/appointments/route.ts), el acceso a políticas y los canales de derechos, con autenticación y permisos apropiados. No imponer nueva aceptación para consultar o cancelar citas existentes ni para pedir acceso, corrección, supresión o revocación. Ante falta de autorización para una operación nueva, detenerla antes de IA, reserva o consumo y explicar cómo continuar.
+1. Muestra las dos decisiones antes del acceso principal con Google. `/api/consent/preauthorize` firma una prueba anónima durante veinte minutos con fecha del servidor, sin escribir identidad ni registros anónimos en base de datos. Tras Google, `/api/consent` la vincula una sola vez al UID autenticado. Un reinicio invalida pruebas pendientes y exige repetir la decisión; no invalida constancias guardadas. El [GET de sesión](../../src/app/api/session/route.ts) es de solo lectura; el perfil se materializa al aceptar explícitamente. Existe acceso separado para consultar citas y ejercer derechos, sin aceptación automática.
+2. Exige autorización de cuenta y, para el cliente, de ese UID con ese negocio. Revisa antes de admisión y de IA, dentro de la transacción de cuota y al ejecutar trabajo que estuvo en cola. Falta de constancia vigente devuelve `CONSENT_REQUIRED` antes de nueva inferencia o consumo. Cubre las funciones de dominio, además de los endpoints.
+3. Revisa de forma transaccional antes de nuevas propuestas/reservas y de nuevas configuraciones, comprobantes, canjes, logos, bloqueos manuales y políticas de clientes. La creación de citas lee el estado de autorización dentro de la misma transacción; una revocación concurrente obliga a resolver el conflicto antes de guardar. No cambia las huellas de reservas anteriores.
+4. Conserva lectura, cancelación, contacto de derechos y recuperación de operaciones existentes. Un reintento de aceptación antigua devuelve el estado vigente y nunca reactiva una retirada. Las constancias son privadas, descargables por su titular, y contienen textos, huellas, finalidades, acciones afirmativas y fechas del servidor. El estado usa revisión incremental; la aceptación nueva requiere la revisión y documentos vigentes.
+5. Al retirar permisos, el navegador detiene lotes pendientes y nuevas confirmaciones sin borrar el historial mostrado. Una consulta de estado atrasada no reabre trabajo mientras la retirada está pendiente o es incierta; se ofrece reintentar la misma decisión. Los envíos comprueban que el token corresponda al UID que inició la acción.
 
-Son requisitos propuestos, sin endpoint nuevo, esquema de persistencia ni control publicados por este documento.
+Los documentos `serverSettings/consent_state_<hash>`, `consent_receipt_<hash>` y `consent_claim_<hash>` usan el contrato de almacenamiento existente; no requieren migración destructiva. La clave efímera de firma corresponde al proceso único exigido por la arquitectura. El origen público usa `SARIN_PUBLIC_BOOKING_ORIGIN`, compartido con los QR, para soportar el Host interno del gateway Pages sin confiar en cabeceras reenviadas del navegador. Estos controles no reemplazan las decisiones jurídicas y operativas siguientes.
 
 ## IA internacional y datos sensibles: decisiones pendientes
 
@@ -78,4 +79,4 @@ Como valoración de riesgo, un servicio o mensaje de una cita puede revelar salu
 - Identificación y contacto de ALS completados en la versión local con la política indicada por el propietario. Recopilar además contactos y roles de cada negocio; la autorización del dueño no cubre automáticamente a todos sus clientes.
 - Aprobar una política de conservación por categoría y finalidad, incluidos respaldos y proveedores, y un procedimiento de derechos con responsable de atención. La norma limita la conservación a lo razonable y necesario y contempla deberes legales/contractuales; la ausencia actual de TTL no autoriza conservación indefinida. No prometer un borrado automático o inmediato que hoy no existe. [Decreto 1074, art. 2.2.2.25.2.8](https://normativa.colpensiones.gov.co/colpens/docs/decreto_1074_2015_pr025.htm).
 - Verificar contratos/DPA, países y tratamiento efectivo de proveedores; resolver salud/datos sensibles y menores antes de autorizar esos usos.
-- Revisar los textos finales con asesoría jurídica pertinente y aprobar por separado su implementación y publicación. La actualización local de privacidad no acredita todavía autorización recogida ni funcionamiento del control propuesto.
+- Revisar los textos finales con asesoría jurídica pertinente antes de publicar el incremento. El control funciona localmente con datos sintéticos; no hay nueva publicación ni constancias de consentimiento atribuidas a usuarios reales por estas pruebas. No considerar a los usuarios anteriores autorizados por antigüedad o por iniciar sesión.
