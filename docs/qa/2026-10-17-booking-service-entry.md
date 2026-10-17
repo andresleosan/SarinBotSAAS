@@ -1,6 +1,6 @@
-# Reserva por servicio y disponibilidad vacía: aceptación local
+# Reserva por servicio y disponibilidad vacía: publicado
 
-Fecha: 17 de octubre de 2026. Estado: aprobado localmente, pendiente de autorización específica de publicación. Runtime candidato `2440af53a7331f9e44a4a7324e798267e72cb912`, rama `codex/booking-selection-and-availability-20261017`, basada en `8ca4770` en el worktree existente del catálogo. El checkout mixto original permanece intacto.
+Fecha: 17 de octubre de 2026. Estado: publicado después de autorización específica del propietario. Runtime publicado `2440af53a7331f9e44a4a7324e798267e72cb912`, rama `codex/booking-selection-and-availability-20261017`, basada en `8ca4770` en el worktree existente del catálogo. El checkout mixto original permanece intacto.
 
 ## Resultado
 
@@ -57,4 +57,54 @@ El humo aislado comprobó cinco páginas HTTP 200, sesión/negocios protegidos 4
 
 Reversión compatible al runtime publicado `f47daf4`, imagen `sha256:6b9dacd55f21fec481b0726fdde2dc4d6ce8874ee3bef6c8849fba9826b5abba`, Worker `795cd3ac-670d-41d0-a026-3a954dc4e35f`, Containers v12. No hay migraciones ni contratos nuevos; conserva lectura y cancelación de citas guardadas. Volver al frontend anterior retira las dos mejoras y conserva datos y metadatos. La selección y propuestas del navegador siguen siendo estados en memoria que una navegación no restituye por sí sola.
 
-La publicación aún no está autorizada: no se envió esta imagen al registro ni se cambió producción. Debe conservar una sola instancia, D1/R2, secretos y presupuesto, y seguir el procedimiento de mantenimiento, cola drenada, sustitución efectiva, reapertura y comprobación real después de la autorización específica del propietario.
+Publicación completada con autorización específica del propietario, Worker `bb969dc5-7062-46a0-9da4-34a08009f236`, Containers v13 e imagen `sha256:3c8e555db893889c444335de9d35a18041d8620ba3bda3e85d68c9fcee5aacd6`. Una instancia conectada y cero antiguas; mantenimiento desactivado, presupuesto y configuración conservados. La comprobación real mantuvo el permiso del negocio pendiente: no se atribuye UI nueva visible ni una reserva real. Los detalles y resultados se registran a continuación.
+
+## Publicación verificada
+
+Cierre efectivo: `2026-10-17T18:02:19.081Z` (13:02 de Bogotá). El propietario autorizó expresamente «Sí, publicar ambas mejoras». La imagen enviada al registro y el runtime desplegado corresponden al archivo Git `2440af53a7331f9e44a4a7324e798267e72cb912`; el digest del registro se verificó después del push. El paquete privado conserva las lecturas y los controles independientes utilizados para este cierre.
+
+Se activó mantenimiento sobre la imagen anterior con Worker `67bf9f98-f592-4abd-a1a0-c2973f7603fa` y se verificó HTTP 503 público. El rollout inmediato con Worker `909fecde-053b-42a8-a807-9ba1a38c311f` mantuvo ese estado hasta confirmar la imagen efectiva y su única instancia conectada. Después se reabrió con el Worker final de la tabla, sin repetir el rollout. Wrangler 4.150.0 validó primero la configuración exacta mediante dry-run; no se ampliaron permisos de la autenticación habitual.
+
+| Elemento | Evidencia real |
+| --- | --- |
+| Worker efectivo | `bb969dc5-7062-46a0-9da4-34a08009f236`, 100 % del tráfico; mantenimiento desactivado. |
+| Containers | v13; 1 instancia, 0 asignaciones antiguas; paginación completa. |
+| Asignación | `d03e5404-e96a-4885-ba0d-1b31f985861f`, `running` / `connected`. |
+| Imagen publicada | `sha256:3c8e555db893889c444335de9d35a18041d8620ba3bda3e85d68c9fcee5aacd6`. |
+| Configuración | Bindings D1/R2, variables y nombres de 13 secretos conservados; presupuesto activo; sin migraciones. |
+| Auditoría independiente | SHA-256 `30dd7c85f899af17caf2c13f8670d069028ec14f32db12b39a81bee85ec08d9c` y 647 archivos coincidentes; baseline, imagen y humo verificados. |
+
+Las cuatro lecturas autenticadas de cola devolvieron HTTP 200 y todos los contadores en cero. En mantenimiento se consultó el ámbito del motor; antes y después se usó el ámbito predeterminado.
+
+| Momento | Ámbito | HTTP | Activas / en cola / críticas / normales |
+| --- | --- | --- | --- |
+| Antes del mantenimiento | `default` | 200 | 0 / 0 / 0 / 0 |
+| Drenaje en mantenimiento | `engine` | 200 | 0 / 0 / 0 / 0 |
+| Después de sustituir la instancia | `engine` | 200 | 0 / 0 / 0 / 0 |
+| Después de reabrir | `default` | 200 | 0 / 0 / 0 / 0 |
+
+| Ruta HTTP comprobada | Estado |
+| --- | --- |
+| `/` | 200 |
+| `/ayuda` | 200 |
+| `/privacidad` | 200 |
+| `/b/sarin-pruebas-20261015` | 200 |
+| `/dashboard/onboarding` | 200 |
+| `/manifest.webmanifest` | 200 |
+| `/api/session` | 401 |
+| `/api/businesses` | 401 |
+
+El perfil público devolvió HTTP 200, con allowlist de negocio y de su único servicio verificada. Los bundles enlazados por la ficha de reserva conservan calendario y detalles e incluyen «Reservar este servicio», `availabilityStatus` y «Prueba otro»; onboarding conserva el marcador del catálogo. Es una verificación `bundle_only`: no acredita que esos controles se hayan visto en la UI real.
+
+| Icono publicado | SHA-256 |
+| --- | --- |
+| `/brand/sarin-face-192.png` | `bec2324dd74f8d0dbc476b5b580c5b2eca65aff171426574706071a40724541e` |
+| `/brand/sarin-face-512.png` | `bfe3c69878d4089d14076be0394acb67bc42fc879a0111e1bbfb855b70e85482` |
+
+En el navegador real, el calendario estaba seleccionado, calendario/chat permanecieron bloqueados por el consentimiento pendiente del negocio y «Mis citas» era visible. Los campos estructurados y el chat no se montaron antes del permiso. **No se vieron en producción los botones individuales de servicio, los detalles ni el estado de disponibilidad vacía.** La UI completa se verificó localmente con los 29 controles del entorno emulado, descritos en la aceptación anterior.
+
+No se aceptaron consentimientos reales, no se modificaron datos del negocio y no se crearon citas en producción. La sesión administrativa se preservó, el viewport se restauró y la intercepción de salud quedó retirada. Las lecturas HTTP y los marcadores del bundle se registran por separado de esta observación del navegador.
+
+La reversión sigue siendo compatible con `f47daf4955872bf007206413489b719e6787aa6c`, imagen `sha256:6b9dacd55f21fec481b0726fdde2dc4d6ce8874ee3bef6c8849fba9826b5abba`, Worker `795cd3ac-670d-41d0-a026-3a954dc4e35f` y Containers v12. No requiere migraciones ni eliminación de datos; conserva citas y metadatos.
+
+El paquete conserva `wrangler.rollback-rollout.json` y `wrangler.rollback-final.json` fijados a esa imagen. Para revertir se repite mantenimiento y drenaje, se espera la única instancia compatible y se reabre. La captura real `booking-entry-live.png` y las lecturas de producción quedan fuera de Git. La rama y la evidencia se enviaron a `origin`; no se atribuye un CI remoto a este push y los cambios posteriores son solo documentación.

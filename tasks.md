@@ -1,12 +1,12 @@
 # Estado de implementación — 2026-10-17
 
-## Entrada por servicio y disponibilidad vacía — aprobado localmente
+## Entrada por servicio y disponibilidad vacía — publicado
 
 - [x] Implementar las dos mejoras aceptadas: mensaje único para consultas correctas sin horarios y «Reservar este servicio» conservando la elección después del acceso y permisos. [Diseño](docs/design/2026-10-17-booking-service-entry.md).
 - [x] Validar catálogo, consumir intención una vez y descartar cambios de UID/negocio/caso; conservar confirmación, recuperación y salud/menores. Revisión independiente PASS tras ajustar nombres accesibles con regresión RED/GREEN.
 - [x] 986 pruebas aprobadas/26 omitidas, tipos y audit limpios. CUA con 29 controles en 320/390/1280, día cerrado y mañana con horarios, precio cero, reinicio/salida y cero inferencia/propuestas/citas. Seis documentos propios limpiados. [Evidencia](docs/qa/2026-10-17-booking-service-entry.md).
 - [x] Congelar `2440af5`, construir imagen Linux `3c8e555d…` y pasar humo aislado; reversión compatible `f47daf4`/`6b9dacd5…`, sin migraciones.
-- [ ] Obtener autorización específica y publicar este incremento; todavía sin push de imagen ni cambios de producción.
+- [x] Publicar tras autorización específica: imagen `3c8e555d…`, Worker `bb969dc5…`, Containers v13. Cuatro colas default/engine/engine/default vacías, una instancia conectada y cero antiguas; HTTP, bundles e iconos verificados. Permiso real del negocio pendiente conservado, sin aceptar consentimientos, crear citas ni editar negocio; sesión administrativa preservada. UI completa probada localmente con 29 controles, sin atribuirla como visible en producción. [Publicación y reversión](docs/qa/2026-10-17-booking-service-entry.md).
 
 Rama `codex/booking-selection-and-availability-20261017`, worktree existente del catálogo; el checkout original se conserva.
 
