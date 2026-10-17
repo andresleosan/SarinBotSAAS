@@ -1,11 +1,11 @@
 # Estado de implementación — 2026-10-17
 
-## Ubicación y modalidad — aprobado localmente
+## Ubicación y modalidad — publicado
 
 - [x] Añadir configuración pública opcional de modalidad, dirección e indicaciones, con enlace seguro y proyección validada; conservar valores omitidos por clientes anteriores.
 - [x] Cerrar TDD y revisión independiente: 1.270 pruebas aprobadas/26 omitidas, tipos/audit limpios y 31 controles manuales de navegador.
 - [x] Verificar cuatro guardados sintéticos con cambios exclusivos de ubicación, limpiar siete documentos propios y detener QA. [Aceptación local](docs/qa/2026-10-17-business-location.md).
-- [ ] Publicar la versión autorizada después de auditar imagen y reversión compatible, drenar cola y verificar una instancia efectiva y la sesión administrativa.
+- [x] Publicar ubicación y modalidad autorizadas: runtime `8da7c54`, imagen `d59fa710…`, Worker `d23f4df4-e256-468b-9168-f0c08e18161d`, Containers v17; una instancia conectada, cero antiguas, cuatro colas vacías y HTTP/bundles/iconos verificados. Autenticación administrativa reverificada; acción/flujo visibles: sí/no, con límites y controles locales separados. [Publicación y reversión](docs/qa/2026-10-17-business-location.md).
 
 ## Añadir cita al calendario — publicado
 
@@ -27,7 +27,7 @@ El propietario indicó «ok vamos paso a paso, implementando probando y publican
 
 - [x] **Publicado:** buscar próxima fecha disponible después de un día sin cupos, conservando servicio/profesional y consultando hasta catorce días. Runtime `1b81385`, imagen `d7ee2234…`; selección de hora y confirmación explícitas. [Cierre de QA y publicación](docs/qa/2026-10-17-next-available-date.md).
 - [x] **Publicado:** añadir la cita al calendario mediante archivo importable, con identidad estable y límites claros de actualización. Runtime `ba34b40`, imagen `188cbc13…`, Containers v16. [QA y publicación](docs/qa/2026-10-17-calendar-export.md).
-- [ ] Dirección/modalidad e indicaciones para llegar en la ficha del negocio.
+- [x] **Publicado:** dirección/modalidad e indicaciones para llegar en la ficha del negocio. Runtime `8da7c54`, imagen `d59fa710…`, Containers v17. Editor observado en producción sin guardar datos reales; cuatro guardados sintéticos y 31 controles locales. [QA y publicación](docs/qa/2026-10-17-business-location.md).
 - [ ] Reprogramar una cita existente con reglas temporales validadas en servidor y cambio atómico.
 - [ ] Recordatorios dentro de Sarin, con programación persistente; el propietario indicó «todo dentro de la app de momento». Correo y WhatsApp fuera del alcance inicial.
 - [ ] Lista de espera con preferencias y confirmación explícita del hueco ofrecido.

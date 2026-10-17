@@ -1,6 +1,6 @@
-# Ubicación y modalidad: aceptación local
+# Ubicación y modalidad: publicado
 
-Estado: aprobado localmente. Publicación autorizada pendiente de ejecutar y verificar.
+Estado: publicado con autorización específica. Runtime publicado `8da7c5494f578d04af09f9a20e470d2c913e222b`.
 
 Tercer incremento de «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro», iniciado después de verificar el calendario publicado (runtime `ba34b40`, Containers v16).
 
@@ -40,6 +40,25 @@ Límites del harness: el banner fijo exclusivo de emuladores cubrió el centro d
 
 Siete documentos propios eliminados después de validar IDs, propietario, huellas y ausencia de datos posteriores; siete documentos compartidos y cuentas Auth conservados. Las cuatro verificaciones de cambios solo de ubicación quedan en el manifiesto. Procesos propios detenidos, seis puertos libres por bind exclusivo, viewport restaurado y ambas pestañas locales cerradas. La autenticación real no se alteró en QA y se verificará al cerrar producción.
 
-Publicación autorizada pendiente: congelar esta revisión, construir y auditar imagen, activar mantenimiento, drenar cola, sustituir la instancia única, reabrir y verificar producción.
+Publicado después de la autorización registrada: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». El artefacto congelado es `8da7c5494f578d04af09f9a20e470d2c913e222b`; los commits posteriores de documentación se distinguen del runtime.
 
 Reversión compatible: runtime `ba34b408024c97c909a774f07c5dde6263644f91`, imagen `sha256:188cbc13955f154678498930e89203e7e5fcfeae957974ac70bc74c898edb4ad`, Worker `6bd8b289-f1e1-4bfa-9961-05afcc16ad41`, Containers v16. El campo opcional privado se conserva al volver al código anterior; no se requiere migración ni borrado de datos.
+
+## Publicación verificada
+
+![Editor de ubicación publicado, consultado sin modificar datos reales](2026-10-17-business-location-production.jpg)
+
+Cierre: `2026-10-17T23:56:01.552Z`. Autorización: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro», limitada a esta ubicación y modalidad. Worker `d23f4df4-e256-468b-9168-f0c08e18161d`, Containers v17, allocation `d0323192-07f3-4eca-b736-30b0349de963`, imagen `sha256:d59fa71083e4e76c62b15959818e19d0bad6ae28c3aa2f52c2dae4d22a9dfcff`. Una instancia running/connected, cero antiguas y paginación completa; mantenimiento desactivado, bindings/variables/13 secretos/presupuesto y Pages `a461b670-5130-41e7-8c75-957f5439cfd7` conservados.
+
+| Etapa | Hora | Scope | HTTP | Activas/cola/críticas/normales |
+| --- | --- | --- | --- | --- |
+| Antes | 2026-10-17T23:49:49.425Z | default | 200 | 0/0/0/0 |
+| Drenaje | 2026-10-17T23:51:05.539Z | engine | 200 | 0/0/0/0 |
+| Rollout | 2026-10-17T23:52:20.933Z | engine | 200 | 0/0/0/0 |
+| Reapertura | 2026-10-17T23:53:04.008Z | default | 200 | 0/0/0/0 |
+
+HTTP: `/` 200; `/ayuda` 200; `/privacidad` 200; `/b/sarin-pruebas-20261015` 200; `/dashboard/onboarding` 200; `/manifest.webmanifest` 200; `/api/session` 401; `/api/businesses` 401. Perfil público con allowlist verificada; iconos: `/brand/sarin-face-192.png` SHA-256 `bec2324dd74f8d0dbc476b5b580c5b2eca65aff171426574706071a40724541e`; `/brand/sarin-face-512.png` SHA-256 `bfe3c69878d4089d14076be0394acb67bc42fc879a0111e1bbfb855b70e85482`. El nuevo marcador y los anteriores se verificaron como bundle_only; no se infiere UI visible.
+
+Sección/configuración visible: sí; flujo no atribuido como observado. Límite real: El editor real de Mi negocio muestra Ubicación y modalidad y Sin publicar seleccionado. La ficha real omite la sección al no tener ubicación configurada. No se guardó una dirección real para probar el recorrido; cuatro guardados y las vistas se validaron localmente. UI completa validada localmente con 31 controles y 4 guardados de ubicación en el negocio sintético (onsite, online, home, cleared). La autenticación administrativa final se reverificó; los límites de observación durante la preparación local conservan su propia fecha en el paquete. No se aceptaron consentimientos ni se crearon/alteraron citas o datos reales para QA.
+
+Reversión compatible: `ba34b408024c97c909a774f07c5dde6263644f91`, imagen `registry.cloudflare.com/05fb22c155667de064b55c4e287b21d8/sarin-bot@sha256:188cbc13955f154678498930e89203e7e5fcfeae957974ac70bc74c898edb4ad`, Worker `6bd8b289-f1e1-4bfa-9961-05afcc16ad41`, Containers v16; sin migraciones ni borrado.
