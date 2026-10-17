@@ -11,6 +11,7 @@ import { readBookingDataPolicy } from './booking-data-policy';
 import { assertConsent } from './consent';
 import { documentIdSchema, requestIdSchema } from './schemas';
 import { HttpError } from './http';
+import { prepareBookingActionAdmission } from './booking-action-admission';
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, item]) => [key, canonical(item)]));
@@ -68,6 +69,8 @@ export async function updateBookingSubjectConsent(user: ChatActor, supplied: z.i
     const current = await load(user, input.businessId, input.case, db, tx), receiptRef = db.collection('serverSettings').doc(receiptId), existing = await tx.get(receiptRef);
     if (existing.exists) { const saved = parse(receiptSchema, existing.data()); if (saved.operationHash !== operationHash || saved.uid !== user.uid || saved.businessId !== input.businessId || bookingSubjectHash(saved.case) !== bookingSubjectHash(input.case)) throw changed(); return; }
     if (current.status.revision !== input.expectedRevision) throw changed();
+    // Repeated withdrawals return current evidence; an effective withdrawal is never rate limited.
+    if (input.action === 'revoke' && !current.state?.active) return;
     const accepting = input.action === 'accept', needs = current.status.documents.requirements;
     if (accepting) {
       if (!current.status.required) throw new HttpError(409, 'Esta reserva no necesita autorización adicional.');
@@ -76,7 +79,8 @@ export async function updateBookingSubjectConsent(user: ChatActor, supplied: z.i
       await assertConsent(user.uid, 'account', undefined, db, tx); await assertConsent(user.uid, 'business_client', current.business, db, tx);
     }
     const revision = current.status.revision + 1, receipt: BookingSubjectReceipt = { uid: user.uid, scope: 'booking_subject', businessId: input.businessId, case: input.case, requestId: input.requestId, action: input.action, revision, occurredAt: Date.now(), policyRevision: current.status.capability.revision, decisions: { dataAuthorized: accepting && needs.dataAuthorized, sensitiveDataAuthorized: accepting && needs.sensitiveDataAuthorized, representationDeclared: accepting && needs.representationDeclared }, documents: current.status.documents };
-    tx.create(receiptRef, { ...receipt, operationHash }); tx.set(current.stateRef, { version: 1, scope: 'booking_subject', uid: user.uid, businessId: input.businessId, case: input.case, revision, active: accepting, fingerprint: current.status.documents.fingerprint, policyRevision: current.status.capability.revision, receiptId });
+    const admit = accepting ? await prepareBookingActionAdmission(tx, db, user.uid, input.businessId, 'authorization', `${input.case.bookingRequestId}:${input.requestId}`) : null;
+    admit?.(); tx.create(receiptRef, { ...receipt, operationHash }); tx.set(current.stateRef, { version: 1, scope: 'booking_subject', uid: user.uid, businessId: input.businessId, case: input.case, revision, active: accepting, fingerprint: current.status.documents.fingerprint, policyRevision: current.status.capability.revision, receiptId });
   });
   return readBookingSubjectConsent(user, input.businessId, input.case, db);
 }

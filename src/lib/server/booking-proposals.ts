@@ -16,6 +16,7 @@ import { assertConsent } from './consent';
 import { bookingSubjectCaseSchema, bookingBeneficiarySchema, type StructuredProposalContext, type ValidatedBookingSubject } from '@/lib/booking-subject';
 import { readBookingDataPolicy, assertBookingIntakePolicy } from './booking-data-policy';
 import { assertBookingSubjectConsent, bookingSubjectHash } from './booking-subject-consent';
+import { prepareBookingActionAdmission } from './booking-action-admission';
 const selectionSchema = bookingSchema.pick({ dateKey: true, startTimeStr: true, serviceId: true, resourceId: true });
 const legacyProposalSchema = z.object({ version: z.literal(1), id: documentIdSchema, businessId: documentIdSchema, actorUid: z.string().min(1).max(128), selection: selectionSchema,
   service: businessConfigSchema.shape.services.element, resource: businessConfigSchema.shape.resources.element, intakeFields: businessConfigSchema.shape.intakeFields,
@@ -70,7 +71,8 @@ export async function createBookingProposal(user: ChatActor, businessId: string,
     if (!getAvailableSlots({ tenant: business, ...selection, existingAppointments: appointments.docs.map(doc => doc.data() as Appointment) }).some(item => item.slots.includes(selection.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible.');
     const proposal: Proposal = proposalSchema.parse({ version: subject ? 2 : 1, id, businessId, actorUid: user.uid, selection, service, resource, intakeFields: subject && (capability.dataMode === 'health' || subject.case.subjectKind === 'represented_minor') ? [] : business.sarinConfig.intakeFields, createdAt: now, expiresAt: now + 600000, appointmentId: null,
       ...(subject ? { subjectCase: subject.case, beneficiaryHash: bookingSubjectHash(subject.beneficiary), policyRevision: capability.revision, authorization } : {}) });
-    tx.create(collection.doc(id), proposal); tx.create(requestRef, { actorUid: user.uid, businessId, selection, proposalId: id });
+    const admit = subject ? await prepareBookingActionAdmission(tx, db, user.uid, businessId, 'proposal', requestId) : null;
+    admit?.(); tx.create(collection.doc(id), proposal); tx.create(requestRef, { actorUid: user.uid, businessId, selection, proposalId: id });
     return view(proposal);
   });
 }
