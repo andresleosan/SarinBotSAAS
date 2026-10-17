@@ -1,0 +1,33 @@
+import { act, createElement } from 'react';
+import { create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, expect, it, vi } from 'vitest';
+import { StructuredBooking } from '@/components/structured-booking';
+import { bookingSubjectContent } from '@/lib/booking-subject-legal';
+import { apiFetch } from '@/lib/client/api';
+import type { PublicBusiness } from '@/types/firestore';
+vi.mock('@/lib/client/api', async original => ({ ...await original<typeof import('@/lib/client/api')>(), apiFetch: vi.fn() }));
+vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { uid: 'demo-user' } }) }));
+vi.mock('@/hooks/useEngineHealth', () => ({ useEngineHealth: () => { throw new Error('Structured booking must not mount inference health'); } }));
+vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => { throw new Error('Structured booking must not mount chat'); } }));
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const capability = { configured: true, revision: 1, dataMode: 'general' as const, representedMinorsEnabled: true };
+const business = { id: 'demo-business', name: 'Demo', phoneWhatsApp: '573001234567', services: [{ id: 's', name: 'Corte', price: 10000, resourceIds: ['r'] }], resources: [{ id: 'r', name: 'Recurso', active: true }], subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 9999999999999 } } as unknown as PublicBusiness;
+let renderer: ReactTestRenderer | undefined;
+afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; vi.mocked(apiFetch).mockReset(); });
+it('minor name field appears only after current case authorization and role change resets it', async () => {
+  vi.mocked(apiFetch).mockImplementation(async (path, init) => { const query = new URL(path, 'http://localhost').searchParams, body = init?.body ? JSON.parse(String(init.body)) : null, subjectCase = body?.case ?? { bookingRequestId: query.get('bookingRequestId')!, subjectKind: 'represented_minor' as const, representativeRole: query.get('representativeRole') as 'parent' }; return { required: true, active: init?.method === 'POST', revision: init?.method ? 1 : 0, capability, receipt: null, documents: { ...bookingSubjectContent(business, subjectCase, capability), fingerprint: 'a'.repeat(64) } }; });
+  await act(async () => { renderer = create(createElement(StructuredBooking, { business, capability, onConfirmed: vi.fn() })); });
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Nombre breve del menor' })).toHaveLength(0);
+  for (const checkbox of renderer!.root.findAllByType('input').filter(input => input.props.type === 'checkbox')) await act(async () => checkbox.props.onChange({ target: { checked: true } }));
+  await act(async () => renderer!.root.findByType('form').props.onSubmit({ preventDefault() {} }));
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Nombre breve del menor' })).toHaveLength(1);
+  await act(async () => renderer!.root.findByProps({ 'aria-label': 'Calidad del representante' }).props.onChange({ target: { value: 'legal_guardian' } }));
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Nombre breve del menor' })).toHaveLength(0);
+  expect(renderer!.root.findAllByType('input').filter(input => input.props.type === 'checkbox').every(input => !input.props.checked)).toBe(true);
+});
+it('health books while inference is offline without mounting a chat', async () => {
+  const health = { ...capability, dataMode: 'health' as const };
+  vi.mocked(apiFetch).mockImplementation(async (path) => { const query = new URL(path, 'http://localhost').searchParams; return { required: true, active: false, revision: 0, capability: health, receipt: null, documents: { ...bookingSubjectContent(business, { bookingRequestId: query.get('bookingRequestId')!, subjectKind: 'self' }, health), fingerprint: 'a'.repeat(64) } }; });
+  await act(async () => { renderer = create(createElement(StructuredBooking, { business, capability: health, onConfirmed: vi.fn() })); });
+  expect(JSON.stringify(renderer!.toJSON())).toContain('Reserva sin IA'); expect(renderer!.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
+});
