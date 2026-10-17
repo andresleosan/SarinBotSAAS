@@ -22,6 +22,8 @@ Cuenta, negocio, política, lectura del catálogo y suscripción habilitan la ac
 | Revisión independiente | PASS después del arreglo StrictMode. No quedan bloqueantes en identidad, recuperación, permisos, selección o consumo. |
 | Navegador | CUA: **32 comprobaciones verdaderas**, 320×740, 390×844 y 1280×900; sin errores de consola. |
 | Preview compilada | Build y TypeScript correctos, 12 páginas generadas; `--debug-prerender` solo para QA emulada, sin Next dev simultáneo. No se usa como imagen de producción. |
+| Imagen de producción | Build normal correcto; humo aislado sin red/credenciales aprobado. El intento previo offline falló al obtener pnpm sin caché y se conserva como tal. |
+| Auditoría independiente del paquete | PASS: 657 archivos idénticos al archivo Git, baseline y migración preservados; imagen Linux/amd64, label y evidencia de humo correctos. |
 | Diff | `git diff --check`: sin errores. |
 
 La revisión de seguridad se limitó a las dos superficies modificadas: página de negocio y Mis citas. No se añadieron endpoints, integraciones o persistencia. La nueva acción revalida registro, catálogo, UID/negocio y estado de permisos/bloqueos al pulsar, incluso si el callback quedó retenido. El calendario mantiene confirmación explícita y recuperación con su cuerpo original. No hay cambios de inferencia, esquema, migraciones, reglas, proveedor, dependencias o cuotas. Por ser un incremento pequeño no se atribuye una campaña nueva de rendimiento.
@@ -45,7 +47,17 @@ Capturas sintéticas inspeccionadas:
 - [Datos vigentes a 390 px](2026-10-17-rebooking-current-390.jpg).
 - [Calendario en escritorio](2026-10-17-rebooking-desktop.jpg).
 
-JSON CUA, logs y reporte HTML permanecen en `qa/reports/`, ignorados por Git; se copian al paquete privado. La fuente se congela después de cerrar esta aceptación para construir la imagen de producción por separado.
+JSON CUA y logs permanecen en `qa/reports/`, ignorados por Git; se copian al paquete privado junto con el reporte HTML autocontenido.
+
+## Artefacto para publicación
+
+Runtime congelado `0b3bf0558b48ded61f9869374bee75c80d29d22a`. El archivo Git tiene SHA-256 `da2fbb1971712c88f39fef4ae207ea4f85043f664b268eeaf0ffb3f9ca1d9ee1`; una auditoría independiente comparó sus **657 archivos** con un archivo Git fresco y con la fuente extraída, sin diferencias ni archivos adicionales. Configuración base, bindings, variables y migración se conservan; solo se adaptan rutas locales del paquete.
+
+Imagen local Linux/amd64 `sarin-bot:rebooking-20261017`, digest `sha256:d75c6c8e217de30ca2adde03a324ec56058be7306bda83e4cbcec0647b1e33bc`, con label de la revisión congelada. La construcción normal de producción pasó. El intento inicial sin red no tenía en caché la capa de pnpm y falló con `EAI_AGAIN registry.npmjs.org`; se conservó su log y se repitió con el registro oficial y versiones fijadas, sin credenciales montadas ni cambios de fuente. El lockfile permanece intacto.
+
+El humo de la imagen final se ejecutó **sin red, en solo lectura y sin credenciales**: cinco páginas 200, APIs protegidas 401, manifiesto e iconos originales idénticos, y marcadores de calendario, detalles, entrada por servicio, disponibilidad vacía y «Volver a reservar». Es una comprobación estática del runtime; el recorrido funcional con datos se acredita con la prueba emulada anterior.
+
+Paquete privado `%LOCALAPPDATA%/SarinBot/rebooking-release-20261017`: archivo y fuente congelados, configuración base, imagen identificada, logs de ambas construcciones, pruebas, fixture limpiado, capturas, aceptación y plan de publicación/reversión. No se ha enviado la imagen al registro ni cambiado producción. La aprobación específica debe cubrir este artefacto y preceder al mantenimiento, drenaje, sustitución de la única instancia, verificación efectiva y reapertura.
 
 ## Reversión
 
