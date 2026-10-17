@@ -55,6 +55,11 @@ describe("the customer's appointments within one business", () => {
     expect(text(renderer.root)).not.toMatch(/Privada de otra persona|Bloqueo privado|Sin identidad/);
     expect(state.reads).toEqual(["/api/businesses/business-fixture/appointments?view=mine"]);
   });
+  it('shows beneficiary only for its own booking and keeps legacy identity unspecified', async () => {
+    state.rows[0].beneficiary = { kind: 'represented_minor', displayName: 'SYNTHETIC_PRIVATE_SUBJECT', representativeRole: 'parent' };
+    state.rows.push(appointment('Otra cita', '2026-10-16T16:00:00Z', 'confirmed', { client: { uid: 'other', name: 'Otra persona', email: '', intakeAnswers: {} }, beneficiary: { kind: 'represented_minor', displayName: 'OTHER_PRIVATE_SUBJECT', representativeRole: 'parent' } }));
+    await render(); expect(text(renderer.root)).toContain('SYNTHETIC_PRIVATE_SUBJECT'); expect(text(renderer.root)).toContain('Gestionada por Cliente'); expect(text(renderer.root)).not.toContain('OTHER_PRIVATE_SUBJECT'); expect(text(renderer.root)).toContain('Registro anterior sin beneficiario declarado');
+  });
 
   it("retains cancelled and past visits in descending history with honest status labels", async () => {
     state.rows.push(appointment("Pasada sin asistencia verificada", "2026-10-14T15:00:00Z"), appointment("Cancelada propia", "2026-10-18T15:00:00Z", "cancelled_by_client"), appointment("Cancelada negocio", "2026-10-13T15:00:00Z", "cancelled_by_owner"), appointment("Completada", "2026-10-12T15:00:00Z", "completed"), appointment("Inasistencia", "2026-10-11T15:00:00Z", "no_show"));
@@ -214,7 +219,7 @@ describe("the customer's appointments within one business", () => {
   });
 
   it("downloads a PNG reminder without exporting contact details or intake answers", async () => {
-    state.rows = [appointment("Corte exportado", "2026-10-16T15:00:00Z")];
+    state.rows = [appointment("Corte exportado", "2026-10-16T15:00:00Z", 'confirmed', { beneficiary: { kind: 'represented_minor', displayName: 'SYNTHETIC_PRIVATE_SUBJECT', representativeRole: 'parent' }, subjectAuthorization: { receiptId: 'demo-private-receipt', bookingRequestId: 'demo-private-case', policyRevision: 1 }, representationReview: { revision: 0, status: 'declared', reviewedBy: null, reviewedAt: null } })];
     const anchor = { href: "", download: "", click: vi.fn(), remove: vi.fn() };
     vi.stubGlobal("document", { createElement: () => anchor, body: { appendChild: vi.fn() } });
     const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test-image");
@@ -224,6 +229,7 @@ describe("the customer's appointments within one business", () => {
     await act(async () => button(renderer, "Guardar imagen de la cita").props.onClick());
     expect(anchor.click).toHaveBeenCalledOnce();
     expect(anchor.download).toMatch(/^cita-.+\.png$/);
+    expect(anchor.download + JSON.stringify(state.createImage.mock.calls)).not.toMatch(/SYNTHETIC_PRIVATE_SUBJECT|demo-private|representativeRole|receiptId/);
     expect((createUrl.mock.calls[0][0] as Blob).type).toBe("image/png");
     expect(state.createImage.mock.calls[0][0]).toEqual({ businessName: props.businessName, serviceName: "Corte exportado", resourceName: undefined,
       startAt: state.rows[0].startAt, endAt: state.rows[0].endAt, generatedAt: now });

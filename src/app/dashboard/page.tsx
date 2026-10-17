@@ -24,6 +24,7 @@ import { apiFetch, errorMessage } from "@/lib/client/api";
 import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
 import { PaidTrialStatus } from "@/components/paid-trial-status";
 import { ClientPolicyControls } from "@/components/client-policy-controls";
+import { RepresentationReviewControls } from '@/components/representation-review';
 import type { Appointment } from "@/types/firestore";
 
 function today() {
@@ -420,6 +421,8 @@ function Agenda() {
                             </p>
                           </div>
                         )}
+                        {appointment.type === 'appointment' && <p className="mt-2 break-words text-sm [overflow-wrap:anywhere]">{appointment.beneficiary?.kind === 'represented_minor' ? <>Para: {appointment.beneficiary.displayName} · Gestionada por {appointment.client?.name || 'la cuenta reservante'}</> : appointment.beneficiary?.kind === 'self' ? <>Para la persona que reserva · Gestionada por {appointment.client?.name || 'la cuenta reservante'}</> : 'Registro anterior sin beneficiario declarado'}</p>}
+                        {business.ownerUid === user?.uid && <RepresentationReviewControls businessId={business.id} appointment={appointment} onSaved={saved => agenda.setValue(rows => (rows ?? []).map(item => item.id === saved.id ? saved : item))} />}
                         {appointment.status === "confirmed" && (
                           <div className="mt-4 flex justify-end border-t border-sarin-line pt-3">
                             <button

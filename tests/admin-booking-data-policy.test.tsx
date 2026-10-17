@@ -1,0 +1,22 @@
+import { act, createElement } from 'react';
+import { create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, expect, it, vi } from 'vitest';
+import { AdminBookingDataPolicy } from '@/components/admin-booking-data-policy';
+const state = vi.hoisted(() => ({ api: vi.fn(), uid: 'demo-admin' }));
+vi.mock('@/lib/client/api', () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
+vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { uid: state.uid }, isSuperadmin: true }) }));
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+let renderer: ReactTestRenderer;
+const businesses = [{ id: 'demo-one', name: 'Uno' }, { id: 'demo-two', name: 'Dos' }], view = { policy: null, capability: { configured: false, revision: 0, dataMode: 'general', representedMinorsEnabled: false } };
+afterEach(async () => { await act(async () => renderer?.unmount()); state.api.mockReset(); });
+it('policy edits preserve current business on stale response and submit a scoped CAS', async () => {
+  let resolve!: (value: unknown) => void;
+  state.api.mockImplementation((path: string) => path.endsWith('=demo-one') ? new Promise(done => { resolve = done; }) : Promise.resolve(view));
+  await act(async () => { renderer = create(createElement(AdminBookingDataPolicy, { businesses })); });
+  await act(async () => renderer.root.findByProps({ 'aria-label': 'Negocio de la clasificación' }).props.onChange({ target: { value: 'demo-two' } }));
+  await act(async () => resolve({ policy: { reason: 'Private old business' }, capability: { ...view.capability, dataMode: 'health', revision: 5 } }));
+  expect(JSON.stringify(renderer.toJSON())).not.toContain('Private old business');
+  await act(async () => { renderer.root.findByProps({ 'aria-label': 'Clase de reservas' }).props.onChange({ target: { value: 'health' } }); renderer.root.findByProps({ 'aria-label': 'Motivo de la clasificación' }).props.onChange({ target: { value: 'Demo revisión' } }); });
+  await act(async () => renderer.root.findByProps({ 'aria-label': 'Clasificación del negocio' }).props.onSubmit({ preventDefault() {} }));
+  const call = state.api.mock.calls.find(([, init]) => init?.method === 'PATCH')!; expect(call[2]).toBe('demo-admin'); expect(JSON.parse(call[1].body)).toEqual({ businessId: 'demo-two', expectedRevision: 0, dataMode: 'health', representedMinorsEnabled: false, reason: 'Demo revisión' });
+});

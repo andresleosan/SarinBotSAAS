@@ -153,6 +153,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], u
         {visible.map(appointment => <article key={appointment.id} className="min-w-0 space-y-3 rounded-xl border border-sarin-line bg-sarin-canvas p-3 sm:p-4">
           <div className="space-y-1">
             <h3 className="break-words font-semibold [overflow-wrap:anywhere]">{appointment.serviceName || "Cita"}</h3>
+            <p className="break-words text-sm [overflow-wrap:anywhere]">{appointment.beneficiary?.kind === 'represented_minor' ? <>Para: {appointment.beneficiary.displayName} · Gestionada por {appointment.client?.name || 'tu cuenta'}</> : appointment.beneficiary?.kind === 'self' ? 'Reserva para ti' : 'Registro anterior sin beneficiario declarado'}</p>
             <p className="text-sm text-sarin-ink">{dateFormat.format(appointment.startAt)}</p>
             <p className="text-sm tabular-nums text-sarin-muted">{timeFormat.format(appointment.startAt)}–{timeFormat.format(appointment.endAt)} (Colombia)</p>
             <p className="text-xs font-semibold text-sarin-blue">{statusLabel(appointment, now)}</p>

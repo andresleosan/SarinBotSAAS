@@ -17,10 +17,11 @@ const business: Business = {
   services: [{ id: 'principal', name: 'Servicio', durationMinutes: 30, bufferMinutes: 0, price: 20000, resourceIds: ['principal'] }],
   weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: false, intervals: [] }])), createdAt: 2000000000000,
 };
-const state = vi.hoisted(() => ({ business: null as Business | null, send: vi.fn(), draft: undefined as BusinessConfig | undefined }));
+const state = vi.hoisted(() => ({ business: null as Business | null, send: vi.fn(), draft: undefined as BusinessConfig | undefined, health: false, chatMount: vi.fn() }));
+vi.mock('@/hooks/useBookingDataPolicy', () => ({ useBookingDataPolicy: () => ({ ready: true, loading: false, error: null, refresh: vi.fn(), capability: { configured: true, revision: 1, dataMode: state.health ? 'health' : 'general', representedMinorsEnabled: state.health } }) }));
 vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null, setBusiness: vi.fn() }) }));
 vi.mock('@/components/business-logo-field', () => ({ BusinessLogoField: () => null }));
-vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => ({ messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false, sendMessage: state.send, configurationDraft: state.draft }) }));
+vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => { state.chatMount(); return { messages: [], isWaitingBatch: false, isGenerating: false, error: null, quotaExhausted: false, requestAlreadyCompleted: false, sendMessage: state.send, configurationDraft: state.draft }; } }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement('a', { href }, children) }));
 vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'fixture-owner' } }) }));
 vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, fieldClass: 'field', buttonClass: 'button' }));
@@ -29,9 +30,17 @@ vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), errorMessage: (error: Er
 
 describe('onboarding editable examples', () => {
   let renderer: ReactTestRenderer;
+  beforeEach(() => { state.health = false; state.chatMount.mockClear(); });
   beforeEach(() => { state.business = structuredClone(business); state.draft = undefined; state.send.mockReset(); vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockResolvedValue({ business }); });
   afterEach(async () => { await act(async () => renderer?.unmount()); });
   async function mount() { await act(async () => { renderer = create(createElement(OnboardingPage)); }); }
+  it('health owner can configure manually without mounting AI or free intake', async () => {
+    state.health = true; await mount(); expect(state.chatMount).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
+    const form = renderer.root.findByProps({ 'aria-label': 'Datos de tu negocio' });
+    await act(async () => form.props.onSubmit({ preventDefault() {} }));
+    expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body)).intakeFields).toEqual([]); expect(state.send).not.toHaveBeenCalled();
+  });
   it('applies a proposed configuration only on explicit action and preserves optional intake metadata', async () => {
     const draft = businessConfigSchema.parse({ name: 'Propuesta nueva', category: business.category, slug: business.slug, phoneWhatsApp: business.phoneWhatsApp, tone: 'Claro', customRules: '', services: business.services, resources: business.resources, weeklySchedule: business.weeklySchedule, intakeFields: [{ key: 'optional_note', label: 'Nota opcional', required: false }] }); state.draft = draft;
     await mount(); expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();

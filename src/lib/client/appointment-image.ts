@@ -11,7 +11,7 @@ const imageError = "No pudimos generar la imagen. Inténtalo de nuevo.";
 const dateFormat = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "long", year: "numeric" });
 const timeFormat = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
-/** Draw only the reminder's public fields. No HTML, remote images or uploads. */
+/** Draw only allowlisted reminder fields. Service/business names may reveal health; no beneficiary or contact is exported. */
 export async function createAppointmentImage(details: AppointmentImageDetails): Promise<Blob> {
   if (![details.startAt, details.endAt, details.generatedAt].every(Number.isFinite) || details.endAt <= details.startAt) throw new Error(imageError);
   await document.fonts?.ready;

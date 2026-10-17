@@ -19,6 +19,8 @@ import {
 } from "@/components/app-shell";
 import { useBusiness } from "@/hooks/useBusiness";
 import { useDebouncedChat } from "@/hooks/useDebouncedChat";
+import { useBookingDataPolicy } from "@/hooks/useBookingDataPolicy";
+import type { BusinessConfig } from "@/lib/server/schemas";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
 import { canPurchasePaidTrial } from "@/lib/paid-trial";
@@ -52,173 +54,12 @@ function initialSchedule(): Record<number, DaySchedule> {
   );
 }
 
-function Configuration() {
-  const { user } = useAuth();
-  const accountConsent = useAccountConsent();
-  const { business, loading, error: businessError, setBusiness } = useBusiness();
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [category, setCategory] = useState("");
-  const [phone, setPhone] = useState("");
-  const [socialLinks, setSocialLinks] = useState<BusinessSocialLink[]>([]);
-  const [tone, setTone] = useState("Cercano y profesional");
-  const [rules, setRules] = useState("");
-  const [intake, setIntake] = useState("");
-  const proposedIntake = useRef<Business['sarinConfig']['intakeFields']>([]);
-  const [resources, setResources] = useState<TenantResource[]>([
-    { id: "principal", name: "", active: true },
-  ]);
-  const [services, setServices] = useState<TenantService[]>([
-    {
-      id: "principal",
-      name: "",
-      durationMinutes: 30,
-      bufferMinutes: 0,
-      price: 0,
-      resourceIds: ["principal"],
-    },
-  ]);
-  const [schedule, setSchedule] = useState(initialSchedule);
+function ConfigurationAssistant({ uid, business, enabled, onDraft }: { uid?: string; business: Business; enabled: boolean; onDraft: (draft: BusinessConfig) => void }) {
   const [input, setInput] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const loadedVersion = useRef("");
-  const loadedBusiness = useRef('');
-  const baseline = useRef('');
-  const latestSnapshot = useRef('');
-  latestSnapshot.current = JSON.stringify([name, slug, category, phone, tone, rules, intake, resources, services, schedule, socialLinks]);
-  useEffect(() => {
-    if (!business?.sarinConfig.onboardingCompleted) return;
-    const version = JSON.stringify([
-      business.id,
-      business.name,
-      business.slug,
-      business.category,
-      business.phoneWhatsApp,
-      business.sarinConfig,
-      business.resources,
-      business.services,
-      business.weeklySchedule,
-      business.socialLinks,
-    ]);
-    if (loadedVersion.current === version) return;
-    if (loadedBusiness.current === business.id && baseline.current && baseline.current !== latestSnapshot.current) return;
-    if (loadedBusiness.current !== business.id) proposedIntake.current = [];
-    loadedBusiness.current = business.id;
-    baseline.current = JSON.stringify([business.name, business.slug, business.category, business.phoneWhatsApp, business.sarinConfig.tone, business.sarinConfig.customRules, business.sarinConfig.intakeFields.map(item => item.label).join('\n'), business.resources, business.services, business.weeklySchedule, business.socialLinks ?? []]);
-    loadedVersion.current = version;
-    setName(business.name);
-    setSlug(business.slug);
-    setCategory(business.category);
-    setPhone(business.phoneWhatsApp);
-    setSocialLinks(business.socialLinks ?? []);
-    setTone(business.sarinConfig.tone);
-    setRules(business.sarinConfig.customRules);
-    setIntake(
-      business.sarinConfig.intakeFields.map((item) => item.label).join("\n"),
-    );
-    setResources(business.resources);
-    setServices(business.services);
-    setSchedule(business.weeklySchedule);
-  }, [business]);
-  const chat = useDebouncedChat({
-    actorUid: user?.uid,
-    enabled: accountConsent.active,
-    mode: "sarin_onboarding",
-    tenantId: business?.id || "onboarding",
-  });
-  function useConfigurationDraft() {
-    const draft = chat.configurationDraft;
-    if (!draft) return;
-    setName(draft.name); setSlug(business?.slug || draft.slug); setCategory(draft.category); setPhone(draft.phoneWhatsApp);
-    if (draft.socialLinks !== undefined) setSocialLinks(draft.socialLinks);
-    proposedIntake.current = draft.intakeFields;
-    setTone(draft.tone); setRules(draft.customRules); setIntake(draft.intakeFields.map(field => field.label).join('\n'));
-    setResources(draft.resources); setServices(draft.services); setSchedule(draft.weeklySchedule); setSaved(false);
-  }
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!accountConsent.active || !isSubscriptionAllowed(business)) return;
-    setError(null);
-    setSaved(false);
-    setSaving(true);
-    const submittedSnapshot = latestSnapshot.current;
-    try {
-      const response = await apiFetch<{ business: Business }>("/api/businesses", {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          slug,
-          category,
-          phoneWhatsApp: phone,
-          socialLinks,
-          tone,
-          customRules: rules,
-          resources,
-          services,
-          weeklySchedule: schedule,
-          intakeFields: intake
-            .split("\n")
-            .map((label) => label.trim())
-            .filter(Boolean)
-            .map(
-              (label, index) =>
-                (proposedIntake.current[index]?.label === label ? proposedIntake.current[index] : undefined) ?? business?.sarinConfig.intakeFields.find(
-                  (field) => field.label === label,
-                ) ?? {
-                  key: `dato_${crypto.randomUUID()}`,
-                  label,
-                  required: true,
-                },
-            ),
-        }),
-      });
-      baseline.current = submittedSnapshot;
-      loadedVersion.current = '';
-      setBusiness(response.business);
-      setSaved(true);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setSaving(false);
-    }
-  }
-  function updateDay(index: number, next: DaySchedule) {
-    setSchedule((previous) => ({ ...previous, [index]: next }));
-  }
-  if (loading) return <Notice>Cargando configuración…</Notice>;
-  if (businessError) return <Notice error>{businessError}</Notice>;
-  if (!isSubscriptionAllowed(business)) return (
-    <section className="max-w-2xl space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
-      <h1 className="text-3xl font-bold">{canPurchasePaidTrial(business?.subscription) ? "Empieza con tu prueba pagada" : "Elige un plan para continuar"}</h1>
-      <p className="text-sm leading-6 text-sarin-muted">{canPurchasePaidTrial(business?.subscription) ? "Por $5.000 COP puedes configurar tu negocio y recibir hasta 10 citas, sin caducidad. Después, elige un plan para continuar." : "Revisa los planes y el estado de tus pagos para volver a configurar tu negocio y recibir nuevas citas. Tu agenda existente se conserva."}</p>
-      <Notice>{business?.subscription.paidTrial?.source === 'invitation' && business.subscription.paidTrial.accessSuspended ? 'El acceso de cortesía está suspendido. Contacta a administración; tus citas y consumo se conservan.' : business?.subscription.status === "pending_payment" ? "La configuración y Sarin se habilitan después de aprobar tu comprobante o canjear una invitación. Si ya enviaste el comprobante, espera su revisión." : "Necesitas acceso vigente para configurar tu negocio y usar Sarin."}</Notice>
-      <Link href="/dashboard/billing" className={buttonClass + " inline-flex items-center"}>Ver pagos y planes</Link>
-    </section>
-  );
+  const accountConsent = { active: enabled };
+  const chat = useDebouncedChat({ actorUid: uid, enabled, mode: "sarin_onboarding", tenantId: business.id });
+  function useConfigurationDraft() { if (chat.configurationDraft) onDraft(chat.configurationDraft); }
   return (
-    <div className="max-w-[45rem] space-y-5 xl:max-w-5xl">
-      <div>
-        <p className="text-xs uppercase tracking-widest text-sarin-blue">
-          Configuración
-        </p>
-        <h1 className="mt-2 text-3xl font-bold">
-          {business?.sarinConfig.onboardingCompleted ? "Así trabaja tu negocio" : "Configura el espacio de tu negocio"}
-        </h1>
-        <p className="mt-2 text-sm text-sarin-muted">
-          Cuéntaselo a Sarin o completa los datos.{business?.subscription.status === "trial" ? business.subscription.paidTrial?.source === 'invitation' ? " Tu prueba de cortesía incluye diez citas y 700 respuestas; sin cobro ni caducidad." : " Tu prueba pagada incluye la configuración y hasta 10 citas, sin caducidad." : ""}
-        </p>
-      </div>
-      {error && <Notice error>{error}</Notice>}
-      {saved && (
-        <Notice>
-          Configuración guardada. Tu enlace y agenda ya están disponibles en el
-          panel.
-        </Notice>
-      )}
-      {business && business.sarinConfig.onboardingCompleted && <BusinessLogoField business={business} onSaved={setBusiness} />}
-      <div className="grid items-start gap-5 xl:grid-cols-[18rem_minmax(0,1fr)]">
         <section className="flex min-w-0 flex-col rounded-2xl border border-sarin-line bg-sarin-paper xl:sticky xl:top-6">
           <h2 className="flex items-center gap-2 border-b border-sarin-line px-4 py-3 font-semibold">
             <SarinMark className="h-8 w-8" />
@@ -291,11 +132,177 @@ function Configuration() {
             </button>
           </form>
         </section>
-        <form
+  );
+}
+
+function Configuration() {
+  const { user } = useAuth();
+  const accountConsent = useAccountConsent();
+  const { business, loading, error: businessError, setBusiness } = useBusiness();
+  const policy = useBookingDataPolicy(user?.uid, business?.id);
+  const health = policy.ready && policy.capability?.dataMode === "health";
+  const restrictedIntake = policy.ready && (health || policy.capability?.representedMinorsEnabled === true);
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [category, setCategory] = useState("");
+  const [phone, setPhone] = useState("");
+  const [socialLinks, setSocialLinks] = useState<BusinessSocialLink[]>([]);
+  const [tone, setTone] = useState("Cercano y profesional");
+  const [rules, setRules] = useState("");
+  const [intake, setIntake] = useState("");
+  const proposedIntake = useRef<Business['sarinConfig']['intakeFields']>([]);
+  const [resources, setResources] = useState<TenantResource[]>([
+    { id: "principal", name: "", active: true },
+  ]);
+  const [services, setServices] = useState<TenantService[]>([
+    {
+      id: "principal",
+      name: "",
+      durationMinutes: 30,
+      bufferMinutes: 0,
+      price: 0,
+      resourceIds: ["principal"],
+    },
+  ]);
+  const [schedule, setSchedule] = useState(initialSchedule);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const loadedVersion = useRef("");
+  const loadedBusiness = useRef('');
+  const baseline = useRef('');
+  const latestSnapshot = useRef('');
+  latestSnapshot.current = JSON.stringify([name, slug, category, phone, tone, rules, intake, resources, services, schedule, socialLinks]);
+  useEffect(() => {
+    if (!business?.sarinConfig.onboardingCompleted) return;
+    const version = JSON.stringify([
+      business.id,
+      business.name,
+      business.slug,
+      business.category,
+      business.phoneWhatsApp,
+      business.sarinConfig,
+      business.resources,
+      business.services,
+      business.weeklySchedule,
+      business.socialLinks,
+    ]);
+    if (loadedVersion.current === version) return;
+    if (loadedBusiness.current === business.id && baseline.current && baseline.current !== latestSnapshot.current) return;
+    if (loadedBusiness.current !== business.id) proposedIntake.current = [];
+    loadedBusiness.current = business.id;
+    baseline.current = JSON.stringify([business.name, business.slug, business.category, business.phoneWhatsApp, business.sarinConfig.tone, business.sarinConfig.customRules, business.sarinConfig.intakeFields.map(item => item.label).join('\n'), business.resources, business.services, business.weeklySchedule, business.socialLinks ?? []]);
+    loadedVersion.current = version;
+    setName(business.name);
+    setSlug(business.slug);
+    setCategory(business.category);
+    setPhone(business.phoneWhatsApp);
+    setSocialLinks(business.socialLinks ?? []);
+    setTone(business.sarinConfig.tone);
+    setRules(business.sarinConfig.customRules);
+    setIntake(
+      business.sarinConfig.intakeFields.map((item) => item.label).join("\n"),
+    );
+    setResources(business.resources);
+    setServices(business.services);
+    setSchedule(business.weeklySchedule);
+  }, [business]);
+  function applyConfigurationDraft(draft: BusinessConfig) {
+    setName(draft.name); setSlug(business?.slug || draft.slug); setCategory(draft.category); setPhone(draft.phoneWhatsApp);
+    if (draft.socialLinks !== undefined) setSocialLinks(draft.socialLinks);
+    proposedIntake.current = draft.intakeFields;
+    setTone(draft.tone); setRules(draft.customRules); setIntake(draft.intakeFields.map(field => field.label).join('\n'));
+    setResources(draft.resources); setServices(draft.services); setSchedule(draft.weeklySchedule); setSaved(false);
+  }
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!accountConsent.active || !policy.ready || !isSubscriptionAllowed(business)) return;
+    setError(null);
+    setSaved(false);
+    setSaving(true);
+    const submittedSnapshot = latestSnapshot.current;
+    try {
+      const response = await apiFetch<{ business: Business }>("/api/businesses", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          slug,
+          category,
+          phoneWhatsApp: phone,
+          socialLinks,
+          tone,
+          customRules: rules,
+          resources,
+          services,
+          weeklySchedule: schedule,
+          intakeFields: restrictedIntake ? [] : intake
+            .split("\n")
+            .map((label) => label.trim())
+            .filter(Boolean)
+            .map(
+              (label, index) =>
+                (proposedIntake.current[index]?.label === label ? proposedIntake.current[index] : undefined) ?? business?.sarinConfig.intakeFields.find(
+                  (field) => field.label === label,
+                ) ?? {
+                  key: `dato_${crypto.randomUUID()}`,
+                  label,
+                  required: true,
+                },
+            ),
+        }),
+      });
+      baseline.current = submittedSnapshot;
+      loadedVersion.current = '';
+      setBusiness(response.business);
+      setSaved(true);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setSaving(false);
+    }
+  }
+  function updateDay(index: number, next: DaySchedule) {
+    setSchedule((previous) => ({ ...previous, [index]: next }));
+  }
+  if (loading) return <Notice>Cargando configuración…</Notice>;
+  if (businessError) return <Notice error>{businessError}</Notice>;
+  if (!isSubscriptionAllowed(business)) return (
+    <section className="max-w-2xl space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
+      <h1 className="text-3xl font-bold">{canPurchasePaidTrial(business?.subscription) ? "Empieza con tu prueba pagada" : "Elige un plan para continuar"}</h1>
+      <p className="text-sm leading-6 text-sarin-muted">{canPurchasePaidTrial(business?.subscription) ? "Por $5.000 COP puedes configurar tu negocio y recibir hasta 10 citas, sin caducidad. Después, elige un plan para continuar." : "Revisa los planes y el estado de tus pagos para volver a configurar tu negocio y recibir nuevas citas. Tu agenda existente se conserva."}</p>
+      <Notice>{business?.subscription.paidTrial?.source === 'invitation' && business.subscription.paidTrial.accessSuspended ? 'El acceso de cortesía está suspendido. Contacta a administración; tus citas y consumo se conservan.' : business?.subscription.status === "pending_payment" ? "La configuración y Sarin se habilitan después de aprobar tu comprobante o canjear una invitación. Si ya enviaste el comprobante, espera su revisión." : "Necesitas acceso vigente para configurar tu negocio y usar Sarin."}</Notice>
+      <Link href="/dashboard/billing" className={buttonClass + " inline-flex items-center"}>Ver pagos y planes</Link>
+    </section>
+  );
+  return (
+    <div className="max-w-[45rem] space-y-5 xl:max-w-5xl">
+      <div>
+        <p className="text-xs uppercase tracking-widest text-sarin-blue">
+          Configuración
+        </p>
+        <h1 className="mt-2 text-3xl font-bold">
+          {business?.sarinConfig.onboardingCompleted ? "Así trabaja tu negocio" : "Configura el espacio de tu negocio"}
+        </h1>
+        <p className="mt-2 text-sm text-sarin-muted">
+          Cuéntaselo a Sarin o completa los datos.{business?.subscription.status === "trial" ? business.subscription.paidTrial?.source === 'invitation' ? " Tu prueba de cortesía incluye diez citas y 700 respuestas; sin cobro ni caducidad." : " Tu prueba pagada incluye la configuración y hasta 10 citas, sin caducidad." : ""}
+        </p>
+      </div>
+      {error && <Notice error>{error}</Notice>}
+      {saved && (
+        <Notice>
+          Configuración guardada. Tu enlace y agenda ya están disponibles en el
+          panel.
+        </Notice>
+      )}
+      {business && business.sarinConfig.onboardingCompleted && <BusinessLogoField business={business} onSaved={setBusiness} />}
+      <div className={`grid items-start gap-5 ${policy.ready && !health ? "xl:grid-cols-[18rem_minmax(0,1fr)]" : ""}`}>
+        {policy.ready && !health && business ? <ConfigurationAssistant key={`${user?.uid}:${business.id}`} uid={user?.uid} business={business} enabled={accountConsent.active} onDraft={applyConfigurationDraft} /> : <div className="space-y-2"><Notice error={Boolean(policy.error)}>{policy.error || (health ? 'Este negocio se configura manualmente. Las reservas de salud usan formulario sin IA; no incluyas información de pacientes en el catálogo.' : 'Comprobando las opciones de configuración…')}</Notice>{policy.error && <button type="button" className={buttonClass} onClick={policy.refresh}>Reintentar clasificación</button>}</div>}
+
+        <form aria-label="Datos de tu negocio"
           className="@container min-w-0 space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5"
           onSubmit={(event) => void save(event)}
         >
-          <fieldset disabled={!accountConsent.active} className="min-w-0 space-y-5">
+          <fieldset disabled={!accountConsent.active || !policy.ready} className="min-w-0 space-y-5">
           <h2 className="text-lg font-semibold">Datos de tu negocio</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs text-sarin-muted">
@@ -660,7 +667,7 @@ function Configuration() {
               })}
             </div>
           </section>
-          <section className="space-y-2">
+          {!restrictedIntake && <section className="space-y-2">
             <label className="block text-xs text-sarin-muted">
               Preguntas obligatorias para reservar (una por línea)
               <textarea
@@ -685,7 +692,8 @@ function Configuration() {
                 { label: "Dudas del servicio", value: "¿Quieres aclarar algún detalle del servicio antes de reservar?" },
               ]}
             />
-          </section>
+          </section>}
+          {!health && <>
           <label className="block text-xs text-sarin-muted">
             Tono del asistente
             <input
@@ -721,6 +729,7 @@ function Configuration() {
               ]}
             />
           </section>
+          </>}
           <button className={buttonClass + " w-full"} disabled={saving}>
             {saving
               ? "Guardando…"
