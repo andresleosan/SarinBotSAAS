@@ -23,6 +23,8 @@ El adulto que reserva para sí mismo en un negocio general comienza con «Reserv
 | `pnpm audit --audit-level=high` | Sin vulnerabilidades conocidas. Lockfile y dependencias sin cambios. |
 | `git diff --check` | Sin errores. |
 
+La rama se envió a `origin`; el workflow remoto solo se dispara en `main`, PR o ejecución manual, por lo que no se atribuye una corrida CI al push de esta rama. Los resultados de la tabla son verificaciones locales ejecutadas.
+
 La seguridad conserva validación y autorización del servidor, consentimientos vigentes, límites, disponibilidad transaccional, cupos e idempotencia. El nuevo calendario general usa `subjectKind: self` y `beneficiary.kind: self`, ya admitidos por el backend publicado. No cambia API, esquema, regla de almacenamiento, secreto, proveedor ni despliegue de Pages. El replay de una confirmación incierta valida el UID, repite los datos originales y no se convierte en una reserva nueva. Cambiar de UID o negocio limpia el ámbito anterior y descarta respuestas tardías.
 
 Las simulaciones de respuesta perdida, errores, retirada durante confirmación, cambio de política/salud, identidad y restricciones de salud/menores son pruebas de componente/hook y contratos existentes; no se atribuyen a una manipulación de red en Chrome. Las propuestas pendientes viven en memoria; tras recargar se debe consultar «Mis citas» para comprobar lo ya guardado.
@@ -70,5 +72,7 @@ Fuente congelada **`98629e12df5df28801983ee59f87a103c835b710`**. Imagen local `s
 Humo de esa imagen: filesystem de solo lectura, red `none`, sin credenciales; portada, ayuda, privacidad, onboarding y `/b/synthetic-catalog` HTTP 200; APIs protegidas anónimas 401; manifiesto y SHA-256 de ambos iconos correctos; bundle con calendario y destinatario explícito. El contenedor de humo se retiró. Este humo no demuestra acceso real a ADC/D1: los contratos se validaron con los emuladores y el backend no tiene cambios.
 
 Paquete privado `%LOCALAPPDATA%/SarinBot/direct-calendar-release-20261017`: archivo Git/hash, fuentes, logs de build, inspección de imagen, humo, resumen QA, plan de publicación y configuraciones base/mantenimiento con rollback a la imagen actual. `release-status.json` registra `awaiting_production_authorization`, `productionApproval=false`, `registryPushed=false`, `productionChanged=false`. El ID local se registra aquí antes de cualquier push; no se presenta como un digest confirmado del registro remoto.
+
+Preflight independiente de solo lectura a las **15:57:56 UTC / 10:57:56 Colombia**: Worker `274d9bf2…` al 100 %, mantenimiento desactivado, presupuesto activo, trece secretos y todos los bindings/variables iguales a la base. Containers v10 con imagen `b2b925f5…`, máximo/configurado uno, una allocation running/conectada y cero antiguas tras paginación completa. Pages `a461b670…` intacto. Registro privado `independent-before.json`. Se corrigió la falta de un JSON de evidencia del finalizador copiado y se repitió este helper desde el propio paquete con salida cero; no afecta al código o imagen congelados.
 
 Pendiente autorización específica de producción. Esa autorización no se infiere de la aprobación del diseño. Antes del corte se verificará nuevamente la base remota, se fijará el digest devuelto por el registro y se exigirá mantenimiento, drenaje y una única instancia efectiva antes de reabrir.
