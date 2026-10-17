@@ -1,6 +1,6 @@
-# Próxima fecha disponible: aceptación local
+# Próxima fecha disponible: publicado
 
-Estado: aprobado localmente. Publicación autorizada pendiente de ejecutar y verificar.
+Estado: publicado con autorización específica. Runtime publicado `1b8138582a2784748537a7f1905db29368c9e57e`.
 
 Primer incremento de la secuencia autorizada con «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». La aprobación incluye publicar cada versión probada antes de pasar a la siguiente. Esta entrega amplía el calendario existente; conserva Agenda clara, permisos, confirmación y recuperación.
 
@@ -41,6 +41,25 @@ Capturas revisadas: [día sin cupos y foco a 320](2026-10-17-next-available-empt
 
 Se limpiaron exactamente diez documentos propios de la fixture, preservando las cuentas y decisiones compartidas. Se cerró la pestaña local, se restauró el viewport y se detuvieron la preview y los emuladores propios. Los puertos 3041/8080/9099/4400/4500/9150 quedaron libres, comprobados mediante bind exclusivo y cierre. La autenticación administrativa de producción no se reverificó durante QA local; se comprobará por separado después de publicar.
 
-Publicación autorizada pendiente: congelar esta revisión, construir y auditar imagen, activar mantenimiento, drenar cola, sustituir la instancia única, reabrir y verificar producción.
+Publicado después de la autorización registrada: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». El artefacto congelado es `1b8138582a2784748537a7f1905db29368c9e57e`; los commits posteriores de documentación se distinguen del runtime.
 
 Base compatible anterior: runtime `0b3bf0558b48ded61f9869374bee75c80d29d22a`, imagen `sha256:d75c6c8e217de30ca2adde03a324ec56058be7306bda83e4cbcec0647b1e33bc`, Worker `f0695392-6b63-479e-a18c-af161f8ce017`, Containers v14. Esta función no incluye migraciones, cambios de secretos ni cambios de dependencias.
+
+## Publicación verificada
+
+![Producción: reserva bloqueada por los permisos pendientes; no se activaron consentimientos para QA](2026-10-17-next-available-production.jpg)
+
+Cierre: `2026-10-17T23:24:01.782Z`. Autorización: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro», limitada a esta búsqueda. Worker `2e25bd87-70ab-4f7d-bcdb-9eed349ec8d0`, Containers v15, allocation `d03329ef-b456-4b3e-96ec-fe5ab6f003fc`, imagen `sha256:d7ee223446ef4609137056572e3adbfdecb2233828a402afbc1ab46e8d42f617`. Una instancia running/connected, cero antiguas y paginación completa; mantenimiento desactivado, bindings/variables/13 secretos/presupuesto conservados.
+
+| Etapa | Hora | Scope | HTTP | Activas/cola/críticas/normales |
+| --- | --- | --- | --- | --- |
+| Antes | 2026-10-17T23:19:21.677Z | default | 200 | 0/0/0/0 |
+| Drenaje | 2026-10-17T23:21:14.395Z | engine | 200 | 0/0/0/0 |
+| Rollout | 2026-10-17T23:22:25.418Z | engine | 200 | 0/0/0/0 |
+| Reapertura | 2026-10-17T23:23:01.303Z | default | 200 | 0/0/0/0 |
+
+HTTP: `/` 200; `/ayuda` 200; `/privacidad` 200; `/b/sarin-pruebas-20261015` 200; `/dashboard/onboarding` 200; `/manifest.webmanifest` 200; `/api/session` 401; `/api/businesses` 401. Perfil público con allowlist verificada; iconos: `/brand/sarin-face-192.png` SHA-256 `bec2324dd74f8d0dbc476b5b580c5b2eca65aff171426574706071a40724541e`; `/brand/sarin-face-512.png` SHA-256 `bfe3c69878d4089d14076be0394acb67bc42fc879a0111e1bbfb855b70e85482`. El nuevo marcador y los anteriores se verificaron como bundle_only; no se infiere UI visible.
+
+Acción visible: no; flujo no atribuido como observado. Límite real: El negocio de prueba devuelve bookingAvailable=false y tiene los permisos del negocio pendientes. La ficha muestra la reserva deshabilitada. No se aceptaron condiciones reales ni se modificaron datos para activar el flujo. UI completa validada localmente con 29 controles. La autenticación administrativa final se reverificó; los límites de observación durante la preparación local conservan su propia fecha en el paquete. No se aceptaron consentimientos ni se crearon/alteraron citas o datos reales para QA.
+
+Reversión compatible: `0b3bf0558b48ded61f9869374bee75c80d29d22a`, imagen `registry.cloudflare.com/05fb22c155667de064b55c4e287b21d8/sarin-bot@sha256:d75c6c8e217de30ca2adde03a324ec56058be7306bda83e4cbcec0647b1e33bc`, Worker `f0695392-6b63-479e-a18c-af161f8ce017`, Containers v14; sin migraciones ni borrado.

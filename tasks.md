@@ -1,17 +1,17 @@
 # Estado de implementación — 2026-10-17
 
-## Próxima fecha disponible — aprobado localmente
+## Próxima fecha disponible — publicado
 
 - [x] Implementar búsqueda explícita de hasta catorce días, con servicio/profesional conservados y selección de hora manual.
 - [x] Corregir revisión de reloj y confirmación con regresiones RED/GREEN; mantener recuperación de la operación original.
 - [x] Pasar 1.105 pruebas/26 omitidas, tipos, audit y D1 local real; 29 controles CUA en móvil/escritorio. Corregir foco de teclado y limpiar diez documentos propios y todos los procesos de QA. [Aceptación](docs/qa/2026-10-17-next-available-date.md).
-- [ ] Publicar la versión autorizada después de auditar imagen y reversión compatible, drenar cola y verificar una instancia efectiva y la sesión administrativa.
+- [x] Publicar la búsqueda autorizada: runtime `1b81385`, imagen `d7ee2234…`, Worker `2e25bd87-70ab-4f7d-bcdb-9eed349ec8d0`, Containers v15; una instancia conectada, cero antiguas, cuatro colas vacías y HTTP/bundles/iconos verificados. Autenticación administrativa reverificada; acción/flujo visibles: no/no, con límites y controles locales separados. [Publicación y reversión](docs/qa/2026-10-17-next-available-date.md).
 
 ## Adaptaciones de Fresha — ejecución secuencial autorizada
 
 El propietario indicó «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». Cada incremento se implementa, prueba, publica y verifica antes de comenzar el siguiente; la autorización incluye las publicaciones en Sarin.
 
-- [ ] **Aprobado localmente:** buscar próxima fecha disponible después de un día sin cupos, conservando servicio/profesional y consultando hasta catorce días. Selección de hora y confirmación explícitas. [Protocolo de QA](qa/tests/next-available-date.md).
+- [x] **Publicado:** buscar próxima fecha disponible después de un día sin cupos, conservando servicio/profesional y consultando hasta catorce días. Runtime `1b81385`, imagen `d7ee2234…`; selección de hora y confirmación explícitas. [Cierre de QA y publicación](docs/qa/2026-10-17-next-available-date.md).
 - [ ] Añadir la cita al calendario mediante archivo importable, con identidad estable y límites claros de actualización.
 - [ ] Dirección/modalidad e indicaciones para llegar en la ficha del negocio.
 - [ ] Reprogramar una cita existente con reglas temporales validadas en servidor y cambio atómico.
