@@ -8,7 +8,12 @@ import type { ChatActor } from '@/types/chat';
 import { documentIdSchema, requestIdSchema } from './schemas';
 import { HttpError } from './http';
 
-const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([key, item]) => [key, canonical(item)]));
+  return value;
+}
+const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 export const consentStateKey = (uid: string, scope: ConsentScope, businessId: string | null = null) => `consent_state_${hash([uid, scope, businessId])}`;
 const scopeSchema = z.enum(['account', 'business_client']);
 const revisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER - 1);

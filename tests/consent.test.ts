@@ -115,4 +115,19 @@ describe('explicit versioned consent', () => {
     await ref.delete();
     await expect(assertConsent(user.uid, 'account', undefined, db)).rejects.toMatchObject({ status: 503 });
   });
+
+  it('validates receipt content independently of stored map key order while still detecting changed text', async () => {
+    const { db, rows } = setup(); await accept(db);
+    const key = [...rows.keys()].find(path => path.startsWith('serverSettings/consent_receipt_'))!;
+    const ref = db.collection('serverSettings').doc(key.split('/')[1]), receipt = (await ref.get()).data()!;
+    function reorder(value: unknown): unknown {
+      if (Array.isArray(value)) return value.map(reorder);
+      if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).reverse().map(([key, item]) => [key, reorder(item)]));
+      return value;
+    }
+    await ref.set(reorder(receipt) as object);
+    await expect(assertConsent(user.uid, 'account', undefined, db)).resolves.toBeUndefined();
+    await ref.set({ ...receipt, documents: { ...receipt.documents, notice: 'Changed text' } });
+    await expect(assertConsent(user.uid, 'account', undefined, db)).rejects.toMatchObject({ status: 503 });
+  });
 });

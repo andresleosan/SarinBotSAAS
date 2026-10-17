@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { memoryFirestore } from './memoryFirestore';
 const state = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => state.db }));
@@ -8,6 +8,7 @@ import { GET as documents, POST as preauthorize } from '@/app/api/consent/preaut
 import { GET as session } from '@/app/api/session/route';
 const request = (body?: unknown, auth = true, origin = 'http://localhost') => new Request('http://localhost/api/consent', { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', Origin: origin, ...(auth ? { Authorization: 'Bearer synthetic' } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 beforeEach(() => { state.db = memoryFirestore().db; });
+afterEach(() => vi.unstubAllEnvs());
 describe('consent HTTP boundaries', () => {
   it('serves public account documents without collecting identity and rejects invalid choices/origin', async () => {
     const result = await documents(); expect(result.headers.get('cache-control')).toBe('no-store');
@@ -27,6 +28,14 @@ describe('consent HTTP boundaries', () => {
     const { documents: doc } = await (await documents()).json();
     const request = new Request('http://localhost:3042/api/consent/preauthorize', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: '127.0.0.1:3042', Origin: 'http://127.0.0.1:3042' }, body: JSON.stringify({ fingerprint: doc.fingerprint, termsAccepted: true, dataAuthorized: true }) });
     expect((await preauthorize(request)).status).toBe(200);
+  });
+  it('uses the configured public origin through Pages instead of trusting its rewritten backend Host or forwarded headers', async () => {
+    vi.stubEnv('NODE_ENV', 'production'); vi.stubEnv('SARIN_PUBLIC_BOOKING_ORIGIN', 'https://sarinbotsaas.pages.dev');
+    const { documents: doc } = await (await documents()).json();
+    const body = JSON.stringify({ fingerprint: doc.fingerprint, termsAccepted: true, dataAuthorized: true });
+    const make = (origin: string) => new Request('http://internal:3000/api/consent/preauthorize', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: 'runtime.synthetic.internal', Origin: origin, 'X-Forwarded-Host': 'foreign.test' }, body });
+    expect((await preauthorize(make('https://sarinbotsaas.pages.dev'))).status).toBe(200);
+    expect((await preauthorize(make('https://foreign.test'))).status).toBe(403);
   });
   it('session inspection never creates or modifies a profile before explicit acceptance', async () => {
     const db = state.db as ReturnType<typeof memoryFirestore>['db'];
