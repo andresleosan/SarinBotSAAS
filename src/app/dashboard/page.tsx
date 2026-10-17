@@ -11,6 +11,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/auth-provider";
+import { useAccountConsent } from '@/components/consent-panel';
 import {
   AppShell,
   Notice,
@@ -35,6 +36,7 @@ function today() {
 }
 
 function Agenda() {
+  const accountConsent = useAccountConsent();
   const { business, loading, error: businessError } = useBusiness();
   const { user } = useAuth();
   const [date, setDate] = useState(today);
@@ -69,7 +71,7 @@ function Agenda() {
   }, []);
   async function block(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!business || actionRequest.current) return;
+    if (!accountConsent.active || !business || actionRequest.current) return;
     const controller = actionRequest.current = new AbortController();
     setSaving(true);
     setError(null);
@@ -502,7 +504,7 @@ function Agenda() {
           </label>
           <button
             disabled={
-              saving || !date || !business.resources.some((item) => item.active)
+              !accountConsent.active || saving || !date || !business.resources.some((item) => item.active)
             }
             className={buttonClass + " self-end"}
           >

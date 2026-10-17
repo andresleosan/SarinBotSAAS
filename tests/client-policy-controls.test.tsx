@@ -1,3 +1,4 @@
+vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: true }) }));
 import { act, createElement } from 'react';
 import { create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';

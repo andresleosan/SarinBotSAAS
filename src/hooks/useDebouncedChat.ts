@@ -8,6 +8,7 @@ interface ChatParams {
   mode: "sarin_onboarding" | "sarin_client" | "sarin_owner_copilot";
   tenantId: string;
   actorUid?: string;
+  enabled?: boolean;
   debounceMs?: number;
   onToolExecuted?: (toolName: string, result: Record<string, unknown>) => void;
 }
@@ -41,6 +42,7 @@ export function useDebouncedChat({
   mode,
   tenantId,
   actorUid = '',
+  enabled = true,
   debounceMs = 2500,
   onToolExecuted,
 }: ChatParams) {
@@ -64,6 +66,16 @@ export function useDebouncedChat({
   const callback = useRef(onToolExecuted);
   callback.current = onToolExecuted;
   const flushRef = useRef<() => Promise<void>>(async () => {});
+  const operational = useRef(enabled);
+  operational.current = enabled;
+  useEffect(() => {
+    if (enabled) return;
+    generation.current++;
+    controller.current?.abort(); confirmation.current?.abort(); confirmation.current = null;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null; pending.current = []; failed.current = null; busy.current = false; ready.current = false;
+    setIsWaitingBatch(false); setIsGenerating(false); setConfirming(false); setProposal(undefined); setConfigurationDraft(undefined);
+  }, [enabled]);
 
   useEffect(() => {
     generation.current++;
@@ -91,7 +103,7 @@ export function useDebouncedChat({
   }, [mode, tenantId, actorUid]);
 
   const flush = useCallback(async () => {
-    if (busy.current || !tenantId) return;
+    if (!operational.current || busy.current || !tenantId) return;
     const batch = failed.current ?? takeBatch(pending.current);
     if (!batch) return;
     if (!failed.current) batch.stateVersion = stateVersion.current;
@@ -158,7 +170,7 @@ export function useDebouncedChat({
   const sendMessage = useCallback(
     (text: string) => {
       const content = text.trim();
-      if (!content || !tenantId || confirmation.current || errorCode === "AI_QUOTA_EXHAUSTED") return;
+      if (!operational.current || !content || !tenantId || confirmation.current || errorCode === "AI_QUOTA_EXHAUSTED") return;
       if (errorCode === "REQUEST_ALREADY_COMPLETED") {
         setError(null);
         setErrorCode(null);
@@ -186,10 +198,10 @@ export function useDebouncedChat({
   );
 
   const retry = useCallback(() => {
-    if (!busy.current && failed.current) void flushRef.current();
+    if (operational.current && !busy.current && failed.current) void flushRef.current();
   }, []);
   const confirmProposal = useCallback(async (proposalId: string, contact: Pick<import('@/lib/server/schemas').BookingInput, 'clientPhone' | 'intakeAnswers'>) => {
-    if (confirmation.current || busy.current || pending.current.length || proposal?.id !== proposalId || proposal.businessId !== tenantId) return;
+    if (!operational.current || confirmation.current || busy.current || pending.current.length || proposal?.id !== proposalId || proposal.businessId !== tenantId) return;
     const abort = confirmation.current = new AbortController(), current = generation.current;
     setConfirming(true); setError(null);
     try {

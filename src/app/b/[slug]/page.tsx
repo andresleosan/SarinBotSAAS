@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Send } from "lucide-react";
 import { SarinMark } from "@/components/sarin-brand";
 import { AuthGate, useAuth } from "@/components/auth-provider";
+import { ConsentPanel, useAccountConsent } from '@/components/consent-panel';
+import { useConsent } from '@/hooks/useConsent';
 import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
 import { ClientAppointments } from "@/components/client-appointments";
 import { BookingProposal } from '@/components/booking-proposal';
@@ -24,6 +26,9 @@ function Island({ slug }: { slug: string }) {
     return data.business;
   });
   const business = projection.value, loading = projection.loading, error = projection.error;
+  const accountConsent = useAccountConsent();
+  const businessConsent = useConsent(user?.uid, 'business_client', business ?? undefined);
+  const permitted = accountConsent.active && businessConsent.active;
   const [input, setInput] = useState("");
   const [appointmentVersion, setAppointmentVersion] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -37,6 +42,7 @@ function Island({ slug }: { slug: string }) {
     mode: "sarin_client",
     tenantId: business?.id || "",
     actorUid: user?.uid,
+    enabled: permitted,
     onToolExecuted: name => { if (name === 'cita_confirmada') setAppointmentVersion(value => value + 1); },
   });
   useEffect(() => {
@@ -45,7 +51,7 @@ function Island({ slug }: { slug: string }) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
-      !input.trim() ||
+      !permitted || !input.trim() ||
       !business ||
       chat.quotaExhausted ||
       !isSubscriptionAllowed(business, Date.now())
@@ -73,9 +79,9 @@ function Island({ slug }: { slug: string }) {
       </div>
     );
   const allowed = isSubscriptionAllowed(business, now);
-  const retryAllowed = allowed || getBusinessAccess(business, now) === "trial_exhausted";
+  const retryAllowed = permitted && (allowed || getBusinessAccess(business, now) === "trial_exhausted");
   const chatAvailable = allowed && !chat.quotaExhausted;
-  const chatAllowed = chatAvailable && !chat.confirming;
+  const chatAllowed = permitted && chatAvailable && !chat.confirming;
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col border-x border-sarin-line bg-sarin-canvas">
       <header className="sticky top-0 z-20 border-b border-sarin-line bg-sarin-paper/95 p-4 backdrop-blur">
@@ -114,6 +120,10 @@ function Island({ slug }: { slug: string }) {
           </a>
         </nav>
       </header>
+      <div className="px-4">
+        <ConsentPanel controller={accountConsent} title="Permisos de mi cuenta" />
+        <ConsentPanel controller={businessConsent} title={`Chat y reservas con ${business.name}`} blockedReason={!accountConsent.active ? 'Primero revisa los permisos de tu cuenta. Tus citas existentes siguen disponibles abajo.' : undefined} />
+      </div>
       <div className="flex-1 space-y-5 p-4 sm:p-6">
         <nav aria-label="Contacto del negocio" className="flex flex-wrap gap-x-4 text-sm text-sarin-blue">
           {business.phoneWhatsApp && <a href={`tel:+${business.phoneWhatsApp.replace(/\D/g, '')}`} className="inline-flex min-h-11 items-center underline">+{business.phoneWhatsApp.replace(/^\+/, '')}</a>}
@@ -213,7 +223,7 @@ function Island({ slug }: { slug: string }) {
             </div>
           )}
           <div ref={end} />
-          {chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming || chat.isGenerating || chat.isWaitingBatch} onConfirm={chat.confirmProposal} />}
+          {permitted && chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming || chat.isGenerating || chat.isWaitingBatch} onConfirm={chat.confirmProposal} />}
         </div>
         {user && <ClientAppointments key={`${business.id}:${user.uid}:${appointmentVersion}`} businessId={business.id} businessName={business.name} resources={business.resources} userId={user.uid} now={now} />}
       </div>

@@ -4,10 +4,11 @@ import type { User } from "firebase/auth";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthGate, AuthProvider, useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/client/api";
-import { signOut, signInWithCredential } from "firebase/auth";
+import { signOut, signInWithCredential, signInWithPopup } from "firebase/auth";
 
 const state = vi.hoisted(() => ({
   listener: null as ((user: User | null) => Promise<void>) | null,
+  currentUser: null as User | null,
 }));
 vi.mock("firebase/auth", () => ({
   GoogleAuthProvider: class {},
@@ -22,7 +23,7 @@ vi.mock("firebase/auth", () => ({
   signOut: vi.fn(),
 }));
 vi.mock("@/lib/firebase/client", () => ({
-  getFirebaseClient: () => ({ auth: {} }),
+  getFirebaseClient: () => ({ auth: { currentUser: state.currentUser } }),
 }));
 vi.mock("@/lib/client/api", () => ({
   apiFetch: vi.fn(),
@@ -65,8 +66,10 @@ describe("authentication provider access state", () => {
   }
   beforeEach(() => {
     state.listener = null;
+    state.currentUser = null;
     vi.mocked(apiFetch).mockReset();
     vi.mocked(signOut).mockReset();
+    vi.mocked(signInWithPopup).mockReset();
   });
   afterEach(async () => {
     await act(async () => renderer?.unmount());
@@ -81,6 +84,28 @@ describe("authentication provider access state", () => {
     expect(destinations).toContain("/ayuda");
     expect(vi.mocked(apiFetch)).not.toHaveBeenCalled();
     expect(JSON.stringify(renderer?.toJSON())).not.toContain("PRIVATE_ADMIN_CONTENT");
+  });
+
+  it('records the explicit pre-Google proof against the resulting account without treating ordinary login as acceptance', async () => {
+    await mount(); await act(async () => state.listener?.(null));
+    state.currentUser = user;
+    vi.mocked(signInWithPopup).mockResolvedValue({ user } as never);
+    vi.mocked(apiFetch).mockResolvedValue({ revision: 0, documents: { fingerprint: 'a'.repeat(64) } });
+    await act(async () => auth.signIn('proof-before-google'));
+    const accepted = vi.mocked(apiFetch).mock.calls.find(call => call[1]?.method === 'POST');
+    expect(accepted?.[0]).toBe('/api/consent');
+    expect(JSON.parse(String(accepted?.[1]?.body))).toMatchObject({ action: 'accept', scope: 'account', termsAccepted: true, dataAuthorized: true, preauthorization: 'proof-before-google' });
+    vi.mocked(apiFetch).mockClear();
+    await act(async () => auth.signIn());
+    expect(vi.mocked(apiFetch).mock.calls.some(call => call[1]?.method === 'POST')).toBe(false);
+  });
+
+  it('does not claim a preauthorization for a different Google account after an identity switch', async () => {
+    await mount(); await act(async () => state.listener?.(null));
+    state.currentUser = { ...user, uid: 'next-account' } as User;
+    vi.mocked(signInWithPopup).mockResolvedValue({ user } as never);
+    await act(async () => auth.signIn('prior-account-proof'));
+    expect(vi.mocked(apiFetch).mock.calls.some(call => call[1]?.method === 'POST')).toBe(false);
   });
 
   it("keeps administrator content blocked when server session validation fails", async () => {

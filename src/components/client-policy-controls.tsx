@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { apiFetch, errorMessage } from '@/lib/client/api';
 import { buttonClass, fieldClass, Notice } from './app-shell';
+import { useAccountConsent } from './consent-panel';
 type Policy = { blocked: boolean; futureAppointmentLimit: number; reason: string | null; inheritsLimit?: boolean };
 type Props = { businessId: string; ownerUid: string; clients: { uid: string; name: string }[] };
 export function ClientPolicyControls(props: Props) { return <PolicyPanel key={`${props.ownerUid}:${props.businessId}`} {...props} />; }
@@ -15,6 +16,7 @@ function PolicyPanel(props: Props) {
   </details>;
 }
 function PolicyForm({ businessId, clientUid }: { businessId: string; clientUid: string }) {
+  const accountConsent = useAccountConsent();
   const [limit, setLimit] = useState('3'), [blocked, setBlocked] = useState(false), [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true), [saving, setSaving] = useState(false), [error, setError] = useState<string | null>(null), [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false), [attempt, setAttempt] = useState(0);
@@ -31,7 +33,7 @@ function PolicyForm({ businessId, clientUid }: { businessId: string; clientUid: 
     return () => { active.current = false; controller.abort(); request.current?.abort(); };
   }, [url, clientUid, attempt]);
   async function save(event: FormEvent) {
-    event.preventDefault(); if (request.current || loading || !loaded) return;
+    event.preventDefault(); if (!accountConsent.active || request.current || loading || !loaded) return;
     const controller = request.current = new AbortController();
     setSaving(true); setError(null); setSaved(false);
     try {
@@ -42,9 +44,9 @@ function PolicyForm({ businessId, clientUid }: { businessId: string; clientUid: 
   }
   return <form className="mt-4 space-y-3" onSubmit={save}>
     {error && <Notice error>{error}</Notice>}{!loaded && !loading && <button type="button" className={buttonClass} onClick={() => setAttempt(value => value + 1)}>Reintentar lectura</button>}{saved && <Notice>Política guardada.</Notice>}
-    <label className="block text-sm">Máximo de citas futuras<select className={fieldClass} aria-label="Máximo de citas futuras" value={limit} disabled={loading || saving} onChange={event => { setLimit(event.target.value); setSaved(false); }}>{clientUid && <option value="">Heredar política general</option>}{Array.from({ length: 20 }, (_, index) => <option key={index} value={index + 1}>{index + 1}</option>)}</select></label>
-    {clientUid && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={blocked} disabled={loading || saving} onChange={event => setBlocked(event.target.checked)} />Pausar nuevas reservas y chat de este cliente</label>}
-    <label className="block text-sm">Motivo del cambio<input className={fieldClass} aria-label="Motivo del cambio" value={reason} required maxLength={300} disabled={loading || saving} onChange={event => setReason(event.target.value)} /></label>
-    <button className={buttonClass} disabled={!loaded || loading || saving || !reason.trim()}>{saving ? 'Guardando…' : 'Guardar política'}</button>
+    <label className="block text-sm">Máximo de citas futuras<select className={fieldClass} aria-label="Máximo de citas futuras" value={limit} disabled={!accountConsent.active || loading || saving} onChange={event => { setLimit(event.target.value); setSaved(false); }}>{clientUid && <option value="">Heredar política general</option>}{Array.from({ length: 20 }, (_, index) => <option key={index} value={index + 1}>{index + 1}</option>)}</select></label>
+    {clientUid && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={blocked} disabled={!accountConsent.active || loading || saving} onChange={event => setBlocked(event.target.checked)} />Pausar nuevas reservas y chat de este cliente</label>}
+    <label className="block text-sm">Motivo del cambio<input className={fieldClass} aria-label="Motivo del cambio" value={reason} required maxLength={300} disabled={!accountConsent.active || loading || saving} onChange={event => setReason(event.target.value)} /></label>
+    <button className={buttonClass} disabled={!accountConsent.active || !loaded || loading || saving || !reason.trim()}>{saving ? 'Guardando…' : 'Guardar política'}</button>
   </form>;
 }

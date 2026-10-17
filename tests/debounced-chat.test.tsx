@@ -37,8 +37,8 @@ function payload(index: number): Payload {
 describe("debounced authenticated chat lifecycle", () => {
   let renderer: ReactTestRenderer | undefined;
   let chat!: ReturnType<typeof useDebouncedChat>;
-  function Harness({ tenantId = "business-1", actorUid = 'client' }: { tenantId?: string; actorUid?: string }) {
-    chat = useDebouncedChat({ mode: "sarin_client", tenantId, actorUid });
+  function Harness({ tenantId = "business-1", actorUid = 'client', enabled = true }: { tenantId?: string; actorUid?: string; enabled?: boolean }) {
+    chat = useDebouncedChat({ mode: "sarin_client", tenantId, actorUid, enabled });
     return null;
   }
   async function mount() {
@@ -79,6 +79,25 @@ describe("debounced authenticated chat lifecycle", () => {
       "Quiero una cita",
       "Hola",
     ]);
+  });
+
+  it('drops pending batches and late results when consent is withdrawn, preserving visible history', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({ reply: 'Respuesta anterior' });
+    await mount(); act(() => chat.sendMessage('Primer mensaje')); await advance();
+    act(() => chat.sendMessage('Pendiente no autorizado'));
+    await act(async () => renderer?.update(createElement(Harness, { enabled: false })));
+    act(() => { chat.sendMessage('No debe salir'); chat.retry(); }); await advance();
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    expect(chat.messages.map(message => message.content)).toContain('Respuesta anterior');
+    expect(chat.isWaitingBatch).toBe(false);
+    await act(async () => renderer?.update(createElement(Harness, { enabled: true })));
+    const pending = deferred<ChatResponse>(); vi.mocked(apiFetch).mockReturnValueOnce(pending.promise);
+    act(() => chat.sendMessage('En curso')); await advance();
+    const signal = vi.mocked(apiFetch).mock.calls[1][1]?.signal;
+    await act(async () => renderer?.update(createElement(Harness, { enabled: false })));
+    expect(signal?.aborted).toBe(true);
+    await act(async () => pending.resolve({ reply: 'No aplicar respuesta tardía' }));
+    expect(chat.messages.some(message => message.content === 'No aplicar respuesta tardía')).toBe(false);
   });
 
   it("waits for the running turn before processing a second burst", async () => {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Copy, UploadCloud } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/auth-provider";
+import { useAccountConsent } from '@/components/consent-panel';
 import {
   AppShell,
   Notice,
@@ -52,6 +53,7 @@ function readDataUrl(blob: Blob): Promise<string> {
 }
 
 function Billing() {
+  const accountConsent = useAccountConsent();
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const [data, setData] = useState<BillingData | null>(null);
@@ -73,7 +75,7 @@ function Billing() {
   const selectedKind = pendingReceipt ? pendingReceipt.kind ?? "subscription" : purchaseKind === "paid_trial" && !canBuyTrial ? "subscription" : purchaseKind;
   const period = data?.allowance?.currentPeriod;
   const canBuyPack = Boolean(period && period.source !== "trial" && period.endsAt > Date.now() && data?.business?.subscription.status === "active" && data.allowance && ["active", "warning", "exhausted"].includes(data.allowance.state));
-  const formLocked = saving || compressing || refreshing || Boolean(pendingReceipt);
+  const formLocked = !accountConsent.active || saving || compressing || refreshing || Boolean(pendingReceipt);
   const uploadDisabled = priceNeedsRefresh || formLocked || !data?.settings.bankAccounts.length || (selectedKind === "paid_trial" && !canBuyTrial) || (selectedKind === "response_pack" && !canBuyPack) || (selectedKind === "subscription" && planId === "whatsapp" && !data?.whatsappAvailable);
   useEffect(() => {
     const controller = new AbortController();

@@ -10,6 +10,7 @@ import { BusinessLogoField } from '@/components/business-logo-field';
 import { BusinessSocialFields } from '@/components/business-social-fields';
 import type { BusinessSocialLink } from '@/lib/business-branding';
 import { AuthGate, useAuth } from "@/components/auth-provider";
+import { useAccountConsent } from '@/components/consent-panel';
 import {
   AppShell,
   Notice,
@@ -53,6 +54,7 @@ function initialSchedule(): Record<number, DaySchedule> {
 
 function Configuration() {
   const { user } = useAuth();
+  const accountConsent = useAccountConsent();
   const { business, loading, error: businessError, setBusiness } = useBusiness();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -122,6 +124,7 @@ function Configuration() {
   }, [business]);
   const chat = useDebouncedChat({
     actorUid: user?.uid,
+    enabled: accountConsent.active,
     mode: "sarin_onboarding",
     tenantId: business?.id || "onboarding",
   });
@@ -136,7 +139,7 @@ function Configuration() {
   }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isSubscriptionAllowed(business)) return;
+    if (!accountConsent.active || !isSubscriptionAllowed(business)) return;
     setError(null);
     setSaved(false);
     setSaving(true);
@@ -253,7 +256,7 @@ function Configuration() {
                   type="button"
                   className="min-h-11 text-sm text-sarin-blue underline"
                   onClick={chat.retry}
-                  disabled={chat.isGenerating}
+                  disabled={!accountConsent.active || chat.isGenerating}
                 >
                   {chat.quotaExhausted ? "Comprobar disponibilidad" : "Reintentar mensaje"}
                 </button>}
@@ -263,7 +266,7 @@ function Configuration() {
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (input.trim() && !chat.quotaExhausted && isSubscriptionAllowed(business)) {
+              if (accountConsent.active && input.trim() && !chat.quotaExhausted && isSubscriptionAllowed(business)) {
                 chat.sendMessage(input);
                 setInput("");
               }
@@ -274,7 +277,7 @@ function Configuration() {
               aria-label="Mensaje para Sarin"
               className={fieldClass}
               value={input}
-              disabled={chat.quotaExhausted}
+              disabled={!accountConsent.active || chat.quotaExhausted}
               maxLength={8000}
               onChange={(event) => setInput(event.target.value)}
               placeholder="Cuéntale cómo trabajas…"
@@ -282,7 +285,7 @@ function Configuration() {
             <button
               aria-label="Enviar mensaje"
               className={buttonClass}
-              disabled={!input.trim() || chat.quotaExhausted || (Boolean(chat.error) && !chat.requestAlreadyCompleted)}
+              disabled={!accountConsent.active || !input.trim() || chat.quotaExhausted || (Boolean(chat.error) && !chat.requestAlreadyCompleted)}
             >
               <Send className="h-4 w-4" />
             </button>
@@ -292,6 +295,7 @@ function Configuration() {
           className="@container min-w-0 space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5"
           onSubmit={(event) => void save(event)}
         >
+          <fieldset disabled={!accountConsent.active} className="min-w-0 space-y-5">
           <h2 className="text-lg font-semibold">Datos de tu negocio</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs text-sarin-muted">
@@ -724,6 +728,7 @@ function Configuration() {
                 ? "Guardar configuración"
                 : "Guardar y abrir mi agenda"}
           </button>
+          </fieldset>
         </form>
       </div>
     </div>

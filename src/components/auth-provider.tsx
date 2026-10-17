@@ -1,12 +1,15 @@
 "use client";
 
 import { SarinBrand } from "@/components/sarin-brand";
+import { AccountConsentProvider, PreauthorizationChoices } from '@/components/consent-panel';
+import type { ConsentStatus } from '@/lib/legal';
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import {
@@ -28,7 +31,7 @@ interface AuthContextValue {
   loading: boolean;
   isSuperadmin: boolean;
   error: string | null;
-  signIn: () => Promise<void>;
+  signIn: (preauthorization?: string) => Promise<void>;
   signInLocal: (account: LocalAccountRole) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -43,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [consentVersion, setConsentVersion] = useState(0);
+  const signingIn = useRef(false);
   useEffect(() => {
     let active = true;
     let version = 0;
@@ -83,13 +88,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubscribe?.();
     };
   }, []);
-  const signIn = useCallback(async () => {
+  const signIn = useCallback(async (preauthorization?: string) => {
+    if (signingIn.current) return;
+    signingIn.current = true;
     setError(null);
     try {
-      await signInWithPopup(getFirebaseClient().auth, new GoogleAuthProvider());
+      const credential = await signInWithPopup(getFirebaseClient().auth, new GoogleAuthProvider());
+      if (preauthorization) {
+        if (getFirebaseClient().auth.currentUser?.uid !== credential.user.uid) return;
+        const consent = await apiFetch<ConsentStatus>('/api/consent?scope=account');
+        if (getFirebaseClient().auth.currentUser?.uid !== credential.user.uid) return;
+        await apiFetch('/api/consent', { method: 'POST', body: JSON.stringify({ scope: 'account', action: 'accept', requestId: crypto.randomUUID(), expectedRevision: consent.revision, fingerprint: consent.documents.fingerprint, termsAccepted: true, dataAuthorized: true, preauthorization }) });
+        if (getFirebaseClient().auth.currentUser?.uid === credential.user.uid) setConsentVersion(value => value + 1);
+      }
     } catch (cause) {
       setError(errorMessage(cause));
-    }
+    } finally { signingIn.current = false; }
   }, []);
   const signOut = useCallback(async () => {
     setIsSuperadmin(false);
@@ -129,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           Entorno local · Firebase emulado · datos de negocio temporales
         </div>
       )}
-      {children}
+      <AccountConsentProvider uid={user?.uid} refreshVersion={consentVersion}>{children}</AccountConsentProvider>
     </AuthContext.Provider>
   );
 }
@@ -202,15 +216,8 @@ export function AuthGate({
               ))}
             </div>
           )}
-          <button
-            onClick={() => void signIn()}
-            disabled={localSigningIn !== null}
-            className="min-h-12 w-full rounded-[10px] bg-sarin-blue px-4 py-3 text-sm font-semibold text-white hover:bg-[#244dd0] disabled:opacity-50"
-          >
-            {localEmulators
-              ? "Entrar con Google emulado"
-              : "Continuar con Google"}
-          </button>
+          <PreauthorizationChoices onContinue={signIn} />
+          <button onClick={() => void signIn()} disabled={localSigningIn !== null} className="min-h-11 w-full text-left text-sm text-sarin-blue underline">Entrar para consultar mis citas o ejercer mis derechos</button>
           <nav aria-label="Información del servicio" className="flex flex-wrap gap-x-5 text-xs text-sarin-blue">
             <a href="/privacidad" className="inline-flex min-h-11 items-center underline underline-offset-4">Privacidad</a>
             <a href="/ayuda" className="inline-flex min-h-11 items-center underline underline-offset-4">Ayuda</a>
