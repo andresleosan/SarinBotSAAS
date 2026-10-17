@@ -1,15 +1,15 @@
 # Estado de implementación — 2026-10-17
 
-## Calendario de reserva directa — aceptación local
+## Calendario de reserva directa — publicado
 
 - [x] Diseño acotado aprobado: calendario general para el adulto que reserva para sí mismo, después de Google y permisos; chat como elección manual. [Decisión y fuente oficial Fresha](docs/design/2026-10-17-direct-booking-calendar.md).
 - [x] Reutilizar servicio/profesional/día/hora, propuesta, teléfono e intake, con confirmación explícita. Salud/menores y sus autorizaciones conservados; sin API, esquema, dependencia o proveedor nuevos.
 - [x] Conservar operación incierta, cuerpo original y UID esperado ante retirada de permisos, error de política o cambio a salud; bloquear rutas/destinatario y campos hasta recuperar. Regresiones RED/GREEN y revisión independiente PASS.
 - [x] 955 pruebas aprobadas/26 omitidas, tipos, 129 comprobaciones de recorrido, 74 pruebas Worker/dry-run y audit limpios. CUA compilado en 320/390/1280, cita sintética confirmada y lectura de persistencia con 24 controles; sin inferencia. [Evidencia](docs/qa/2026-10-17-direct-booking-calendar.md).
-- [x] Congelar `98629e1`, construir imagen local Linux `b6bc75f9…` y comprobar humo aislado sin red/credenciales; rollback compatible `accab511`/`b2b925f5…`. Paquete privado preparado, sin enviar imagen ni cambiar producción.
-- [ ] Publicar tras autorización específica de producción, con mantenimiento/drenaje, una instancia efectiva y comprobación final. La aprobación del diseño no sustituye este paso.
+- [x] Congelar `98629e1`, construir imagen Linux `b6bc75f9…` y comprobar humo aislado sin red/credenciales antes de autorizar producción; rollback compatible `accab511`/`b2b925f5…` y paquete privado preparados.
+- [x] Publicar tras autorización específica: imagen `b6bc75f9…`, Worker `08a0183f…`, Containers v11; cola drenada, una instancia conectada y cero antiguas. HTTP/bundles/iconos y selector/permisos en Chrome verificados; sesión administrativa conservada. [Cierre y reversión](docs/qa/2026-10-17-direct-booking-calendar.md).
 
-Rama `codex/direct-booking-calendar-20261017`, basada en `b91c545`, en el worktree existente del catálogo. Producción conserva el catálogo publicado; el checkout original permanece intacto.
+Rama `codex/direct-booking-calendar-20261017`, basada en `b91c545`, en el worktree existente del catálogo. Runtime publicado del archivo Git congelado `98629e1`; el checkout original permanece intacto. La imagen anterior `accab511`/`b2b925f5…` es el rollback compatible.
 
 ## Categorías y descripciones — publicado
 

@@ -1,6 +1,6 @@
 # Calendario de reservas: aceptación local
 
-Fecha: 17 de octubre de 2026. Estado: implementación y aceptación local; publicación pendiente de autorización específica. Rama `codex/direct-booking-calendar-20261017`, basada en `b91c545`, en el worktree existente `F:/Proyectos/SarinBot-worktrees/service-catalog`. El checkout original mixto se conserva.
+Fecha: 17 de octubre de 2026. Estado: publicado y verificado tras autorización específica. Runtime `98629e1`, rama `codex/direct-booking-calendar-20261017`, basada en `b91c545`, en el worktree existente `F:/Proyectos/SarinBot-worktrees/service-catalog`. El checkout original mixto se conserva.
 
 ## Resultado
 
@@ -61,7 +61,7 @@ Se restauró el viewport y se cerraron las pestañas locales. Preview y emulador
 
 ## Publicación y reversión
 
-No se ha enviado ni activado una imagen nueva. Producción sigue en el catálogo `accab511`, imagen `sha256:b2b925f5965b38e8eca40fccd31087648f97b245e27da9a0e9725c54ae431df0`, Worker `274d9bf2-6b19-4704-99c1-88dbb8ef0e42`, Containers v10, con máximo uno y presupuesto activo.
+La base del corte fue el catálogo `accab511`, imagen `sha256:b2b925f5965b38e8eca40fccd31087648f97b245e27da9a0e9725c54ae431df0`, Worker `274d9bf2-6b19-4704-99c1-88dbb8ef0e42`, Containers v10, con máximo uno y presupuesto activo. La imagen del calendario está ahora publicada en Containers v11, según el cierre siguiente.
 
 La revisión independiente confirmó que ese runtime admite las propuestas v2 general-self y las citas que crea este calendario. Es el rollback compatible de este incremento: conservar D1/R2, secretos, cupos y metadatos; activar mantenimiento, drenar, volver a esa imagen, verificar una instancia efectiva y lecturas antes de reabrir. No se necesita migración ni borrar datos. Una página nueva del frontend anterior no reanuda una propuesta de calendario en memoria; las citas ya guardadas siguen consultables y cancelables y un cliente de calendario aún abierto conserva compatibilidad con el servidor anterior.
 
@@ -71,8 +71,31 @@ Fuente congelada **`98629e12df5df28801983ee59f87a103c835b710`**. Imagen local `s
 
 Humo de esa imagen: filesystem de solo lectura, red `none`, sin credenciales; portada, ayuda, privacidad, onboarding y `/b/synthetic-catalog` HTTP 200; APIs protegidas anónimas 401; manifiesto y SHA-256 de ambos iconos correctos; bundle con calendario y destinatario explícito. El contenedor de humo se retiró. Este humo no demuestra acceso real a ADC/D1: los contratos se validaron con los emuladores y el backend no tiene cambios.
 
-Paquete privado `%LOCALAPPDATA%/SarinBot/direct-calendar-release-20261017`: archivo Git/hash, fuentes, logs de build, inspección de imagen, humo, resumen QA, plan de publicación y configuraciones base/mantenimiento con rollback a la imagen actual. `release-status.json` registra `awaiting_production_authorization`, `productionApproval=false`, `registryPushed=false`, `productionChanged=false`. El ID local se registra aquí antes de cualquier push; no se presenta como un digest confirmado del registro remoto.
+Paquete privado `%LOCALAPPDATA%/SarinBot/direct-calendar-release-20261017`: archivo Git/hash, fuentes, logs de build, inspección de imagen, humo, resumen QA, plan de publicación y configuraciones base/mantenimiento con rollback al catálogo. Su estado inicial fue `awaiting_production_authorization`; el cierre actual registra `complete`, autorización recibida, imagen enviada y publicación verificada. El digest confirmado por el push coincide con el ID local preparado.
 
 Preflight independiente de solo lectura a las **15:57:56 UTC / 10:57:56 Colombia**: Worker `274d9bf2…` al 100 %, mantenimiento desactivado, presupuesto activo, trece secretos y todos los bindings/variables iguales a la base. Containers v10 con imagen `b2b925f5…`, máximo/configurado uno, una allocation running/conectada y cero antiguas tras paginación completa. Pages `a461b670…` intacto. Registro privado `independent-before.json`. Se corrigió la falta de un JSON de evidencia del finalizador copiado y se repitió este helper desde el propio paquete con salida cero; no afecta al código o imagen congelados.
 
-Pendiente autorización específica de producción. Esa autorización no se infiere de la aprobación del diseño. Antes del corte se verificará nuevamente la base remota, se fijará el digest devuelto por el registro y se exigirá mantenimiento, drenaje y una única instancia efectiva antes de reabrir.
+### Publicación autorizada y verificada
+
+El propietario respondió «si autorizo» a la pregunta explícita de publicación del calendario. Se registró esa autorización en el paquete antes de enviar la imagen. El preflight independiente autorizado de las **16:04:14 UTC / 11:04:14 Colombia** confirmó la base sin drift, el archivo fuente/hash, la imagen Linux, el humo y el rollback.
+
+La imagen fijada es **`registry.cloudflare.com/05fb22c155667de064b55c4e287b21d8/sarin-bot@sha256:b6bc75f9f108e0f798dcb4f135e3cf281844060c2bd64e3181382b7cb785a39b`**. El push devolvió exactamente ese digest. Wrangler 4.150.0, su ayuda instalada y la [guía oficial de rollouts](https://developers.cloudflare.com/containers/configuration/rollouts/) se comprobaron antes de ejecutar el dry-run de la configuración fijada. No se actualizaron dependencias.
+
+| Etapa | Evidencia |
+| --- | --- |
+| Mantenimiento | Worker `0c2a1183-76a4-4b6e-af7d-3d091b24e7c0`, imagen anterior conservada; origen público 503 y cola autenticada vacía. |
+| Sustitución | Worker `ec916e4f-119b-477c-9591-7a0907132a66`, imagen nueva y mantenimiento activo; se esperó la promoción efectiva. |
+| Instancia efectiva | Containers **v11**, allocation **`d0386d9c-015d-48f0-921a-cefee306d711`**, running y conectada al singleton `sarin-global-app`. Máximo/configurado uno y cero antiguas tras paginación completa. Gate independiente de las 16:09:54 UTC aprobado. |
+| Reapertura | Worker **`08a0183f-997a-4b84-8c9a-803a78b47b3c`**, mantenimiento desactivado, sin otro rollout. |
+| Cierre independiente | **16:10:41 UTC / 11:10:41 Colombia**: Worker al 100 %, imagen/v11/instancia correctos; trece secretos, todos los bindings/variables, D1/R2 y presupuesto preservados. |
+| Pages | Deployment `a461b670-5130-41e7-8c75-957f5439cfd7` conservado; no se redesplegó. |
+
+La cola autenticada estuvo vacía antes del cierre, después de drenar, en la imagen nueva y tras reabrir. El despertar de v11 comprobó el arranque con ADC real mediante el endpoint de salud, sin inferencia. Las capturas de salud usaron exclusivamente la sesión existente, conservaron sus credenciales en Chrome y retiraron los patrones temporales de inspección al terminar.
+
+El control HTTP público comprobó portada, ayuda, privacidad, negocio, configuración y manifiesto 200; APIs protegidas anónimas 401; perfil con allowlist/no-store, rutas inválidas y ambos iconos por SHA-256. Los bundles publicados contienen el calendario y los campos de catálogo conservados. Registro `http-final.json`.
+
+Chrome real comprobó ambos negocios de prueba: el selector muestra calendario inicialmente elegido, «Mis citas» sigue visible y ningún chat se monta antes de los permisos. La cuenta actual mantiene autorización de cuenta y tiene pendientes los permisos de cliente de esos negocios; las dos opciones permanecen deshabilitadas correctamente. Esa verificación fue de solo lectura. La confirmación completa y persistencia son la evidencia local anterior, no una cita nueva en producción.
+
+En 390×844 el documento ocupa 375 px, sin desbordamiento; consola sin errores/advertencias inesperadas. La captura real `calendar-live-390.png` y `browser-final.json` quedan en el paquete privado, fuera de Git. Se restauró el viewport; el negocio publicado y la pestaña administrativa quedan disponibles, con la sesión administrativa comprobada y conservada. No hay restauración de sesión pendiente.
+
+`release-status.json` y `publication-plan.json` están en **`complete`**, con `productionApproval=true`, `registryPushed=true`, `productionChanged=true` y `publicationComplete=true`. El respaldo fijado `b2b925f5…` sigue disponible; las configuraciones `wrangler.rollback-rollout.json` y `wrangler.rollback-final.json` conservan bindings y datos. No hay migración ni cambios de configuración del negocio para esta aceptación.
