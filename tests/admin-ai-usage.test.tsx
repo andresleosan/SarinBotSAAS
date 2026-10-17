@@ -167,3 +167,4 @@ describe("monthly administrative AI usage", () => {
     expect(text(panel())).not.toContain("USD 0");
   });
 });
+vi.mock('@/components/admin-booking-data-policy', () => ({ AdminBookingDataPolicy: () => null }));

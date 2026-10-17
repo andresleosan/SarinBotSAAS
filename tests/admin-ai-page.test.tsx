@@ -167,3 +167,4 @@ describe("owner AI controls", () => {
     expect(patches()).toHaveLength(0);
   });
 });
+vi.mock('@/components/admin-booking-data-policy', () => ({ AdminBookingDataPolicy: () => null }));

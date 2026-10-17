@@ -89,3 +89,4 @@ describe("administrative WhatsApp preparation", () => {
   });
 });
 vi.mock('@/components/admin-ai-budget', () => ({ AdminAiBudget: () => null }));
+vi.mock('@/components/admin-booking-data-policy', () => ({ AdminBookingDataPolicy: () => null }));
