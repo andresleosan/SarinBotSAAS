@@ -29,12 +29,12 @@ function validNextResult(value: unknown, selected: Selection, today: string): va
     ? !result.availability.some(item => item.slots.length > 0)
     : validDateKey(result.dateKey) && result.dateKey >= result.fromDateKey && result.dateKey <= result.throughDateKey && result.availability.some(item => item.slots.length > 0);
 }
-export function useStructuredBooking(uid: string | undefined, business: { id: string }, subjectCase: BookingSubjectCase, subjectActive: boolean, initialServiceId = '') {
+export function useStructuredBooking(uid: string | undefined, business: { id: string }, subjectCase: BookingSubjectCase, subjectActive: boolean, initialServiceId = '', initialHint?: { dateKey: string; resourceId?: string | null }) {
   const key = uid ? JSON.stringify([uid, business.id, subjectCase]) : null, identity = useRef({ key });
   if (identity.current.key !== key) identity.current = { key };
   const current = identity.current;
-  const initialService = useRef({ identity: current, serviceId: initialServiceId });
-  const initial = () => ({ identity: current, selection: { serviceId: initialService.current.identity === current ? initialService.current.serviceId : '', resourceId: '', dateKey: colombianToday(), startTimeStr: '' }, availability: [] as Slots, availabilityStatus: 'idle' as AvailabilityStatus, nextAvailabilityStatus: 'idle' as NextAvailabilityStatus, nextAvailabilityRange: null as NextAvailabilityRange | null, proposal: null as BookingProposalView | null, appointment: null as Appointment | null, busy: false, frozen: false, uncertain: false, error: null as string | null });
+  const initialService = useRef({ identity: current, serviceId: initialServiceId, dateKey: validDateKey(initialHint?.dateKey) ? initialHint.dateKey : colombianToday(), resourceId: initialHint?.resourceId ?? '' });
+  const initial = () => ({ identity: current, selection: { serviceId: initialService.current.identity === current ? initialService.current.serviceId : '', resourceId: initialService.current.identity === current ? initialService.current.resourceId : '', dateKey: initialService.current.identity === current ? initialService.current.dateKey : colombianToday(), startTimeStr: '' }, availability: [] as Slots, availabilityStatus: 'idle' as AvailabilityStatus, nextAvailabilityStatus: 'idle' as NextAvailabilityStatus, nextAvailabilityRange: null as NextAvailabilityRange | null, proposal: null as BookingProposalView | null, appointment: null as Appointment | null, busy: false, frozen: false, uncertain: false, error: null as string | null });
   const [stored, setStored] = useState(initial), state = stored.identity === current ? stored : initial();
   const latest = useRef(state); latest.current = state;
   const permission = useRef(subjectActive); permission.current = subjectActive;

@@ -9,6 +9,8 @@ import { useConsent } from '@/hooks/useConsent';
 import { useBookingDataPolicy } from '@/hooks/useBookingDataPolicy';
 import { StructuredBooking } from '@/components/structured-booking';
 import { AppointmentReschedule } from '@/components/appointment-reschedule';
+import { useWaitlist, validWaitlistDate, type WaitlistBookingHint, type WaitlistController } from '@/hooks/use-waitlist';
+import type { WaitlistRequestView } from '@/types/waitlist';
 import { Notice, buttonClass, fieldClass } from '@/components/app-shell';
 import { ClientAppointments } from '@/components/client-appointments';
 import { BookingProposal } from '@/components/booking-proposal';
@@ -49,8 +51,8 @@ function GeneralBookingChat({ business, uid, permitted, now, onConfirmed, onLock
     </form>
   </section>;
 }
-function BookingJourney({ business, capability, uid, permitted, policyReady, now, onConfirmed, initialServiceId, onInitialServiceHandled, onLockedChange }: { business: PublicBusiness; capability: BookingCapability; uid: string; permitted: boolean; policyReady: boolean; now: number; onConfirmed: () => void; initialServiceId?: string; onInitialServiceHandled?: () => void; onLockedChange?: (locked: boolean) => void }) {
-  const [represented, setRepresented] = useState(false), [locked, setLocked] = useState(false), [mode, setMode] = useState<'calendar' | 'chat'>('calendar'), structuredStarted = useRef(capability.dataMode === 'health');
+function BookingJourney({ business, capability, uid, permitted, policyReady, now, onConfirmed, initialServiceId, initialBookingHint, waitlist, onInitialServiceHandled, onLockedChange }: { business: PublicBusiness; capability: BookingCapability; uid: string; permitted: boolean; policyReady: boolean; now: number; onConfirmed: () => void; initialServiceId?: string; initialBookingHint?: WaitlistBookingHint; waitlist?: WaitlistController; onInitialServiceHandled?: () => void; onLockedChange?: (locked: boolean) => void }) {
+  const [represented, setRepresented] = useState(initialBookingHint?.subjectKind === 'represented_minor'), [locked, setLocked] = useState(false), [mode, setMode] = useState<'calendar' | 'chat'>('calendar'), structuredStarted = useRef(capability.dataMode === 'health');
   useEffect(() => { onLockedChange?.(locked); return () => onLockedChange?.(false); }, [locked, onLockedChange]);
   const keepChat = mode === 'chat' && locked;
   const structured = !keepChat && (capability.dataMode === 'health' || represented || mode === 'calendar');
@@ -62,12 +64,12 @@ function BookingJourney({ business, capability, uid, permitted, policyReady, now
     {capability.dataMode === 'general' && capability.representedMinorsEnabled && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Para quién reservas?</legend><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" aria-pressed={!represented} disabled={switchLocked} onClick={() => { if (!switchLocked) { setMode('calendar'); setRepresented(false); } }}>Para mí</button><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" aria-pressed={represented} disabled={switchLocked} onClick={() => { if (!switchLocked) setRepresented(true); }}>Para un menor a quien represento</button></fieldset>}
     {capability.dataMode === 'general' && !represented && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Cómo prefieres reservar?</legend>{([['calendar', 'Reservar con calendario'], ['chat', 'Hablar con Sarin']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} disabled={switchLocked} onClick={() => selectMode(value)} className={`min-h-11 max-w-full rounded-lg border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue disabled:opacity-50 ${mode === value ? 'border-sarin-blue bg-sarin-soft text-sarin-blue' : 'border-sarin-line'}`}>{label}</button>)}</fieldset>}
     {!enabled && <Notice>Revisa los permisos y las opciones del negocio antes de comenzar una nueva reserva. Puedes recuperar una confirmación pendiente y consultar Mis citas.</Notice>}
-    {structured ? (structuredStarted.current && <StructuredBooking business={business} capability={capability} initialSubjectKind={represented ? 'represented_minor' : 'self'} initialServiceId={initialServiceId} onInitialServiceHandled={onInitialServiceHandled} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} />) : <GeneralBookingChat business={business} uid={uid} permitted={enabled && capability.dataMode === 'general' && !represented} now={now} onConfirmed={onConfirmed} onLockedChange={setLocked} />}
+    {structured ? (structuredStarted.current && <StructuredBooking business={business} capability={capability} initialSubjectKind={represented ? 'represented_minor' : 'self'} initialServiceId={initialServiceId} initialBookingHint={initialBookingHint} waitlist={waitlist} onInitialServiceHandled={onInitialServiceHandled} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} />) : <GeneralBookingChat business={business} uid={uid} permitted={enabled && capability.dataMode === 'general' && !represented} now={now} onConfirmed={onConfirmed} onLockedChange={setLocked} />}
   </div>;
 }
 function BookingWorkspace({ business, capability, uid, permitted, policyReady, catalogReady, now, initialServiceId, onInitialServiceHandled }: { business: PublicBusiness; capability: BookingCapability | null; uid: string; permitted: boolean; policyReady: boolean; catalogReady: boolean; now: number; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
   const [version, setVersion] = useState(0), [locked, setLocked] = useState(false);
-  const [entry, setEntry] = useState<{ revision: number; serviceId?: string } | null>(null);
+  const [entry, setEntry] = useState<{ revision: number; serviceId?: string; hint?: WaitlistBookingHint } | null>(null);
   const [rescheduleEntry, setRescheduleEntry] = useState<{ source: Appointment; capability: BookingCapability } | null>(null), activeReschedule = useRef(rescheduleEntry);
   const [appointmentActionLocked, setAppointmentActionLocked] = useState(false), localAction = useRef(false), rescheduleLocked = useRef(false);
   const [sourceCurrent, setSourceCurrent] = useState(true), [changeNotice, setChangeNotice] = useState<string | null>(null);
@@ -80,7 +82,21 @@ function BookingWorkspace({ business, capability, uid, permitted, policyReady, c
   useEffect(() => { if (entry) { start.current?.focus(); start.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [entry?.revision]);
   useEffect(() => { if (rescheduleEntry) { changeStart.current?.focus(); changeStart.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [rescheduleEntry]);
   useEffect(() => { if (changeNotice) { appointmentsStart.current?.focus(); appointmentsStart.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [version, changeNotice]);
-  const handleActionLock = useCallback((value: boolean) => { localAction.current = value; setAppointmentActionLocked(value); }, []);
+  const handleActionLock = useCallback((value: boolean) => { if (!mounted.current || (value && localAction.current)) return false; localAction.current = value; setAppointmentActionLocked(value); return true; }, []);
+  const acquireWaitlistAction = useCallback(() => handleActionLock(true), [handleActionLock]);
+  const releaseWaitlistAction = useCallback(() => { handleActionLock(false); }, [handleActionLock]);
+  const waitlist = useWaitlist(business.id, uid, { canJoin: rebookingEnabled, actionsLocked: locked || Boolean(rescheduleEntry) || appointmentActionLocked, acquireAction: acquireWaitlistAction, releaseAction: releaseWaitlistAction });
+  const latestWaitlist = useRef({ controller: waitlist, business, capability }); latestWaitlist.current = { controller: waitlist, business, capability };
+  function chooseWaitlist(request: WaitlistRequestView, revision: number) {
+    const latest = latestWaitlist.current, value = latest.controller;
+    if (!mounted.current || activeReschedule.current || localAction.current || !current.current.rebookingEnabled || value.busy || value.loading || value.readError
+      || !value.canResume(request, revision) || value.request !== request || !validWaitlistDate(request.dateKey)) return;
+    const service = latest.business.services.find(item => item.id === request.serviceId);
+    if (!service || !latest.business.resources.some(item => item.active && service.resourceIds.includes(item.id) && (request.resourceId === null || item.id === request.resourceId))
+      || (request.subjectKind === 'represented_minor' && (!latest.capability?.representedMinorsEnabled || !['parent', 'legal_guardian'].includes(request.representativeRole ?? '')))) return;
+    current.current.onInitialServiceHandled?.();
+    setEntry(previous => ({ revision: (previous?.revision ?? 0) + 1, serviceId: request.serviceId, hint: { serviceId: request.serviceId, dateKey: request.dateKey, resourceId: request.resourceId, subjectKind: request.subjectKind, ...(request.representativeRole ? { representativeRole: request.representativeRole } : {}) } }));
+  }
   const handleRescheduleLock = useCallback((value: boolean) => { rescheduleLocked.current = value; }, []);
   const handleAppointmentsRead = useCallback((appointments: Appointment[] | null) => {
     const active = activeReschedule.current;
@@ -93,7 +109,7 @@ function BookingWorkspace({ business, capability, uid, permitted, policyReady, c
   }
   function handleInitialService() {
     onInitialServiceHandled?.();
-    setEntry(previous => previous?.serviceId !== undefined ? { ...previous, serviceId: undefined } : previous);
+    setEntry(previous => previous?.serviceId !== undefined || previous?.hint !== undefined ? { ...previous!, serviceId: undefined, hint: undefined } : previous);
   }
   function reschedule(source: Appointment) {
     if (!mounted.current || activeReschedule.current || localAction.current || !capability || !current.current.reschedulingEnabled || source.tenantId !== business.id || source.client?.uid !== uid || source.type !== 'appointment' || source.status !== 'confirmed' || source.startAt <= Date.now() || !Number.isSafeInteger(source.rescheduleRevision ?? 0) || (source.rescheduleRevision ?? 0) < 0) return;
@@ -111,11 +127,11 @@ function BookingWorkspace({ business, capability, uid, permitted, policyReady, c
   }
   return <>
     {capability && !rescheduleEntry && <div ref={start} role="region" aria-label="Nueva reserva" tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue">
-      <BookingJourney key={entry?.revision ?? 0} business={business} capability={capability} uid={uid} permitted={permitted && !appointmentActionLocked} policyReady={policyReady} now={now} initialServiceId={entry ? entry.serviceId : initialServiceId} onInitialServiceHandled={handleInitialService} onConfirmed={() => setVersion(value => value + 1)} onLockedChange={setLocked} />
+      <BookingJourney key={entry?.revision ?? 0} business={business} capability={capability} uid={uid} permitted={permitted && !appointmentActionLocked} policyReady={policyReady} now={now} initialServiceId={entry ? entry.serviceId : initialServiceId} initialBookingHint={entry?.hint} waitlist={waitlist} onInitialServiceHandled={handleInitialService} onConfirmed={() => setVersion(value => value + 1)} onLockedChange={setLocked} />
     </div>}
     {rescheduleEntry && <div ref={changeStart} role="region" aria-label="Cambio de horario de mi cita" tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><AppointmentReschedule uid={uid} source={rescheduleEntry.source} business={business} capability={capability ?? rescheduleEntry.capability} enabled={permitted && policyReady && catalogReady && Boolean(capability) && !appointmentActionLocked} sourceCurrent={sourceCurrent} onConfirmed={result => changed(rescheduleEntry, result)} onCancel={() => closeReschedule(rescheduleEntry)} onLockedChange={handleRescheduleLock} /></div>}
     {changeNotice && <p role="status" className="rounded-xl border border-sarin-line bg-sarin-paper p-4 text-sm text-sarin-blue">{changeNotice}</p>}
-    <div ref={appointmentsStart} tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><ClientAppointments key={version} businessId={business.id} businessName={business.name} resources={business.resources} services={business.services} userId={uid} now={now} onRebook={rebook} rebookingEnabled={rebookingEnabled} onReschedule={reschedule} reschedulingEnabled={reschedulingEnabled} actionsLocked={locked || Boolean(rescheduleEntry)} onActionLockChange={handleActionLock} onAppointmentsRead={handleAppointmentsRead} /></div>
+    <div ref={appointmentsStart} tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><ClientAppointments key={version} businessId={business.id} businessName={business.name} resources={business.resources} services={business.services} userId={uid} now={now} waitlist={waitlist} waitlistResumeEnabled={rebookingEnabled} onWaitlistChoose={chooseWaitlist} onRebook={rebook} rebookingEnabled={rebookingEnabled} onReschedule={reschedule} reschedulingEnabled={reschedulingEnabled} actionsLocked={locked || Boolean(rescheduleEntry) || waitlist.busy} onActionLockChange={handleActionLock} onAppointmentsRead={handleAppointmentsRead} /></div>
   </>;
 }
 function Island({ slug, initialServiceId, onInitialServiceHandled }: { slug: string; initialServiceId?: string; onInitialServiceHandled?: () => void }) {

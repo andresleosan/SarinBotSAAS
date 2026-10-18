@@ -6,7 +6,7 @@ import { HttpError } from './http';
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stateSchema = z.object({ version: z.literal(1), events: z.array(z.object({ at: z.number().int().nonnegative().safe(), request: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).max(1000) }).strict();
 /** Prepare read-only; caller invokes the writes after all other transaction reads. */
-export async function prepareBookingActionAdmission(tx: Transaction, db: Database, uid: string, businessId: string, kind: 'authorization' | 'proposal', requestId: string, now = Date.now()): Promise<() => void> {
+export async function prepareBookingActionAdmission(tx: Transaction, db: Database, uid: string, businessId: string, kind: 'authorization' | 'proposal' | 'waitlist', requestId: string, now = Date.now()): Promise<() => void> {
   const scopes = [
     { ref: db.collection('serverSettings').doc(`booking_action_uid_${hash(uid)}`), limits: [20, 120, 300] },
     { ref: db.collection('serverSettings').doc(`booking_action_business_${hash(businessId)}`), limits: [100, 500, 1000] },

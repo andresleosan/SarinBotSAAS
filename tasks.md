@@ -1,5 +1,12 @@
 # Estado de implementación — 2026-10-17
 
+## Lista de espera dentro de la app — validada localmente, publicación pendiente
+
+- [x] Definir una solicitud privada por cuenta/negocio y selección de servicio, día y profesional, con consulta explícita y continuación normal del calendario. [Diseño autorizado](docs/superpowers/specs/2026-10-17-in-app-waitlist-design.md).
+- [x] Implementar API/UI y conservación privada; probar el recorrido sintético en 320/390/1280 px con 21 controles, retirada persistente y limpieza verificada.
+- [x] Cerrar revisión independiente PASS y suite integrada: 1.575 aprobadas/28 omitidas, TypeScript y 76 de Cloudflare. D1 lee 30 filas con y sin 1.001 citas históricas; sin SQL nuevo. Corregir admisión por revisión, reconciliación 5xx, profesionales activos, timestamps del fixture y propietario canónico en eliminación privada (11/11).
+- [ ] Congelar y auditar artefacto, publicar con instancia única y comprobar producción. [Evidencia en curso](docs/qa/2026-10-17-in-app-waitlist.md).
+
 ## Recordatorios dentro de la app — publicados
 
 - [x] Incorporar la preferencia del propietario: «todo dentro de la app de momento». Explorar la guía oficial de Fresha y los contratos actuales, con revisiones independientes de backend e interfaz.

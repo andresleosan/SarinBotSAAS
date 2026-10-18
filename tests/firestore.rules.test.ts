@@ -93,6 +93,18 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
       }
     }
   });
+  it('keeps active waitlist selections and cancellation tombstones private from browsers', async () => {
+    await environment.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'businesses/one/waitlistRequests/current'), { ownerUid: 'customer', businessId: 'one', revision: 1, request: { serviceId: 'private-service' } });
+      await setDoc(doc(context.firestore(), 'businesses/one/waitlistRequests/empty'), { ownerUid: 'customer', businessId: 'one', revision: 2, request: null });
+    });
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('customer'), environment.authenticatedContext('owner-one'), environment.authenticatedContext('stale-admin', { isSuperadmin: true })]) {
+      const db = context.firestore();
+      for (const id of ['current', 'empty']) await assertFails(getDoc(doc(db, `businesses/one/waitlistRequests/${id}`)));
+      await assertFails(getDocs(query(collection(db, 'businesses/one/waitlistRequests'), where('ownerUid', '==', 'customer'))));
+      await assertFails(setDoc(doc(db, 'businesses/one/waitlistRequests/forged'), { ownerUid: 'customer', businessId: 'one', request: null }));
+    }
+  });
   it('protects receipts and ignores a stale or forged superadmin profile flag', async () => {
     const owner = environment.authenticatedContext('owner-one').firestore();
     const stranger = environment.authenticatedContext('stale-admin').firestore();

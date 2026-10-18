@@ -56,6 +56,12 @@ export async function readBookingSubjectConsent(user: ChatActor, businessId: str
   if (tx) return (await load(user, businessId, subjectCase, db, tx)).status;
   return db.runTransaction(async transaction => (await load(user, businessId, subjectCase, db, transaction)).status);
 }
+/** Verified read-only evidence for optional features bound to this exact case. */
+export async function readVerifiedBookingSubjectAnchor(tx: Transaction, user: ChatActor, businessId: string, subjectCase: BookingSubjectCase, db: Database) {
+  const current = await load(user, businessId, subjectCase, db, tx);
+  return { status: current.status, anchor: current.state && current.status.receipt
+    ? { revision: current.state.revision, fingerprint: current.state.fingerprint, receiptId: current.state.receiptId } : null };
+}
 export async function assertBookingSubjectConsent(tx: Transaction, user: ChatActor, business: Business, subjectCase: BookingSubjectCase, db: Database) {
   const current = await load(user, business.id, subjectCase, db, tx), status = current.status;
   if (subjectCase.subjectKind === 'represented_minor' && !status.capability.representedMinorsEnabled) throw new HttpError(409, 'El negocio no ha habilitado reservas para menores.', 'REPRESENTED_BOOKING_DISABLED');

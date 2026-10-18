@@ -53,7 +53,7 @@ it('carries a public service through sign-in and both prior consent gates withou
   expect(serviceSelect().props.value).toBe('haircut');
   expect(renderer!.root.findByProps({ 'aria-label': 'Recurso de la reserva' }).props.value).toBe('');
   expect(renderer!.root.findByProps({ 'aria-label': 'Detalles del servicio' })).toBeTruthy();
-  expect(vi.mocked(apiFetch).mock.calls.every(([path, init]) => path.startsWith('/api/booking-subject-consent?') && !init?.method)).toBe(true);
+  expect(vi.mocked(apiFetch).mock.calls.every(([path, init]) => (path.startsWith('/api/booking-subject-consent?') || path.endsWith('/waitlist')) && !init?.method)).toBe(true);
 });
 
 it('consumes the entry choice once and leaves manual changes and new reservations in control', async () => {

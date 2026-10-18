@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarPlus, Download } from "lucide-react";
 import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
 import { ClientAppointmentReminders } from "@/components/client-appointment-reminders";
+import { ClientWaitlist } from "@/components/client-waitlist";
+import type { WaitlistController } from "@/hooks/use-waitlist";
+import type { WaitlistRequestView } from "@/types/waitlist";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useApiPoll } from "@/lib/client/use-api-poll";
 import { createAppointmentImage, type AppointmentImageDetails } from "@/lib/client/appointment-image";
@@ -43,7 +46,7 @@ function statusLabel(appointment: Appointment, now: number): string {
   }
 }
 
-export function ClientAppointments({ businessId, businessName, resources = [], services = [], userId, now, onRebook, rebookingEnabled = false, onReschedule, reschedulingEnabled = false, actionsLocked = false, onActionLockChange, onAppointmentsRead }: { businessId: string; businessName: string; resources?: TenantResource[]; services?: TenantService[]; userId: string; now: number; onRebook?: (serviceId: string) => void; rebookingEnabled?: boolean; onReschedule?: (appointment: Appointment) => boolean | void; reschedulingEnabled?: boolean; actionsLocked?: boolean; onActionLockChange?: (locked: boolean) => void; onAppointmentsRead?: (appointments: Appointment[] | null) => void }) {
+export function ClientAppointments({ businessId, businessName, resources = [], services = [], userId, now, onRebook, rebookingEnabled = false, onReschedule, reschedulingEnabled = false, actionsLocked = false, onActionLockChange, onAppointmentsRead, waitlist, waitlistResumeEnabled = false, onWaitlistChoose }: { businessId: string; businessName: string; resources?: TenantResource[]; services?: TenantService[]; userId: string; now: number; onRebook?: (serviceId: string) => void; rebookingEnabled?: boolean; onReschedule?: (appointment: Appointment) => boolean | void; reschedulingEnabled?: boolean; actionsLocked?: boolean; onActionLockChange?: (locked: boolean) => boolean | void; waitlist?: WaitlistController; waitlistResumeEnabled?: boolean; onWaitlistChoose?: (request: WaitlistRequestView, revision: number) => void; onAppointmentsRead?: (appointments: Appointment[] | null) => void }) {
   const [retry, setRetry] = useState(0);
   const scope = `${businessId}:${userId}`;
   const currentScope = useRef({ key: scope });
@@ -138,8 +141,8 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
   }
   async function cancel(appointment: Appointment) {
     if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
+    if (latest.current.onActionLockChange?.(true) === false) return;
     pending.current = appointment.id;
-    latest.current.onActionLockChange?.(true);
     setPendingId(appointment.id);
     setActionError(null);
     setNotice(null);
@@ -161,8 +164,8 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
   }
   async function download(appointment: Appointment) {
     if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
+    if (latest.current.onActionLockChange?.(true) === false) return;
     exporting.current = { id: appointment.id, kind: "image" };
-    latest.current.onActionLockChange?.(true);
     setExportAction(exporting.current); setActionError(null); setNotice(null);
     const generatedAt = Date.now();
     function details(item: Appointment): AppointmentImageDetails {
@@ -206,8 +209,8 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
     }
     const snapshot = details(saved);
     const serviceId = saved.serviceId, resourceId = saved.resourceId;
+    if (latest.current.onActionLockChange?.(true) === false) return;
     exporting.current = { id: saved.id, kind: "calendar" };
-    latest.current.onActionLockChange?.(true);
     setExportAction(exporting.current); setActionError(null); setNotice(null);
     try {
       const content = await createAppointmentCalendar(snapshot);
@@ -233,6 +236,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       </div>
       <ClientAppointmentReminders businessId={businessId} userId={userId} now={now} currentOccurrences={currentOccurrences}
         actionsLocked={actionsLocked || Boolean(pendingId || exportingId)} onViewAppointment={viewReminder} />
+      {waitlist && onWaitlistChoose && <ClientWaitlist controller={waitlist} services={services} resources={resources} actionsLocked={actionsLocked || Boolean(pendingId || exportingId)} canResume={waitlistResumeEnabled} onChoose={onWaitlistChoose} />}
       <div role="group" aria-label="Ver mis citas" className="grid grid-cols-3 gap-1 rounded-xl bg-sarin-canvas p-1">
         {views.map(item => <button key={item.id} type="button" aria-pressed={view === item.id} onClick={() => changeView(item.id)}
           className={`min-h-11 min-w-0 rounded-lg px-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue sm:text-sm ${view === item.id ? "bg-sarin-blue text-white" : "text-sarin-muted hover:bg-sarin-soft"}`}>{item.label}</button>)}

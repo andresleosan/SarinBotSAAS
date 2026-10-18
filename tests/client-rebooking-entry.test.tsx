@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/client/api';
 import { bookingSubjectContent } from '@/lib/booking-subject-legal';
 import type { PublicBusiness } from '@/types/firestore';
 import type { BookingSubjectCase } from '@/lib/booking-subject';
+import type { WaitlistState } from '@/types/waitlist';
 
 const state = vi.hoisted(() => ({ user: { uid: 'demo-client', displayName: 'Cliente sintético' } as { uid: string; displayName: string } | null, account: true, business: true, ready: true, health: false, minors: false, chatLock: '' }));
 vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: state.user, signOut: vi.fn() }), AuthGate: ({ children }: { children: ReactNode }) => state.user ? children : null }));
@@ -23,6 +24,7 @@ vi.mock('next/link', () => ({ default: ({ children, href }: { children: ReactNod
 
 const fixture = { id: 'demo-business', slug: 'shop', name: 'Negocio sintético', category: 'Servicios', phoneWhatsApp: '573000000000', timezone: 'America/Bogota', services: [{ id: 'haircut', name: 'Corte vigente', price: 42000, durationMinutes: 40, bufferMinutes: 5, resourceIds: ['one'] }, { id: 'advice', name: 'Asesoría gratuita', price: 0, durationMinutes: 15, bufferMinutes: 0, resourceIds: ['one'] }], resources: [{ id: 'one', name: 'Profesional vigente', active: true }], weeklySchedule: {}, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 9999999999999 } } as PublicBusiness;
 let business: PublicBusiness, renderer: ReactTestRenderer | undefined, params: Promise<{ slug: string }>;
+let waitlistState: WaitlistState;
 const text = (node: ReactTestInstance | string): string => typeof node === 'string' ? node : node.children.map(text).join('');
 const page = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
 const update = () => act(async () => renderer!.update(page()));
@@ -37,8 +39,10 @@ async function choose(label: string, value: string) { await act(async () => fiel
 beforeEach(() => {
   state.user = { uid: 'demo-client', displayName: 'Cliente sintético' }; state.account = true; state.business = true; state.ready = true; state.health = false; state.minors = false; state.chatLock = '';
   business = { ...fixture }; params = Promise.resolve({ slug: 'shop' });
+  waitlistState = { businessId: business.id, ownerUid: 'demo-client', revision: 0, serverNow: Date.now(), request: null };
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ business })));
   vi.mocked(apiFetch).mockImplementation(async path => {
+    if (path.endsWith('/waitlist')) return waitlistState;
     if (!path.startsWith('/api/booking-subject-consent?')) throw new Error('A fresh booking entry must only read its subject consent');
     const query = new URL(path, 'http://localhost').searchParams;
     const kind = query.get('subjectKind') as BookingSubjectCase['subjectKind'];
@@ -67,7 +71,7 @@ it('starts a fresh calendar case with current catalog data and no historical boo
   expect(text(field('Detalles del servicio'))).toContain('40 minutos');
   expect(caseIds().at(-1)).not.toBe(before);
   expect(renderer!.root.findAllByProps({ 'aria-pressed': true }).map(text)).not.toContain('Hablar con Sarin');
-  expect(vi.mocked(apiFetch).mock.calls.every(([path, init]) => path.startsWith('/api/booking-subject-consent?') && !init?.method)).toBe(true);
+  expect(vi.mocked(apiFetch).mock.calls.every(([path, init]) => (path.startsWith('/api/booking-subject-consent?') || path.endsWith('/waitlist')) && !init?.method)).toBe(true);
 });
 
 it('consumes each history choice once and does not restore it after manual changes or another case', async () => {
@@ -180,4 +184,43 @@ it('starts a new health authorization and does not inherit a minor or other prio
   expect(caseIds().at(-1)).not.toBe(before);
   expect(field('Permisos de esta reserva')).toBeTruthy();
   expect(renderer!.root.findAllByProps({ 'aria-label': 'Servicio de la reserva' })).toHaveLength(0);
+});
+
+function availableWaitlist(represented = false) {
+  const checkedAt = Date.now();
+  waitlistState = { ...waitlistState, serverNow: checkedAt, revision: 1, request: { id: 'demo-entry', serviceId: 'haircut', dateKey: '2030-02-02', resourceId: 'one', subjectKind: represented ? 'represented_minor' : 'self', ...(represented ? { representativeRole: 'legal_guardian' as const } : {}), createdAt: checkedAt, expiresAt: Date.parse('2030-02-03T05:00:00Z'), status: 'available', checkedAt } };
+}
+it('resumes a waitlist with fresh case and one-shot exact hints while leaving the request intact', async () => {
+  vi.useFakeTimers(); vi.setSystemTime(waitlistState.serverNow + 1);
+  availableWaitlist(); await render(); const before = caseIds().at(-1);
+  expect(typeof history().props.onWaitlistChoose).toBe('function');
+  await act(async () => history().props.onWaitlistChoose(history().props.waitlist.request, 1));
+  expect(field('Servicio de la reserva').props.value).toBe('haircut'); expect(field('Día de la reserva').props.value).toBe('2030-02-02'); expect(field('Recurso de la reserva').props.value).toBe('one');
+  expect(caseIds().at(-1)).not.toBe(before); expect(button('Revisar propuesta').props.disabled).toBe(true);
+  expect(vi.mocked(apiFetch).mock.calls.every(([_path, init]) => !init?.method)).toBe(true);
+  expect(history().props.waitlist.request.id).toBe('demo-entry');
+  await act(async () => button('Iniciar otra reserva').props.onClick()); expect(field('Servicio de la reserva').props.value).toBe(''); expect(field('Día de la reserva').props.value).not.toBe('2030-02-02');
+});
+it('resumes represented waitlist through a new subject authorization with its role and no inherited name', async () => {
+  state.minors = true; availableWaitlist(true); await render(); const before = caseIds().at(-1);
+  expect(typeof history().props.onWaitlistChoose).toBe('function');
+  await act(async () => history().props.onWaitlistChoose(history().props.waitlist.request, 1));
+  expect(field('Calidad del representante').props.value).toBe('legal_guardian'); expect(field('Permisos de esta reserva')).toBeTruthy(); expect(caseIds().at(-1)).not.toBe(before);
+  expect(renderer!.root.findAllByProps({ 'aria-label': 'Nombre breve del menor' })).toHaveLength(0);
+  expect(vi.mocked(apiFetch).mock.calls.every(([_path, init]) => !init?.method)).toBe(true);
+});
+it.each(['account', 'business', 'ready', 'subscription', 'catalog'] as const)('blocks a retained waitlist continuation after %s gate changes', async gate => {
+  vi.useFakeTimers(); availableWaitlist(); await render(); expect(typeof history().props.onWaitlistChoose).toBe('function');
+  const retained = history().props.onWaitlistChoose, request = history().props.waitlist.request, before = caseIds().at(-1);
+  if (gate === 'subscription') { business = { ...fixture, subscription: { ...fixture.subscription, status: 'suspended' } }; await act(async () => vi.advanceTimersByTimeAsync(15000)); }
+  else if (gate === 'catalog') { business = { ...fixture, resources: [] }; await act(async () => vi.advanceTimersByTimeAsync(15000)); }
+  else { state[gate] = false; await update(); }
+  await act(async () => retained(request, 1)); expect(caseIds().at(-1)).toBe(before);
+});
+it('does not resume an any-professional request when no current service resource remains active', async () => {
+  vi.useFakeTimers(); availableWaitlist(); waitlistState.request!.resourceId = null; await render();
+  const retained = history().props.onWaitlistChoose, request = history().props.waitlist.request, before = caseIds().at(-1);
+  business = { ...fixture, resources: fixture.resources.map(resource => ({ ...resource, active: false })) };
+  await act(async () => vi.advanceTimersByTimeAsync(15000));
+  await act(async () => retained(request, 1)); expect(caseIds().at(-1)).toBe(before);
 });

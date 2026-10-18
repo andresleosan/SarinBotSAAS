@@ -72,6 +72,12 @@ describe('explicit calendar file export from own appointments', () => {
     expect(text(renderer!.root)).toContain('Archivo de calendario descargado. Los cambios y cancelaciones se consultan en Mis citas.');
     expect(apiFetch).not.toHaveBeenCalled(); expect(state.image).not.toHaveBeenCalled();
   });
+  it.each(['calendar', 'image', 'cancel'])('honors a synchronous workspace mutex rejection before %s begins', async kind => {
+    await mount({ onActionLockChange: locked => !locked });
+    if (kind === 'cancel') await act(async () => button('Cancelar cita').props.onClick());
+    await act(async () => { void button(kind === 'calendar' ? 'Añadir al calendario' : kind === 'image' ? 'Guardar imagen de la cita' : 'Sí, cancelar cita').props.onClick(); });
+    expect(state.calendar).not.toHaveBeenCalled(); expect(state.image).not.toHaveBeenCalled(); expect(apiFetch).not.toHaveBeenCalled();
+  });
 
   it('offers export only for valid own future confirmed appointments and keeps the PNG action', async () => {
     state.rows.push(appointment('cancelled', { status: 'cancelled_by_owner' }), appointment('completed', { status: 'completed' }), appointment('ongoing', { startAt: now - 1000, endAt: now + 10000 }), appointment('past', { startAt: now - 10000, endAt: now - 1000 }), appointment('another-client', { client: { uid: 'other', name: '', email: '', intakeAnswers: {} } }), appointment('another-business', { tenantId: 'other' }), appointment('manual', { type: 'manual_block' }), appointment('invalid', { endAt: Number.NaN }));
