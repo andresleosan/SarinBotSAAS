@@ -1,7 +1,7 @@
 # Implementación de lista de espera
 
 Spec: [Diseño autorizado](../specs/2026-10-17-in-app-waitlist-design.md).
-Base `711dab5`, worktree existente `service-catalog`, rama `codex/in-app-waitlist-20261017`. Estado: implementación y validación local aprobadas; artefacto y publicación pendientes.
+Base `711dab5`, worktree existente `service-catalog`, rama `codex/in-app-waitlist-20261017`. Estado: implementación, validación, artefacto y publicación completados; runtime `491ab52`, Containers v20.
 
 ## Restricciones globales
 
@@ -52,11 +52,13 @@ Evidencia consolidada: [aceptación local y límites](../../qa/2026-10-17-in-app
 
 Archivos: helpers privados nuevos, paquete `in-app-waitlist-release-20261017`, `docs/qa/2026-10-17-in-app-waitlist.md`, tasks/STACK/spec/plan finales. No modificar paquete reminders.
 
-- [ ] Huella inicial/final inmutable de v19, fuente limpia y publicada, imagen exacta, smoke aislado, auditoría independiente.
-- [ ] Conservar configuración/bindings/secretos/Pages/instancia única y reversión a v19; mantener excepción exacta GET /api/session durante mantenimiento.
-- [ ] Auditar estado real, drenar cola, publicar imagen, esperar asignación efectiva sin instancia anterior, comprobar salud/cola y reabrir.
-- [ ] Verificar HTTP y navegador productivo, restaurar viewport/interceptación y acceso admin.
-- [ ] Documentar IDs/hash/alcance/límites, cerrar paquete y sincronizar commit documental.
+- [x] Huella inicial/final inmutable de v19 (847 archivos), fuente limpia y publicada (763 archivos), imagen exacta, smoke aislado y auditoría independiente aprobados.
+- [x] Conservar configuración/bindings/13 secretos/Pages/instancia única y reversión a v19; GET `/api/session` autenticado devolvió 200 durante mantenimiento. Sin migración SQL; 0001/0002 intactos.
+- [x] Auditar estado real, drenar cola, publicar imagen y esperar asignación efectiva v20 con cero antiguas; cuatro controles autenticados de cola vacíos y calentamiento auxiliar separado; servicio reabierto.
+- [x] Verificar HTTP y navegador productivo, restaurar viewport/interceptación y acceso admin. Panel vacío realmente visible; alta/continuación no disponibles para esa cuenta, sin aceptar consentimientos ni mutar datos reales.
+- [x] Documentar IDs/hash/alcance/límites y cerrar paquete en `complete`. El commit documental se sincroniza al integrar este cierre.
+
+Runtime `491ab526f8bb6c26d63f4fbc806bcb5a90b47cea`, Worker `61ebd3f8-4e6f-41d9-bd6e-fb9b8f0e849b`, imagen `sha256:f601ca41a14244cb24a1e177921ec6923143c5211c58a1f66de375941b3c49d3` y asignación `d03d0d7d-9828-4364-8617-b881b1a65d60`. El aviso conocido de `workerd postinstall` terminó en `Done`; build y smoke pasaron. [Cierre y evidencia productiva](../../qa/2026-10-17-in-app-waitlist.md).
 
 ## Review Focus
 

@@ -1,6 +1,6 @@
 # Lista de espera dentro de Sarin
 
-Estado: alcance autorizado con «ok seguir», sobre el incremento de recordatorios publicado en v19. Se mantiene la autorización de implementar, probar y publicar cada incremento antes del siguiente. Base documental `711dab5`; runtime productivo `ed28549`.
+Estado: implementado, probado y publicado como Containers v20, runtime `491ab52`, el 17 de octubre de 2026. Alcance autorizado con «ok seguir» y autorización de implementar, probar y publicar cada incremento antes del siguiente. Base del diseño: documental `711dab5` y runtime de recordatorios `ed28549` (v19). [Aceptación, publicación y límites](../../qa/2026-10-17-in-app-waitlist.md).
 
 ## Recorrido aprobado y decisiones
 
@@ -55,7 +55,7 @@ Sin proveedores nuevos, correo, SMS, push ni inferencia. Una comprobación al mo
 
 Pruebas de autorización cruzada, reglas privadas, fechas/reloj, filtros exactos, salud/menores, revocar/reaceptar, permisos suspendidos, cancelación sin negocio/permisos, duplicados/revisiones/ABA, pérdida de respuesta, corrupción y D1 real concurrente. UI: resultado vacío vigente, cambios de selección/ámbito, mutex, reanudación con caso nuevo sin datos personales, catálogo cambiado, teclado y anchos 320/390/1280. Fixture aislado demo-*; limpieza solo de sus datos.
 
-Revisión independiente, suite aplicable y build de imagen congelada. Paquete v19 inmutable, nueva reversión compatible, instancia única y cola drenada para publicación. Verificación HTTP/navegador productiva sin aceptar consentimientos ni crear reservas reales para QA. Se documentarán límites de observación.
+Revisión independiente, suite aplicable y build de imagen congelada completados: 1.575 pruebas aprobadas/28 omitidas, 76 de Cloudflare, 763 archivos de fuente auditados y smoke aislado aprobado. Paquete v19 de 847 archivos intacto, reversión compatible, instancia única y cuatro colas autenticadas vacías. Publicación v20 verificada por HTTP y navegador sin aceptar consentimientos ni crear reservas reales para QA. En producción se observó el panel vacío; no había solicitud ni permisos de nueva reserva para mostrar alta/continuación. El recorrido completo se probó con datos sintéticos locales y sus 21 controles visuales preceden a las correcciones finales verificadas mediante regresiones automatizadas. Los IDs y límites constan en la aceptación enlazada.
 
 ## Referencias
 

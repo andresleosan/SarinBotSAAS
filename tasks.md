@@ -1,11 +1,11 @@
 # Estado de implementación — 2026-10-17
 
-## Lista de espera dentro de la app — validada localmente, publicación pendiente
+## Lista de espera dentro de la app — publicada
 
 - [x] Definir una solicitud privada por cuenta/negocio y selección de servicio, día y profesional, con consulta explícita y continuación normal del calendario. [Diseño autorizado](docs/superpowers/specs/2026-10-17-in-app-waitlist-design.md).
 - [x] Implementar API/UI y conservación privada; probar el recorrido sintético en 320/390/1280 px con 21 controles, retirada persistente y limpieza verificada.
 - [x] Cerrar revisión independiente PASS y suite integrada: 1.575 aprobadas/28 omitidas, TypeScript y 76 de Cloudflare. D1 lee 30 filas con y sin 1.001 citas históricas; sin SQL nuevo. Corregir admisión por revisión, reconciliación 5xx, profesionales activos, timestamps del fixture y propietario canónico en eliminación privada (11/11).
-- [ ] Congelar y auditar artefacto, publicar con instancia única y comprobar producción. [Evidencia en curso](docs/qa/2026-10-17-in-app-waitlist.md).
+- [x] Congelar y auditar 763 archivos de fuente; build y smoke aislado aprobados. Publicar runtime `491ab52`, imagen `f601ca41…`, Worker `61ebd3f8-4e6f-41d9-bd6e-fb9b8f0e849b`, Containers v20: una instancia conectada, cero antiguas, cuatro colas autenticadas vacías y sesión 200 durante mantenimiento. Sin SQL nuevo; paquete v19 de 847 archivos intacto. Panel vacío observado realmente en producción; alta/continuación no visibles ni ejecutadas, sin aceptar permisos o mutar datos reales. [Publicación, límites y reversión](docs/qa/2026-10-17-in-app-waitlist.md).
 
 ## Recordatorios dentro de la app — publicados
 
@@ -52,7 +52,7 @@ El propietario indicó «ok vamos paso a paso, implementando probando y publican
 - [x] **Publicado:** dirección/modalidad e indicaciones para llegar en la ficha del negocio. Runtime `8da7c54`, imagen `d59fa710…`, Containers v17. Editor observado en producción sin guardar datos reales; cuatro guardados sintéticos y 31 controles locales. [QA y publicación](docs/qa/2026-10-17-business-location.md).
 - [x] **Publicado:** reprogramar una cita existente con validación temporal, cambio atómico del mismo ID y recuperación de confirmación. Runtime `97b6572`, imagen `f3dcad7f…`, Containers v18. 1.390 pruebas y 44 controles locales; producción verificada sin crear ni mover citas reales. [QA, publicación y excepción operativa documentada](docs/qa/2026-10-17-appointment-reschedule.md).
 - [x] Recordatorios dentro de Sarin, con regla persistente de 24 horas y visto explícito; disponibles al consultar Mis citas. El propietario indicó «todo dentro de la app de momento». Correo y WhatsApp fuera del alcance inicial.
-- [ ] Lista de espera con preferencias y confirmación explícita del hueco ofrecido.
+- [x] **Publicada:** lista de espera privada por servicio, día y profesional, con consulta dentro de Mis citas y continuación explícita del calendario. Runtime `491ab52`, imagen `f601ca41…`, Containers v20. Una solicitud por cuenta/negocio, sin asignación automática ni mensajes externos. [QA y publicación](docs/qa/2026-10-17-in-app-waitlist.md).
 
 Orden basado en la [investigación de Fresha](docs/qa/2026-10-17-fresha-next-adaptations.md). La implementación sigue en el worktree aislado `service-catalog`; el checkout original permanece conservado.
 
