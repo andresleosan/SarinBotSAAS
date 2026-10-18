@@ -1,5 +1,12 @@
 # Estado de implementación — 2026-10-17
 
+## Recordatorios dentro de la app — diseño en revisión
+
+- [x] Incorporar la preferencia del propietario: «todo dentro de la app de momento». Explorar la guía oficial de Fresha y los contratos actuales, con revisiones independientes de backend e interfaz.
+- [x] Preparar el [diseño revisable](docs/superpowers/specs/2026-10-17-in-app-reminders-design.md): regla persistida y horario canónico, preferencia opcional por negocio y visto separado de la cita, sin despachador ni actividad con la pantalla cerrada.
+- [ ] Cerrar la revisión del diseño y la elección entre un aviso 24 horas antes o dos a 24 horas y 2 horas; después preparar la implementación, pruebas y publicación del incremento.
+- [ ] Antes del próximo despliegue, corregir y probar la consulta autenticada de sesión durante mantenimiento, conservando la autenticación y el bloqueo de tráfico de negocio.
+
 ## Cambiar horario de una cita — publicado
 
 - [x] Conservar la identidad y los datos de la cita al sustituir su horario de forma atómica, con resumen explícito y sin consumir otra unidad del plan.
