@@ -54,6 +54,11 @@ export async function updateClientPolicy(owner: ChatActor, businessId: string, i
   });
 }
 /** Read-only: caller writes the shared client lock after all availability reads. */
+export async function assertClientCanReschedule(tx: Transaction, business: Business, actorUid: string, db: Database): Promise<void> {
+  if ((await readPolicy(business.id, actorUid, db, tx)).blocked) throw new HttpError(403, 'Este negocio ha pausado tus nuevas reservas. Puedes consultar y cancelar tus citas.', 'CLIENT_BLOCKED');
+}
+
+/** Read-only: caller writes the shared client lock after all availability reads. */
 export async function assertClientCanBook(tx: Transaction, business: Business, actorUid: string, now: number, db: Database): Promise<void> {
   const policy = await readPolicy(business.id, actorUid, db, tx);
   if (policy.blocked) throw new HttpError(403, 'Este negocio ha pausado tus nuevas reservas. Puedes consultar y cancelar tus citas.', 'CLIENT_BLOCKED');

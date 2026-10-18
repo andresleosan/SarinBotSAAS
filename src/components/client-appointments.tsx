@@ -41,7 +41,7 @@ function statusLabel(appointment: Appointment, now: number): string {
   }
 }
 
-export function ClientAppointments({ businessId, businessName, resources = [], services = [], userId, now, onRebook, rebookingEnabled = false }: { businessId: string; businessName: string; resources?: TenantResource[]; services?: TenantService[]; userId: string; now: number; onRebook?: (serviceId: string) => void; rebookingEnabled?: boolean }) {
+export function ClientAppointments({ businessId, businessName, resources = [], services = [], userId, now, onRebook, rebookingEnabled = false, onReschedule, reschedulingEnabled = false, actionsLocked = false, onActionLockChange, onAppointmentsRead }: { businessId: string; businessName: string; resources?: TenantResource[]; services?: TenantService[]; userId: string; now: number; onRebook?: (serviceId: string) => void; rebookingEnabled?: boolean; onReschedule?: (appointment: Appointment) => boolean | void; reschedulingEnabled?: boolean; actionsLocked?: boolean; onActionLockChange?: (locked: boolean) => void; onAppointmentsRead?: (appointments: Appointment[] | null) => void }) {
   const [retry, setRetry] = useState(0);
   const scope = `${businessId}:${userId}`;
   const currentScope = useRef({ key: scope });
@@ -55,6 +55,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const pending = useRef<string | null>(null);
+  const handingOff = useRef(false);
   const exporting = useRef<ExportAction | null>(null);
   const [exportAction, setExportAction] = useState<ExportAction | null>(null);
   const exportingId = exportAction?.id ?? null;
@@ -66,14 +67,18 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
     setConfirmationId(null); setPendingId(null); pending.current = null;
     exporting.current = null; setExportAction(null);
     setActionError(null); setNotice(null);
+    handingOff.current = false;
     return () => { if (currentScope.current === actionScope) currentScope.current = { key: '' }; };
   }, [scope]);
+  useEffect(() => { if (!actionsLocked) handingOff.current = false; }, [actionsLocked]);
 
   // The query is scoped by the authenticated UID; recheck it before displaying or acting.
   const ownAppointments = appointments.filter(item => item.tenantId === businessId && item.type === "appointment" && item.client?.uid === userId && knownStatuses.includes(item.status)
     && Number.isFinite(item.startAt) && Number.isFinite(item.endAt) && item.endAt > item.startAt);
-  const latest = useRef({ appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, view, loading, readError });
-  latest.current = { appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, view, loading, readError };
+  const latest = useRef({ appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, onReschedule, reschedulingEnabled, actionsLocked, onActionLockChange, onAppointmentsRead, view, loading, readError });
+  latest.current = { appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, onReschedule, reschedulingEnabled, actionsLocked, onActionLockChange, onAppointmentsRead, view, loading, readError };
+  useEffect(() => { latest.current.onAppointmentsRead?.(loading || readError ? null : latest.current.appointments); }, [appointmentRead.value, loading, readError, scope]);
+  useEffect(() => () => { latest.current.onActionLockChange?.(false); }, [scope]);
   const visible = ownAppointments.filter(item => view === "calendar" ? dateKey(item.startAt) === selectedDate
     : view === "upcoming" ? item.status === "confirmed" && item.endAt > now : isHistorical(item, now))
     .sort((a, b) => view === "history" ? b.startAt - a.startAt : a.startAt - b.startAt);
@@ -84,7 +89,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
     setActionError(null);
   }
   function rebook(appointment: Appointment) {
-    if (currentScope.current !== actionScope || pending.current || exporting.current) return;
+    if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current) return;
     const current = latest.current;
     if (current.view !== "history" || !current.onRebook || !current.rebookingEnabled || current.loading || current.readError) return;
     const saved = current.appointments.find(item => item.id === appointment.id);
@@ -92,9 +97,19 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
     const service = current.services.find(item => item.id === saved.serviceId);
     if (service) current.onRebook(service.id);
   }
+  function reschedule(appointment: Appointment) {
+    if (currentScope.current !== actionScope || handingOff.current || pending.current || exporting.current) return;
+    const current = latest.current;
+    if (current.actionsLocked || !current.onReschedule || !current.reschedulingEnabled || current.loading || current.readError) return;
+    const saved = current.appointments.find(item => item.id === appointment.id);
+    if (!saved || !canChange(saved, Date.now()) || JSON.stringify(saved) !== JSON.stringify(appointment)) return;
+    // A synchronous acceptance transfers the mutex before React renders the workspace.
+    handingOff.current = current.onReschedule(saved) === true;
+  }
   async function cancel(appointment: Appointment) {
-    if (currentScope.current !== actionScope || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
+    if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
     pending.current = appointment.id;
+    latest.current.onActionLockChange?.(true);
     setPendingId(appointment.id);
     setActionError(null);
     setNotice(null);
@@ -112,11 +127,12 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       setView("history");
       setNotice("Cita cancelada.");
     } catch (cause) { if (currentScope.current === actionScope) setActionError(errorMessage(cause)); }
-    finally { if (currentScope.current === actionScope) { pending.current = null; setPendingId(null); } }
+    finally { if (currentScope.current === actionScope) { pending.current = null; setPendingId(null); latest.current.onActionLockChange?.(false); } }
   }
   async function download(appointment: Appointment) {
-    if (currentScope.current !== actionScope || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
+    if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
     exporting.current = { id: appointment.id, kind: "image" };
+    latest.current.onActionLockChange?.(true);
     setExportAction(exporting.current); setActionError(null); setNotice(null);
     const generatedAt = Date.now();
     function details(item: Appointment): AppointmentImageDetails {
@@ -141,10 +157,10 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       finally { anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }
       setNotice("Imagen de la cita descargada. Consulta Mis citas para ver cambios o cancelaciones.");
     } catch (cause) { if (currentScope.current === actionScope) setActionError(errorMessage(cause)); }
-    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); } }
+    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); latest.current.onActionLockChange?.(false); } }
   }
   async function downloadCalendar(appointment: Appointment) {
-    if (currentScope.current !== actionScope || pending.current || exporting.current) return;
+    if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current) return;
     const current = latest.current;
     if (current.loading || current.readError) return;
     const saved = current.appointments.find(item => item.id === appointment.id);
@@ -161,6 +177,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
     const snapshot = details(saved);
     const serviceId = saved.serviceId, resourceId = saved.resourceId;
     exporting.current = { id: saved.id, kind: "calendar" };
+    latest.current.onActionLockChange?.(true);
     setExportAction(exporting.current); setActionError(null); setNotice(null);
     try {
       const content = await createAppointmentCalendar(snapshot);
@@ -175,7 +192,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       downloadICSFile(content, `cita-${dateKey(actual.startAt)}.ics`);
       setNotice("Archivo de calendario descargado. Los cambios y cancelaciones se consultan en Mis citas.");
     } catch (cause) { if (currentScope.current === actionScope) setActionError(errorMessage(cause)); }
-    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); } }
+    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); latest.current.onActionLockChange?.(false); } }
   }
 
   return (
@@ -211,20 +228,21 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
             <p className="text-sm tabular-nums text-sarin-muted">{timeFormat.format(appointment.startAt)}–{timeFormat.format(appointment.endAt)} (Colombia)</p>
             <p className="text-xs font-semibold text-sarin-blue">{statusLabel(appointment, now)}</p>
           </div>
-          {view === "history" && onRebook && currentService && <button type="button" aria-label={`Volver a reservar: ${currentService.name}`} disabled={!rebookingEnabled || loading || Boolean(readError || pendingId || exportingId)} onClick={() => rebook(appointment)} className="min-h-11 max-w-full rounded-[10px] border border-sarin-line px-3 py-2 text-left text-sm font-semibold text-sarin-blue hover:border-sarin-blue hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:cursor-not-allowed disabled:opacity-50">Volver a reservar</button>}
+          {view === "history" && onRebook && currentService && <button type="button" aria-label={`Volver a reservar: ${currentService.name}`} disabled={actionsLocked || !rebookingEnabled || loading || Boolean(readError || pendingId || exportingId)} onClick={() => rebook(appointment)} className="min-h-11 max-w-full rounded-[10px] border border-sarin-line px-3 py-2 text-left text-sm font-semibold text-sarin-blue hover:border-sarin-blue hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:cursor-not-allowed disabled:opacity-50">Volver a reservar</button>}
           {canChange(appointment, now) && <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-              <button type="button" disabled={Boolean(pendingId || exportingId)} className="flex min-h-11 max-w-full items-center gap-2 rounded text-left text-sm font-medium text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => download(appointment)}><Download className="h-4 w-4 shrink-0" />{exportAction?.id === appointment.id && exportAction.kind === "image" ? "Preparando imagen…" : "Guardar imagen de la cita"}</button>
-              <button type="button" disabled={loading || Boolean(readError || pendingId || exportingId)} className="flex min-h-11 max-w-full items-center gap-2 rounded text-left text-sm font-medium text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => downloadCalendar(appointment)}><CalendarPlus className="h-4 w-4 shrink-0" />{exportAction?.id === appointment.id && exportAction.kind === "calendar" ? "Preparando calendario…" : "Añadir al calendario"}</button>
-              {confirmationId !== appointment.id && <button type="button" disabled={Boolean(pendingId || exportingId)} className="min-h-11 rounded text-sm text-sarin-muted underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => { setConfirmationId(appointment.id); setActionError(null); setNotice(null); }}>Cancelar cita</button>}
+              {onReschedule && <button type="button" disabled={actionsLocked || !reschedulingEnabled || loading || Boolean(readError || pendingId || exportingId)} className="min-h-11 rounded text-left text-sm font-semibold text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => reschedule(appointment)}>Cambiar horario</button>}
+              <button type="button" disabled={actionsLocked || Boolean(pendingId || exportingId)} className="flex min-h-11 max-w-full items-center gap-2 rounded text-left text-sm font-medium text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => download(appointment)}><Download className="h-4 w-4 shrink-0" />{exportAction?.id === appointment.id && exportAction.kind === "image" ? "Preparando imagen…" : "Guardar imagen de la cita"}</button>
+              <button type="button" disabled={actionsLocked || loading || Boolean(readError || pendingId || exportingId)} className="flex min-h-11 max-w-full items-center gap-2 rounded text-left text-sm font-medium text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => downloadCalendar(appointment)}><CalendarPlus className="h-4 w-4 shrink-0" />{exportAction?.id === appointment.id && exportAction.kind === "calendar" ? "Preparando calendario…" : "Añadir al calendario"}</button>
+              {confirmationId !== appointment.id && <button type="button" disabled={actionsLocked || Boolean(pendingId || exportingId)} className="min-h-11 rounded text-sm text-sarin-muted underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50" onClick={() => { if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current) return; setConfirmationId(appointment.id); setActionError(null); setNotice(null); }}>Cancelar cita</button>}
             </div>
             <p className="text-xs text-sarin-muted">Se descarga un archivo para importar. No se actualiza automáticamente: consulta Mis citas para ver cambios o cancelaciones.</p>
           </div>}
           {confirmationId === appointment.id && canChange(appointment, now) && <div role="group" aria-label={`Confirmar cancelación de ${appointment.serviceName || "cita"}`} className="space-y-3 border-t border-sarin-line pt-3">
             <p className="text-sm text-sarin-ink">¿Quieres cancelar esta cita? El horario quedará libre.</p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className={buttonClass} disabled={Boolean(pendingId || exportingId)} onClick={() => cancel(appointment)}>{pendingId === appointment.id ? "Cancelando…" : "Sí, cancelar cita"}</button>
-              <button type="button" className="min-h-11 rounded-xl border border-sarin-line px-3 text-sm text-sarin-ink disabled:opacity-50" disabled={Boolean(pendingId)} onClick={() => { setConfirmationId(null); setActionError(null); }}>Conservar cita</button>
+              <button type="button" className={buttonClass} disabled={actionsLocked || Boolean(pendingId || exportingId)} onClick={() => cancel(appointment)}>{pendingId === appointment.id ? "Cancelando…" : "Sí, cancelar cita"}</button>
+              <button type="button" className="min-h-11 rounded-xl border border-sarin-line px-3 text-sm text-sarin-ink disabled:opacity-50" disabled={actionsLocked || Boolean(pendingId)} onClick={() => { setConfirmationId(null); setActionError(null); }}>Conservar cita</button>
             </div>
           </div>}
         </article>;

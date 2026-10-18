@@ -152,6 +152,7 @@ export async function cancelAppointment(user: ChatActor, businessId: string, app
     const lock = await transaction.get(lockReference);
     const clientLockReference = appointment.type === 'appointment' && appointment.client?.uid ? businessReference.collection('bookingLocks').doc(`client_${clientPolicyKey(appointment.client.uid)}`) : null;
     const clientLock = clientLockReference ? await transaction.get(clientLockReference) : null;
+    if (!owner && (!Number.isSafeInteger(appointment.startAt) || appointment.startAt <= Date.now())) throw new HttpError(409, 'Solo puedes cancelar citas que aún no han comenzado.');
     const cancelled: Appointment = { ...appointment, status: owner ? 'cancelled_by_owner' : 'cancelled_by_client' };
     transaction.set(reference, cancelled);
     transaction.set(lockReference, { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: Date.now() });

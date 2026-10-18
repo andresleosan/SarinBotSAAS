@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useRef, useState, type FormEvent } from 'react';
+import { use, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Send } from 'lucide-react';
 import { SarinMark } from '@/components/sarin-brand';
@@ -8,6 +8,7 @@ import { ConsentPanel, useAccountConsent } from '@/components/consent-panel';
 import { useConsent } from '@/hooks/useConsent';
 import { useBookingDataPolicy } from '@/hooks/useBookingDataPolicy';
 import { StructuredBooking } from '@/components/structured-booking';
+import { AppointmentReschedule } from '@/components/appointment-reschedule';
 import { Notice, buttonClass, fieldClass } from '@/components/app-shell';
 import { ClientAppointments } from '@/components/client-appointments';
 import { BookingProposal } from '@/components/booking-proposal';
@@ -15,7 +16,8 @@ import { useDebouncedChat } from '@/hooks/useDebouncedChat';
 import { useEngineHealth } from '@/hooks/useEngineHealth';
 import { useApiPoll } from '@/lib/client/use-api-poll';
 import { getBusinessAccess, isSubscriptionAllowed } from '@/lib/sarin/subscription';
-import type { PublicBusiness, PublicBusinessProfile } from '@/types/firestore';
+import type { Appointment, PublicBusiness, PublicBusinessProfile } from '@/types/firestore';
+import { canRescheduleSubscription, type RescheduleResult } from '@/lib/appointment-reschedule';
 import { BusinessPublicProfile } from '@/components/business-public-profile';
 import { BusinessLocation } from '@/components/business-location';
 import type { BookingCapability } from '@/lib/booking-subject';
@@ -66,14 +68,26 @@ function BookingJourney({ business, capability, uid, permitted, policyReady, now
 function BookingWorkspace({ business, capability, uid, permitted, policyReady, catalogReady, now, initialServiceId, onInitialServiceHandled }: { business: PublicBusiness; capability: BookingCapability | null; uid: string; permitted: boolean; policyReady: boolean; catalogReady: boolean; now: number; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
   const [version, setVersion] = useState(0), [locked, setLocked] = useState(false);
   const [entry, setEntry] = useState<{ revision: number; serviceId?: string } | null>(null);
-  const start = useRef<HTMLDivElement>(null), mounted = useRef(true);
-  const rebookingEnabled = permitted && policyReady && catalogReady && Boolean(capability) && !locked && isSubscriptionAllowed(business, now);
-  const current = useRef({ rebookingEnabled, services: business.services, onInitialServiceHandled });
-  current.current = { rebookingEnabled, services: business.services, onInitialServiceHandled };
+  const [rescheduleEntry, setRescheduleEntry] = useState<{ source: Appointment; capability: BookingCapability } | null>(null), activeReschedule = useRef(rescheduleEntry);
+  const [appointmentActionLocked, setAppointmentActionLocked] = useState(false), localAction = useRef(false), rescheduleLocked = useRef(false);
+  const [sourceCurrent, setSourceCurrent] = useState(true), [changeNotice, setChangeNotice] = useState<string | null>(null);
+  const start = useRef<HTMLDivElement>(null), changeStart = useRef<HTMLDivElement>(null), appointmentsStart = useRef<HTMLDivElement>(null), mounted = useRef(true);
+  const entryAllowed = permitted && policyReady && catalogReady && Boolean(capability) && !locked && !appointmentActionLocked && !rescheduleEntry;
+  const rebookingEnabled = entryAllowed && isSubscriptionAllowed(business, now), reschedulingEnabled = entryAllowed && canRescheduleSubscription(business, now);
+  const current = useRef({ rebookingEnabled, reschedulingEnabled, services: business.services, onInitialServiceHandled });
+  current.current = { rebookingEnabled, reschedulingEnabled, services: business.services, onInitialServiceHandled };
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { if (entry) { start.current?.focus(); start.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [entry?.revision]);
+  useEffect(() => { if (rescheduleEntry) { changeStart.current?.focus(); changeStart.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [rescheduleEntry]);
+  useEffect(() => { if (changeNotice) { appointmentsStart.current?.focus(); appointmentsStart.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [version, changeNotice]);
+  const handleActionLock = useCallback((value: boolean) => { localAction.current = value; setAppointmentActionLocked(value); }, []);
+  const handleRescheduleLock = useCallback((value: boolean) => { rescheduleLocked.current = value; }, []);
+  const handleAppointmentsRead = useCallback((appointments: Appointment[] | null) => {
+    const active = activeReschedule.current;
+    if (active) setSourceCurrent(Boolean(appointments?.some(item => item.id === active.source.id && JSON.stringify(item) === JSON.stringify(active.source))));
+  }, []);
   function rebook(serviceId: string) {
-    if (!mounted.current || !current.current.rebookingEnabled || !current.current.services.some(service => service.id === serviceId)) return;
+    if (!mounted.current || activeReschedule.current || localAction.current || !current.current.rebookingEnabled || !current.current.services.some(service => service.id === serviceId)) return;
     current.current.onInitialServiceHandled?.();
     setEntry(previous => ({ revision: (previous?.revision ?? 0) + 1, serviceId }));
   }
@@ -81,11 +95,27 @@ function BookingWorkspace({ business, capability, uid, permitted, policyReady, c
     onInitialServiceHandled?.();
     setEntry(previous => previous?.serviceId !== undefined ? { ...previous, serviceId: undefined } : previous);
   }
+  function reschedule(source: Appointment) {
+    if (!mounted.current || activeReschedule.current || localAction.current || !capability || !current.current.reschedulingEnabled || source.tenantId !== business.id || source.client?.uid !== uid || source.type !== 'appointment' || source.status !== 'confirmed' || source.startAt <= Date.now() || !Number.isSafeInteger(source.rescheduleRevision ?? 0) || (source.rescheduleRevision ?? 0) < 0) return;
+    const next = { source, capability }; activeReschedule.current = next; setSourceCurrent(true); setChangeNotice(null); setRescheduleEntry(next);
+    return true;
+  }
+  function closeReschedule(expected: NonNullable<typeof rescheduleEntry>) {
+    if (!mounted.current || activeReschedule.current !== expected || rescheduleLocked.current) return;
+    activeReschedule.current = null; setRescheduleEntry(null); appointmentsStart.current?.focus();
+  }
+  function changed(expected: NonNullable<typeof rescheduleEntry>, result: RescheduleResult) {
+    if (!mounted.current || activeReschedule.current !== expected || result.appointmentId !== expected.source.id || result.revision !== (expected.source.rescheduleRevision ?? 0) + 1) return;
+    activeReschedule.current = null; rescheduleLocked.current = false; setRescheduleEntry(null); setVersion(value => value + 1);
+    setChangeNotice('Cambio de horario confirmado. Consulta Mis citas para ver el horario y estado actuales. Si importaste un archivo de calendario, debes actualizarlo manualmente según Mis citas.');
+  }
   return <>
-    {capability && <div ref={start} role="region" aria-label="Nueva reserva" tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue">
-      <BookingJourney key={entry?.revision ?? 0} business={business} capability={capability} uid={uid} permitted={permitted} policyReady={policyReady} now={now} initialServiceId={entry ? entry.serviceId : initialServiceId} onInitialServiceHandled={handleInitialService} onConfirmed={() => setVersion(value => value + 1)} onLockedChange={setLocked} />
+    {capability && !rescheduleEntry && <div ref={start} role="region" aria-label="Nueva reserva" tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue">
+      <BookingJourney key={entry?.revision ?? 0} business={business} capability={capability} uid={uid} permitted={permitted && !appointmentActionLocked} policyReady={policyReady} now={now} initialServiceId={entry ? entry.serviceId : initialServiceId} onInitialServiceHandled={handleInitialService} onConfirmed={() => setVersion(value => value + 1)} onLockedChange={setLocked} />
     </div>}
-    <ClientAppointments key={version} businessId={business.id} businessName={business.name} resources={business.resources} services={business.services} userId={uid} now={now} onRebook={rebook} rebookingEnabled={rebookingEnabled} />
+    {rescheduleEntry && <div ref={changeStart} role="region" aria-label="Cambio de horario de mi cita" tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><AppointmentReschedule uid={uid} source={rescheduleEntry.source} business={business} capability={capability ?? rescheduleEntry.capability} enabled={permitted && policyReady && catalogReady && Boolean(capability) && !appointmentActionLocked} sourceCurrent={sourceCurrent} onConfirmed={result => changed(rescheduleEntry, result)} onCancel={() => closeReschedule(rescheduleEntry)} onLockedChange={handleRescheduleLock} /></div>}
+    {changeNotice && <p role="status" className="rounded-xl border border-sarin-line bg-sarin-paper p-4 text-sm text-sarin-blue">{changeNotice}</p>}
+    <div ref={appointmentsStart} tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><ClientAppointments key={version} businessId={business.id} businessName={business.name} resources={business.resources} services={business.services} userId={uid} now={now} onRebook={rebook} rebookingEnabled={rebookingEnabled} onReschedule={reschedule} reschedulingEnabled={reschedulingEnabled} actionsLocked={locked || Boolean(rescheduleEntry)} onActionLockChange={handleActionLock} onAppointmentsRead={handleAppointmentsRead} /></div>
   </>;
 }
 function Island({ slug, initialServiceId, onInitialServiceHandled }: { slug: string; initialServiceId?: string; onInitialServiceHandled?: () => void }) {

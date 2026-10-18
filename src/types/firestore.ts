@@ -152,6 +152,9 @@ export interface TenantClientMemory {
 }
 
 export interface Appointment {
+  rescheduleRevision?: number;
+  lastRescheduleProposalId?: string;
+  rescheduledAt?: number;
   beneficiary?: import('@/lib/booking-subject').BookingBeneficiary;
   subjectAuthorization?: { receiptId: string; bookingRequestId: string; policyRevision: number };
   representationReview?: import('@/lib/booking-subject').RepresentationReview;

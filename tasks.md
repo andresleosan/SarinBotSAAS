@@ -1,5 +1,11 @@
 # Estado de implementación — 2026-10-17
 
+## Cambiar horario de una cita — aprobado localmente
+
+- [x] Conservar la identidad y los datos de la cita al sustituir su horario de forma atómica, con resumen explícito y sin consumir otra unidad del plan.
+- [x] Verificar permisos, política vigente, concurrencia y recuperación: 1.390 pruebas aprobadas/26 omitidas, ocho casos D1 con dos conexiones, revisión independiente y 44 controles de navegador sintético. Un cambio/una propuesta locales, ninguna cita nueva; 15 documentos propios limpiados. [Evidencia](docs/qa/2026-10-17-appointment-reschedule.md).
+- [ ] Publicar la versión autorizada después de auditar imagen y reversión compatible, drenar cola y verificar una instancia efectiva y la sesión administrativa.
+
 ## Ubicación y modalidad — publicado
 
 - [x] Añadir configuración pública opcional de modalidad, dirección e indicaciones, con enlace seguro y proyección validada; conservar valores omitidos por clientes anteriores.
