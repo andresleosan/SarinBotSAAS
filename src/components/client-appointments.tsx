@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { CalendarPlus, Download } from "lucide-react";
 import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
+import { ClientAppointmentReminders } from "@/components/client-appointment-reminders";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { useApiPoll } from "@/lib/client/use-api-poll";
 import { createAppointmentImage, type AppointmentImageDetails } from "@/lib/client/appointment-image";
 import { createAppointmentCalendar, type AppointmentCalendarDetails } from "@/lib/client/appointment-calendar";
 import { downloadICSFile } from "@/lib/utils/icsGenerator";
 import type { Appointment, TenantResource, TenantService } from "@/types/firestore";
+import type { ReminderOccurrence } from "@/types/appointment-reminders";
 
 type View = "upcoming" | "history" | "calendar";
 type ExportAction = { id: string; kind: "image" | "calendar" };
@@ -61,12 +63,15 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
   const exportingId = exportAction?.id ?? null;
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [reminderFocus, setReminderFocus] = useState<ReminderOccurrence | null>(null);
+  const appointmentElements = useRef(new Map<string, HTMLElement>());
 
   useEffect(() => {
     currentScope.current = actionScope;
     setConfirmationId(null); setPendingId(null); pending.current = null;
     exporting.current = null; setExportAction(null);
     setActionError(null); setNotice(null);
+    setReminderFocus(null);
     handingOff.current = false;
     return () => { if (currentScope.current === actionScope) currentScope.current = { key: '' }; };
   }, [scope]);
@@ -82,6 +87,31 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
   const visible = ownAppointments.filter(item => view === "calendar" ? dateKey(item.startAt) === selectedDate
     : view === "upcoming" ? item.status === "confirmed" && item.endAt > now : isHistorical(item, now))
     .sort((a, b) => view === "history" ? b.startAt - a.startAt : a.startAt - b.startAt);
+  const currentOccurrences: ReminderOccurrence[] | null = loading || readError ? null : ownAppointments.flatMap(item => {
+    const revision = item.rescheduleRevision === undefined ? 0 : item.rescheduleRevision;
+    return item.status === "confirmed" && item.startAt > now && Number.isSafeInteger(revision) && revision >= 0
+      ? [{ appointmentId: item.id, sourceRevision: revision, sourceStartAt: item.startAt, offsetMinutes: 1440 as const }] : [];
+  });
+  function currentReminderAppointment(occurrence: ReminderOccurrence) {
+    const current = latest.current;
+    if (currentScope.current !== actionScope || current.actionsLocked || handingOff.current || pending.current || exporting.current || current.loading || current.readError) return undefined;
+    return current.appointments.find(item => item.id === occurrence.appointmentId && canChange(item, Date.now()) && item.startAt === occurrence.sourceStartAt
+      && (item.rescheduleRevision === undefined ? 0 : item.rescheduleRevision) === occurrence.sourceRevision && occurrence.offsetMinutes === 1440);
+  }
+  function viewReminder(occurrence: ReminderOccurrence) {
+    if (!currentReminderAppointment(occurrence)) return;
+    changeView("upcoming");
+    setReminderFocus(occurrence);
+  }
+  useEffect(() => {
+    if (!reminderFocus || view !== "upcoming") return;
+    if (currentReminderAppointment(reminderFocus)) {
+      const element = appointmentElements.current.get(reminderFocus.appointmentId);
+      element?.focus({ preventScroll: true });
+      element?.scrollIntoView({ block: "center", behavior: "auto" });
+    }
+    setReminderFocus(null);
+  }, [reminderFocus, view, appointmentRead.value, actionsLocked, scope]);
 
   function changeView(next: View) {
     setView(next);
@@ -201,6 +231,8 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
         <h2 id="my-appointments-title" className="font-semibold text-sarin-ink">Mis citas</h2>
         <p className="mt-1 text-xs text-sarin-muted">Tus reservas en este negocio. Horarios de Colombia.</p>
       </div>
+      <ClientAppointmentReminders businessId={businessId} userId={userId} now={now} currentOccurrences={currentOccurrences}
+        actionsLocked={actionsLocked || Boolean(pendingId || exportingId)} onViewAppointment={viewReminder} />
       <div role="group" aria-label="Ver mis citas" className="grid grid-cols-3 gap-1 rounded-xl bg-sarin-canvas p-1">
         {views.map(item => <button key={item.id} type="button" aria-pressed={view === item.id} onClick={() => changeView(item.id)}
           className={`min-h-11 min-w-0 rounded-lg px-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue sm:text-sm ${view === item.id ? "bg-sarin-blue text-white" : "text-sarin-muted hover:bg-sarin-soft"}`}>{item.label}</button>)}
@@ -220,7 +252,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       <div className="space-y-3">
         {visible.map(appointment => {
           const currentService = services.find(service => service.id === appointment.serviceId);
-          return <article key={appointment.id} className="min-w-0 space-y-3 rounded-xl border border-sarin-line bg-sarin-canvas p-3 sm:p-4">
+          return <article key={appointment.id} tabIndex={-1} ref={element => { if (element) appointmentElements.current.set(appointment.id, element); else appointmentElements.current.delete(appointment.id); }} className="min-w-0 scroll-mt-40 space-y-3 rounded-xl border border-sarin-line bg-sarin-canvas p-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue sm:p-4">
           <div className="space-y-1">
             <h3 className="break-words font-semibold [overflow-wrap:anywhere]">{appointment.serviceName || "Cita"}</h3>
             <p className="break-words text-sm [overflow-wrap:anywhere]">{appointment.beneficiary?.kind === 'represented_minor' ? <>Para: {appointment.beneficiary.displayName} · Gestionada por {appointment.client?.name || 'tu cuenta'}</> : appointment.beneficiary?.kind === 'self' ? 'Reserva para ti' : 'Registro anterior sin beneficiario declarado'}</p>

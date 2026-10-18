@@ -1,12 +1,12 @@
 # Recordatorios de citas dentro de Sarin
 
-Estado: propuesta para revisión. No implementada ni publicada. Base publicada: runtime `97b6572`, Containers v18; documentación `6df82f3`.
+Estado: diseño aprobado por el propietario; implementación en curso. Base publicada: runtime `97b6572`, Containers v18; documentación `6df82f3`.
 
 ## Intención y alcance
 
 El propietario autorizó avanzar por incrementos implementados, probados y publicados, y eligió «todo dentro de la app de momento». El siguiente incremento ayudará al cliente a recordar una cita próxima cuando consulte Sarin, sin enviar mensajes externos. No se atribuye todavía una reducción de inasistencias.
 
-Propuesta inicial: **un recordatorio disponible desde 24 horas antes de la cita**, dentro de «Mis citas» de cada negocio. La antelación se está consultando al propietario; dos avisos, a 24 horas y 2 horas, es la alternativa presentada. Esta propuesta usa un único aviso hasta que se confirme la elección.
+Decisión confirmada: **un recordatorio disponible desde 24 horas antes de la cita**, dentro de «Mis citas» de cada negocio. El propietario eligió «Un aviso 24 horas antes» y aprobó implementar este diseño. No se incluye un segundo aviso.
 
 El recordatorio necesita Sarin abierto y conexión. No funciona como una alarma con la app cerrada, ni solicita permisos de notificaciones del navegador. Correo, SMS, WhatsApp, push, IA y un centro global de notificaciones quedan fuera de este incremento.
 
@@ -41,7 +41,7 @@ Dos colecciones privadas bajo cada negocio, incorporadas expresamente a la lista
 - Preferencia por UID autenticado: versión de esquema, revisión para controlar cambios concurrentes, `ownerUid`, `businessId`, habilitación, antelación permitida y fecha de modificación del servidor. Al habilitar se guardan las revisiones y huellas verificadas de los permisos `account` y `business_client` vigentes; no se copian sus textos ni respuestas.
 - Recibo por cuenta, cita y clase de aviso: referencia de cita, revisión de reprogramación, inicio de esa ocurrencia, antelación y fecha de visto. Como máximo un recibo físico por cita y clase; otra ocurrencia sustituye el recibo al marcarla como vista. No hay cuerpos de notificación ni copia de datos personales de la reserva.
 
-La identidad lógica del aviso incluye negocio, UID, cita, revisión, inicio y antelación. Un visto de 24 horas no puede silenciar uno de 2 horas si se aprueba la segunda opción. La revisión ausente de una cita anterior equivale a cero; un valor corrupto no se normaliza silenciosamente.
+La identidad lógica del aviso incluye negocio, UID, cita, revisión, inicio y antelación fija de 1.440 minutos. La revisión ausente de una cita anterior equivale a cero; un valor corrupto no se normaliza silenciosamente.
 
 Un GET autenticado devuelve la preferencia y una proyección mínima de avisos disponibles. Consulta exclusivamente citas propias confirmadas dentro de la ventana futura máxima, calcula `disponibleDesde = inicio - antelación` y lee por ID determinista solo los recibos correspondientes a esas citas. No recorre el historial de citas o vistos ni escribe durante GET. Un desbordamiento del límite documental produce un error explícito, nunca un resultado vacío o truncado sin aviso. Se añadirán los índices de Firestore necesarios para conservar el entorno de pruebas y la reversión explícita.
 
@@ -53,7 +53,9 @@ Las consultas y controles solo están disponibles para la cuenta propietaria de 
 
 Las citas existentes quedan cubiertas sin backfill: la regla se aplica a su horario canónico. v18 puede ignorar los nuevos documentos y seguir gestionando las citas. Al volver a esta función, un recibo solo es válido para la ocurrencia actual. El inicio distingue cambios de horario de un escritor antiguo; no se promete distinguir A→B→A de escritores arbitrarios que no incrementen la revisión.
 
-No se necesita migrar la tabla documental de D1 ni eliminar datos de producción. Las nuevas colecciones deben figurar en los procedimientos privados de exportación y atención de solicitudes de eliminación. En este incremento no hay purga automática: los recibos se conservan con su cita, y el procedimiento operativo de eliminación de cita, cuenta o negocio debe borrar sus recibos y las preferencias que correspondan, y verificar su ausencia. Ese procedimiento debe documentarse y ensayarse con datos sintéticos antes de publicar. No se promete TTL por añadir un campo de caducidad; una limpieza automática posterior necesita implementación y verificación propias.
+No se cambia la tabla documental ni se eliminan datos de producción. La prueba D1 durante la implementación encontró 1.018 filas leídas con 1.001 citas históricas, frente a 17 en el caso mínimo: el índice por cliente todavía examinaba su historial. Se incorpora un índice compuesto aditivo por padre, UID, estado, tipo e inicio para la ventana futura, con respaldo verificado antes de aplicarlo. El runtime v18 admite conservar este índice durante la reversión.
+
+Las nuevas colecciones deben figurar en los procedimientos privados de exportación y atención de solicitudes de eliminación. En este incremento no hay purga automática: los recibos se conservan con su cita, y el procedimiento operativo de eliminación de cita, cuenta o negocio debe borrar sus recibos y las preferencias que correspondan, y verificar su ausencia. Ese procedimiento debe documentarse y ensayarse con datos sintéticos antes de publicar. No se promete TTL por añadir un campo de caducidad; una limpieza automática posterior necesita implementación y verificación propias.
 
 ## Coste y operación
 

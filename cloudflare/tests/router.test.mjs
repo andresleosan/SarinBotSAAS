@@ -126,6 +126,54 @@ test('maintenance rejects all application paths before acquiring the singleton',
   assert.equal(calls, 0);
 });
 
+test('maintenance forwards only exact bearer-format session reads to the existing Next authentication', async () => {
+  let calls = 0;
+  for (const [authorization, status, body] of [
+    ['Bearer synthetic-valid-token', 200, { user: { uid: 'synthetic-user' }, isSuperadmin: false }],
+    ['bearer synthetic-invalid-token', 401, { error: 'Session rejected by Next' }],
+    ['Bearer synthetic-denied-token', 403, { error: 'Access rejected by Next' }],
+  ]) {
+    const request = new Request('https://app.example.invalid/api/session', { headers: { Authorization: authorization } });
+    const upstream = Response.json(body, { status });
+    const response = await forwardToSingleton(request, name => ({ fetch: async forwarded => {
+      calls++;
+      assert.equal(name, SINGLETON_NAME);
+      assert.equal(forwarded.url, request.url);
+      assert.equal(forwarded.method, 'GET');
+      assert.equal(forwarded.headers.get('Authorization'), authorization);
+      return upstream;
+    } }), { SARIN_MAINTENANCE: 'true' });
+    assert.equal(response.status, status);
+    assert.equal(response.body, upstream.body);
+    assert.deepEqual(await response.json(), body);
+    for (const header of ['Cache-Control', 'CDN-Cache-Control', 'Cloudflare-CDN-Cache-Control']) assert.equal(response.headers.get(header), 'no-store');
+  }
+  assert.equal(calls, 3);
+});
+
+test('maintenance rejects session route, query, fragment, method and bearer variants before acquiring the singleton', async () => {
+  let calls = 0;
+  const get = () => { calls++; throw new Error('must stay closed'); };
+  const send = (path = '/api/session', method = 'GET', authorization = 'Bearer synthetic') => forwardToSingleton(new Request(`https://app.example.invalid${path}`, {
+    method, headers: authorization === null ? {} : { Authorization: authorization },
+  }), get, { SARIN_MAINTENANCE: 'true' });
+  for (const path of [
+    '/api/session/', '/api/session/extra', '/api/Session', '/api/%73ession',
+    '/api/session?', '/api/session?refresh=1', '/api/session?scope=engine', '/api/session?refresh=',
+    '/api/session#', '/api/session#fragment', '/api/session?refresh=1#fragment',
+    '/', '/b/demo', '/api/businesses/demo/appointments?view=mine', '/api/sarin/chat', '/api/admin',
+  ]) {
+    const response = await send(path);
+    assert.equal(response.status, 503, path);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  }
+  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal((await send('/api/session', method)).status, 503, method);
+  for (const authorization of [null, '', 'synthetic', 'Basic synthetic', 'Bearer', 'Bearer ', 'Bearer token with spaces', 'Bearer  synthetic', 'Bearer\tsynthetic']) {
+    assert.equal((await send('/api/session', 'GET', authorization)).status, 503, String(authorization));
+  }
+  assert.equal(calls, 0);
+});
+
 test('maintenance forwards only the exact authenticated local engine health read to the existing Next authorization', async () => {
   let calls = 0;
   for (const status of [200, 401, 403]) {
@@ -152,7 +200,7 @@ test('maintenance rejects method, route, query and credential variants without a
     '/api/sarin/health', '/api/sarin/health/', '/api/sarin/health/extra?scope=engine', '/api/sarin/health?scope=chat',
     '/api/sarin/health?scope=engine&scope=engine', '/api/sarin/health?scope=engine&scope=chat', '/api/sarin/health?scope=engine&extra=1',
     '/api/sarin/health?scope=engine&', '/api/sarin/health?Scope=engine', '/api/sarin/health?scope=%65ngine',
-    '/api/sarin/health?scope=engine#fragment', '/api/session', '/api/admin', '/api/businesses', '/api/sarin/chat',
+    '/api/sarin/health?scope=engine#fragment', '/api/admin', '/api/businesses', '/api/sarin/chat',
   ];
   for (const path of paths) assert.equal((await forwardToSingleton(new Request(`https://sarinbotsaas.pages.dev${path}`, { headers: { Authorization: 'Bearer synthetic' } }), get, { SARIN_MAINTENANCE: 'true' })).status, 503, path);
   for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal((await forwardToSingleton(new Request(`https://sarinbotsaas.pages.dev${canonical}`, { method, headers: { Authorization: 'Bearer synthetic' } }), get, { SARIN_MAINTENANCE: 'true' })).status, 503, method);

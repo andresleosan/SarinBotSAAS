@@ -38,7 +38,8 @@ describe('rebooking from the own appointment history', () => {
     state.rows = [appointment()]; state.readMode = 'ready'; state.resolveRead = null; state.resolveMutation = null;
     state.image.mockReset().mockResolvedValue(new Blob(['synthetic'], { type: 'image/png' }));
     events = new EventTarget(); vi.stubGlobal('window', events);
-    vi.mocked(apiFetch).mockReset().mockImplementation((_path, init) => {
+    vi.mocked(apiFetch).mockReset().mockImplementation((_path, init, uid) => {
+      if (_path.endsWith('/reminders')) return Promise.resolve({ businessId: _path.split('/')[3], ownerUid: uid, serverNow: now, preference: { enabled: false, revision: 0, status: 'disabled', offsetMinutes: 1440 }, reminders: [] });
       if (init?.method) return new Promise(resolve => { state.resolveMutation = resolve; });
       if (state.readMode === 'error') return Promise.reject(new Error('Lectura sintética no disponible'));
       if (state.readMode === 'deferred') return new Promise(resolve => { state.resolveRead = resolve; });
@@ -96,7 +97,7 @@ describe('rebooking from the own appointment history', () => {
   it.each(['unmount', 'remount'])('keeps current StrictMode actions usable and invalidates retained actions after %s', async change => {
     const workspace = (version: number) => createElement(StrictMode, null, createElement(ClientAppointments, { ...props, key: version }));
     await act(async () => { renderer = create(workspace(0)); });
-    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(apiFetch).mock.calls.filter(([path]) => path.endsWith('/appointments?view=mine'))).toHaveLength(2);
     await history();
     const staleClick = rebookButtons()[0].props.onClick;
     await act(async () => staleClick());

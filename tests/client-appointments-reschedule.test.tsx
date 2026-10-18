@@ -25,7 +25,10 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now); events = new EventTarget(); vi.stubGlobal('window', events);
   state.rows = [source]; state.failRead = false; state.image.mockReset(); state.calendar.mockReset();
   props = { businessId: 'demo-shop', businessName: 'Negocio', userId: 'demo-client', now, services: [service], onReschedule: vi.fn(), reschedulingEnabled: true };
-  vi.mocked(apiFetch).mockReset().mockImplementation(async () => { if (state.failRead) throw new Error('Lectura fallida'); return { appointments: state.rows }; });
+  vi.mocked(apiFetch).mockReset().mockImplementation(async (path, _init, uid) => {
+    if (path.endsWith('/reminders')) return { businessId: path.split('/')[3], ownerUid: uid, serverNow: now, preference: { enabled: false, revision: 0, status: 'disabled', offsetMinutes: 1440 }, reminders: [] };
+    if (state.failRead) throw new Error('Lectura fallida'); return { appointments: state.rows };
+  });
 });
 afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; vi.unstubAllGlobals(); vi.useRealTimers(); });
 

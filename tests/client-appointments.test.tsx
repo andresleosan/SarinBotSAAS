@@ -38,7 +38,8 @@ describe("the customer's appointments within one business", () => {
     state.signals = []; state.reads = [];
     state.emitImmediately = true;
     state.rows = [appointment("Más tarde", "2026-10-17T15:00:00Z"), appointment("Primera cita", "2026-10-16T15:00:00Z")];
-    vi.mocked(apiFetch).mockImplementation((path, init) => {
+    vi.mocked(apiFetch).mockImplementation((path, init, uid) => {
+      if (path.endsWith('/reminders')) return Promise.resolve({ businessId: path.split('/')[3], ownerUid: uid, serverNow: now, preference: { enabled: false, revision: 0, status: 'disabled', offsetMinutes: 1440 }, reminders: [] });
       if (init?.method) return Promise.resolve({});
       state.reads.push(path); state.signals.push(init!.signal as AbortSignal);
       if (state.emitImmediately) return Promise.resolve({ appointments: state.rows });
@@ -203,7 +204,8 @@ describe("the customer's appointments within one business", () => {
     const events = new EventTarget();
     vi.stubGlobal("window", events);
     let reads = 0, oldRead!: (response: unknown) => void;
-    vi.mocked(apiFetch).mockImplementation((_path, init) => {
+    vi.mocked(apiFetch).mockImplementation((_path, init, uid) => {
+      if (_path.endsWith('/reminders')) return Promise.resolve({ businessId: _path.split('/')[3], ownerUid: uid, serverNow: now, preference: { enabled: false, revision: 0, status: 'disabled', offsetMinutes: 1440 }, reminders: [] });
       if (init?.method) return Promise.resolve({ appointment: { ...state.rows[0], status: "cancelled_by_client" } });
       if (++reads === 1) return Promise.resolve({ appointments: state.rows });
       return new Promise(resolve => { oldRead = resolve; });

@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /** Test-only Workerd + real local D1/R2, without network or account credentials. */
@@ -22,8 +22,11 @@ export async function createDataTestRuntime() {
   try {
     const db = await mf.getD1Database('SARIN_DB');
     const bucket = await mf.getR2Bucket('SARIN_FILES');
-    const schema = readFileSync(new URL('../migrations/0001_data.sql', import.meta.url), 'utf8');
-    await db.exec(schema.replace(/^--.*$/gm, '').replace(/\r?\n/g, ' '));
+    const directory = new URL('../migrations/', import.meta.url);
+    for (const migration of readdirSync(directory).filter(name => /^\d+.*\.sql$/.test(name)).sort()) {
+      const schema = readFileSync(new URL(migration, directory), 'utf8');
+      await db.exec(schema.replace(/^--.*$/gm, '').replace(/\r?\n/g, ' '));
+    }
     return { db, bucket, dispose: () => mf.dispose(), fetch: command => mf.dispatchFetch('http://sarin-data.test/execute', { method: 'POST', body: JSON.stringify(command) }) };
   } catch (error) { await mf.dispose(); throw error; }
 }

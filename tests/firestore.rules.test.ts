@@ -79,6 +79,20 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
     await assertFails(setDoc(doc(db,'businesses','one','appointments','new'),{client:{uid:'customer'}}));
     await assertSucceeds(getDocs(collection(environment.authenticatedContext('owner-one').firestore(),'businesses','one','appointments')));
   });
+  it('keeps reminder preferences and seen receipts private to authenticated server handlers', async () => {
+    await environment.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'businesses/one/reminderPreferences/synthetic'), { ownerUid: 'customer', businessId: 'one', enabled: true });
+      await setDoc(doc(context.firestore(), 'businesses/one/reminderReceipts/synthetic'), { ownerUid: 'customer', businessId: 'one', seenAt: 1 });
+    });
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('customer'), environment.authenticatedContext('owner-one'), environment.authenticatedContext('stale-admin', { isSuperadmin: true })]) {
+      for (const name of ['reminderPreferences', 'reminderReceipts']) {
+        const db = context.firestore();
+        await assertFails(getDoc(doc(db, `businesses/one/${name}/synthetic`)));
+        await assertFails(getDocs(collection(db, `businesses/one/${name}`)));
+        await assertFails(setDoc(doc(db, `businesses/one/${name}/forged`), { ownerUid: 'customer', businessId: 'one' }));
+      }
+    }
+  });
   it('protects receipts and ignores a stale or forged superadmin profile flag', async () => {
     const owner = environment.authenticatedContext('owner-one').firestore();
     const stranger = environment.authenticatedContext('stale-admin').firestore();

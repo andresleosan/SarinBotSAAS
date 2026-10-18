@@ -85,6 +85,13 @@ export async function assertConsent(uid: string, scope: ConsentScope, business?:
   if (!current.value?.active || current.value.fingerprint !== current.documents.fingerprint) throw new HttpError(428, scope === 'account' ? 'Revisa y acepta las condiciones y la autorización de tu cuenta antes de nuevas operaciones.' : 'Autoriza el chat y las reservas de este negocio antes de continuar.', 'CONSENT_REQUIRED');
   await verifiedReceipt(current, db, tx);
 }
+/** Read-only anchor for optional features; a later reauthorization never restores an old opt-in. */
+export async function readVerifiedConsentAnchor(uid: string, scope: ConsentScope, business: ConsentBusiness | undefined, db: Database, tx: Transaction) {
+  const current = await state(uid, scope, business, db, tx);
+  await verifiedReceipt(current, db, tx);
+  return { active: Boolean(current.value?.active && current.value.fingerprint === current.documents.fingerprint), revision: current.value?.revision ?? 0,
+    fingerprint: current.value?.fingerprint ?? current.documents.fingerprint, receiptId: current.value?.receiptId ?? null };
+}
 export async function updateConsent(user: ChatActor, supplied: ConsentInput, db: Database = getAdminDb()): Promise<ConsentStatus> {
   const input = consentInputSchema.parse(supplied), businessId = input.scope === 'business_client' ? input.businessId! : null;
   const receiptId = `consent_receipt_${hash([user.uid, input.scope, businessId, input.requestId])}`;

@@ -51,7 +51,8 @@ describe('explicit calendar file export from own appointments', () => {
     state.calendar.mockReset().mockResolvedValue('BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n');
     state.image.mockReset().mockResolvedValue(new Blob(['synthetic'], { type: 'image/png' })); state.download.mockReset();
     events = new EventTarget(); vi.stubGlobal('window', events);
-    vi.mocked(apiFetch).mockReset().mockImplementation((_path, init) => {
+    vi.mocked(apiFetch).mockReset().mockImplementation((_path, init, uid) => {
+      if (_path.endsWith('/reminders')) return Promise.resolve({ businessId: _path.split('/')[3], ownerUid: uid, serverNow: now, preference: { enabled: false, revision: 0, status: 'disabled', offsetMinutes: 1440 }, reminders: [] });
       if (init?.method) return new Promise(resolve => { state.resolveMutation = resolve; });
       if (state.readMode === 'error') return Promise.reject(new Error('Lectura sintética no disponible'));
       if (state.readMode === 'deferred') return new Promise(resolve => { state.resolveRead = resolve; });

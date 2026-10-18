@@ -117,6 +117,10 @@ export async function forwardToSingleton(request: Request, get: (name: string) =
   let drainRead = false;
   if (input.SARIN_MAINTENANCE === 'true') {
     const url = new URL(request.url);
+    // Session refresh must reach Next's Firebase authentication during maintenance.
+    // Match the complete URL so even empty query/fragment delimiters stay closed.
+    const sessionRead = request.method === 'GET' && url.href === `${url.origin}/api/session`
+      && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '');
     // The existing Next handler still verifies Firebase and the superadmin UID.
     // Its engine queue probe and exact budget administration remain available;
     // Next still authorizes the superadmin before either action.
@@ -126,7 +130,7 @@ export async function forwardToSingleton(request: Request, get: (name: string) =
     const businessBudgetRead = request.method === 'GET' && [...url.searchParams.keys()].every(key => key === 'businessId') && url.searchParams.getAll('businessId').length === 1 && /^[A-Za-z0-9_-]{1,128}$/.test(url.searchParams.get('businessId') ?? '');
     const budgetAdministration = ['GET', 'PATCH'].includes(request.method) && url.pathname === '/api/admin/abuse' && (!url.search || budgetCursorRead || businessBudgetRead) && !url.hash && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '');
     const bookingAdministration = url.pathname === '/api/admin/booking-data-policy' && !url.hash && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '') && ((request.method === 'GET' && businessBudgetRead) || (request.method === 'PATCH' && !url.search));
-    if (!drainRead && !budgetAdministration && !bookingAdministration) return Response.json({ error: 'La aplicación está en mantenimiento.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
+    if (!sessionRead && !drainRead && !budgetAdministration && !bookingAdministration) return Response.json({ error: 'La aplicación está en mantenimiento.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
   }
   try {
     const requestHeaders = new Headers(request.headers);

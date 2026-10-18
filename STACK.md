@@ -2,9 +2,9 @@
 
 Sarin es un monolito modular Next.js App Router con runtime Node.js 24, React 19 y TypeScript estricto. El gestor fijado es **pnpm 11.23.0**: la raíz y `cloudflare/` comparten `pnpm-workspace.yaml` y un único `pnpm-lock.yaml`; la instalación reproducible parte de la raíz con `pnpm install --frozen-lockfile`. Las credenciales se cargan del entorno y la inicialización Firebase es diferida para permitir builds sin secretos.
 
-## Decisiones de arquitectura — recordatorios propuestos, 17 de octubre de 2026
+## Decisiones de arquitectura — recordatorios aprobados, 17 de octubre de 2026
 
-Propuesta pendiente de revisión, sin runtime nuevo: recordatorios por cuenta y negocio dentro de «Mis citas», disponibles al consultar Sarin mediante una regla persistida y el horario canónico. Preferencias y vistos se guardan fuera de `Appointment`, cuyo documento íntegro participa en el fingerprint de reprogramación. No se propone un dispatcher, cron nuevo ni contenedor permanentemente despierto: no se necesitan para avisos que solo se consultan dentro de la pantalla. Trabajos materializados en las transacciones de citas añadirían acoplamiento y reconciliación durante rollback; un servicio independiente no aporta escalado ni operación separados necesarios. [Diseño y alternativas](docs/superpowers/specs/2026-10-17-in-app-reminders-design.md).
+Implementación probada, publicación pendiente: un recordatorio desde 24 horas antes, por cuenta y negocio dentro de «Mis citas», disponible al consultar Sarin mediante una regla persistida y el horario canónico. Preferencias y vistos se guardan fuera de `Appointment`, cuyo documento íntegro participa en el fingerprint de reprogramación. No se incorpora un dispatcher, cron nuevo ni contenedor permanentemente despierto: no se necesitan para avisos que solo se consultan dentro de la pantalla. Trabajos materializados en las transacciones de citas añadirían acoplamiento y reconciliación durante rollback; un servicio independiente no aporta escalado ni operación separados necesarios. [Diseño y alternativas](docs/superpowers/specs/2026-10-17-in-app-reminders-design.md).
 
 ### Costo de la propuesta
 
