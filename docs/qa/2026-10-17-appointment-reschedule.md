@@ -1,6 +1,6 @@
-# Cambiar horario de una cita: aceptación local
+# Cambiar horario de una cita: publicado
 
-Estado: aprobado localmente. Publicación autorizada pendiente de ejecutar y verificar.
+Estado: publicado con autorización específica. Runtime publicado `97b65723ad35994c49f56f15a73367ba33a6eb3c`.
 
 El propietario autorizó implementar, probar y publicar cada adaptación antes de comenzar la siguiente. Esta entrega permite cambiar el horario de una cita propia futura confirmada desde Mis citas, conservando su identidad, cliente, contacto, respuestas y beneficiario. El resumen compara el horario anterior con el propuesto y muestra las condiciones actuales del servicio antes de confirmar.
 
@@ -53,4 +53,30 @@ Las evidencias privadas están bajo `qa/reports/appointment-reschedule*` y se co
 
 La reversión prevista es la versión publicada de ubicación y modalidad: runtime `8da7c5494f578d04af09f9a20e470d2c913e222b`, imagen `sha256:d59fa71083e4e76c62b15959818e19d0bad6ae28c3aa2f52c2dae4d22a9dfcff`, Containers v17. Sin migraciones SQL ni cambios de bindings. Conserva las citas en su estado actual con metadatos opcionales; v17 no ofrece el nuevo recorrido ni confirma o recupera sus propuestas. Revertir código no restaura horarios anteriores.
 
-Publicación autorizada pendiente: congelar esta revisión, construir y auditar imagen, activar mantenimiento, drenar cola, sustituir la instancia única, reabrir y verificar producción.
+Publicado después de la autorización registrada: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro». El artefacto congelado es `97b65723ad35994c49f56f15a73367ba33a6eb3c`; los commits posteriores de documentación se distinguen del runtime.
+
+## Publicación verificada
+
+Cierre: `2026-10-18T00:40:50.655Z`. Autorización: «ok vamos paso a paso, implementando probando y publicando, y pasamos al otro», limitada a esta reprogramación de cita. Worker `ee6fc3fb-9661-4558-96f2-d4ae023ae141`, Containers v18, allocation `d03f4b9a-fc34-4e42-b476-59bff56c5d52`, imagen `sha256:f3dcad7f89f0b81200938039890e7e8516eab3bfd0a101a25aa01fd78bbb567b`. Una instancia running/connected, cero antiguas y paginación completa; mantenimiento desactivado, bindings/variables/13 secretos/presupuesto y Pages `a461b670-5130-41e7-8c75-957f5439cfd7` conservados.
+
+| Etapa | Hora | Scope | HTTP | Activas/cola/críticas/normales |
+| --- | --- | --- | --- | --- |
+| Antes | 2026-10-18T00:28:57.358Z | default | 200 | 0/0/0/0 |
+| Drenaje | 2026-10-18T00:31:46.143Z | engine | 200 | 0/0/0/0 |
+| Reapertura | 2026-10-18T00:39:11.237Z | default | 200 | 0/0/0/0 |
+
+HTTP: `/` 200; `/ayuda` 200; `/privacidad` 200; `/b/sarin-pruebas-20261015` 200; `/dashboard/onboarding` 200; `/manifest.webmanifest` 200; `/api/session` 401; `/api/businesses` 401; `/api/businesses/synthetic-reschedule/reschedule/availability` 401; `/api/businesses/synthetic-reschedule/reschedule/proposals` 401; `/api/businesses/synthetic-reschedule/booking-proposals/synthetic-proposal/confirm` 401. Perfil público con allowlist verificada; iconos: `/brand/sarin-face-192.png` SHA-256 `bec2324dd74f8d0dbc476b5b580c5b2eca65aff171426574706071a40724541e`; `/brand/sarin-face-512.png` SHA-256 `bfe3c69878d4089d14076be0394acb67bc42fc879a0111e1bbfb855b70e85482`. El nuevo marcador y los anteriores se verificaron como bundle_only; no se infiere UI visible.
+
+Acción visible: no; flujo no atribuido como observado. Límite real: La ficha real Sarin Pruebas muestra No tienes próximas citas; los permisos del negocio siguen pendientes y se conservaron sin aceptarlos. No se creó ni modificó una cita real para exponer la acción o el flujo. UI completa validada localmente con 44 controles y 1 cita sintética alterada, 1 propuesta local y 0 citas nuevas creadas por el navegador. La autenticación administrativa final se reverificó; los límites de observación durante la preparación local conservan su propia fecha en el paquete. No se aceptaron consentimientos ni se crearon/alteraron citas o datos reales para QA.
+
+Reversión compatible: `8da7c5494f578d04af09f9a20e470d2c913e222b`, imagen `registry.cloudflare.com/05fb22c155667de064b55c4e287b21d8/sarin-bot@sha256:d59fa71083e4e76c62b15959818e19d0bad6ae28c3aa2f52c2dae4d22a9dfcff`, Worker `d23f4df4-e256-468b-9168-f0c08e18161d`, Containers v17; sin migraciones ni borrado. Límite funcional de reversión: v17 sirve las citas del mismo ID ya actualizadas, pero no incluye la interfaz ni la confirmación de nuevas propuestas de reprogramación. Las confirmaciones pendientes requieren volver a esta candidata o una resolución operativa explícita. El código anterior no revierte horarios ya cambiados; los calendarios importados requieren actualización manual. La reversión no migra ni borra datos.
+
+### Recuperación operativa y orden de verificación
+
+El mantenimiento bloqueó `/api/session` durante una renovación normal de Firebase. La identidad siguió conectada, pero el panel perdió temporalmente su clasificación administrativa. No se cerró la sesión, extrajeron tokens ni simularon roles. La instancia candidata se inició mediante una petición con credencial sintética inválida que devolvió **401**, sin datos ni cola; la auditoría independiente comprobó la imagen exacta, una instancia nueva running/connected y cero antiguas antes de reabrir.
+
+Se documentó una excepción al orden previsto: la cola candidata se midió **después de reabrir**, a las `00:39:11.237Z`, 21,358 segundos después del evento registrado de reapertura. La medición autenticada con el proveedor activo y scope `default` devolvió HTTP 200 y los cuatro contadores a cero. Antes de reabrir, el estado vacío de la cola nueva fue una inferencia del código y la topología, no una medición: el proceso anterior estaba drenado y eliminado, el nuevo inicializa vacío, el mantenimiento bloquea inferencia y WhatsApp/retención están deshabilitados. Hubo una ventana breve de admisión de tráfico legítimo antes de esa medición.
+
+El sondeo separado de Ollama con scope `engine` no produjo una cola utilizable tras la reapertura; no se atribuye disponibilidad de ese motor ni se fabricó `queue-after-rollout.json`. Ambos scopes consultan la misma cola del proceso. Existen **tres muestras autenticadas reales**, las de la tabla, y revisión independiente de esta recuperación. Los controles del cierre validaron la excepción, la cronología y la medición dentro del primer minuto; no se cambió el runtime congelado para resolverla. El paquete privado conserva `reopen-recovery-decision.json`, `independent-recovery-review.json`, `warmup-auth-boundary.json`, las auditorías originales y el helper ejecutado con esta excepción explícita.
+
+Seguimiento operativo: permitir la consulta autenticada de sesión necesaria para conservar el panel durante mantenimiento, con pruebas de frontera de autorización antes del próximo despliegue. Esta mejora no forma parte del runtime v18 publicado.

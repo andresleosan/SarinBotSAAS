@@ -1,10 +1,10 @@
 # Estado de implementación — 2026-10-17
 
-## Cambiar horario de una cita — aprobado localmente
+## Cambiar horario de una cita — publicado
 
 - [x] Conservar la identidad y los datos de la cita al sustituir su horario de forma atómica, con resumen explícito y sin consumir otra unidad del plan.
 - [x] Verificar permisos, política vigente, concurrencia y recuperación: 1.390 pruebas aprobadas/26 omitidas, ocho casos D1 con dos conexiones, revisión independiente y 44 controles de navegador sintético. Un cambio/una propuesta locales, ninguna cita nueva; 15 documentos propios limpiados. [Evidencia](docs/qa/2026-10-17-appointment-reschedule.md).
-- [ ] Publicar la versión autorizada después de auditar imagen y reversión compatible, drenar cola y verificar una instancia efectiva y la sesión administrativa.
+- [x] Publicar la reprogramación autorizada: runtime `97b6572`, imagen `f3dcad7f…`, Worker `ee6fc3fb-9661-4558-96f2-d4ae023ae141`, Containers v18; una instancia conectada, cero antiguas y HTTP/bundles/iconos verificados. Cuatro contadores de cola medidos a cero después de reabrir; excepción de orden y tres muestras reales documentadas. Autenticación administrativa reverificada; acción/flujo visibles: no/no, con límites y controles locales separados. [Publicación y reversión](docs/qa/2026-10-17-appointment-reschedule.md).
 
 ## Ubicación y modalidad — publicado
 
@@ -34,7 +34,7 @@ El propietario indicó «ok vamos paso a paso, implementando probando y publican
 - [x] **Publicado:** buscar próxima fecha disponible después de un día sin cupos, conservando servicio/profesional y consultando hasta catorce días. Runtime `1b81385`, imagen `d7ee2234…`; selección de hora y confirmación explícitas. [Cierre de QA y publicación](docs/qa/2026-10-17-next-available-date.md).
 - [x] **Publicado:** añadir la cita al calendario mediante archivo importable, con identidad estable y límites claros de actualización. Runtime `ba34b40`, imagen `188cbc13…`, Containers v16. [QA y publicación](docs/qa/2026-10-17-calendar-export.md).
 - [x] **Publicado:** dirección/modalidad e indicaciones para llegar en la ficha del negocio. Runtime `8da7c54`, imagen `d59fa710…`, Containers v17. Editor observado en producción sin guardar datos reales; cuatro guardados sintéticos y 31 controles locales. [QA y publicación](docs/qa/2026-10-17-business-location.md).
-- [ ] Reprogramar una cita existente con reglas temporales validadas en servidor y cambio atómico.
+- [x] **Publicado:** reprogramar una cita existente con validación temporal, cambio atómico del mismo ID y recuperación de confirmación. Runtime `97b6572`, imagen `f3dcad7f…`, Containers v18. 1.390 pruebas y 44 controles locales; producción verificada sin crear ni mover citas reales. [QA, publicación y excepción operativa documentada](docs/qa/2026-10-17-appointment-reschedule.md).
 - [ ] Recordatorios dentro de Sarin, con programación persistente; el propietario indicó «todo dentro de la app de momento». Correo y WhatsApp fuera del alcance inicial.
 - [ ] Lista de espera con preferencias y confirmación explícita del hueco ofrecido.
 
