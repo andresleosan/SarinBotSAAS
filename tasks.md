@@ -1,13 +1,13 @@
 # Estado de implementación — 2026-10-17
 
-## Recordatorios dentro de la app — probados, publicación en preparación
+## Recordatorios dentro de la app — publicados
 
 - [x] Incorporar la preferencia del propietario: «todo dentro de la app de momento». Explorar la guía oficial de Fresha y los contratos actuales, con revisiones independientes de backend e interfaz.
 - [x] Preparar el [diseño revisable](docs/superpowers/specs/2026-10-17-in-app-reminders-design.md): regla persistida y horario canónico, preferencia opcional por negocio y visto separado de la cita, sin despachador ni actividad con la pantalla cerrada.
 - [x] Diseño aprobado y antelación confirmada: un único aviso 24 horas antes. [Plan de implementación](docs/superpowers/plans/2026-10-17-in-app-reminders.md), con pruebas y publicación ya autorizadas como parte de la ejecución secuencial.
 - [x] Implementar preferencias y vistos privados, API, interfaz y procedimiento de conservación. Revisión independiente PASS, 1.482 pruebas aprobadas/27 omitidas, 76 de Cloudflare y 20 controles de navegador; 17 documentos sintéticos limpiados y puertos libres. [Evidencia](docs/qa/2026-10-17-in-app-reminders.md).
-- [x] Corregir y probar la consulta autenticada de sesión durante mantenimiento, conservando la autenticación y el bloqueo de tráfico de negocio; pendiente la observación administrativa real durante despliegue.
-- [ ] Congelar y auditar el artefacto, verificar respaldo D1/R2, aplicar el índice aditivo y publicar con una sola instancia, comprobaciones reales de cola y reversión compatible.
+- [x] Corregir y probar la consulta autenticada de sesión durante mantenimiento: GET real respondió 200 con rol administrativo; autenticación reverificada tras reabrir.
+- [x] Publicar runtime `ed28549`, imagen `515440cf…`, Worker `50207852-3327-48d0-adb0-4417c454a3c3`, Containers v19. Respaldo D1/R2 recuperado localmente; índice aditivo con documentos, commits y revisión intactos. Una instancia conectada, cero antiguas y cuatro controles obligatorios de cola reales en el orden previsto. Controles visibles en producción; recorrido de escritura completo probado con datos sintéticos. [Publicación y reversión](docs/qa/2026-10-17-in-app-reminders.md).
 
 ## Cambiar horario de una cita — publicado
 
@@ -44,7 +44,7 @@ El propietario indicó «ok vamos paso a paso, implementando probando y publican
 - [x] **Publicado:** añadir la cita al calendario mediante archivo importable, con identidad estable y límites claros de actualización. Runtime `ba34b40`, imagen `188cbc13…`, Containers v16. [QA y publicación](docs/qa/2026-10-17-calendar-export.md).
 - [x] **Publicado:** dirección/modalidad e indicaciones para llegar en la ficha del negocio. Runtime `8da7c54`, imagen `d59fa710…`, Containers v17. Editor observado en producción sin guardar datos reales; cuatro guardados sintéticos y 31 controles locales. [QA y publicación](docs/qa/2026-10-17-business-location.md).
 - [x] **Publicado:** reprogramar una cita existente con validación temporal, cambio atómico del mismo ID y recuperación de confirmación. Runtime `97b6572`, imagen `f3dcad7f…`, Containers v18. 1.390 pruebas y 44 controles locales; producción verificada sin crear ni mover citas reales. [QA, publicación y excepción operativa documentada](docs/qa/2026-10-17-appointment-reschedule.md).
-- [ ] Recordatorios dentro de Sarin, con programación persistente; el propietario indicó «todo dentro de la app de momento». Correo y WhatsApp fuera del alcance inicial.
+- [x] Recordatorios dentro de Sarin, con regla persistente de 24 horas y visto explícito; disponibles al consultar Mis citas. El propietario indicó «todo dentro de la app de momento». Correo y WhatsApp fuera del alcance inicial.
 - [ ] Lista de espera con preferencias y confirmación explícita del hueco ofrecido.
 
 Orden basado en la [investigación de Fresha](docs/qa/2026-10-17-fresha-next-adaptations.md). La implementación sigue en el worktree aislado `service-catalog`; el checkout original permanece conservado.

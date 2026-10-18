@@ -1,6 +1,6 @@
-# Recordatorios dentro de Sarin — QA antes de publicar
+# Recordatorios dentro de Sarin — QA y publicación
 
-**Estado: implementación, revisión de código, aceptación local de navegador y limpieza de datos sintéticos completas; publicación pendiente.** Los procesos locales propios están cerrados y los seis puertos de QA libres; faltan empaquetado y despliegue. Este documento no acredita un despliegue. La base productiva sigue siendo Containers v18, runtime `97b65723ad35994c49f56f15a73367ba33a6eb3c`. El trabajo se realiza en `codex/in-app-reminders-20261017`, dentro del worktree `service-catalog`; no se modifica el paquete cerrado de v18.
+**Estado: publicado y verificado en Containers v19; mantenimiento desactivado.** El gate de publicación quedó completo en `2026-10-18T01:27:10.665Z`. Runtime `ed28549402b2c93e88324f33f130ef6f56d6988d`, instancia única conectada y cero asignaciones anteriores. Los procesos locales propios están cerrados y los seis puertos de QA libres. El paquete cerrado de v18 se preservó. El cierre documental y su referencia de Git se conservan en el registro final del paquete.
 
 El propietario aprobó un único aviso desde 24 horas antes, dentro de Mis citas, optativo por cuenta/negocio y con visto explícito persistente. También autorizó implementar, probar y publicar los incrementos. [Diseño aprobado](../superpowers/specs/2026-10-17-in-app-reminders-design.md) · [Plan](../superpowers/plans/2026-10-17-in-app-reminders.md).
 
@@ -25,17 +25,19 @@ Los registros completos permanecen en el directorio privado/ignorado `qa/reports
 | Reglas en emulador Firestore | 25 aprobadas en 2 archivos | `in-app-reminders-backend-report.md` |
 | Exportación/eliminación privada | 10 aprobadas, incluidos D1 real y ámbito por cita | `tests/reminder-data-maintenance.test.ts` y ejecución registrada por el controlador |
 
-Las cifras focalizadas se solapan con la suite general; no se suman como pruebas adicionales. Las 27 omitidas no se presentan como ejecutadas. El build de previsualización se reconstruyó con la corrección final y se utilizó para repetir la aceptación del caso de respuesta perdida. La imagen de publicación todavía requiere congelación, construcción y auditoría propias.
+Las cifras focalizadas se solapan con la suite general; no se suman como pruebas adicionales. Las 27 omitidas no se presentan como ejecutadas. El build de previsualización se reconstruyó con la corrección final y se utilizó para repetir la aceptación del caso de respuesta perdida. La imagen publicada pasó construcción, auditoría independiente de fuente/paquete y smoke aislado.
 
 Cobertura relevante: UID/negocio ajenos, ventana inclusiva de 24 horas e inicio exclusivo, citas antiguas, revisión corrupta, revocación y nueva aceptación de permisos, CAS de preferencia, visto idempotente, A→B→A con revisión, conflictos de cancelación/reprogramación, pérdida de respuesta y journal. Los casos D1 usan dos conexiones locales y el manejador productivo de datos; GET no escribe y marcar visto conserva intacta una propuesta de cambio pendiente.
 
 ## D1, conservación y mantenimiento
 
-La medición inicial detectó que 1.001 citas históricas elevaban una lectura de 17 a 1.018 filas. La migración aditiva `0002_appointment_reminder_window.sql` añade el índice de la consulta por cuenta/estado/tipo/inicio. La evidencia final local registra **16 filas leídas, 0 escritas y 16 sentencias**, tanto en el caso mínimo como con las 1.001 citas históricas. El ensayo de migración conserva todos los documentos y la revisión global. El índice puede permanecer durante una reversión de aplicación a v18; **todavía no se acredita su aplicación en producción**.
+La medición inicial detectó que 1.001 citas históricas elevaban una lectura de 17 a 1.018 filas. La migración aditiva `0002_appointment_reminder_window.sql` añade el índice de la consulta por cuenta/estado/tipo/inicio. La evidencia final local registra **16 filas leídas, 0 escritas y 16 sentencias**, tanto en el caso mínimo como con las 1.001 citas históricas. El ensayo de migración conserva todos los documentos y la revisión global. En producción se aplicó exclusivamente ese índice después del drenaje y del respaldo privado verificado. El índice permanece compatible con una reversión de aplicación a v18.
+
+El respaldo D1/R2 se restauró localmente y verificó un objeto R2. La auditoría independiente comparó respaldo, estado previo y posterior: **54 documentos, 4 commits y revisión global 37**, con hashes de contenido iguales. Solo se añadió el índice exacto de 0002; no se alteraron documentos ni se eliminaron datos. Los cuerpos SQL y exportaciones privadas permanecen fuera de Git. Evidencia: `independent-migration-evidence-audit.json` en el paquete de publicación.
 
 El [procedimiento privado de conservación](../reminder-data-lifecycle.md) cubre exportación, revisión, eliminación transaccional del inventario exacto y comprobación de ausencia para cita/cuenta/negocio, preservando vecinos. No hay TTL ni purga automática. Una revisión independiente detectó que D1 no admitía el filtro `appointmentId`; se corrigió y se observaron dos regresiones fallar antes y pasar después con D1 real.
 
-La excepción de mantenimiento permite únicamente GET exacto `/api/session` con formato Bearer y conserva la autenticación real de Next/Firebase. Los casos de método, consulta, fragmento, ruta y cabecera inválidos siguen cerrados. La comprobación con sesión administrativa real durante mantenimiento es un paso de publicación pendiente; las pruebas de routing no sustituyen esa observación.
+La excepción de mantenimiento permite únicamente GET exacto `/api/session` con formato Bearer y conserva la autenticación real de Next/Firebase. Los casos de método, consulta, fragmento, ruta y cabecera inválidos siguen cerrados. La sesión administrativa real respondió **HTTP 200, isSuperadmin true**, durante mantenimiento a las `2026-10-18T01:23:48.603Z`; no se imprimió el token. Una recarga administrativa después de la publicación volvió a verificar la sesión con HTTP 200.
 
 ## Navegador sintético y limpieza
 
@@ -47,7 +49,7 @@ Entorno de loopback `http://127.0.0.1:3041`, Auth/Firestore emulados y negocio t
 - Reprogramación de la misma cita de 14:00 a 15:00: el aviso usa el horario actual y vuelve a pendiente. Cancelarla retira el aviso.
 - Desactivación mediante teclado, preferencia apagada tras recarga, escritorio de 1280 px sin desbordamiento y cierre de sesión que oculta los recordatorios privados.
 
-Los registros `in-app-reminders.fixture.record-changed.log` y `in-app-reminders.fixture.record-cancelled.log` pasaron su verificación sin escrituras de comprobación. Registran **una cita sintética modificada, una cancelada, una propuesta creada y cero citas nuevas creadas por el navegador**, conservando Auth y permisos de cuenta compartidos. No hubo mutaciones de datos productivos.
+Los registros `in-app-reminders.fixture.record-changed.log` y `in-app-reminders.fixture.record-cancelled.log` pasaron su verificación sin escrituras de comprobación. Registran **una cita sintética modificada, una cancelada, una propuesta creada y cero citas nuevas creadas por el navegador**, conservando Auth y permisos de cuenta compartidos. Estas pruebas no hicieron mutaciones de datos productivos; la publicación realizó por separado el cambio aditivo de índice descrito arriba.
 
 La primera pérdida controlada de respuesta reveló un defecto visual: GET recuperaba la preferencia, pero quedaba el error rojo inglés «Failed to fetch». Se corrigió con pruebas RED/GREEN: mensajes de red en español y eliminación del error incierto de preferencia después de GET válido, sin repetir PATCH. Los errores de visto o rechazos definitivos de permisos se conservan. Tras reconstruir la previsualización, el navegador repitió la desactivación: el servidor respondió 200, se perdió deliberadamente esa respuesta, GET recuperó el estado apagado y desapareció el error obsoleto. Se observó **un solo PATCH**, mensaje temporal en español y persistencia después de recarga.
 
@@ -73,15 +75,47 @@ Los informes privados `in-app-reminders-backend-independent-review.md`, `in-app-
 - La medición con 1.001 citas históricas prueba la consulta estrecha del backend de recordatorios. La lectura existente de Mis citas sigue cargando el historial completo con su límite D1; no demuestra paginación ni soporte integral de interfaz por encima de ese límite. Si esa lectura falla, se muestra el error y se ocultan los avisos.
 - Los sondeos independientes pueden ocultar brevemente una ocurrencia recién movida hasta coincidir. Cada escritura vuelve a validar el estado canónico.
 - Un aviso requiere Sarin abierto y conexión; no equivale a una alarma externa.
+- La construcción registró una validación fallida del binario `workerd` durante postinstall en Alpine, seguida de finalización del postinstall. La construcción de Next y el smoke HTTP de la imagen pasaron. Esto acredita el runtime de Next utilizado, no la ejecución de `workerd` dentro de Alpine; la advertencia se conserva en la auditoría del paquete.
 
-## Cierre pendiente
+## Publicación efectiva
+
+Paquete privado: `C:/Users/USER/AppData/Local/SarinBot/in-app-reminders-release-20261017`. `release-status.json` registra `phase: complete` y `publicationComplete: true`; `publication-summary.md` conserva el resumen. La fuente congelada contiene **739 archivos**, contrastados por bytes con un `git archive` nuevo; ZIP SHA-256 `ec1fa0d7ead05fe807313777ce633cbd211c65a2c38bf4af2e4dcc5e0d353cd3`.
+
+| Identificador | Valor verificado |
+| --- | --- |
+| Runtime publicado | `ed28549402b2c93e88324f33f130ef6f56d6988d` |
+| Imagen inmutable | `sha256:515440cfc7cb1ea7d2bb2e282cbe90cd6c5eb37dafc00859915b06598adc6afe` |
+| Worker de mantenimiento | `0180f374-e913-4c5a-abbc-7e72c66623db` |
+| Worker de rollout | `b2fdf702-c635-4694-ba67-b360d27810f1` |
+| Worker final | `50207852-3327-48d0-adb0-4417c454a3c3` |
+| Containers / asignación | v19 / `d0362b28-5703-4e46-85e8-c0974f60649b` |
+
+Las auditorías independientes del candidato y estado final pasaron: imagen efectiva correcta, instancia en ejecución conectada al Durable Object y cero asignaciones anteriores. Se preservaron configuración, los 13 nombres de secretos y la publicación de Pages `a461b670-5130-41e7-8c75-957f5439cfd7`.
+
+Se cumplieron **las cuatro comprobaciones obligatorias de cola autenticada en orden estándar**, todas HTTP 200 con `activeSlots`, `queuedRequests`, `criticalQueued` y `normalQueued` en cero, `maxSlots: 4`:
+
+| Gate | Momento UTC | Archivo |
+| --- | --- | --- |
+| Antes de mantenimiento | `2026-10-18T01:22:30.887Z` | `queue-before.json` |
+| Drenaje durante mantenimiento | `2026-10-18T01:23:49.979Z` | `queue-drained.json` |
+| Candidato efectivo antes de reabrir | `2026-10-18T01:25:53.721Z` | `queue-after-rollout.json` |
+| Después de reabrir | `2026-10-18T01:26:21.217Z` | `queue-after-reopen.json` |
+
+Además hubo dos sondeos autenticados de calentamiento durante rollout, a las `01:24:47.217Z` y `01:25:19.849Z`, también con cola vacía. Son evidencia adicional: no sustituyen el gate posterior de candidato efectivo ni se omiten del total de observaciones.
+
+En producción se observó realmente la sección **Recordatorios**, la explicación de 24 horas y la opción **Activar recordatorios** con preferencia apagada. [Captura productiva de 390 px](2026-10-17-in-app-reminders-production-390.png). Se mantuvo sin aceptar el permiso de negocio existente: no se escribieron preferencias, vistos, citas ni consentimientos productivos desde el navegador. El recorrido completo de activar/ver/visto/cambiar/cancelar/desactivar se probó exclusivamente con datos sintéticos locales. La comprobación final restauró el viewport, retiró la interceptación de salud y preservó el acceso administrativo (`browser-final.json`).
+
+Reversión compatible preparada: runtime v18 `97b65723ad35994c49f56f15a73367ba33a6eb3c` e imagen `sha256:f3dcad7f89f0b81200938039890e7e8516eab3bfd0a101a25aa01fd78bbb567b`. v18 ignora las colecciones nuevas y conserva reservas/reprogramación; la reversión mantiene el índice y los documentos privados. No implica DROP, restauración sobre datos actuales ni borrado. Al regresar a recordatorios se validan otra vez ocurrencia y permisos.
+
+## Cierre
 
 - [x] Build de previsualización final, aceptación local de navegador, capturas correctas y limpieza verificada de datos propios.
 - [x] Detención de procesos locales propios y comprobación de puertos libres.
-- [ ] Fuente revisada congelada y publicada en Git, paquete nuevo, imagen inmutable, auditoría y smoke; v18 preservada.
-- [ ] Respaldo privado D1/R2 verificado, escritores drenados, aplicación de 0002 y comprobación de documentos intactos.
-- [ ] Sesión administrativa real durante mantenimiento, cola auténtica vacía, nueva instancia única y cero asignaciones anteriores antes de reabrir.
-- [ ] Reapertura, comprobaciones HTTP/UI y cola autenticada; identificación de imagen, Worker, versión y asignación efectivas.
-- [ ] Documentación final, evidencia sincronizada y conservación del acceso administrativo.
+- [x] Fuente revisada congelada y publicada en Git, paquete nuevo, imagen inmutable, auditoría y smoke; v18 preservada.
+- [x] Respaldo privado D1/R2 verificado, escritores drenados, aplicación de 0002 y comprobación de documentos intactos.
+- [x] Sesión administrativa real durante mantenimiento, cola auténtica vacía, nueva instancia única y cero asignaciones anteriores antes de reabrir.
+- [x] Reapertura, comprobaciones HTTP/UI y cola autenticada; identificación de imagen, Worker, versión y asignación efectivas.
+- [x] Acceso administrativo y viewport preservados; resumen privado de publicación completado.
+- [x] Commit/push del cierre documental y sincronización final del paquete; referencia exacta en `review-record.json`.
 
-Imagen candidata, versión efectiva, Worker final, asignación y evidencias productivas: **pendientes**. No se asignan valores hasta ejecutar y comprobar esos pasos.
+La publicación y el cierre están completos. El runtime permanece idéntico al de la imagen auditada.

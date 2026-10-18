@@ -1,6 +1,6 @@
 # Recordatorios de citas dentro de Sarin
 
-Estado: diseño aprobado por el propietario; implementación en curso. Base publicada: runtime `97b6572`, Containers v18; documentación `6df82f3`.
+Estado: diseño aprobado, implementado y publicado como runtime `ed28549`, Containers v19. [Aceptación y límites](../../qa/2026-10-17-in-app-reminders.md). Base de comparación y reversión: runtime `97b6572`, Containers v18; documentación `6df82f3`.
 
 ## Intención y alcance
 

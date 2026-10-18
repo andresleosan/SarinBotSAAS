@@ -78,23 +78,26 @@ Files: synthetic fixture scripts, privacy procedure under docs, tracked QA repor
 - [x] Complete browser320/390/1280 coverage, logout privacy check, final lost-preference response recheck and correctly framed screenshots; automated tests cover UID/business switches.
 - [x] Full app tests, typecheck, Cloudflare check and dependency audit; record actual results and limitations.
 - [x] Rebuild latest reviewed UI for local acceptance; clean only fixture-owned data and verify absence/preservation (17 owned documents, shared Auth/account consent preserved).
-- [x] Stop only owned local processes and verify ports are free; immutable production-image build remains in Task5.
+- [x] Stop only owned local processes and verify ports are free; immutable production-image build also completed in Task5.
 
 ## Task 5 — publish and close
 
 - [x] Independent whole-change review and focused fixes; code review PASS includes the later preference-error follow-up.
-- [ ] Finish remaining acceptance gates and commit/push exact reviewed runtime.
-- [ ] Create a new release package, hash immutable v18 baseline, freeze source, build immutable candidate and audit/smoke it. Prepare compatible rollback.
-- [ ] Before the additive index, drain writers, export and verify a private D1/R2 backup, apply only0002 and verify schema plus unchanged document hashes. No table/document migration or deletion.
-- [ ] Maintenance/drain using real authenticated queue; roll single container, verify effective image, old allocation0, candidate queue0, reopen exact config. Maintenance session fix prevents token renewal from dropping admin access.
-- [ ] Verify production HTTP/browser and authenticated queue; document evidence and observational limits. Update tasks/STACK/QA, commit/push docs and sync the new package without touching v18.
+- [x] Finish remaining acceptance gates and commit/push exact reviewed runtime `ed28549402b2c93e88324f33f130ef6f56d6988d`.
+- [x] Create a new release package, hash immutable v18 baseline, freeze739 source files, build immutable candidate and audit/smoke it. Prepare compatible rollback.
+- [x] Before the additive index, drain writers, export and locally restore/verify a private D1/R2 backup, apply only0002 and verify unchanged54 documents/4commits/revision37 plus1R2 object. No document migration or deletion.
+- [x] Maintenance/drain using real authenticated queue; roll single container, verify effective image, old allocation0, candidate queue0, reopen exact config. Authenticated maintenance GET/session200 confirmed administrative access.
+- [x] Verify production HTTP/browser and authenticated queue; document evidence and observational limits. Production shows optional disabled reminders; complete action flow remains synthetic local only.
+- [x] Commit/push final documentation and sync the completed package without touching v18; exact documentation revision retained in the private review record.
 
 ## Progress
 
-- Design approved: one24h reminder, explicit persistent seen, in-app only. Standing publication authorization applies. Implementation, independent code reviews, local browser acceptance and data cleanup complete; owned process shutdown complete; package and production gates remain pending.
-- Maintenance routing: independent root reviewPASS; router27/27 andCloudflare76/76. Real maintenance session integration pending.
+- Design approved: one24h reminder, explicit persistent seen, in-app only. Standing publication authorization applies. Implementation, independent reviews, local QA/cleanup, immutable package, additive index and production gates complete; final documentation committed/pushed and the completed package synchronized.
+- Maintenance routing: independent root reviewPASS; router27/27 andCloudflare76/76. Real authenticated GET/session returned200/isSuperadmin true duringmaintenance at2026-10-18T01:23:48.603Z and session was reverified after reopening.
 - Private lifecycle:10testsPASS, including actual localD1 two-connection conflict and appointment-only/combined owner-appointment scopes. Review found and fixed the missing D1 appointmentId query field; no production deletion.
 - Implementation decision from measured evidence: add a compatible D1 query index. Initial expectation of noSQL migration was revised after1001 historical appointments increased oneGET from17 to1018rows. This is a non-destructive implementation refinement within the approved feature, validated and backed up before production.
-- Final measured indexed fixture:16rows read/0written/16statements both baseline and1001history. Local migration preserves documents/global revision; production application is pending.
+- Final measured indexed fixture:16rows read/0written/16statements both baseline and1001history. Production applied only exact0002 after backup/drain; independent audit confirms54docs/4commits/revision37 unchanged and1R2 object locally restored/verified.
 - Automated evidence:1482app testsPASS/27skip across149files, UI48PASS, backend/regressions53PASS, emulator rules25PASS, Cloudflare76PASS plusdry-run, typecheckPASS and no known dependency vulnerabilities. Counts overlap; they are not additive.
-- [Prepublication QA report](../../qa/2026-10-17-in-app-reminders.md):20browser checks true, latest response-loss recheck passed with onePATCH/no replay, screenshots at320/390/1280, synthetic reschedule14:00→15:00 and cancellation, cleanup17owned docs with2reminder docs removed through the lifecycle helper. Runtime publication remains pending; owned local processes stopped and all six ports verified free.
+- [Final QA/publication report](../../qa/2026-10-17-in-app-reminders.md):20local browser checks true, response-loss recheck passed with onePATCH/no replay, synthetic reschedule14:00→15:00/cancellation, cleanup17owned docs including2reminder docs. Local processes stopped and sixports free. Actual production screenshot shows disabled optional24h reminders; no browser writes to production preference/seen/appointments/consents.
+- Published Containers v19: image515440cfc7cb1ea7d2bb2e282cbe90cd6c5eb37dafc00859915b06598adc6afe, Worker50207852-3327-48d0-adb0-4417c454a3c3, allocationd0362b28-5703-4e46-85e8-c0974f60649b. Effective singleton running/DOconnected, old0, settings/13secret names/Pages unchanged, maintenancefalse.
+- Four mandatory authenticated empty-queue gates passed in standard order, plus two rollout warmups. Source/ZIP exact739files, image build/smoke and independent package auditsPASS. Alpineworkerd postinstall validation warning remains documented; Next runtime build/smoke passed, not Alpineworkerd execution.

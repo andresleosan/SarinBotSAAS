@@ -1,6 +1,6 @@
 # Recordatorios de citas — aceptación del incremento
 
-Base productiva v18; diseño aprobado: un aviso24h, opt-in por cuenta/negocio, visto persistente y permisos vigentes. Todo dato de acción es sintético en `demo-sarin-bot` y loopback. No aceptar permisos ni crear, mover o cancelar citas reales.
+Base de comparación v18; incremento publicado como v19. Diseño aprobado: un aviso24h, opt-in por cuenta/negocio, visto persistente y permisos vigentes. Todo dato de acción es sintético en `demo-sarin-bot` y loopback. No aceptar permisos ni crear, mover o cancelar citas reales. Resultados y límites: `docs/qa/2026-10-17-in-app-reminders.md`.
 
 ## Contratos automatizados
 
