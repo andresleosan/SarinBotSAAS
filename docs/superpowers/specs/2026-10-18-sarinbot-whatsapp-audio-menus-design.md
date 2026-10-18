@@ -1,6 +1,6 @@
 # SarinBot por WhatsApp: audios, menús y administración privada
 
-Fecha: 2026-10-18. Estado: diseño para revisión del titular; sin implementación ni activación nueva.
+Fecha: 2026-10-18. Estado: aprobado expresamente por el titular el 18 de octubre de 2026; sin implementación ni activación nueva.
 
 ## Resultado solicitado
 
