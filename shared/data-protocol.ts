@@ -11,7 +11,7 @@ export type DataCommand =
 export type DataReadResult = { revision: number; documents: { path: string; data: DataRecord }[] };
 export type DataCommitResult = { revision: number };
 
-export const DATA_COLLECTIONS = ['users', 'businesses', 'businessSlugs', 'publicBusinesses', 'paymentReceipts', 'paymentImages', 'platformSettings', 'serverSettings', 'invitations', 'businessLogos', 'chatStates', 'bookingProposals', 'responseQuotaScopes', 'responseQuotaTurns', 'aiBudgetCalls', 'aiBudgetPeriods', 'aiUsageCalls', 'aiUsageMonths', 'aiUsageMeta', 'whatsappNumbers', 'whatsappBusinesses', 'whatsappInbox', 'whatsappOutbox', 'whatsappConversations', 'whatsappMessageIds', 'whatsappUsage'] as const;
+export const DATA_COLLECTIONS = ['users', 'businesses', 'businessSlugs', 'publicBusinesses', 'paymentReceipts', 'paymentImages', 'platformSettings', 'serverSettings', 'invitations', 'businessLogos', 'chatStates', 'bookingProposals', 'responseQuotaScopes', 'responseQuotaTurns', 'aiBudgetCalls', 'aiBudgetPeriods', 'aiUsageCalls', 'aiUsageMonths', 'aiUsageMeta', 'whatsappNumbers', 'whatsappBusinesses', 'whatsappInbox', 'whatsappOutbox', 'whatsappConversations', 'whatsappMessageIds', 'whatsappUsage', 'platformWhatsAppEvents', 'platformWhatsAppConversations'] as const;
 export const DATA_CHILDREN: Record<string, readonly string[]> = { businesses: ['appointments', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests'], responseQuotaScopes: ['periods'], aiUsageMonths: ['businesses'], whatsappUsage: ['businesses'] };
 export function isDataPath(value: unknown, document: boolean): value is string {
   if (typeof value !== 'string' || value.length > 1024) return false;
