@@ -214,6 +214,9 @@ test('executes original erasure phases before bounded link control cleanup and m
     ['platformWhatsAppEvents', 'body_present', now, 1], ['platformWhatsAppConversations', 'body_present', now, 1],
     ['platformWhatsAppEvents', now, 1], ['platformWhatsAppConversations', now, 1],
     ['platformWhatsAppLinkChallenges', now, 1], ['platformWhatsAppLinks', now, 1],
+    ['platformWhatsAppJobs', 'body_present', now, 1], ['platformWhatsAppOutbox', 'body_present', now, 1],
+    ['platformWhatsAppJobs', now, 1], ['platformWhatsAppOutbox', now, 1],
+    ['platformWhatsAppBudgetCalls', now, 1], ['platformWhatsAppBudgetPeriods', now, 1],
   ]);
   assert.match(queries[0].sql, /ORDER BY json_extract\(data,'\$\.bodyExpiresAt'\) ASC,path ASC LIMIT \?/);
   assert.match(queries[2].sql, /ORDER BY json_extract\(data,'\$\.expiresAt'\) ASC,path ASC LIMIT \?/);
@@ -250,7 +253,7 @@ test('retries a rolled-back commit three times with the same UUID and then compl
   assert.deepEqual(await cleanupPlatformWhatsAppRetention(failing, { now }), { clearedBodies: 1, deletedMetadata: 0, morePending: true });
   assert.equal(attempts.length, 3);
   assert.deepEqual(attempts[1], attempts[0]); assert.deepEqual(attempts[2], attempts[0]);
-  assert.deepEqual(queries, ['platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppLinkChallenges', 'platformWhatsAppLinks']);
+  assert.deepEqual(queries, ['platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppLinkChallenges', 'platformWhatsAppLinks', 'platformWhatsAppJobs', 'platformWhatsAppOutbox', 'platformWhatsAppJobs', 'platformWhatsAppOutbox', 'platformWhatsAppBudgetCalls', 'platformWhatsAppBudgetPeriods']);
   assert.deepEqual(warnings, [{ event: 'platform_whatsapp_retention_incomplete', invalidRecords: 0, failedPhases: 1 }]);
   assert.equal((await get(env, 'platformWhatsAppEvents/a')).state, 'body_present');
   assert.equal((await get(env, 'platformWhatsAppConversations/a')).contactContent, null);

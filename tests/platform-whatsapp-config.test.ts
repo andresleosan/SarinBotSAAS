@@ -43,10 +43,10 @@ describe('platform configuration', () => {
     expect(config.missingConfiguration).toEqual(names.slice(0, 4));
     expect(config).toMatchObject({ configured: false, receiveEnabled: false, retentionEnabled: false, aiEnabled: false, sendEnabled: false });
   });
-  it('retention is required and requested AI/send remain inoperable', () => {
+  it('retention remains required while processing flags only express configuration', () => {
     configure();
     vi.stubEnv(names[1], 'false'); vi.stubEnv(names[2], 'true'); vi.stubEnv(names[3], 'true');
-    expect(getPlatformWhatsAppConfig()).toMatchObject({ configured: false, aiEnabled: false, sendEnabled: false, missingConfiguration: names.slice(1, 4) });
+    expect(getPlatformWhatsAppConfig()).toMatchObject({ configured: false, aiEnabled: true, sendEnabled: true, missingConfiguration: [names[1]] });
   });
   it.each(['', ' ', '\n\t', 's'.repeat(4097)])('clears invalid signing secret', (secret) => {
     configure(); vi.stubEnv(names[4], secret);
@@ -79,7 +79,7 @@ describe('platform configuration', () => {
   it('requires the exact reception combination using the shared 503 error', () => {
     configure(); vi.stubEnv(names[0], 'true');
     const config = getPlatformWhatsAppConfig();
-    const changes = [{ configured: false }, { receiveEnabled: false }, { retentionEnabled: false }, { aiEnabled: true }, { sendEnabled: true }, { scope: null }, { scope: { ...config.scope, extra: true } }, { scope: { wabaId: '12345', phoneE164: '+15550000001' } }, { contentKey: new Uint8Array(32) }, { contentKey: Buffer.alloc(31) }, { signingSecret: ' ' }, { signingSecret: 's'.repeat(4097) }];
+    const changes = [{ configured: false }, { receiveEnabled: false }, { retentionEnabled: false }, { scope: null }, { scope: { ...config.scope, extra: true } }, { scope: { wabaId: '12345', phoneE164: '+15550000001' } }, { contentKey: new Uint8Array(32) }, { contentKey: Buffer.alloc(31) }, { signingSecret: ' ' }, { signingSecret: 's'.repeat(4097) }];
     for (const change of changes) {
       try { requirePlatformWhatsAppReception({ ...config, ...change } as never); throw new Error('accepted'); }
       catch (error) {

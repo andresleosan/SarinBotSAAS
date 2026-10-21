@@ -21,6 +21,7 @@ import { assertPlatformWhatsAppNow, normalizePlatformWhatsAppConnection, platfor
 import { readVerifiedConsentAnchor } from './consent';
 import type { NormalizedYCloudEvent } from './ycloud-webhook';
 import { HttpError } from './http';
+import { readOwnerWorkCancellation, stageOwnerWorkCancellation } from './platform-whatsapp-work-cancellation';
 
 type IncomingText = Omit<Extract<NormalizedYCloudEvent, { kind: 'incoming_text' }>, 'customerSentAt'> & { customerSentAt?: number | null };
 import type { PlatformWhatsAppLinkStatus } from '@/types/platform-whatsapp-link';
@@ -253,9 +254,12 @@ export async function confirmPlatformWhatsAppLink(user: DecodedIdToken, input: {
       displaced = await readOwner(tx, db, oldOwner, now);
       if (destination.uidIndex !== uidIndex && displaced.current) throw conflict();
     }
+    const cancellation = await readOwnerWorkCancellation(user.uid, tx, db);
+    const displacedCancellation = displaced?.owner && displaced.owner.uidIndex !== uidIndex ? await readOwnerWorkCancellation(displaced.owner.ownerUid, tx, db) : null;
     const link: Link = { ...platformWhatsAppIdentity(config.scope), recordType: 'link', uidIndex, phoneIndex: c.phoneIndex, revision: 1, status: 'active', createdAt: now, validUntil: now + LINK_TTL, expiresAt: now + LINK_TTL, phoneSuffix: c.phoneSuffix, conversationId: c.conversationId, ...consent, confirmedAuthTime: at };
     const phone: Phone = { ...platformWhatsAppIdentity(config.scope), recordType: 'link_phone', uidIndex, phoneIndex: c.phoneIndex, linkId: id, linkRevision: 1, createdAt: now, expiresAt: link.expiresAt };
     const request: RequestRecord = { ...platformWhatsAppIdentity(config.scope), recordType: 'link_request', uidIndex, requestDigest, fingerprint, action: 'confirm', challengeId: input.challengeId, linkId: id, resultRevision: 1, createdAt: now, expiresAt: now + LINK_TTL };
+    stageOwnerWorkCancellation(cancellation, tx, db, now); stageOwnerWorkCancellation(displacedCancellation, tx, db, now);
     if (facts.link) { stageLink(tx, db, owner.currentLinkId!, { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 }); if (facts.phone?.linkId === owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex)); }
     if (displaced?.owner && displaced.owner.uidIndex !== uidIndex) {
       if (displaced.link) stageLink(tx, db, displaced.owner.currentLinkId!, { ...displaced.link, status: 'revoked', revision: displaced.link.revision + 1 });
@@ -289,7 +293,9 @@ export async function revokePlatformWhatsAppLink(user: DecodedIdToken, input: st
     if (prior) { if (prior.actorUid !== user.uid || prior.generation !== parsed[1] || prior.requestDigest !== requestDigest) throw unavailable(); return; }
     const owner = await ownerLookup(tx, db, user.uid), facts = await readOwner(tx, db, owner, now);
     if (!owner || owner.revokeGeneration !== parsed[1] || !facts.current && !facts.pending) throw conflict();
+    const cancellation = await readOwnerWorkCancellation(user.uid, tx, db);
     const record: RevokeRecord = { ...platformWhatsAppIdentity(owner), recordType: 'link_revoke_request', createdAt: now, expiresAt: now + LINK_TTL, actorUid: user.uid, generation: parsed[1], requestDigest, challengeId: facts.pending ? owner.pendingChallengeId : null, linkId: facts.current ? owner.currentLinkId : null, resultRevision: facts.current ? facts.current.revision + 1 : null };
+    stageOwnerWorkCancellation(cancellation, tx, db, now);
     if (facts.link) { stageLink(tx, db, owner.currentLinkId!, { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 }); if (facts.phone?.uidIndex === owner.uidIndex && facts.phone.linkId === owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex)); }
     if (facts.challenge) stageChallenge(tx, db, owner.pendingChallengeId!, { ...facts.challenge, status: 'revoked' });
     stageOwner(tx, db, owner, null, null, now, generation); tx.create(db.collection(challenges).doc('revoke_' + requestDigest), record);

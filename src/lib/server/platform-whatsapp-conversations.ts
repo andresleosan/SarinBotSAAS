@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { Database } from '@/lib/storage/types';
 import type { PlatformWhatsAppConversationList, PlatformWhatsAppConversationView } from '@/types/platform-whatsapp';
@@ -8,6 +9,11 @@ import { decryptPlatformWhatsAppContent } from './platform-whatsapp-crypto';
 import { assertPlatformWhatsAppNow, isPlatformWhatsAppControlReplay, platformWhatsAppConflictError, platformWhatsAppControlIdentity, platformWhatsAppConversationControlSchema,
   platformWhatsAppIdentity, platformWhatsAppIsoTime, samePlatformWhatsAppScope } from './platform-whatsapp-store';
 import { HttpError } from './http';
+import { preparePlatformWhatsAppAudioRetentionIdentity, readPlatformWhatsAppAudioRetentionIdentityInTransaction } from './platform-whatsapp-link';
+import { actorAuthority, authorityFingerprint, freshWorkConnection } from './platform-whatsapp-work-authority';
+import { readWorkCancellation, stageWorkCancellation } from './platform-whatsapp-work-cancellation';
+import { stageWork } from './platform-whatsapp-work-records';
+import { normalizePlatformWhatsAppConnection } from './platform-whatsapp-store';
 
 function presentConversation(id: string, record: PlatformWhatsAppConversationRecord, config: PlatformWhatsAppConfig, now: number): PlatformWhatsAppConversationView {
   let customerPhone: string | null = null, lastMessage: string | null = null, contentAvailable = false;
@@ -49,15 +55,28 @@ export async function applyPlatformWhatsAppConversationControl(input: unknown, a
   if (!parsed.success) throw new HttpError(400, 'Control no válido.');
   const body = parsed.data, config = getPlatformWhatsAppConfig(), control = platformWhatsAppControlIdentity(actorUid, body.requestId, body);
   const conversationRef = database.collection('platformWhatsAppConversations').doc(body.conversationId), auditRef = database.collection('platformWhatsAppEvents').doc(control.id);
+  const initial = body.mode === 'bot' ? (await conversationRef.get()).data() : null;
+  const shown = initial && isPlatformWhatsAppConversationRecord(initial) ? presentConversation(body.conversationId, initial, config, now) : null;
+  const prepared = body.mode === 'bot' && shown?.customerPhone && config.scope ? await preparePlatformWhatsAppAudioRetentionIdentity(shown.customerPhone, config.scope, database, now) : null;
+  const epoch = randomUUID();
   const updated = await database.runTransaction(async transaction => {
     const [snapshot, audit] = await Promise.all([transaction.get(conversationRef), transaction.get(auditRef)]);
     const value = snapshot.data();
     if (!config.scope || !isPlatformWhatsAppConversationRecord(value) || !samePlatformWhatsAppScope(value, config.scope) || value.expiresAt <= now) throw new HttpError(404, 'Conversación no disponible.');
     if (isPlatformWhatsAppControlReplay(audit.data(), control.fingerprint, now)) return value;
     if (value.revision !== body.expectedRevision || value.revision === Number.MAX_SAFE_INTEGER) throw platformWhatsAppConflictError();
+    const cancellation = await readWorkCancellation(body.conversationId, value, transaction, database);
+    const connection = body.mode === 'bot' ? normalizePlatformWhatsAppConnection((await transaction.get(database.collection('serverSettings').doc('platform_whatsapp'))).data(), config.scope, now) : null;
+    const identity = body.mode === 'bot' && prepared && shown?.customerPhone ? await readPlatformWhatsAppAudioRetentionIdentityInTransaction(prepared, shown.customerPhone, value, transaction, database, now) : null;
+    if (body.mode === 'bot' && (!identity || identity.conversationId !== body.conversationId || !connection || !freshWorkConnection(connection, now))) throw new HttpError(403, 'La conversación no tiene autorización vigente para el asistente.');
     const updated = { ...value, mode: body.mode, revision: value.revision + 1 };
     const record: PlatformWhatsAppControlRecord = { ...platformWhatsAppIdentity(value), recordType: 'control', state: 'conversation_control', receivedAt: now, updatedAt: now,
       expiresAt: now + PLATFORM_METADATA_TTL, actorUid, fingerprint: control.fingerprint, action: body.mode, targetId: body.conversationId, resultRevision: updated.revision };
+    stageWorkCancellation(cancellation, updated.revision, transaction, database, now);
+    if (body.mode === 'bot' && identity && connection) {
+      const old = cancellation?.head;
+      stageWork(transaction, database, 'platformWhatsAppJobs/head_' + body.conversationId, { ...platformWhatsAppIdentity(value), recordType: 'control_head', conversationId: body.conversationId, controlEpoch: old && old.expiresAt > now ? old.controlEpoch : epoch, controlRevision: old && old.expiresAt > now ? old.controlRevision + 1 : 0, connectionRevision: connection.connectionRevision, entryState: 'bot', botAuthorityFingerprint: authorityFingerprint(actorAuthority(identity)), attachedConversationRevision: updated.revision, headJobId: null, tailJobId: null, currentMenuOutboxId: null, status: 'idle', nextAttemptAt: null, receivedAt: now, expiresAt: now + PLATFORM_METADATA_TTL });
+    }
     transaction.set(conversationRef, updated); transaction.set(auditRef, record);
     return updated;
   });

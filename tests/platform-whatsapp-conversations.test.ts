@@ -60,10 +60,10 @@ describe('bounded private platform conversation views and controls', () => {
     }
     store.rows.delete(path); await expect(control(input, 'demo-admin', store.db, now)).rejects.toMatchObject({ status: 404 });
   });
-  it('rejects stale revisions and bot controls without writing', async () => {
+  it('rejects stale revisions and unverified bot controls without writing', async () => {
     const store = memoryStore(); store.seed(path, conversation({ revision: 2 })); const before = structuredClone([...store.rows]);
     await expect(control(input, 'demo-admin', store.db, now)).rejects.toMatchObject({ status: 409 });
-    await expect(control({ ...input, mode: 'bot' }, 'demo-admin', store.db, now)).rejects.toMatchObject({ status: 400 }); expect([...store.rows]).toEqual(before);
+    await expect(control({ ...input, expectedRevision: 2, mode: 'bot' }, 'demo-admin', store.db, now)).rejects.toMatchObject({ status: 403 }); expect([...store.rows]).toEqual(before);
   });
   it('fails closed on invalid audit replay and max-safe conversation records', async () => {
     const store = memoryStore(); store.seed(path, conversation()); await control(input, 'demo-admin', store.db, now);

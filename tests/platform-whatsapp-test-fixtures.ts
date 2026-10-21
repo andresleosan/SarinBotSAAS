@@ -21,7 +21,7 @@ export function configure() {
 }
 export function connection(overrides: Partial<PlatformWhatsAppConnectionRecord> = {}): PlatformWhatsAppConnectionRecord {
   return { ...identity, recordType: 'connection', connectionRevision: 0, providerConnection: 'unverified', paused: false, pausedReason: null, updatedAt: now,
-    connectedAt: null, connectedRevision: null, lastSignedInboundAt: null, lastHumanEchoAt: null, lastDeliveryAt: null, ...overrides };
+    connectedAt: null, connectedRevision: null, lastSignedInboundAt: null, lastHumanEchoAt: null, lastDeliveryAt: null, ...overrides } as PlatformWhatsAppConnectionRecord;
 }
 export function conversation(overrides: Partial<PlatformWhatsAppConversationRecord> = {}): PlatformWhatsAppConversationRecord {
   return { ...identity, recordType: 'conversation', state: 'body_erased', mode: 'human', revision: 0, updatedAt: now,

@@ -34,7 +34,9 @@ describe('positive encrypted audio descriptor retention only', () => {
     expect((await list(store.db, now + 86_400_000)).conversations[0]).toMatchObject({ customerPhone: null, contentAvailable: false });
     const raw = JSON.stringify([...store.rows].filter(([path]) => path.startsWith('platformWhatsAppEvents/')));
     for (const value of [phone, descriptor.link, descriptor.sha256, descriptor.id, token().uid, link.linkId]) expect(raw).not.toContain(value);
-    expect([...store.rows.keys()].every(path => /^(serverSettings|platformWhatsAppLinks|platformWhatsAppLinkChallenges|platformWhatsAppConversations|platformWhatsAppEvents)\//.test(path))).toBe(true);
+    expect([...store.rows.keys()].every(path => /^(serverSettings|platformWhatsAppLinks|platformWhatsAppLinkChallenges|platformWhatsAppConversations|platformWhatsAppEvents|platformWhatsAppJobs)\//.test(path))).toBe(true);
+    expect([...store.rows.values()].filter(row => row.recordType === 'control_head')).toHaveLength(1);
+    expect([...store.rows.values()].some(row => row.recordType === 'job')).toBe(false);
   });
   it('uses supplied transactions and keeps current Firebase lookup outside callbacks', async () => {
     await linked(); let inCallback = false;

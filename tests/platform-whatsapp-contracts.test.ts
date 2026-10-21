@@ -103,9 +103,10 @@ describe('frozen platform record contracts', () => {
     for (const change of [{ updatedAt: 2001 }, { actorUid: '' }, { actorUid: 'a'.repeat(129) }, { action: 'human' }, { targetId: digest }, { state: 'conversation_control', targetId: digest, action: 'pause' }]) expect(controlGuard({ ...control(), ...change })).toBe(false);
     expect(controlGuard({ ...control(), actorUid: 'a'.repeat(128) })).toBe(true);
   });
-  it('allows arbitrary valid conversation expiry but only human/review modes', () => {
+  it('allows arbitrary valid conversation expiry and closed human/review/bot modes', () => {
     expect(conversationGuard({ ...conversation(), mode: 'review', expiresAt: 8640000000000000 })).toBe(true);
-    expect(conversationGuard({ ...conversation(), mode: 'bot' })).toBe(false);
+    expect(conversationGuard({ ...conversation(), mode: 'bot' })).toBe(true);
+    expect(conversationGuard({ ...conversation(), mode: 'unknown' })).toBe(false);
     expect(conversationGuard({ ...conversation(), previewOccurredAt: 3000, bodyExpiresAt: 86402000 })).toBe(true);
     expect(conversationGuard({ ...conversation(), bodyExpiresAt: 86402000 })).toBe(false);
     expect(conversationGuard({ ...conversation(), state: 'body_erased', contactContent: null })).toBe(true);

@@ -20,7 +20,7 @@ const controlFields = {
   requestId: z.string().regex(/^[A-Za-z0-9_-]{8,128}(?![\s\S])/),
 };
 export const platformWhatsAppConversationControlSchema = z.object({
-  ...controlFields, conversationId: z.string().regex(PLATFORM_DIGEST_PATTERN), mode: z.enum(['human', 'review']),
+  ...controlFields, conversationId: z.string().regex(PLATFORM_DIGEST_PATTERN), mode: z.enum(['human', 'review', 'bot']),
 }).strict();
 export const platformWhatsAppConnectionControlSchema = z.discriminatedUnion('action', [
   z.object({ ...controlFields, action: z.literal('pause') }).strict(),
@@ -95,6 +95,7 @@ export async function applyPlatformWhatsAppConnectionControl(input: unknown, act
       || (body.action === 'record_connected' && (!config.configured || !config.scope || !samePlatformWhatsAppScope(body, config.scope)))
       || (body.action === 'resume' && (!config.configured || connection.providerConnection !== 'connected'))) throw platformWhatsAppConflictError();
     const updated = { ...connection, connectionRevision: connection.connectionRevision + 1, updatedAt: now };
+    if (updated.observationStatus !== undefined) { updated.observationStatus = 'none'; updated.observationRevision = null; updated.observedAt = null; }
     if (body.action === 'pause') { updated.paused = true; updated.pausedReason = connection.providerConnection === 'disconnected' ? 'disconnected' : 'manual'; }
     if (body.action === 'disconnect') { updated.providerConnection = 'disconnected'; updated.paused = true; updated.pausedReason = 'disconnected'; }
     if (body.action === 'record_connected') {

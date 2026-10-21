@@ -15,6 +15,8 @@ import { HttpError } from './http';
 import { validatePlatformAudioDescriptor, type AudioDescriptor } from '../../../shared/platform-whatsapp-audio';
 import { parsePlatformMenuChoice } from '../../../shared/platform-whatsapp-menu';
 import { preparePlatformWhatsAppAudioRetentionIdentity, readPlatformWhatsAppAudioRetentionIdentityInTransaction } from './platform-whatsapp-link';
+import { prepareWorkAdmission, readWorkAdmission } from './platform-whatsapp-work-admission';
+import { readWorkCancellation, stageWorkCancellation } from './platform-whatsapp-work-cancellation';
 
 const externalId = z.string().min(1).max(256).regex(/^[\x21-\x7e]+$/);
 const eventFields = {
@@ -58,6 +60,13 @@ export async function ingestPlatformWhatsAppEvent(input: unknown, config: Platfo
   const events = database.collection('platformWhatsAppEvents'), conversations = database.collection('platformWhatsAppConversations');
   const connectionRef = database.collection('serverSettings').doc('platform_whatsapp'), conversationRef = conversations.doc(conversationId);
   const prepared = event.kind === 'incoming_audio' ? await preparePlatformWhatsAppAudioRetentionIdentity(event.customerPhone, scope, database, now) : null;
+  const workPrepared = await prepareWorkAdmission(event, scope, eventId, database, now);
+  const originalPlaintext = event.kind === 'incoming_audio' && prepared
+    ? { customerPhone: event.customerPhone, audio: event.audio, retentionAnchor: { uid: prepared.uid, linkId: prepared.linkId, linkRevision: prepared.linkRevision, account: prepared.account, support: prepared.support } }
+    : { customerPhone: event.customerPhone, text: event.kind === 'incoming_text' || event.kind === 'human_echo' ? event.text : null };
+  const originalBodyLive = Math.min(event.occurredAt, now) + PLATFORM_BODY_TTL > now;
+  const eventEnvelope = originalBodyLive && (!newKind || event.kind === 'incoming_audio' && prepared) ? encryptPlatformWhatsAppContent(originalPlaintext, events.doc(eventId).path, config.contentKey) : null;
+  const previewEnvelope = eventEnvelope ? encryptPlatformWhatsAppContent(event.kind === 'incoming_audio' ? { customerPhone: event.customerPhone, text: null } : originalPlaintext, conversationRef.path, config.contentKey) : null;
   return database.runTransaction(async transaction => {
     const stageEvent = (id: string, value: PlatformWhatsAppStoredEvent) => {
       if (!isPlatformWhatsAppStoredEvent(value)) throw platformWhatsAppUnavailableError();
@@ -116,6 +125,10 @@ export async function ingestPlatformWhatsAppEvent(input: unknown, config: Platfo
       previewOccurredAt: event.occurredAt, previewReceivedAt: now, canonicalIdentity, contactContent: null, conflictAt: null };
     if (conflict) {
       const base = current ?? seed;
+      const cancelled = await readWorkCancellation(conversationId, scope, transaction, database);
+      const relatedCancelled = await Promise.all([...related].map(async ([id, value]) => ({ value, facts: await readWorkCancellation(id, value, transaction, database) })));
+      stageWorkCancellation(cancelled, current || !newKind ? base.revision + 1 : null, transaction, database, now);
+      for (const item of relatedCancelled) stageWorkCancellation(item.facts, item.value.revision + 1, transaction, database, now);
       if (current || !newKind) stageConversation(conversationId, { ...base, mode: 'review', revision: base.revision + 1, conflictAt: now });
       for (const [id, value] of related) stageConversation(id, { ...value, mode: 'review', revision: value.revision + 1, conflictAt: now });
       const record: PlatformWhatsAppConflictRecord = { ...platformWhatsAppIdentity(scope), recordType: 'conflict', state: 'metadata', conversationId, fingerprint, receivedAt: now, expiresAt: now + PLATFORM_METADATA_TTL };
@@ -137,32 +150,33 @@ export async function ingestPlatformWhatsAppEvent(input: unknown, config: Platfo
     const retentionIdentity = event.kind === 'incoming_audio' && prepared && prepared.conversationId === conversationId && bodyExpiresAt > now
       ? await readPlatformWhatsAppAudioRetentionIdentityInTransaction(prepared, event.customerPhone, scope, transaction, database, now) : null;
     const bodyPresent = bodyExpiresAt > now && (!newKind || retentionIdentity !== null);
-    const plaintext = event.kind === 'incoming_audio' && retentionIdentity
-      ? { customerPhone: event.customerPhone, audio: event.audio, retentionAnchor: { uid: retentionIdentity.uid, linkId: retentionIdentity.linkId, linkRevision: retentionIdentity.linkRevision, account: retentionIdentity.account, support: retentionIdentity.support } }
-      : { customerPhone: event.customerPhone, text: event.kind === 'incoming_text' || event.kind === 'human_echo' ? event.text : null };
-    const record: PlatformWhatsAppEventRecord = { ...platformWhatsAppIdentity(scope), recordType: 'event', connectionRevision: connection.connectionRevision, conversationId,
+    let record: PlatformWhatsAppEventRecord = { ...platformWhatsAppIdentity(scope), recordType: 'event', connectionRevision: connection.connectionRevision, conversationId,
       kind: event.kind, occurredAt: event.occurredAt, canonicalIdentity, fingerprint, receivedAt: now, bodyExpiresAt, expiresAt: now + PLATFORM_METADATA_TTL,
       ...(event.kind !== 'human_echo' && Object.hasOwn(event, 'customerSentAt') ? { customerSentAt: event.customerSentAt } : {}),
       ...(newKind ? { ingressDisposition: retentionIdentity ? 'descriptor_retained' : 'control_only' } : {}),
-      ...(bodyPresent ? { state: 'body_present', content: encryptPlatformWhatsAppContent(plaintext, events.doc(eventId).path, config.contentKey) } : { state: 'body_erased', content: null }) } as PlatformWhatsAppEventRecord;
+      ...(bodyPresent ? { state: 'body_present', content: eventEnvelope } : { state: 'body_erased', content: null }) } as PlatformWhatsAppEventRecord;
     let updated: PlatformWhatsAppConversationRecord = { ...(current ?? seed), updatedAt: Math.max(current?.updatedAt ?? 0, now), expiresAt: now + PLATFORM_METADATA_TTL };
     if (event.kind !== 'human_echo') updated.lastInboundAt = Math.max(updated.lastInboundAt ?? 0, event.occurredAt);
     else updated.lastHumanAt = Math.max(updated.lastHumanAt ?? 0, event.occurredAt);
     if (!current || event.occurredAt > current.previewOccurredAt || (event.occurredAt === current.previewOccurredAt && canonicalIdentity > current.canonicalIdentity)) {
       updated = { ...updated, previewOccurredAt: event.occurredAt, previewReceivedAt: now, canonicalIdentity, bodyExpiresAt,
-        ...(bodyPresent ? { state: 'body_present', contactContent: encryptPlatformWhatsAppContent(event.kind === 'incoming_audio' ? { customerPhone: event.customerPhone, text: null } : plaintext, conversationRef.path, config.contentKey) } : { state: 'body_erased', contactContent: null }) };
+        ...(bodyPresent ? { state: 'body_present', contactContent: previewEnvelope! } : { state: 'body_erased', contactContent: null }) };
     }
     if (event.kind !== 'human_echo') connection.lastSignedInboundAt = Math.max(connection.lastSignedInboundAt ?? 0, event.occurredAt);
     else connection.lastHumanEchoAt = Math.max(connection.lastHumanEchoAt ?? 0, event.occurredAt);
     connection.updatedAt = Math.max(connection.updatedAt, now);
+    const admission = await readWorkAdmission(event, eventId, record, current, !newKind || retentionIdentity ? updated : current, connection, workPrepared, transaction, database, now);
+    record = admission.record;
+    if (admission.conversation) updated = admission.conversation;
     if (!isPlatformWhatsAppEventRecord(record) || !isPlatformWhatsAppConversationRecord(updated)) throw platformWhatsAppUnavailableError();
+    admission.stage();
     stageEvent(eventId, record);
     for (const id of identities.slice(1)) {
       const alias: PlatformWhatsAppAliasRecord = { ...platformWhatsAppIdentity(scope), recordType: 'alias', state: 'metadata', canonicalEventId: eventId, conversationId, fingerprint,
         bodyExpiresAt, receivedAt: now, expiresAt: record.expiresAt };
       stageEvent(id, alias);
     }
-    if (!newKind || retentionIdentity) { stageConversation(conversationId, updated); transaction.set(connectionRef, connection); }
+    if (!newKind || retentionIdentity || record.kind === 'incoming_choice' && record.ingressDisposition === 'choice_consumed' && admission.conversation) { stageConversation(conversationId, updated); transaction.set(connectionRef, connection); }
     return { outcome: 'stored', conversationId };
   });
 }

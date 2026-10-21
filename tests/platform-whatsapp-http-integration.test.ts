@@ -12,6 +12,10 @@ import { createDataTestRuntime } from '../cloudflare/tests/data-runtime.mjs';
 import { createCloudflareDatabase, StorageError, type DataTransport } from '@/lib/storage/database';
 import type { DataReadResult, DataCommitResult } from '../shared/data-protocol';
 import type { Database } from '@/lib/storage/types';
+import { createPlatformWorkStore, takePlatformSendPermit } from '@/lib/server/platform-whatsapp-work-store';
+import { configureWork, workCircuit } from './platform-whatsapp-work-fixtures';
+import { connection } from './platform-whatsapp-test-fixtures';
+import { workCatalog } from '../shared/platform-whatsapp-work';
 
 const admin = vi.hoisted(() => ({ db: vi.fn<() => Database>(() => { throw new Error('Default backend forbidden'); }), verify: vi.fn(), getUser: vi.fn() }));
 vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: admin.db, getAdminAuth: () => ({ verifyIdToken: admin.verify, getUser: admin.getUser }) }));
@@ -43,7 +47,7 @@ it.each(['audio', 'interactive'])('signed %s flows through the real reader into 
     interactive: { type: 'button_reply', button_reply: { id: 'sarinbot.menu.v1:accept:12345678-1234-4234-8234-123456789abc', title: 'sarinbot.link.fake' } } };
   const result = await POST(signed({ whatsappInboundMessage: message })); expect(result.status).toBe(200); expect(await result.json()).toEqual({ received: true });
   const rows = [...store.rows.values()]; expect(rows.filter(row => row.recordType === 'event')).toEqual([expect.objectContaining({ kind: type === 'audio' ? 'incoming_audio' : 'incoming_choice', ingressDisposition: 'control_only', content: null })]);
-  expect(rows).toHaveLength(2); expect(admin.getUser).not.toHaveBeenCalled();
+  expect(rows).toHaveLength(type === 'audio' ? 3 : 2); expect(admin.getUser).not.toHaveBeenCalled();
   const before = structuredClone([...store.rows]); expect((await POST(signed({ whatsappInboundMessage: message }))).status).toBe(200); expect([...store.rows]).toEqual(before);
 });
 it('strict public MIME differs from admin JSON prefix parsing', async () => {
@@ -117,6 +121,27 @@ describe('signed link controls across real owner API, verifier and local D1', ()
     expect(await result.json()).toEqual({ received: true });
   }
   const issue = () => begin(token(), { phoneE164: phone, requestId: 'demo-d1-begin' }, db, now);
+  it('consumes a genuinely produced accepted outbox through signed POST once across two D1 handles', async () => {
+    configureWork();
+    await db.collection('serverSettings').doc('platform_whatsapp').set({ ...connection({ providerConnection: 'connected' }), observationStatus: 'connected', observationRevision: 0, observedAt: now });
+    const circuit = workCircuit(); await db.collection('platformWhatsAppBudgetPeriods').doc(circuit.circuitId).set(circuit);
+    await assertReceived(control('Synthetic support request', { sendTime: new Date(now).toISOString() }, 'demo-genuine-source'));
+    const work = createPlatformWorkStore(db, () => now), lease = (await work.claimNext())!;
+    const outbox = await work.saveReply(lease, workCatalog.identification.text), claim = (await work.claimSend(outbox.outboxId))!;
+    expect(await takePlatformSendPermit(outbox.outboxId, claim.token, db, now)).not.toBeNull();
+    await work.finishSend(outbox.outboxId, claim.token, { status: 'accepted', providerId: 'demo-real-accepted' });
+    const choice = (id: string, from = phone) => signed({ id, whatsappInboundMessage: { id: id + '-message', wabaId: scope.wabaId, from, to: scope.phoneE164, sendTime: new Date(now).toISOString(), type: 'interactive', interactive: { type: 'button_reply', button_reply: { id: 'sarinbot.menu.v1:accept:' + outbox.outboxId, title: 'Untrusted title' } } } });
+    await assertReceived(choice('demo-foreign-choice', '+12025550102'));
+    expect((await db.collection('platformWhatsAppOutbox').doc(outbox.outboxId).get()).data()?.consumedAt).toBeNull();
+    const other = createCloudflareDatabase(transport); let calls = 0; admin.db.mockImplementation(() => calls++ % 2 ? db : other);
+    await Promise.all([assertReceived(choice('demo-consume-one')), assertReceived(choice('demo-consume-two'))]);
+    const events = (await db.collection('platformWhatsAppEvents').get()).docs.map(d => d.data());
+    expect(events.filter(e => e.ingressDisposition === 'choice_consumed')).toHaveLength(1);
+    expect(events.filter(e => e.ingressDisposition === 'control_only' && e.kind === 'incoming_choice')).toHaveLength(2);
+    expect((await db.collection('platformWhatsAppJobs').get()).docs.filter(d => d.data().recordType === 'job').map(d => d.data().catalogId).sort()).toEqual(['identification', 'support_menu']);
+    await assertReceived(choice('demo-stale-choice'));
+    expect((await db.collection('platformWhatsAppEvents').get()).docs.filter(d => d.data().ingressDisposition === 'choice_consumed')).toHaveLength(1);
+  });
   it('proves genuine issued code once without any ordinary envelope, then requires explicit web confirmation', async () => {
     const issuance = await linkRoute.POST(authorized('POST', { action: 'begin', phoneE164: phone, requestId: 'demo-d1-api-begin' }));
     expect(issuance.status).toBe(200);

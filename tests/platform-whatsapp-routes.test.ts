@@ -82,8 +82,8 @@ describe('admin exact envelopes and body bounds', () => {
     await response(await status.PATCH(request('PATCH', connectionBody)), 200, statusBody); expect(mocks.connection).toHaveBeenCalledWith(connectionBody, 'demo-admin');
     await response(await conversations.PATCH(request('PATCH', conversationBody)), 200, { conversation: view }); expect(mocks.control).toHaveBeenCalledWith(conversationBody, 'demo-admin');
   });
-  it.each([[status.PATCH, connectionBody], [conversations.PATCH, conversationBody]] as const)('rejects injected actor/config/bot fields in closed controls', async (handler, body) => {
-    for (const patch of [{ actorUid: 'demo-other' }, { mode: 'bot' }, { signingSecret: 'demo' }, { receiveEnabled: true }]) {
+  it.each([[status.PATCH, connectionBody], [conversations.PATCH, conversationBody]] as const)('rejects injected actor/config and unknown mode fields in closed controls', async (handler, body) => {
+    for (const patch of [{ actorUid: 'demo-other' }, { mode: 'unknown' }, { signingSecret: 'demo' }, { receiveEnabled: true }]) {
       await response(await handler(request('PATCH', { ...body, ...patch })), 400, { error: 'Datos no válidos. Revisa los campos enviados.' });
     }
     expect(mocks.connection).not.toHaveBeenCalled(); expect(mocks.control).not.toHaveBeenCalled();

@@ -9,8 +9,8 @@ const scopeSchema = z.object({ wabaId: idSchema, phoneE164: z.string().regex(PLA
 export interface PlatformWhatsAppConfig {
   receiveEnabled: boolean;
   retentionEnabled: boolean;
-  aiEnabled: false;
-  sendEnabled: false;
+  aiEnabled: boolean;
+  sendEnabled: boolean;
   configured: boolean;
   missingConfiguration: string[];
   scope: PlatformWhatsAppScope | null;
@@ -29,9 +29,7 @@ export function getPlatformWhatsAppConfig(): PlatformWhatsAppConfig {
   const receiveEnabled = flag('PLATFORM_WHATSAPP_RECEIVE_ENABLED');
   const retentionEnabled = flag('PLATFORM_WHATSAPP_RETENTION_ENABLED');
   if (!retentionEnabled && !missingConfiguration.includes('PLATFORM_WHATSAPP_RETENTION_ENABLED')) missingConfiguration.push('PLATFORM_WHATSAPP_RETENTION_ENABLED');
-  for (const name of ['PLATFORM_WHATSAPP_AI_ENABLED', 'PLATFORM_WHATSAPP_SEND_ENABLED']) {
-    if (flag(name)) missingConfiguration.push(name);
-  }
+  const aiEnabled = flag('PLATFORM_WHATSAPP_AI_ENABLED'), sendEnabled = flag('PLATFORM_WHATSAPP_SEND_ENABLED');
   let signingSecret = process.env.PLATFORM_YCLOUD_WEBHOOK_SECRET ?? '';
   if (!/\S/.test(signingSecret) || signingSecret.length > 4096) {
     missingConfiguration.push('PLATFORM_YCLOUD_WEBHOOK_SECRET');
@@ -51,20 +49,20 @@ export function getPlatformWhatsAppConfig(): PlatformWhatsAppConfig {
       if (name && !missingConfiguration.includes(name)) missingConfiguration.push(name);
     }
   }
-  return { receiveEnabled, retentionEnabled, aiEnabled: false, sendEnabled: false, configured: missingConfiguration.length === 0, missingConfiguration, scope: scope.success ? scope.data : null, signingSecret, contentKey };
+  return { receiveEnabled, retentionEnabled, aiEnabled, sendEnabled, configured: missingConfiguration.length === 0, missingConfiguration, scope: scope.success ? scope.data : null, signingSecret, contentKey };
 }
 
 export function publicPlatformWhatsAppConfig(config: PlatformWhatsAppConfig): PublicPlatformWhatsAppConfig {
   return {
     receiveEnabled: config.receiveEnabled, retentionEnabled: config.retentionEnabled,
-    aiEnabled: false, sendEnabled: false, configured: config.configured,
+    aiEnabled: config.aiEnabled, sendEnabled: config.sendEnabled, configured: config.configured,
     missingConfiguration: [...config.missingConfiguration],
     scope: config.scope ? { wabaId: config.scope.wabaId, phoneE164: config.scope.phoneE164, phoneNumberId: config.scope.phoneNumberId } : null,
   };
 }
 
 export function requirePlatformWhatsAppReception(config: PlatformWhatsAppConfig): void {
-  if (!config.configured || !config.receiveEnabled || !config.retentionEnabled || config.aiEnabled !== false || config.sendEnabled !== false
+  if (!config.configured || !config.receiveEnabled || !config.retentionEnabled
     || !scopeSchema.safeParse(config.scope).success || !Buffer.isBuffer(config.contentKey) || config.contentKey.length !== 32
     || typeof config.signingSecret !== 'string' || !/\S/.test(config.signingSecret) || config.signingSecret.length > 4096) {
     throw new HttpError(503, 'La recepción de WhatsApp de plataforma no está habilitada y configurada.');

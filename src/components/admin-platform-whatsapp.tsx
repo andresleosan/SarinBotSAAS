@@ -154,7 +154,7 @@ function PlatformWorkspace({ scope }: { scope: string }) {
 
   return <section aria-labelledby="platform-whatsapp-title" className="min-w-0 space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-6">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0"><h2 id="platform-whatsapp-title" className="text-xl font-semibold">WhatsApp de SarinBot</h2><p className="mt-1 text-sm leading-6 text-sarin-muted">Consultas dirigidas a SarinBot. El titular responde desde WhatsApp Business App. Esta bandeja solo permite atención humana y revisión.</p></div>
+      <div className="min-w-0"><h2 id="platform-whatsapp-title" className="text-xl font-semibold">WhatsApp de SarinBot</h2><p className="mt-1 text-sm leading-6 text-sarin-muted">Consultas dirigidas a SarinBot. El titular puede tomar la conversación desde WhatsApp Business App. Reactivar el asistente requiere permisos vigentes; no habilita la IA ni el envío de mensajes.</p></div>
       <button type="button" className={`${secondaryButtonClass} shrink-0`} disabled={pending || authLost} onClick={() => { setError(null); setNotice(null); poll.refresh(); }}>Actualizar bandeja de SarinBot</button>
     </div>
     <p className="text-xs leading-6 text-sarin-muted">Actualización cada 15 segundos mientras esta página está visible, al recuperar el foco o al pulsar Actualizar. Fechas de Colombia.</p>
@@ -193,17 +193,18 @@ function PlatformWorkspace({ scope }: { scope: string }) {
     {!!snapshot?.inbox.conversations.length && <ul className="space-y-4">{snapshot.inbox.conversations.map(value => cache.view(value)).map(conversation => <li key={conversation.id}>
       <article aria-label="Consulta de SarinBot" className="min-w-0 space-y-3 rounded-xl border border-sarin-line p-4">
         <h3 className="break-all font-semibold">{conversation.contentAvailable ? conversation.customerPhone || 'Contacto no disponible' : 'Contacto vencido'}</h3>
-        <p className="text-sm font-medium">{conversation.mode === 'human' ? 'Atención humana' : 'Necesita revisión'} · Revisión {conversation.revision}</p>
+        <p className="text-sm font-medium">{conversation.mode === 'human' ? 'Atención humana' : conversation.mode === 'bot' ? 'Asistente' : 'Necesita revisión'} · Revisión {conversation.revision}</p>
         {conversation.contentAvailable ? <p className="whitespace-pre-wrap break-words rounded-xl bg-sarin-canvas p-3 text-sm leading-6">{conversation.lastMessage || 'Sin texto disponible.'}</p>
           : <p className="text-sm text-sarin-muted">Contenido vencido o no disponible. El texto y el contacto se conservan como máximo 24 horas.</p>}
         <p className="text-xs leading-6 text-sarin-muted">Último mensaje recibido: {date(conversation.lastInboundAt)} · Colombia<br />Última respuesta del titular: {date(conversation.lastHumanAt)} · Colombia</p>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           {conversation.mode !== 'human' && <button type="button" className={buttonClass} disabled={disabled} onClick={() => void mutate('conversations', { conversationId: conversation.id, mode: 'human', expectedRevision: conversation.revision })}>Tomar conversación</button>}
           {conversation.mode !== 'review' && <button type="button" className={secondaryButtonClass} disabled={disabled} onClick={() => void mutate('conversations', { conversationId: conversation.id, mode: 'review', expectedRevision: conversation.revision })}>Marcar para revisión</button>}
+          {conversation.mode !== 'bot' && <button type="button" className={secondaryButtonClass} disabled={disabled} onClick={() => void mutate('conversations', { conversationId: conversation.id, mode: 'bot', expectedRevision: conversation.revision })}>Reactivar asistente</button>}
         </div>
       </article>
     </li>)}</ul>}
     {pending && !authLost && <p role="status" className="text-sm text-sarin-muted">Guardando cambio…</p>}
-    <p className="border-t border-sarin-line pt-4 text-xs leading-6 text-sarin-muted">Las conversaciones de negocios y sus controles comerciales están en la sección siguiente. Aquí no se envían mensajes ni se activa un bot.</p>
+    <p className="border-t border-sarin-line pt-4 text-xs leading-6 text-sarin-muted">Las conversaciones de negocios y sus controles comerciales están en la sección siguiente. Reactivar el asistente permite futuras consultas autorizadas; la conexión, la IA y el envío conservan sus controles independientes.</p>
   </section>;
 }

@@ -273,12 +273,12 @@ describe('durable platform linking', () => {
     auth.getUser.mockRejectedValue(new Error('synthetic unavailable'));
     await expect(verify(incoming({ text: c.code }), db, now)).rejects.toMatchObject({ status: 503 });
   });
-  it('denies a forged bot conversation and identity after confirmed authentication is revoked', async () => {
+  it('resolves link identity in bot mode but denies revoked confirmed authentication', async () => {
     const result = await linked(), row = store.rows.get('platformWhatsAppLinks/link_' + result.linkId)!;
     if (!isPlatformWhatsAppLinkRecord(row)) throw new Error('Invalid fixture');
     await ingestPlatformWhatsAppEvent(incoming(), getPlatformWhatsAppConfig(), store.db, now);
     const path = 'platformWhatsAppConversations/' + row.conversationId, saved = store.rows.get(path)!;
-    store.seed(path, { ...saved, mode: 'bot' }); expect(await resolve(phone, row.conversationId, store.db, now)).toBeNull();
+    store.seed(path, { ...saved, mode: 'bot' }); expect(await resolve(phone, row.conversationId, store.db, now)).toMatchObject({ uid: token().uid, linkId: result.linkId });
     store.seed(path, saved); auth.getUser.mockResolvedValue({ uid: token().uid, disabled: false, tokensValidAfterTime: new Date(now + 1).toISOString() });
     expect(await resolve(phone, row.conversationId, store.db, now + 1)).toBeNull();
   });

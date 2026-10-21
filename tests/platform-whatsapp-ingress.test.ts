@@ -47,7 +47,7 @@ describe('authenticated normalized platform ingress', () => {
   it('stores unverified ingress atomically with separate path-bound ciphertext and no raw identifiers', async () => {
     const store = memoryStore(), result = await ingest(incoming(), configure(), store.db, now);
     expect(result.outcome).toBe('stored'); expect(result.conversationId).toMatch(/^[a-f0-9]{64}$/);
-    expect(store.rows.size).toBe(5); expect(events(store)).toHaveLength(3);
+    expect(store.rows.size).toBe(6); expect(events(store)).toHaveLength(3);
     const [path, event] = canonicals(store)[0];
     // Synthetic identity vector captured from pinned 5649.f with this fixture/key.
     expect(result.conversationId).toBe('2588ec97a58e6c631c128d837531b1b56b93cd8816bfc13759f443d5e235140d');

@@ -1,6 +1,7 @@
 import type { DataCommand, DataWrite } from '../../shared/data-protocol.ts';
 import { isPlatformWhatsAppConversationRecord, isPlatformWhatsAppEventRecord, isPlatformWhatsAppStoredEvent } from '../../shared/platform-whatsapp-records.ts';
 import { DataError, executeDataCommand } from './data.ts';
+import { cleanupPlatformWorkRetention } from './platform-whatsapp-work-retention.ts';
 import { isPlatformWhatsAppStoredLinkControl, isPlatformWhatsAppLinkUidRecord, LINK_UUID, type PlatformWhatsAppStoredLinkControl, type PlatformWhatsAppLinkUidRecord } from '../../shared/platform-whatsapp-link-records.ts';
 
 type RetentionEnvironment = Parameters<typeof executeDataCommand>[1];
@@ -74,6 +75,9 @@ export async function cleanupPlatformWhatsAppRetention(env: RetentionEnvironment
     result.deletedMetadata += phase.changed; result.morePending ||= phase.morePending;
     invalidRecords += phase.invalidRecords; failedPhases += phase.failedPhases;
   }
+  const work = await cleanupPlatformWorkRetention(env, now, batchLimit);
+  result.clearedBodies += work.clearedBodies; result.deletedMetadata += work.deletedMetadata; result.morePending ||= work.morePending;
+  invalidRecords += work.invalidRecords; failedPhases += work.failedPhases;
   if (invalidRecords || failedPhases) console.warn({ event: 'platform_whatsapp_retention_incomplete', invalidRecords, failedPhases });
   return result;
 }

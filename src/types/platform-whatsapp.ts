@@ -3,7 +3,7 @@ import type { PlatformWhatsAppScope } from '../../shared/platform-whatsapp-recor
 export type PlatformWhatsAppConnectionAction = 'pause' | 'resume' | 'disconnect' | 'record_connected';
 export type PlatformWhatsAppPresentationState = 'disconnected' | 'paused' | 'not_configured' | 'configured_unverified' | 'receiving_human' | 'automation_blocked';
 export interface PlatformWhatsAppAuditView {
-  action: PlatformWhatsAppConnectionAction | 'human' | 'review';
+  action: PlatformWhatsAppConnectionAction | 'human' | 'review' | 'bot';
   actorUid: string;
   at: string;
   expiresAt: string;
@@ -12,8 +12,8 @@ export interface PlatformWhatsAppAuditView {
 export interface PlatformWhatsAppStatus {
   receiveEnabled: boolean;
   retentionEnabled: boolean;
-  aiEnabled: false;
-  sendEnabled: false;
+  aiEnabled: boolean;
+  sendEnabled: boolean;
   configured: boolean;
   missingConfiguration: string[];
   scope: PlatformWhatsAppScope | null;
@@ -36,11 +36,11 @@ export type PlatformWhatsAppConnectionControl = PlatformWhatsAppControlRequest &
 );
 export interface PlatformWhatsAppConversationControl extends PlatformWhatsAppControlRequest {
   conversationId: string;
-  mode: 'human' | 'review';
+  mode: 'human' | 'review' | 'bot';
 }
 export interface PlatformWhatsAppConversationView {
   id: string;
-  mode: 'human' | 'review';
+  mode: 'human' | 'review' | 'bot';
   revision: number;
   updatedAt: string;
   lastInboundAt: string | null;

@@ -7,6 +7,7 @@ import { consentContent, type ConsentBusiness, type ConsentDocuments, type Conse
 import type { ChatActor } from '@/types/chat';
 import { documentIdSchema, requestIdSchema } from './schemas';
 import { HttpError } from './http';
+import { readOwnerWorkCancellation, stageOwnerWorkCancellation } from './platform-whatsapp-work-cancellation';
 
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
@@ -116,9 +117,11 @@ export async function updateConsent(user: ChatActor, supplied: ConsentInput, db:
     if (accepting && input.scope !== 'account') await assertConsent(user.uid, 'account', undefined, db, tx);
     const profileRef = db.collection('users').doc(user.uid);
     const profile = accepting && input.scope === 'account' ? await tx.get(profileRef) : null;
+    const cancellation = input.scope === 'account' || input.scope === 'platform_support' ? await readOwnerWorkCancellation(user.uid, tx, db) : null;
     const revision = (current.value?.revision ?? 0) + 1, occurredAt = Date.now();
     const receipt: ConsentReceipt = { uid: user.uid, scope: input.scope, businessId, requestId: input.requestId, action: input.action, revision, occurredAt, preauthorizedAt: preauthorized?.issuedAt ?? null,
       termsAccepted: accepting, dataAuthorized: accepting, documents: current.documents };
+    stageOwnerWorkCancellation(cancellation, tx, db, occurredAt);
     tx.create(reference, { ...receipt, operationHash });
     tx.set(current.reference, { version: 1, uid: user.uid, scope: input.scope, businessId, revision, active: accepting, fingerprint: current.documents.fingerprint, receiptId });
     if (claimRef) tx.create(claimRef, { uid: user.uid, receiptId, occurredAt });

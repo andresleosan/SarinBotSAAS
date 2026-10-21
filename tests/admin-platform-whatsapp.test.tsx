@@ -30,6 +30,16 @@ describe('private platform WhatsApp workspace through the real API client and po
   async function click(label: string) { await act(async () => button(label).props.onClick()); }
   async function event(target: EventTarget, name: string) { await act(async () => target.dispatchEvent(new Event(name))); }
   async function fill(values: string[]) { await act(async () => { root().findAllByType('input').forEach((input, index) => input.props.onChange({ target: { value: values[index] } })); }); }
+  it('offers explicit assistant reentry through the authenticated existing control and labels bot state', async () => {
+    await mount();
+    const pending = deferred<Response>(); transport.mockImplementationOnce(() => pending.promise);
+    await click('Reactivar asistente');
+    expect(body()).toMatchObject({ mode: 'bot', conversationId: inbox.conversations[0].id, expectedRevision: inbox.conversations[0].revision });
+    expect(button('Reactivar asistente').props.disabled).toBe(true);
+    inbox = inboxFixture([conversationFixture({ mode: 'bot' })]);
+    await act(async () => pending.resolve(response({ conversation: inbox.conversations[0] })));
+    expect(content()).toContain('Asistente'); expect(content()).toContain('no habilita la IA ni el envío');
+  });
   beforeEach(() => {
     now = 0; vi.useFakeTimers(); vi.spyOn(performance, 'now').mockImplementation(() => now);
     page = Object.assign(new EventTarget(), { visibilityState: 'visible' }); browser = new EventTarget();
@@ -311,7 +321,7 @@ describe('private platform WhatsApp workspace through the real API client and po
     expect(root().findAllByType('p').find(node => text(node).includes('Consulta sintética'))!.props.className).toContain('whitespace-pre-wrap break-words');
     expect(root().findAll(node => typeof node.props.className === 'string' && node.props.className.includes('flex flex-col gap-2 sm:flex-row sm:flex-wrap')).length).toBeGreaterThan(0);
     expect(root().findAllByType('a')).toHaveLength(0); expect(root().findAllByType('select')).toHaveLength(0);
-    expect(content()).toContain('Las conversaciones de negocios y sus controles comerciales están en la sección siguiente. Aquí no se envían mensajes ni se activa un bot.');
+    expect(content()).toContain('Las conversaciones de negocios y sus controles comerciales están en la sección siguiente. Reactivar el asistente permite futuras consultas autorizadas; la conexión, la IA y el envío conservan sus controles independientes.');
   });
   it('shows nullable and unavailable content without confusing either with an empty inbox', async () => {
     inbox = inboxFixture([conversationFixture({ customerPhone: null, lastMessage: null }), conversationFixture({ id: 'b'.repeat(64), contentAvailable: false })]); await mount();

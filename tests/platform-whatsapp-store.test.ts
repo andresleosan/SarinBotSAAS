@@ -82,11 +82,12 @@ describe('platform connection controls and status', () => {
   it.each([-1, 0.1, NaN, Infinity, 8_640_000_000_000_000 - 2_592_000_000 + 1])('rejects invalid now %s', value => {
     expect(() => assertPlatformWhatsAppNow(value)).toThrow('Fecha no válida.');
   });
-  it('accepts now endpoints and strict controls while rejecting hidden flags and bot mode', () => {
+  it('accepts now endpoints and strict controls while rejecting hidden flags and allowing explicit bot mode', () => {
     assertPlatformWhatsAppNow(0); assertPlatformWhatsAppNow(8_640_000_000_000_000 - 2_592_000_000);
     expect(schema.safeParse({ action: 'pause', expectedRevision: 0, requestId: 'demo-valid', paused: true }).success).toBe(false);
     expect(schema.safeParse({ action: 'pause', expectedRevision: 0, requestId: 'demo-valid\n' }).success).toBe(false);
-    expect(platformWhatsAppConversationControlSchema.safeParse({ conversationId: 'a'.repeat(64), mode: 'bot', expectedRevision: 0, requestId: 'demo-valid' }).success).toBe(false);
+    expect(platformWhatsAppConversationControlSchema.safeParse({ conversationId: 'a'.repeat(64), mode: 'bot', expectedRevision: 0, requestId: 'demo-valid' }).success).toBe(true);
+    expect(platformWhatsAppConversationControlSchema.safeParse({ conversationId: 'a'.repeat(64), mode: 'unknown', expectedRevision: 0, requestId: 'demo-valid' }).success).toBe(false);
     for (const actor of ['', '😀'.repeat(65), null]) expect(() => controlIdentity(actor as string, 'demo-valid', {})).toThrow('Actor no válido.');
     expect(controlIdentity(' ', 'demo-valid', {}).id).toMatch(/^control_[a-f0-9]{64}$/);
   });

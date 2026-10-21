@@ -8,7 +8,7 @@ const MAX_READ = 1000;
 const REPLAY_MS = 24 * 60 * 60 * 1000;
 const encoder = new TextEncoder();
 const fields: Record<string, 'string' | 'number' | 'boolean'> = {
-  ownerUid: 'string', 'client.uid': 'string', dateKey: 'string', resourceId: 'string', status: 'string', type: 'string', tenantId: 'string', businessId: 'string', phoneNumberId: 'string', state: 'string', id: 'string', appointmentId: 'string',
+  ownerUid: 'string', 'client.uid': 'string', dateKey: 'string', resourceId: 'string', status: 'string', type: 'string', tenantId: 'string', businessId: 'string', phoneNumberId: 'string', state: 'string', bodyState: 'string', id: 'string', appointmentId: 'string',
   createdAt: 'number', updatedAt: 'number', submittedAt: 'number', startsAt: 'number', startAt: 'number', nextAttemptAt: 'number', bodyExpiresAt: 'number', expiresAt: 'number', enabled: 'boolean',
 };
 type DataEnvironment = Pick<CloudflareBindings, 'SARIN_DB' | 'SARIN_FILES'>;

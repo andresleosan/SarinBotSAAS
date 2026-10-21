@@ -28,7 +28,7 @@ interface ExpiringMetadata extends PlatformWhatsAppIdentity {
 type ContentState<K extends string> =
   | ({ state: 'body_present' } & Record<K, PlatformWhatsAppCiphertext>)
   | ({ state: 'body_erased' } & Record<K, null>);
-export interface PlatformWhatsAppConnectionRecord extends PlatformWhatsAppIdentity {
+interface PlatformWhatsAppConnectionBase extends PlatformWhatsAppIdentity {
   recordType: 'connection';
   connectionRevision: number;
   providerConnection: 'unverified' | 'connected' | 'disconnected';
@@ -41,6 +41,10 @@ export interface PlatformWhatsAppConnectionRecord extends PlatformWhatsAppIdenti
   lastHumanEchoAt: number | null;
   lastDeliveryAt: null;
 }
+export type PlatformWhatsAppConnectionRecord = PlatformWhatsAppConnectionBase & (
+  | { observationStatus?: never; observationRevision?: never; observedAt?: never }
+  | { observationStatus: 'none' | 'connected' | 'disconnected' | 'failed'; observationRevision: number | null; observedAt: number | null }
+);
 export type PlatformWhatsAppEventRecord = ExpiringMetadata & {
   recordType: 'event';
   connectionRevision: number;
@@ -54,6 +58,7 @@ export type PlatformWhatsAppEventRecord = ExpiringMetadata & {
   | (ContentState<'content'> & { kind: 'human_echo' })
   | (ContentState<'content'> & { kind: 'incoming_audio'; customerSentAt: number | null; ingressDisposition: 'descriptor_retained' })
   | { state: 'body_erased'; content: null; kind: 'incoming_audio' | 'incoming_choice'; customerSentAt: number | null; ingressDisposition: 'control_only' }
+  | { state: 'body_erased'; content: null; kind: 'incoming_choice'; customerSentAt: number | null; ingressDisposition: 'choice_consumed'; consumedOutboxId: string; consumedAction: string; resultControlEpoch: string; resultControlRevision: number; resultJobId: string | null }
 );
 export interface PlatformWhatsAppAliasRecord extends ExpiringMetadata {
   recordType: 'alias';
@@ -77,11 +82,11 @@ export type PlatformWhatsAppControlRecord = ExpiringMetadata & {
   resultRevision: number;
 } & (
   | { state: 'connection_control'; targetId: 'platform_whatsapp'; action: 'pause' | 'resume' | 'disconnect' | 'record_connected' }
-  | { state: 'conversation_control'; targetId: string; action: 'human' | 'review' }
+  | { state: 'conversation_control'; targetId: string; action: 'human' | 'review' | 'bot' }
 );
 export type PlatformWhatsAppConversationRecord = PlatformWhatsAppIdentity & ContentState<'contactContent'> & {
   recordType: 'conversation';
-  mode: 'human' | 'review';
+  mode: 'human' | 'review' | 'bot';
   revision: number;
   updatedAt: number;
   lastInboundAt: number | null;
@@ -131,24 +136,30 @@ function hasContent(value: UnknownRecord, field: string): boolean {
   );
 }
 export function isPlatformWhatsAppConnectionRecord(value: unknown): value is PlatformWhatsAppConnectionRecord {
-  return isIdentity(value) && hasExactKeys(value, [...identityKeys, 'recordType', 'connectionRevision', 'providerConnection', 'paused', 'pausedReason', 'updatedAt', 'connectedAt', 'connectedRevision', 'lastSignedInboundAt', 'lastHumanEchoAt', 'lastDeliveryAt'])
+  return isIdentity(value) && hasExactKeys(value, [...identityKeys, 'recordType', 'connectionRevision', 'providerConnection', 'paused', 'pausedReason', 'updatedAt', 'connectedAt', 'connectedRevision', 'lastSignedInboundAt', 'lastHumanEchoAt', 'lastDeliveryAt', ...Object.hasOwn(value, 'observationStatus') ? ['observationStatus', 'observationRevision', 'observedAt'] : []])
     && value.recordType === 'connection' && isInteger(value.connectionRevision)
     && ['unverified', 'connected', 'disconnected'].includes(value.providerConnection as string)
     && typeof value.paused === 'boolean' && [null, 'manual', 'disconnected'].includes(value.pausedReason as string | null)
     && isInteger(value.updatedAt) && isNullableInteger(value.connectedAt) && isNullableInteger(value.connectedRevision)
     && isNullableInteger(value.lastSignedInboundAt) && isNullableInteger(value.lastHumanEchoAt) && value.lastDeliveryAt === null
-    && (value.providerConnection !== 'disconnected' || (value.paused && value.pausedReason === 'disconnected'));
+    && (value.providerConnection !== 'disconnected' || (value.paused && value.pausedReason === 'disconnected'))
+    && (!Object.hasOwn(value, 'observationStatus') || (['none', 'failed'].includes(String(value.observationStatus))
+      ? value.observationRevision === null && value.observedAt === null
+      : ['connected', 'disconnected'].includes(String(value.observationStatus)) && value.observationStatus === value.providerConnection && value.observationRevision === value.connectionRevision && isInteger(value.observedAt) && value.observedAt <= value.updatedAt));
 }
 export function isPlatformWhatsAppEventRecord(value: unknown): value is PlatformWhatsAppEventRecord {
   if (!isMetadata(value)) return false;
   const newer = value.kind === 'incoming_audio' || value.kind === 'incoming_choice';
   const timed = newer || (value.kind === 'incoming_text' && Object.hasOwn(value, 'customerSentAt'));
-  const keys = [...metadataKeys, 'recordType', 'state', 'connectionRevision', 'conversationId', 'kind', 'occurredAt', 'canonicalIdentity', 'fingerprint', 'bodyExpiresAt', 'content', ...timed ? ['customerSentAt'] : [], ...newer ? ['ingressDisposition'] : []];
+  const consumed = value.kind === 'incoming_choice' && value.ingressDisposition === 'choice_consumed';
+  const uuid = (v: unknown) => typeof v === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}(?![\s\S])/.test(v);
+  const keys = [...metadataKeys, 'recordType', 'state', 'connectionRevision', 'conversationId', 'kind', 'occurredAt', 'canonicalIdentity', 'fingerprint', 'bodyExpiresAt', 'content', ...timed ? ['customerSentAt'] : [], ...newer ? ['ingressDisposition'] : [], ...consumed ? ['consumedOutboxId', 'consumedAction', 'resultControlEpoch', 'resultControlRevision', 'resultJobId'] : []];
   return hasExactKeys(value, keys)
     && value.recordType === 'event' && hasContent(value, 'content') && isInteger(value.connectionRevision)
     && isDigest(value.conversationId) && ['incoming_text', 'human_echo', 'incoming_audio', 'incoming_choice'].includes(value.kind as string)
     && (!timed || (isNullableInteger(value.customerSentAt) && (value.customerSentAt === null || (value.customerSentAt as number) <= value.receivedAt)))
-    && (!newer || (value.ingressDisposition === 'control_only' ? value.state === 'body_erased' && value.content === null : value.kind === 'incoming_audio' && value.ingressDisposition === 'descriptor_retained'))
+    && (!newer || (value.ingressDisposition === 'control_only' || consumed ? value.state === 'body_erased' && value.content === null : value.kind === 'incoming_audio' && value.ingressDisposition === 'descriptor_retained'))
+    && (!consumed || uuid(value.consumedOutboxId) && ['accept', 'human', 'stop', 'support', 'plans'].includes(String(value.consumedAction)) && uuid(value.resultControlEpoch) && isInteger(value.resultControlRevision) && (value.resultJobId === null || typeof value.resultJobId === 'string' && /^job_[a-f0-9]{64}(?![\s\S])/.test(value.resultJobId)))
     && isInteger(value.occurredAt) && isDigest(value.canonicalIdentity) && isDigest(value.fingerprint)
     && value.bodyExpiresAt === Math.min(value.occurredAt, value.receivedAt) + PLATFORM_BODY_TTL;
 }
@@ -168,11 +179,11 @@ export function isPlatformWhatsAppControlRecord(value: unknown): value is Platfo
     && isDigest(value.fingerprint) && isInteger(value.resultRevision)
     && (value.state === 'connection_control'
       ? value.targetId === 'platform_whatsapp' && ['pause', 'resume', 'disconnect', 'record_connected'].includes(value.action as string)
-      : isDigest(value.targetId) && ['human', 'review'].includes(value.action as string));
+      : isDigest(value.targetId) && ['human', 'review', 'bot'].includes(value.action as string));
 }
 export function isPlatformWhatsAppConversationRecord(value: unknown): value is PlatformWhatsAppConversationRecord {
   return isIdentity(value) && hasExactKeys(value, [...identityKeys, 'recordType', 'state', 'mode', 'revision', 'updatedAt', 'lastInboundAt', 'lastHumanAt', 'bodyExpiresAt', 'expiresAt', 'previewOccurredAt', 'previewReceivedAt', 'canonicalIdentity', 'contactContent', 'conflictAt'])
-    && value.recordType === 'conversation' && hasContent(value, 'contactContent') && ['human', 'review'].includes(value.mode as string)
+    && value.recordType === 'conversation' && hasContent(value, 'contactContent') && ['human', 'review', 'bot'].includes(value.mode as string)
     && isInteger(value.revision) && isInteger(value.updatedAt) && isInteger(value.expiresAt)
     && isNullableInteger(value.lastInboundAt) && isNullableInteger(value.lastHumanAt)
     && isInteger(value.previewOccurredAt) && isInteger(value.previewReceivedAt)
