@@ -26,7 +26,7 @@ const git = (...argv) => {
 };
 const lf = (bytes) => {
   try {
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
     return text.includes('\0') ? null : Buffer.from(text.replace(/\r\n/g, '\n'));
   } catch { return null; }
 };
@@ -77,7 +77,7 @@ const manifest = {
   schemaVersion: 1,
   sourceCommit,
   sourceTree: git('rev-parse', `${sourceCommit}^{tree}`).toString('utf8').trim(),
-  algorithm: 'SHA-256 of every tracked Git blob at sourceCommit; UTF-8 text additionally hashes CRLF-to-LF bytes. Working inputs must match raw bytes or only CRLF/LF. The source inventory excludes untracked/private/generated inputs; an explicitly supplied public-runtime reference is compared separately.',
+  algorithm: 'SHA-256 of every tracked Git blob at sourceCommit; UTF-8 text additionally hashes CRLF-to-LF bytes with any BOM preserved. Working inputs must match raw bytes or only CRLF/LF; NUL-containing or invalid UTF-8 bytes require exact equality. The source inventory excludes untracked/private/generated inputs; an explicitly supplied public-runtime reference is compared separately.',
   selfReference: { sourceCommitExcludes: followupPaths, followup: 'Subsequent documentation/verification-only commit; identify its SHA from Git history, never embed its own SHA in this manifest.' },
   fileCount: files.length,
   sourceIndexSha256: sha(Buffer.from(files.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(''))),

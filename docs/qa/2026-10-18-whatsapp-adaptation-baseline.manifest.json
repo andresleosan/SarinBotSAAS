@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceCommit": "8d0b7702f1d1f5694ff8ca930657a2280e2ce04a",
   "sourceTree": "68f4bf86739cd33737d9a90e548e6afbca0aa9f4",
-  "algorithm": "SHA-256 of every tracked Git blob at sourceCommit; UTF-8 text additionally hashes CRLF-to-LF bytes. Working inputs must match raw bytes or only CRLF/LF. The source inventory excludes untracked/private/generated inputs; an explicitly supplied public-runtime reference is compared separately.",
+  "algorithm": "SHA-256 of every tracked Git blob at sourceCommit; UTF-8 text additionally hashes CRLF-to-LF bytes with any BOM preserved. Working inputs must match raw bytes or only CRLF/LF; NUL-containing or invalid UTF-8 bytes require exact equality. The source inventory excludes untracked/private/generated inputs; an explicitly supplied public-runtime reference is compared separately.",
   "selfReference": {
     "sourceCommitExcludes": [
       "docs/qa/2026-10-18-whatsapp-adaptation-baseline.md",
@@ -28,7 +28,7 @@
       "gitBlob": "74ed40ac0f80a1c8d8c9867e5bbeb7f6b39f1f7e",
       "bytes": 3101,
       "sha256": "8e9c0873176e6f9c0e70818212dfc42faa54ca1b9e0eb55e7a6454268a72e1cb",
-      "lfSha256": "d234079e18ccd592c579e61e39d2293fcd2be5734d7cb3eac0500d7f3df254b8"
+      "lfSha256": "8e9c0873176e6f9c0e70818212dfc42faa54ca1b9e0eb55e7a6454268a72e1cb"
     },
     {
       "path": ".gitattributes",
@@ -2094,7 +2094,7 @@
       "gitBlob": "73c80d004c59f811357ef6e65c1e24c6b2df35b8",
       "bytes": 2386,
       "sha256": "7c34a1e155fee482335e3436983277fb474cfdd0d15278c6d59c8282f831c75b",
-      "lfSha256": "c763e1b88cebe1f03a4d5b3928d3a538ef5275865da338efe7d51b695951c192"
+      "lfSha256": "7c34a1e155fee482335e3436983277fb474cfdd0d15278c6d59c8282f831c75b"
     },
     {
       "path": "docs/qa/2026-10-20-source-restoration-r3a-domain.md",
@@ -2522,7 +2522,7 @@
       "gitBlob": "f6c39f4501f723262cb6392d609680cef4ac3d0a",
       "bytes": 23409,
       "sha256": "fe09beeec7531db1893d2f93c62f98378f7d2c7a2e9c63b09ee993502b5a885e",
-      "lfSha256": "5e6afbeffe6a4043af5c79bf8eefc8f58878d999e2e99ec0a19b2ac994c6cfaf"
+      "lfSha256": "fe09beeec7531db1893d2f93c62f98378f7d2c7a2e9c63b09ee993502b5a885e"
     },
     {
       "path": "docs/superpowers/plans/2026-10-16-pilot-business-branding.md",
@@ -2994,7 +2994,7 @@
       "gitBlob": "f06302647abe2320fa403bc38b9f9a031294cf67",
       "bytes": 16,
       "sha256": "0e48089c1fd70767c2e01428417a02df4d2e6840ade151222ff8d944bb793b8e",
-      "lfSha256": "f049bff6b28cfaa2327fa29e27aa53c76a8b91de7565254ee7dce1983a22090d"
+      "lfSha256": "0e48089c1fd70767c2e01428417a02df4d2e6840ade151222ff8d944bb793b8e"
     },
     {
       "path": "qa/source-restoration-r0/assemble.mjs",
@@ -3002,7 +3002,7 @@
       "gitBlob": "1eda40059a5df4e81448282ffafb1ce8c5eaa1d2",
       "bytes": 7054,
       "sha256": "96c7f3a225f2b367a4f3f8082909562cce9524a3f2cf856a46ba793df676d34d",
-      "lfSha256": "dacda70d94b3daf37b64a8356ec993f3269043ce5125c3c10e7b8b1a163279ff"
+      "lfSha256": "96c7f3a225f2b367a4f3f8082909562cce9524a3f2cf856a46ba793df676d34d"
     },
     {
       "path": "qa/source-restoration-r0/assembly-verification.json",
@@ -3106,7 +3106,7 @@
       "gitBlob": "3dd5cc720e556476ed15f6d4c99e3f05abac038b",
       "bytes": 1784,
       "sha256": "c0c488a3bd6de10d1ae795c3c965deabf345e3e4ba3da3cc44eee6cbd39254cc",
-      "lfSha256": "414b9862357c51e3e4cdd0f28eeb8a3f658e83f04449b526c7728ed6deee92b9"
+      "lfSha256": "c0c488a3bd6de10d1ae795c3c965deabf345e3e4ba3da3cc44eee6cbd39254cc"
     },
     {
       "path": "qa/source-restoration-r0/run-vitest.mjs",
@@ -3114,7 +3114,7 @@
       "gitBlob": "28fe42d281329ca903bdb1caf2c8e2933229e488",
       "bytes": 652,
       "sha256": "f7d03504bbe996d5c495e6f383399fc21118e8ced2e9b7cf8b2dfe72be1ed119",
-      "lfSha256": "f898eccbfa7409068035f3998393274570aae6a028cf1a0e0a6cdb6ef4c48552"
+      "lfSha256": "f7d03504bbe996d5c495e6f383399fc21118e8ced2e9b7cf8b2dfe72be1ed119"
     },
     {
       "path": "qa/source-restoration-r0/shared-before.json",
@@ -3146,7 +3146,7 @@
       "gitBlob": "6241f157b2725e8be6486391fd7e82da2ab47d5c",
       "bytes": 2498,
       "sha256": "4dd78cb336390a3b96204bc898298d2f09cbe7fbea76fac57e2e613520426a3f",
-      "lfSha256": "6229c88065bcf821294e452392ba3adfcd0aad2f341d8b759e7ea3454ec27329"
+      "lfSha256": "4dd78cb336390a3b96204bc898298d2f09cbe7fbea76fac57e2e613520426a3f"
     },
     {
       "path": "qa/source-restoration-r0/verify-git-bytes.mjs",
@@ -3154,7 +3154,7 @@
       "gitBlob": "46991a4c075dad86a41155761ed094da0d6d1ddd",
       "bytes": 720,
       "sha256": "f3207d5feb49d3a1faff4095f1df9a0a4d3e0578ad9de909eea849c74ca8e573",
-      "lfSha256": "b89483a416094b5ff02c00d6c3739199d6c4d5a6b96ea9d1b427d1901912225b"
+      "lfSha256": "f3207d5feb49d3a1faff4095f1df9a0a4d3e0578ad9de909eea849c74ca8e573"
     },
     {
       "path": "qa/source-restoration-r0/vitest-results.json",
@@ -3186,7 +3186,7 @@
       "gitBlob": "65c7830482321c98b188577b264c0cd3eae15ef9",
       "bytes": 14511,
       "sha256": "2f8428e848440a94f7470855224800d9fa9f430b57e4a681d1c0ff2b2095d8ba",
-      "lfSha256": "ba148d4fd9ff2f51ab66b72432feff3db6c5ed861254b1d7bed303c8aa08b7a8"
+      "lfSha256": "2f8428e848440a94f7470855224800d9fa9f430b57e4a681d1c0ff2b2095d8ba"
     },
     {
       "path": "qa/tests/appointment-reschedule.md",
