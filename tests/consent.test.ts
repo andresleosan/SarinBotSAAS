@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { memoryFirestore } from './memoryFirestore';
-import { assertConsent, preauthorizeAccount, readConsent, updateConsent } from '@/lib/server/consent';
+import { assertConsent, consentDocuments, preauthorizeAccount, readConsent, updateConsent } from '@/lib/server/consent';
 
 const now = Date.parse('2030-01-01T12:00:00Z');
 const user = { uid: 'client', email: 'client@example.test', name: 'Cliente' };
@@ -17,6 +17,12 @@ async function accept(db: Db, scope: 'account' | 'business_client' = 'account', 
 describe('explicit versioned consent', () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
   afterEach(() => vi.useRealTimers());
+
+  it('fingerprints the published documents independently for account and a named synthetic business', () => {
+    // Independently reconstructed from the published literal AST, with recursively sorted keys.
+    expect(consentDocuments('account').fingerprint).toBe('0266cade348f0cea94ea79d38d69f8a597e36d19dcdce7ddceab8caef575fcb7');
+    expect(consentDocuments('business_client', { id: 'demo-fingerprint', name: 'Negocio sintético', phoneWhatsApp: '12345678' }).fingerprint).toBe('38e87d63418d061441185236b26fd5a88f19ee0e4ae319cf24df053ee816da11');
+  });
 
   it('denies missing consent without manufacturing a profile or acceptance', async () => {
     const { db, rows } = setup();

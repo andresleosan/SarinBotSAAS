@@ -315,7 +315,7 @@ function Billing() {
             revisión antes de enviar otro pago.
           </Notice>
         )}
-        {!data.whatsappAvailable && <p className="text-xs text-sarin-muted">Sarin WhatsApp está en preparación y todavía no se puede contratar. Para mayor volumen, solicita una cotización a medida.</p>}
+        {!data.whatsappAvailable && <p className="text-xs text-sarin-muted">SarinBot WhatsApp está en preparación y todavía no se puede contratar. Para mayor volumen, solicita una cotización a medida.</p>}
         <div className="space-y-2">
           <h2 className="font-semibold">Datos para tu transferencia</h2>
           {data.settings.bankAccounts.length === 0 ? (

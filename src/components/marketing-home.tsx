@@ -6,10 +6,11 @@ import { SarinArrival } from "./sarin-arrival";
 import { MarketingPricing } from "./marketing-pricing";
 import { PAID_TRIAL_APPOINTMENT_LIMIT, PAID_TRIAL_INCLUDED_RESPONSES, PAID_TRIAL_PRICE_COP } from "@/lib/paid-trial";
 import { publicApplicationOrigin } from "@/lib/marketing-links";
+import { sarinWhatsAppUrl } from "@/lib/sarin-contact";
 import "./marketing-home.css";
 
 function MarketingBrand({ eager = false }: { eager?: boolean }) {
-  return <span className="agenda-brand"><Image src="/brand/sarin-face-mark.png" alt="" width={40} height={40} className="agenda-brand-face" loading={eager ? "eager" : "lazy"} /><span>sarin<span className="agenda-brand-suffix">bot</span></span></span>;
+  return <span className="agenda-brand"><Image src="/brand/sarin-face-mark.png" alt="" width={40} height={40} className="agenda-brand-face" loading={eager ? "eager" : "lazy"} /><span>Sarin<span className="agenda-brand-suffix">Bot</span></span></span>;
 }
 
 const steps = [
@@ -29,7 +30,7 @@ export function MarketingHome({ standalone = false, publicAppUrl }: { standalone
     <div className="agenda-home">
       <a href="#main-content" className="sarin-skip">Saltar al contenido</a>
       <header className="agenda-header agenda-container">
-        <Link href="/" aria-label="Sarin Bot, inicio"><MarketingBrand eager /></Link>
+        <Link href="/" aria-label="SarinBot, inicio"><MarketingBrand eager /></Link>
         <nav aria-label="Navegación principal" className="agenda-nav">
           <a href="#como-funciona">El asistente</a>
           <a href="#tu-agenda">Tu agenda</a>
@@ -42,7 +43,7 @@ export function MarketingHome({ standalone = false, publicAppUrl }: { standalone
       <main id="main-content">
         <section className="agenda-hero agenda-container" aria-labelledby="agenda-heading">
           <h1 id="agenda-heading">Menos mensajes.<br /><span>Más citas en orden.</span></h1>
-          <p className="agenda-intro">Un enlace para tus clientes. Una agenda para ti.<br className="agenda-desktop-break" /> Sarin consulta tus servicios y horarios, confirma reservas y las organiza en tu agenda.</p>
+          <p className="agenda-intro">Un enlace para tus clientes. Una agenda para ti.<br className="agenda-desktop-break" /> SarinBot consulta tus servicios y horarios, confirma reservas y las organiza en tu agenda.</p>
           <div className="agenda-hero-actions">
             <Link href={onboarding} className="agenda-button">
               {accessEnabled ? `Empezar por $${price(PAID_TRIAL_PRICE_COP)} COP` : "Ver planes y prueba"}<ArrowRight aria-hidden="true" />
@@ -56,7 +57,7 @@ export function MarketingHome({ standalone = false, publicAppUrl }: { standalone
         <section id="como-funciona" className="agenda-how agenda-container" aria-labelledby="how-heading">
           <div className="agenda-section-heading">
             <h2 id="how-heading">De la conversación<br />a una cita confirmada.</h2>
-            <p>Configura servicios, profesionales, precios y horarios. Sarin consulta esa información antes de reservar.</p>
+            <p>Configura servicios, profesionales, precios y horarios. SarinBot consulta esa información antes de reservar.</p>
           </div>
           <ol className="agenda-steps">
             {steps.map(({ title, text }) => <li key={title}>
@@ -65,13 +66,13 @@ export function MarketingHome({ standalone = false, publicAppUrl }: { standalone
           </ol>
         </section>
         <section id="tu-espacio" className="agenda-details agenda-container" aria-labelledby="space-heading">
-          <h2 id="space-heading" className="agenda-sr-only">Tu espacio con Sarin</h2>
+          <h2 id="space-heading" className="agenda-sr-only">Tu espacio con SarinBot</h2>
           <div className="agenda-detail"><h3>Reservas vinculadas al cliente</h3><p>Tu cliente entra con Google, consulta disponibilidad y revisa el resumen antes de confirmar. La cita queda vinculada a su cuenta.</p></div>
           <div className="agenda-detail"><h3>Sus citas, dentro de tu negocio</h3><p>En «Mis citas», el cliente consulta sus próximas reservas, el historial y las citas de una fecha. Puede cancelar una cita antes de que empiece y usar «Guardar imagen de la cita» para descargar un PNG de una reserva futura confirmada. La imagen es estática; los cambios se consultan en «Mis citas».</p></div>
         </section>
         <section id="planes" className="agenda-how agenda-container" aria-labelledby="plans-heading">
           <div className="agenda-section-heading">
-            <h2 id="plans-heading">Prueba con {PAID_TRIAL_APPOINTMENT_LIMIT} citas.<br />Continúa con Sarin Esencial.</h2>
+            <h2 id="plans-heading">Prueba con {PAID_TRIAL_APPOINTMENT_LIMIT} citas.<br />Continúa con SarinBot Esencial.</h2>
             <p>La prueba cuesta ${price(PAID_TRIAL_PRICE_COP)} COP una sola vez e incluye la configuración y {PAID_TRIAL_INCLUDED_RESPONSES} respuestas de IA en total, sin vencimiento por días.</p>
           </div>
           <p className="agenda-launch-note">Cada cita creada consume un cupo de la prueba; cancelarla no lo devuelve. Las {PAID_TRIAL_INCLUDED_RESPONSES} respuestas son un límite independiente y también incluyen la configuración. Al agotarse las citas o las respuestas, se necesita un plan para continuar con la atención de IA.</p>
@@ -84,8 +85,9 @@ export function MarketingHome({ standalone = false, publicAppUrl }: { standalone
         </section>
       </main>
       <footer className="agenda-footer agenda-container">
-        <Link href="/" aria-label="Sarin Bot, inicio"><MarketingBrand /></Link>
+        <Link href="/" aria-label="SarinBot, inicio"><MarketingBrand /></Link>
         <p>Un producto de <a href="https://www.alsdevstudio.com/">ALS DevStudio<ArrowUpRight aria-hidden="true" /></a></p>
+        <a href={sarinWhatsAppUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className="agenda-text-link">Contactar a SarinBot por WhatsApp<ArrowUpRight aria-hidden="true" /></a>
         {accessEnabled && <nav aria-label="Información del servicio" className="flex flex-wrap gap-x-5">
           <Link href={standalone ? `${publicOrigin}/ayuda` : "/ayuda"} className="agenda-text-link">Ayuda</Link>
           <Link href={standalone ? `${publicOrigin}/privacidad` : "/privacidad"} className="agenda-text-link">Privacidad</Link>

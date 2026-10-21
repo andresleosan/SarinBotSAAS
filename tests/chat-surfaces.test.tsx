@@ -43,23 +43,31 @@ describe("chat pause surfaces", () => {
   });
   afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); });
   const modeButton = (label: string) => renderer.root.findAllByType('button').find(button => text(button) === label);
-  async function chooseChat() { const button = modeButton('Hablar con Sarin'); expect(button).toBeDefined(); await act(async () => button!.props.onClick()); }
+  async function chooseChat() { const button = modeButton('Hablar con SarinBot'); expect(button).toBeDefined(); await act(async () => button!.props.onClick()); }
+  it.each(['+12345678', '12345678', '1234-5678'])('publishes only exact business phone links in the signed-in booking screen: %s', async phoneWhatsApp => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ business: { id: 'fixture-business', name: 'Negocio sintético', phoneWhatsApp, services: [], subscription: state.publicSubscription } })));
+    await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
+    const contact = renderer.root.findByProps({ 'aria-label': 'Contacto del negocio' });
+    const links = contact.findAllByType('a');
+    expect(links.map(link => link.props.href)).toEqual(phoneWhatsApp === '1234-5678' ? [] : ['tel:+12345678', 'https://wa.me/12345678']);
+    if (links.length) expect(links[1].props).toMatchObject({ target: '_blank', rel: 'noopener noreferrer', referrerPolicy: 'no-referrer' });
+  });
   it.each([false, true])('starts with the self calendar without chat or engine calls when minors=%s', async minors => {
     state.minors = minors;
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
     expect(renderer.root.findAllByProps({ 'data-kind': 'self', 'data-enabled': true })).toHaveLength(1);
     expect(modeButton('Reservar con calendario')?.props['aria-pressed']).toBe(true);
-    expect(modeButton('Hablar con Sarin')?.props['aria-pressed']).toBe(false);
+    expect(modeButton('Hablar con SarinBot')?.props['aria-pressed']).toBe(false);
     expect(state.chatMount).not.toHaveBeenCalled(); expect(state.engineMount).not.toHaveBeenCalled();
     expect(text(renderer.root)).toContain('Cita conservada');
   });
   it('offers chat explicitly and allows returning to the self calendar', async () => {
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
     await chooseChat(); expect(state.chatMount).toHaveBeenCalled();
-    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para SarinBot' })).toHaveLength(1);
     await act(async () => modeButton('Reservar con calendario')!.props.onClick());
     expect(renderer.root.findAllByProps({ 'data-kind': 'self' })).toHaveLength(1);
-    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para SarinBot' })).toHaveLength(0);
   });
   it.each(['isWaitingBatch', 'isGenerating', 'confirming', 'confirmationUncertain'] as const)('locks route and subject changes while chat %s', async flag => {
     const params = Promise.resolve({ slug: 'fixture' }); const view = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
@@ -67,14 +75,14 @@ describe("chat pause surfaces", () => {
     state.chat[flag] = true; await act(async () => renderer.update(view()));
     expect(modeButton('Reservar con calendario')?.props.disabled).toBe(true);
     expect(modeButton('Para un menor a quien represento')?.props.disabled).toBe(true);
-    if (flag === 'confirmationUncertain') expect(renderer.root.findByProps({ 'aria-label': 'Mensaje para Sarin' }).props.disabled).toBe(true);
+    if (flag === 'confirmationUncertain') expect(renderer.root.findByProps({ 'aria-label': 'Mensaje para SarinBot' }).props.disabled).toBe(true);
   });
   it('preserves the calendar controller and locks route changes while confirmation needs recovery', async () => {
     const params = Promise.resolve({ slug: 'fixture' }); const view = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
     await act(async () => { renderer = create(view()); });
     expect(state.structuredProps?.initialSubjectKind).toBe('self');
     await act(async () => state.structuredProps!.onLockedChange(true));
-    expect(modeButton('Hablar con Sarin')?.props.disabled).toBe(true);
+    expect(modeButton('Hablar con SarinBot')?.props.disabled).toBe(true);
     state.businessConsent = false; await act(async () => renderer.update(view()));
     expect(state.structuredUnmount).not.toHaveBeenCalled();
     expect(renderer.root.findAllByProps({ 'data-kind': 'self', 'data-enabled': false })).toHaveLength(1);
@@ -83,7 +91,7 @@ describe("chat pause surfaces", () => {
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
     await act(async () => modeButton('Para un menor a quien represento')!.props.onClick());
     expect(renderer.root.findAllByProps({ 'data-kind': 'represented_minor' })).toHaveLength(1);
-    expect(modeButton('Hablar con Sarin')).toBeUndefined();
+    expect(modeButton('Hablar con SarinBot')).toBeUndefined();
     await act(async () => modeButton('Para mí')!.props.onClick());
     expect(renderer.root.findAllByProps({ 'data-kind': 'self' })).toHaveLength(1);
   });
@@ -91,16 +99,16 @@ describe("chat pause surfaces", () => {
     state.businessConsent = false;
     const params = Promise.resolve({ slug: 'fixture' }); const view = () => createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }));
     await act(async () => { renderer = create(view()); });
-    expect(modeButton('Hablar con Sarin')?.props.disabled).toBe(true);
+    expect(modeButton('Hablar con SarinBot')?.props.disabled).toBe(true);
     expect(state.structuredMount).not.toHaveBeenCalled(); expect(state.chatMount).not.toHaveBeenCalled();
     state.dataMode = 'health'; await act(async () => renderer.update(view()));
-    expect(modeButton('Hablar con Sarin')).toBeUndefined(); expect(state.chatMount).not.toHaveBeenCalled();
+    expect(modeButton('Hablar con SarinBot')).toBeUndefined(); expect(state.chatMount).not.toHaveBeenCalled();
   });
   it('keeps appointments and cancellation visible while new chat and booking contact require consent', async () => {
     state.businessConsent = false;
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: 'fixture' }) }))); });
-    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
-    expect(modeButton('Hablar con Sarin')?.props.disabled).toBe(true);
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para SarinBot' })).toHaveLength(0);
+    expect(modeButton('Hablar con SarinBot')?.props.disabled).toBe(true);
     expect(text(renderer.root)).toContain('Cita conservada');
     state.businessConsent = true;
   });
@@ -137,7 +145,7 @@ describe("chat pause surfaces", () => {
     if (change === 'health') state.dataMode = 'health';
     await act(async () => renderer.update(render()));
     expect(renderer.root.findAllByProps({ 'aria-label': 'Asistente de reservas' })).toHaveLength(1);
-    expect(renderer.root.findByProps({ 'aria-label': 'Mensaje para Sarin' }).props.disabled).toBe(true);
+    expect(renderer.root.findByProps({ 'aria-label': 'Mensaje para SarinBot' }).props.disabled).toBe(true);
     expect(renderer.root.findByProps({ 'aria-label': 'Teléfono para la cita' }).props.disabled).toBe(true);
     const recovery = renderer.root.findAllByType('button').find(node => text(node) === 'Recuperar confirmación')!;
     expect(recovery.props.disabled).toBe(false);
@@ -158,7 +166,7 @@ describe("chat pause surfaces", () => {
     state.chat.error = "Solicitud ya atendida";
     state.chat.requestAlreadyCompleted = true;
     await act(async () => { renderer = create(createElement(OnboardingPage)); });
-    const input = renderer.root.findAllByType("input").find((node) => node.props["aria-label"] === "Mensaje para Sarin")!;
+    const input = renderer.root.findAllByType("input").find((node) => node.props["aria-label"] === "Mensaje para SarinBot")!;
     await act(async () => input.props.onChange({ target: { value: "Nueva consulta" } }));
     const send = renderer.root.findAllByType("button").find((node) => node.props["aria-label"] === "Enviar mensaje")!;
     expect(send.props.disabled).toBe(false);
@@ -170,7 +178,7 @@ describe("chat pause surfaces", () => {
     const params = Promise.resolve({ slug: "fixture" });
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params }))); });
     await chooseChat();
-    const input = renderer.root.findAllByType("input").find((node) => node.props["aria-label"] === "Mensaje para Sarin")!;
+    const input = renderer.root.findAllByType("input").find((node) => node.props["aria-label"] === "Mensaje para SarinBot")!;
     expect(input.props.disabled).toBe(true);
     expect(text(renderer.root)).toContain("Cita conservada");
     expect(renderer.root.findAllByType("a").some(node => node.props.href === "#mis-citas" && text(node) === "Mis citas")).toBe(true);
@@ -198,7 +206,7 @@ describe("chat pause surfaces", () => {
     state.publicSubscription = { status: "trial", trialEndsAt: 0, currentPeriodEndsAt: 0, paidTrial: { paymentId: "intro", activatedAt: 1800000000000, appointmentLimit: 10, appointmentsUsed: 10 } };
     await act(async () => { renderer = create(createElement(Suspense, { fallback: null }, createElement(ClientPage, { params: Promise.resolve({ slug: "fixture" }) }))); });
     await chooseChat();
-    expect(renderer.root.findByProps({ "aria-label": "Mensaje para Sarin" }).props.disabled).toBe(true);
+    expect(renderer.root.findByProps({ "aria-label": "Mensaje para SarinBot" }).props.disabled).toBe(true);
     expect(text(renderer.root)).toContain("Cita conservada");
     expect(text(renderer.root)).not.toContain("Elige un plan");
     expect(state.send).not.toHaveBeenCalled();
@@ -211,7 +219,7 @@ describe("chat pause surfaces", () => {
     await chooseChat();
     const retry = renderer.root.findAllByType("button").find(node => text(node) === "Reintentar mensaje")!;
     expect(retry.props.disabled).toBe(false);
-    expect(renderer.root.findByProps({ "aria-label": "Mensaje para Sarin" }).props.disabled).toBe(true);
+    expect(renderer.root.findByProps({ "aria-label": "Mensaje para SarinBot" }).props.disabled).toBe(true);
     expect(renderer.root.findByProps({ "aria-label": "Enviar mensaje" }).props.disabled).toBe(true);
     await act(async () => retry.props.onClick());
     expect(state.retry).toHaveBeenCalledTimes(1);

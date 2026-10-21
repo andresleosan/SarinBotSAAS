@@ -6,7 +6,7 @@ import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import type { AdminWhatsAppConversation, AdminWhatsAppConversations as Conversations, WhatsAppConversationMode } from "@/types/whatsapp";
 
-const labels: Record<WhatsAppConversationMode, string> = { bot: "Sarin atiende", human: "Tú atiendes", review: "Necesita revisión" };
+const labels: Record<WhatsAppConversationMode, string> = { bot: "SarinBot atiende", human: "Tú atiendes", review: "Necesita revisión" };
 const date = (value: string | null) => value ? new Date(value).toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "medium", timeStyle: "short" }) : "Sin registro";
 const secondaryButton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-sarin-line px-3 py-2 text-sm font-medium text-sarin-blue transition hover:bg-sarin-soft disabled:opacity-50";
 
@@ -56,7 +56,7 @@ export function AdminWhatsAppConversations({ businesses }: { businesses: { id: s
       });
       if (!mounted.current || controller.signal.aborted) return;
       setData(previous => previous ? { ...previous, conversations: previous.conversations.map(item => item.id === response.conversation.id ? response.conversation : item) } : previous);
-      setNotice(mode === "bot" ? "Conversación devuelta a Sarin. Responderá a mensajes nuevos; no retoma los pendientes anteriores." : mode === "human" ? "Conversación tomada. Sarin queda pausado para que atiendas desde WhatsApp Business." : "Conversación marcada para revisión. Sarin queda pausado.");
+      setNotice(mode === "bot" ? "Conversación devuelta a SarinBot. Responderá a mensajes nuevos; no retoma los pendientes anteriores." : mode === "human" ? "Conversación tomada. SarinBot queda pausado para que atiendas desde WhatsApp Business." : "Conversación marcada para revisión. SarinBot queda pausado.");
     } catch (cause) {
       if (!mounted.current || controller.signal.aborted) return;
       setError(errorMessage(cause));
@@ -81,7 +81,7 @@ export function AdminWhatsAppConversations({ businesses }: { businesses: { id: s
   const busy = loading || working !== null;
 
   return <section aria-labelledby="admin-conversations-title" className="min-w-0 space-y-5 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-6">
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"><div className="min-w-0"><h2 id="admin-conversations-title" className="text-xl font-semibold">Conversaciones de WhatsApp</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-sarin-muted">Toma una conversación para atenderla tú, déjala en revisión o devuelve la atención a Sarin.</p></div><button type="button" onClick={() => void refresh()} disabled={busy} className={secondaryButton + " shrink-0 self-start"}><RefreshCw aria-hidden="true" className="h-4 w-4" />{loading ? "Consultando conversaciones…" : "Actualizar conversaciones"}</button></div>
+    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"><div className="min-w-0"><h2 id="admin-conversations-title" className="text-xl font-semibold">Conversaciones de WhatsApp</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-sarin-muted">Toma una conversación para atenderla tú, déjala en revisión o devuelve la atención a SarinBot.</p></div><button type="button" onClick={() => void refresh()} disabled={busy} className={secondaryButton + " shrink-0 self-start"}><RefreshCw aria-hidden="true" className="h-4 w-4" />{loading ? "Consultando conversaciones…" : "Actualizar conversaciones"}</button></div>
     <label className="block max-w-sm text-sm font-medium">Conversaciones del negocio<select className={fieldClass + " mt-2"} value={businessId} disabled={busy} onChange={event => setBusinessId(event.target.value)}><option value="">Todos los negocios</option>{[...businessOptions].map(([id, name]) => <option value={id} key={id}>{name}</option>)}</select></label>
     {error && <Notice error>{error}{data ? " Se conserva el último estado confirmado hasta actualizarlo." : ""}</Notice>}
     {notice && <Notice>{notice}</Notice>}
@@ -94,10 +94,10 @@ export function AdminWhatsAppConversations({ businesses }: { businesses: { id: s
       <div className="space-y-1 text-xs leading-5 text-sarin-muted"><p>Último mensaje recibido: {date(conversation.lastInboundAt)} · Colombia</p>{conversation.lastHumanAt && <p>Última intervención humana: {date(conversation.lastHumanAt)} · Colombia</p>}</div>
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         {conversation.mode !== "human" && <button type="button" disabled={busy} onClick={() => void changeMode(conversation, "human")} className={buttonClass}>{working === conversation.id ? "Guardando…" : "Tomar conversación"}</button>}
-        {conversation.mode !== "bot" && <button type="button" disabled={busy} onClick={() => void changeMode(conversation, "bot")} className={secondaryButton}>{working === conversation.id ? "Guardando…" : "Devolver a Sarin"}</button>}
+        {conversation.mode !== "bot" && <button type="button" disabled={busy} onClick={() => void changeMode(conversation, "bot")} className={secondaryButton}>{working === conversation.id ? "Guardando…" : "Devolver a SarinBot"}</button>}
         {conversation.mode !== "review" && <button type="button" disabled={busy} onClick={() => void changeMode(conversation, "review")} className={secondaryButton}>{working === conversation.id ? "Guardando…" : "Marcar para revisión"}</button>}
       </div>
     </article></li>)}</ul>}
-    <p className="border-t border-sarin-line pt-4 text-xs leading-6 text-sarin-muted">Atiende los mensajes desde WhatsApp Business con coexistencia habilitada. Al devolver una conversación, Sarin responde a mensajes nuevos. Una respuesta ya aceptada por WhatsApp no se puede retirar.</p>
+    <p className="border-t border-sarin-line pt-4 text-xs leading-6 text-sarin-muted">Atiende los mensajes desde WhatsApp Business con coexistencia habilitada. Al devolver una conversación, SarinBot responde a mensajes nuevos. Una respuesta ya aceptada por WhatsApp no se puede retirar.</p>
   </section>;
 }

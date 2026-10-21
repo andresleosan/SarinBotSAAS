@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SarinBrand } from "@/components/sarin-brand";
+import { sarinContact, sarinWhatsAppUrl } from "@/lib/sarin-contact";
 
 export const metadata: Metadata = {
-  title: "Ayuda · Sarin Bot",
-  description: "Cómo reservar y gestionar citas, pagar la prueba de Sarin y solicitar soporte.",
+  title: "Ayuda · SarinBot",
+  description: "Cómo reservar y gestionar citas, pagar la prueba de SarinBot y solicitar soporte.",
 };
 
 const linkClass = "text-sarin-blue underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue";
@@ -14,19 +15,19 @@ export default function HelpPage() {
     <div className="min-h-screen bg-sarin-canvas text-sarin-ink">
       <a href="#contenido" className="sarin-skip">Saltar al contenido</a>
       <header className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-4 border-b border-sarin-line px-5 py-6 sm:px-8">
-        <Link href="/" aria-label="Sarin Bot, inicio"><SarinBrand /></Link>
-        <nav aria-label="Información de Sarin" className="flex flex-wrap gap-5 text-sm">
+        <Link href="/" aria-label="SarinBot, inicio"><SarinBrand /></Link>
+        <nav aria-label="Información de SarinBot" className="flex flex-wrap gap-5 text-sm">
           <Link href="/ayuda" aria-current="page" className="inline-flex min-h-11 items-center font-semibold">Ayuda</Link>
           <Link href="/privacidad" className={`inline-flex min-h-11 items-center ${linkClass}`}>Privacidad</Link>
         </nav>
       </header>
       <main id="contenido" className="mx-auto max-w-3xl px-5 py-8 sm:px-8 sm:py-12">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Ayuda con Sarin</h1>
-        <p className="mt-3 text-sm leading-7 text-sarin-muted">Citas de clientes, acceso del negocio y pagos. Última actualización: 16 de octubre de 2026.</p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Ayuda con SarinBot</h1>
+        <p className="mt-3 text-sm leading-7 text-sarin-muted">Citas de clientes, acceso del negocio y pagos. Última actualización: 18 de octubre de 2026.</p>
         <div className="mt-8 space-y-8 rounded-2xl border border-sarin-line bg-sarin-paper p-5 text-sm leading-7 sm:p-8">
           <section aria-labelledby="citas">
             <h2 id="citas" className="text-lg font-semibold">Reservar y consultar una cita</h2>
-            <p className="mt-2">Abre el enlace o QR del negocio e inicia sesión con Google. Indica a Sarin el servicio y cuándo quieres acudir. Revisa servicio, profesional, fecha y hora antes de confirmar. La cita debe quedar guardada para considerarse confirmada.</p>
+            <p className="mt-2">Abre el enlace o QR del negocio e inicia sesión con Google. Indica a SarinBot el servicio y cuándo quieres acudir. Revisa servicio, profesional, fecha y hora antes de confirmar. La cita debe quedar guardada para considerarse confirmada.</p>
             <p className="mt-3">En «Mis citas», dentro del mismo negocio, puedes ver tus próximas reservas, el historial y las citas de una fecha. Usa la misma cuenta de Google con la que reservaste. Puedes cancelar una cita antes de su inicio; cancelar cambia su estado y conserva el registro.</p>
             <p className="mt-3">Si la atención de IA está en pausa o el motor no responde, tus citas existentes siguen disponibles. Contacta al establecimiento para acordar una nueva reserva o resolver dudas sobre el servicio.</p>
           </section>
@@ -43,10 +44,10 @@ export default function HelpPage() {
           </section>
           <section aria-labelledby="pagos">
             <h2 id="pagos" className="text-lg font-semibold">Transferencias y revisión de pagos</h2>
-            <p className="mt-2">En «Suscripción», elige la prueba o un plan, utiliza una de las cuentas de transferencia mostradas y envía tu comprobante desde el formulario. Revisa allí el precio, la vigencia y las respuestas incluidas antes de pagar. Si no aparecen cuentas de pago, contacta a Sarin antes de hacer una transferencia.</p>
-            <p className="mt-3">Andrés Santiago revisa los comprobantes manualmente en la bandeja de administración de Sarin. Actualmente no se envían avisos automáticos por correo: los pendientes se consultan en esa consola. Subir el comprobante no equivale a tener el pago aprobado ni habilita el acceso inicial por sí solo.</p>
+            <p className="mt-2">En «Suscripción», elige la prueba o un plan, utiliza una de las cuentas de transferencia mostradas y envía tu comprobante desde el formulario. Revisa allí el precio, la vigencia y las respuestas incluidas antes de pagar. Si no aparecen cuentas de pago, contacta a SarinBot antes de hacer una transferencia.</p>
+            <p className="mt-3">Andrés Santiago revisa los comprobantes manualmente en la bandeja de administración de SarinBot. Actualmente no se envían avisos automáticos por correo: los pendientes se consultan en esa consola. Subir el comprobante no equivale a tener el pago aprobado ni habilita el acceso inicial por sí solo.</p>
             <p className="mt-3">El estado de revisión aparece en «Suscripción». Si se rechaza, consulta el motivo mostrado antes de enviar otro comprobante. No se promete un horario ni un plazo automático de aprobación. Para consultar un pago pendiente, escribe al contacto de soporte.</p>
-            <p className="mt-3">No hay cobros recurrentes automáticos. Los pagos a Sarin contratan el uso de la plataforma para el negocio; no pagan el corte, consulta u otro servicio que un cliente reserve en el establecimiento.</p>
+            <p className="mt-3">No hay cobros recurrentes automáticos. Los pagos a SarinBot contratan el uso de la plataforma para el negocio; no pagan el corte, consulta u otro servicio que un cliente reserve en el establecimiento.</p>
           </section>
           <section aria-labelledby="whatsapp">
             <h2 id="whatsapp" className="text-lg font-semibold">WhatsApp</h2>
@@ -54,10 +55,11 @@ export default function HelpPage() {
           </section>
           <section aria-labelledby="soporte">
             <h2 id="soporte" className="text-lg font-semibold">Soporte y consultas sobre datos</h2>
-            <p className="mt-2">Contacta a Andrés Santiago · Sarin en:</p>
+            <p className="mt-2">Contacta a Andrés Santiago · SarinBot en:</p>
+            <p><a href={sarinWhatsAppUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className={`inline-flex min-h-11 max-w-full items-center py-2 ${linkClass}`}>WhatsApp de SarinBot: {sarinContact.displayPhone}</a></p>
             <a href="mailto:alsdevstudio@alsdevstudio.com" className={`inline-block min-h-11 break-all py-2 ${linkClass}`}>alsdevstudio@alsdevstudio.com</a>
             <p className="mt-2">Indica el negocio y el problema que necesitas resolver. No envíes contraseñas ni códigos de acceso. Para cambios en el servicio reservado, contacta al establecimiento.</p>
-            <p className="mt-3">Puedes consultar qué datos utiliza Sarin y cómo solicitar su revisión en <Link href="/privacidad" className={linkClass}>Privacidad y datos</Link>.</p>
+            <p className="mt-3">Puedes consultar qué datos utiliza SarinBot y cómo solicitar su revisión en <Link href="/privacidad" className={linkClass}>Privacidad y datos</Link>.</p>
           </section>
         </div>
         <footer className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">

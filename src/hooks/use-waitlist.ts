@@ -30,7 +30,7 @@ function validState(value: WaitlistState, businessId: string, userId: string): b
 function message(cause: unknown) {
   const text = errorMessage(cause);
   return /^(?:Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed|fetch failed)$/i.test(text)
-    ? 'No pudimos conectar con Sarin. Revisa tu conexión e inténtalo de nuevo.' : text;
+    ? 'No pudimos conectar con SarinBot. Revisa tu conexión e inténtalo de nuevo.' : text;
 }
 export function useWaitlist(businessId: string, userId: string, context: Context) {
   const key = JSON.stringify([businessId, userId]), identity = useRef({ key });

@@ -26,7 +26,7 @@ export function generateICSFileContent(params: {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Sarin Bot//Agenda Inteligente//ES',
+    'PRODID:-//SarinBot//Agenda Inteligente//ES',
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${formatICSDate(new Date())}`,

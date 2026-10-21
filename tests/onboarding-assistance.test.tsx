@@ -37,7 +37,7 @@ describe('onboarding editable examples', () => {
   function questionsAndInstructions() { return ['Preguntas para reservar', 'Indicaciones del negocio'].map(label => renderer.root.findByProps({ 'aria-label': label }).props.value as string); }
   it('health owner can configure manually without mounting AI or free intake', async () => {
     state.health = true; await mount(); expect(state.chatMount).not.toHaveBeenCalled();
-    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para SarinBot' })).toHaveLength(0);
     const form = renderer.root.findByProps({ 'aria-label': 'Datos de tu negocio' });
     await act(async () => form.props.onSubmit({ preventDefault() {} }));
     expect(JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body)).intakeFields).toEqual([]); expect(state.send).not.toHaveBeenCalled();

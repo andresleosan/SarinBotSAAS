@@ -20,7 +20,7 @@ export function MarketingPricing({ endpoint }: { endpoint: string | null }) {
           <p>{plan.periodDays} días de acceso y {price(plan.includedResponses)} respuestas de IA. Agenda, reservas por conversación, enlace del negocio y QR.</p>
         </li>)}
       </ul>
-      <p className="agenda-launch-note">Los planes se pagan por transferencia y se activan tras revisar el comprobante. Una respuesta completa de Sarin cuenta una vez. Al agotar las respuestas, la IA se pausa; tu agenda y tus citas se conservan. Con un plan vigente puedes añadir {price(offer.responsePack.responses)} respuestas por ${price(offer.responsePack.priceCOP)} COP, válidas hasta que termine ese período. Sin cobros automáticos.</p>
+      <p className="agenda-launch-note">Los planes se pagan por transferencia y se activan tras revisar el comprobante. Una respuesta completa de SarinBot cuenta una vez. Al agotar las respuestas, la IA se pausa; tu agenda y tus citas se conservan. Con un plan vigente puedes añadir {price(offer.responsePack.responses)} respuestas por ${price(offer.responsePack.priceCOP)} COP, válidas hasta que termine ese período. Sin cobros automáticos.</p>
     </div>
   );
 }

@@ -198,7 +198,7 @@ function Console() {
           <p className="text-xs uppercase tracking-widest text-sarin-blue">
             Administración
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Control de Sarin</h1>
+          <h1 className="mt-2 text-3xl font-bold">Control de SarinBot</h1>
           <p className="mt-2 text-sm text-sarin-muted">
             Administra las suscripciones, revisa pagos y elige la IA de los negocios.
           </p>

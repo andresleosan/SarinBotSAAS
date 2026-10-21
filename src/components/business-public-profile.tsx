@@ -2,6 +2,7 @@
 
 import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
 import { BusinessLocation } from '@/components/business-location';
+import { BusinessContactLinks, businessContactDigits } from '@/components/business-contact-links';
 import type { PublicBusinessProfile } from '@/types/firestore';
 
 const weekDays = [
@@ -45,7 +46,7 @@ function categoryGroups(services: readonly PublicService[]) {
 }
 
 export function BusinessPublicProfile({ profile, onContinue }: { profile: PublicBusinessProfile; onContinue: (serviceId?: string) => void }) {
-  const telephone = profile.phoneWhatsApp.replace(/\D/g, '');
+  const telephone = businessContactDigits(profile.phoneWhatsApp);
   const hasContact = Boolean(telephone || profile.socialLinks?.length);
   const hasCategories = profile.services.some(service => Boolean(service.category?.trim()));
 
@@ -97,7 +98,7 @@ export function BusinessPublicProfile({ profile, onContinue }: { profile: Public
         {hasContact && <section className="min-w-0 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
           <h2 className="text-lg font-semibold">Contacto</h2>
           <nav aria-label="Contacto del negocio" className="mt-2 flex min-w-0 flex-col items-start">
-            {telephone && <a href={`tel:+${telephone}`} className={contactClass}>+{telephone}</a>}
+            <BusinessContactLinks phone={profile.phoneWhatsApp} className={contactClass} />
             {(profile.socialLinks ?? []).map(link => <a key={link.platform} href={link.url} target="_blank" rel="noopener noreferrer" className={contactClass}>{businessSocialPlatformLabels[link.platform]} · {businessSocialLabel(link)}</a>)}
           </nav>
         </section>}

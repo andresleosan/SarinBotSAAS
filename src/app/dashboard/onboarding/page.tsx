@@ -66,7 +66,7 @@ function ConfigurationAssistant({ uid, business, enabled, onDraft }: { uid?: str
         <section className="flex min-w-0 flex-col rounded-2xl border border-sarin-line bg-sarin-paper xl:sticky xl:top-6">
           <h2 className="flex items-center gap-2 border-b border-sarin-line px-4 py-3 font-semibold">
             <SarinMark className="h-8 w-8" />
-            Configurar con Sarin
+            Configurar con SarinBot
           </h2>
           <div
             aria-live="polite"
@@ -74,7 +74,7 @@ function ConfigurationAssistant({ uid, business, enabled, onDraft }: { uid?: str
           >
             <p className="text-sm leading-relaxed text-sarin-muted">
               Describe el nombre de tu negocio, sus servicios, precios,
-              profesionales y horarios. Sarin puede preparar una propuesta;
+              profesionales y horarios. SarinBot puede preparar una propuesta;
               úsala en el formulario, revísala y guarda cuando esté correcta.
             </p>
             {chat.messages.map((message) => (
@@ -89,7 +89,7 @@ function ConfigurationAssistant({ uid, business, enabled, onDraft }: { uid?: str
             {(chat.isGenerating || chat.isWaitingBatch) && (
               <p role="status" className="text-xs text-sarin-blue">
                 {chat.isGenerating
-                  ? "Sarin está preparando tu configuración…"
+                  ? "SarinBot está preparando tu configuración…"
                   : "Preparando tu mensaje…"}
               </p>
             )}
@@ -118,7 +118,7 @@ function ConfigurationAssistant({ uid, business, enabled, onDraft }: { uid?: str
             className="flex gap-2 border-t border-sarin-line p-3"
           >
             <input
-              aria-label="Mensaje para Sarin"
+              aria-label="Mensaje para SarinBot"
               className={fieldClass}
               value={input}
               disabled={!accountConsent.active || chat.quotaExhausted}
@@ -278,7 +278,7 @@ function Configuration() {
     <section className="max-w-2xl space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-5 sm:p-6">
       <h1 className="text-3xl font-bold">{canPurchasePaidTrial(business?.subscription) ? "Empieza con tu prueba pagada" : "Elige un plan para continuar"}</h1>
       <p className="text-sm leading-6 text-sarin-muted">{canPurchasePaidTrial(business?.subscription) ? "Por $5.000 COP puedes configurar tu negocio y recibir hasta 10 citas, sin caducidad. Después, elige un plan para continuar." : "Revisa los planes y el estado de tus pagos para volver a configurar tu negocio y recibir nuevas citas. Tu agenda existente se conserva."}</p>
-      <Notice>{business?.subscription.paidTrial?.source === 'invitation' && business.subscription.paidTrial.accessSuspended ? 'El acceso de cortesía está suspendido. Contacta a administración; tus citas y consumo se conservan.' : business?.subscription.status === "pending_payment" ? "La configuración y Sarin se habilitan después de aprobar tu comprobante o canjear una invitación. Si ya enviaste el comprobante, espera su revisión." : "Necesitas acceso vigente para configurar tu negocio y usar Sarin."}</Notice>
+      <Notice>{business?.subscription.paidTrial?.source === 'invitation' && business.subscription.paidTrial.accessSuspended ? 'El acceso de cortesía está suspendido. Contacta a administración; tus citas y consumo se conservan.' : business?.subscription.status === "pending_payment" ? "La configuración y SarinBot se habilitan después de aprobar tu comprobante o canjear una invitación. Si ya enviaste el comprobante, espera su revisión." : "Necesitas acceso vigente para configurar tu negocio y usar SarinBot."}</Notice>
       <Link href="/dashboard/billing" className={buttonClass + " inline-flex items-center"}>Ver pagos y planes</Link>
     </section>
   );
@@ -292,7 +292,7 @@ function Configuration() {
           {business?.sarinConfig.onboardingCompleted ? "Así trabaja tu negocio" : "Configura el espacio de tu negocio"}
         </h1>
         <p className="mt-2 text-sm text-sarin-muted">
-          Cuéntaselo a Sarin o completa los datos.{business?.subscription.status === "trial" ? business.subscription.paidTrial?.source === 'invitation' ? " Tu prueba de cortesía incluye diez citas y 700 respuestas; sin cobro ni caducidad." : " Tu prueba pagada incluye la configuración y hasta 10 citas, sin caducidad." : ""}
+          Cuéntaselo a SarinBot o completa los datos.{business?.subscription.status === "trial" ? business.subscription.paidTrial?.source === 'invitation' ? " Tu prueba de cortesía incluye diez citas y 700 respuestas; sin cobro ni caducidad." : " Tu prueba pagada incluye la configuración y hasta 10 citas, sin caducidad." : ""}
         </p>
       </div>
       {error && <Notice error>{error}</Notice>}
@@ -754,7 +754,7 @@ function Configuration() {
                 className={fieldClass + " mt-1.5 min-h-20"}
                 value={rules}
                 maxLength={3000}
-                placeholder="Explica cómo quieres que Sarin atienda a tus clientes."
+                placeholder="Explica cómo quieres que SarinBot atienda a tus clientes."
                 onChange={(event) => setRules(event.target.value)}
               />
             </label>

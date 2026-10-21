@@ -13,7 +13,7 @@ export function renderChatReply({ intent, business, data }: { intent: ChatIntent
     case 'services': reply = business.services.length ? `Servicios de ${business.name}:\n${business.services.map(item => `${item.name}: ${money(item.price)} · ${item.durationMinutes} minutos.`).join('\n')}` : 'El negocio todavía no ha publicado sus servicios. Completa el catálogo en Mi negocio.'; break;
     case 'price': reply = service ? `${service.name}: ${money(service.price)} · ${service.durationMinutes} minutos.` : '¿De qué servicio quieres conocer el precio?'; break;
     case 'contact': reply = business.phoneWhatsApp ? `Puedes contactar a ${business.name} en ${business.phoneWhatsApp}.` : 'El negocio todavía no ha publicado un teléfono de contacto.'; break;
-    case 'location': reply = `El negocio no ha publicado una dirección en Sarin.${business.phoneWhatsApp ? ` Consulta la ubicación en ${business.phoneWhatsApp}.` : ' Contacta al negocio para confirmar la ubicación.'}`; break;
+    case 'location': reply = `El negocio no ha publicado una dirección en SarinBot.${business.phoneWhatsApp ? ` Consulta la ubicación en ${business.phoneWhatsApp}.` : ' Contacta al negocio para confirmar la ubicación.'}`; break;
     case 'hours': reply = `Horario de Colombia:\n${Object.entries(business.weeklySchedule).map(([day, schedule]) => `${['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][Number(day)]}: ${schedule.isOpen ? schedule.intervals.map(interval => `${interval.start}–${interval.end}`).join(', ') : 'Cerrado'}`).join('\n')}`; break;
     case 'availability': {
       const availability = data.availability as { resourceName: string; slots: string[] }[] | undefined;

@@ -53,7 +53,7 @@ export async function createAppointmentImage(details: AppointmentImageDetails): 
   }
   function divider() { dividers.push(y); y += 40; }
 
-  add("sarinbot", 34, 700, "#315ff3", 42);
+  add("SarinBot", 34, 700, "#315ff3", 42);
   add("Cita confirmada", 60, 700, "#162344", 20);
   add(details.businessName, 52, 600, "#315ff3", 34);
   divider();

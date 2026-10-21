@@ -11,7 +11,7 @@ export function SarinArrival({ comingSoon = false }: { comingSoon?: boolean }) {
   const [pageVisible, setPageVisible] = useState(true);
   const [messageIndex, setMessageIndex] = useState(0);
   const messages = [
-    { title: "¡Hola, soy Sarin!", text: comingSoon ? "Pronto te ayudaré a organizar las citas de tu negocio." : "Te ayudo a organizar las citas de tu negocio." },
+    { title: "¡Hola, soy SarinBot!", text: comingSoon ? "Pronto te ayudaré a organizar las citas de tu negocio." : "Te ayudo a organizar las citas de tu negocio." },
     { title: "Tu negocio, a tu manera.", text: comingSoon ? "Configurarás tus servicios, profesionales y horarios." : "Configura tus servicios, profesionales y horarios." },
     { title: "Un enlace para tus clientes.", text: comingSoon ? "Compartirás tu espacio por mensaje o con un código QR." : "Comparte tu espacio por mensaje o con un código QR." },
     { title: "De la conversación a la cita.", text: comingSoon ? "Tus clientes podrán consultar servicios y horarios disponibles." : "Tus clientes consultan servicios y horarios disponibles." },

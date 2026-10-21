@@ -31,7 +31,7 @@ export function ClientAppointmentReminders({ businessId, userId, now, currentOcc
   }
   return <section aria-labelledby={titleId} className="min-w-0 space-y-3 rounded-xl border border-sarin-line bg-sarin-canvas p-3 sm:p-4">
     <div className="flex items-center gap-2 text-sarin-ink"><Bell aria-hidden="true" className="h-4 w-4 shrink-0" /><h3 id={titleId} className="text-sm font-semibold">Recordatorios</h3></div>
-    <p className="text-xs leading-relaxed text-sarin-muted">Ver avisos de mis próximas citas en Sarin desde 24 horas antes de cada cita. Los avisos aparecen al abrir esta pantalla; no se envían con la app cerrada.</p>
+    <p className="text-xs leading-relaxed text-sarin-muted">Ver avisos de mis próximas citas en SarinBot desde 24 horas antes de cada cita. Los avisos aparecen al abrir esta pantalla; no se envían con la app cerrada.</p>
     {preference && <div className="flex flex-wrap gap-x-5 gap-y-1">
       <button type="button" role="switch" aria-checked={preference.enabled} className={actionClass}
         disabled={busy || (!preference.enabled && actionsLocked)} onClick={() => reminders.setEnabled(!preference.enabled)}>{preference.enabled ? 'Desactivar recordatorios' : 'Activar recordatorios'}</button>
@@ -45,7 +45,7 @@ export function ClientAppointmentReminders({ businessId, userId, now, currentOcc
     {reminders.retryOccurrence && reminders.reminders.some(item => sameReminderOccurrence(item, reminders.retryOccurrence!) && item.seenAt === null) && <button type="button" className={actionClass} disabled={busy || actionsLocked} onClick={reminders.retrySeen}>Reintentar marcar como visto</button>}
     {!reminders.loading && !reminders.readError && !reminders.savingPreference && !reminders.reconciling && <>
       {preference?.status === 'disabled' && <p className="text-xs text-sarin-muted">Desactivados para este negocio. Puedes activarlos cuando quieras.</p>}
-      {preference?.status === 'suspended' && <p className="text-sm text-sarin-muted">Los recordatorios están en pausa. Revisa tus permisos y vuelve a activarlos si quieres recibir estos avisos dentro de Sarin.</p>}
+      {preference?.status === 'suspended' && <p className="text-sm text-sarin-muted">Los recordatorios están en pausa. Revisa tus permisos y vuelve a activarlos si quieres recibir estos avisos dentro de SarinBot.</p>}
       {preference?.status === 'active' && (currentOccurrences === null ? <p role="status" className="text-sm text-sarin-muted">Comprobando tus citas antes de mostrar los avisos…</p> : <>
         {pending.length > 0 ? <ul aria-label="Recordatorios pendientes" className="space-y-2">{pending.map(row)}</ul> : <p className="text-sm text-sarin-muted">No tienes recordatorios pendientes. Los avisos aparecen desde 24 horas antes de cada cita.</p>}
         {seen.length > 0 && <details className="space-y-2"><summary className="min-h-11 cursor-pointer rounded py-3 text-sm font-medium text-sarin-muted focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue">Vistos ({seen.length})</summary><ul aria-label="Recordatorios vistos" className="space-y-2">{seen.map(row)}</ul></details>}

@@ -8,9 +8,9 @@ const spaceGrotesk = localFont({ src: "../../public/fonts/space-grotesk-latin.wo
 const plexMono = localFont({ src: "../../public/fonts/ibm-plex-mono-latin.woff2", weight: "400", variable: "--font-plex-mono", display: "swap", preload: false });
 
 export const metadata: Metadata = {
-  title: "Sarin Bot — Plataforma Inteligente de Citas con IA",
+  title: "SarinBot — Plataforma Inteligente de Citas con IA",
   description:
-    "Agenda automatizada con Sarin Bot para emprendedores y negocios por citas.",
+    "Agenda automatizada con SarinBot para emprendedores y negocios por citas.",
 };
 
 export default function RootLayout({

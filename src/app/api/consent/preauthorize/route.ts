@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const origin = request.headers.get('origin');
     if (origin) {
       const configuredOrigin = process.env.SARIN_PUBLIC_BOOKING_ORIGIN ? new URL(getCanonicalBookingUrl('sarin-permisos')).origin : null;
-      if (!configuredOrigin && process.env.NODE_ENV === 'production') throw new HttpError(503, 'Configura el origen público de Sarin para registrar autorizaciones.');
+      if (!configuredOrigin && process.env.NODE_ENV === 'production') throw new HttpError(503, 'Configura el origen público de SarinBot para registrar autorizaciones.');
       let sameHost = false;
       try {
         const browserOrigin = new URL(origin);

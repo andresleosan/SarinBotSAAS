@@ -73,7 +73,7 @@ function unavailableMessage(provider: EngineProvider, status?: number): string {
   if (status === 401 || status === 403) return `${name} rechazó la credencial del servidor. Revisa su configuración.`;
   if (status === 402) return `${name} no tiene saldo disponible. Revisa la cuenta del proveedor.`;
   if (status === 429) return `${name} alcanzó su límite de solicitudes o cuota. Inténtalo de nuevo en un momento.`;
-  return `Sarin no puede conectar con ${name}. Inténtalo de nuevo en un momento.`;
+  return `SarinBot no puede conectar con ${name}. Inténtalo de nuevo en un momento.`;
 }
 
 async function responseJson(response: Response): Promise<unknown> {

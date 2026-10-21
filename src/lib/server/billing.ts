@@ -23,7 +23,7 @@ function defaultSettings(): PlatformSettings {
     return Number.isSafeInteger(price) && price > 0 && price <= 100000000 ? price : fallback;
   };
   return {
-    companyName: 'Sarin Bot',
+    companyName: 'SarinBot',
     weeklyPriceCOP: configuredPrice(process.env.WEEKLY_PRICE_COP, getBillingPlan('weekly').defaultPriceCOP),
     fortnightlyPriceCOP: configuredPrice(process.env.FORTNIGHTLY_PRICE_COP, getBillingPlan('fortnightly').defaultPriceCOP),
     monthlyPriceCOP: configuredPrice(process.env.MONTHLY_PRICE_COP, getBillingPlan('monthly').defaultPriceCOP),

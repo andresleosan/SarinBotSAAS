@@ -184,7 +184,7 @@ export function AuthGate({
     return (
       <main className="sarin-backdrop grid min-h-screen place-items-center px-5 py-12">
         <section className="sarin-surface w-full max-w-md space-y-6 rounded-2xl p-7 shadow-[0_16px_48px_#233e7c09] sm:p-9">
-          <a href="/" aria-label="Sarin Bot, inicio" className="mb-3 inline-block"><SarinBrand /></a>
+          <a href="/" aria-label="SarinBot, inicio" className="mb-3 inline-block"><SarinBrand /></a>
           <div><p className="sarin-eyebrow mb-3 text-sarin-blue">Tu espacio está aquí</p><h1 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-sarin-ink">Inicia sesión para continuar</h1></div>
           <p className="text-sm leading-7 text-sarin-muted">
             {localEmulators

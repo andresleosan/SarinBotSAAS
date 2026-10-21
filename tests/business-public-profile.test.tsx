@@ -102,9 +102,16 @@ describe('public business profile', () => {
     await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile, onContinue: vi.fn() })); });
     const contact = renderer.root.findByProps({ 'aria-label': 'Contacto del negocio' });
     const links = contact.findAllByType('a');
-    expect(links.map(link => link.props.href)).toEqual(['tel:+573001234567', 'https://www.instagram.com/demo_estudio/', 'https://example.com/']);
-    expect(links.map(textContent)).toEqual(['+573001234567', 'Instagram · @demo_estudio', 'Sitio web · example.com']);
+    expect(links.map(link => link.props.href)).toEqual(['tel:+573001234567', 'https://wa.me/573001234567', 'https://www.instagram.com/demo_estudio/', 'https://example.com/']);
+    expect(links.map(textContent)).toEqual(['+573001234567', 'Escribir por WhatsApp', 'Instagram · @demo_estudio', 'Sitio web · example.com']);
     expect(links[1].props.rel).toBe('noopener noreferrer');
+    expect(links[1].props.referrerPolicy).toBe('no-referrer');
+  });
+
+  it.each([{ socialLinks: [] }, { socialLinks: profile.socialLinks }])('does not publish callable links from a malformed stored phone, with social links=%j', async ({ socialLinks }) => {
+    await act(async () => { renderer = create(createElement(BusinessPublicProfile, { profile: { ...profile, phoneWhatsApp: '1234-5678', socialLinks }, onContinue: vi.fn() })); });
+    expect(renderer.root.findAllByType('a').map(link => link.props.href)).toEqual((socialLinks ?? []).map(link => link.url));
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Contacto del negocio' })).toHaveLength(socialLinks?.length ? 1 : 0);
   });
 
   it('continues only when the visitor chooses to reserve', async () => {

@@ -22,7 +22,7 @@ describe("administrative WhatsApp conversation handoff", () => {
 
   it("shows the confirmed responsibility and customer context", async () => {
     await mount();
-    expect(text(root())).toContain("Sarin atiende");
+    expect(text(root())).toContain("SarinBot atiende");
     expect(text(root())).toContain("Persona de prueba");
     expect(text(root())).toContain("Quiero revisar mi cita");
     expect(text(root())).toContain("Clínica sintética");
@@ -36,11 +36,11 @@ describe("administrative WhatsApp conversation handoff", () => {
     await act(async () => { button("Tomar conversación").props.onClick(); button("Tomar conversación").props.onClick(); });
     expect(writes()).toHaveLength(1);
     expect(JSON.parse(writes()[0][1].body)).toEqual({ conversationId: "thread-a", mode: "human", expectedRevision: 2 });
-    expect(text(root())).toContain("Sarin atiende");
+    expect(text(root())).toContain("SarinBot atiende");
     expect(button("Guardando").props.disabled).toBe(true);
     await act(async () => resolve({ conversation: { ...conversation, mode: "human", revision: 3 } }));
     expect(text(root())).toContain("Tú atiendes");
-    expect(button("Devolver a Sarin").props.disabled).toBe(false);
+    expect(button("Devolver a SarinBot").props.disabled).toBe(false);
   });
 
   it("refreshes a conflict before letting the operator retry with the current revision", async () => {
@@ -59,7 +59,7 @@ describe("administrative WhatsApp conversation handoff", () => {
     state.api.mockResolvedValueOnce({ conversations: [{ ...conversation, mode: "human", revision: 3 }], truncated: false });
     await mount();
     state.api.mockResolvedValueOnce({ conversation: { ...conversation, mode: "bot", revision: 4 } });
-    await act(async () => button("Devolver a Sarin").props.onClick());
+    await act(async () => button("Devolver a SarinBot").props.onClick());
     expect(JSON.parse(writes()[0][1].body).mode).toBe("bot");
     expect(text(root())).toContain("mensajes nuevos");
     state.api.mockResolvedValueOnce({ conversation: { ...conversation, mode: "review", revision: 5 } });
@@ -87,7 +87,7 @@ describe("administrative WhatsApp conversation handoff", () => {
     await mount();
     state.api.mockRejectedValueOnce(new Error("No se pudo guardar"));
     await act(async () => button("Tomar conversación").props.onClick());
-    expect(text(root())).toContain("Sarin atiende");
+    expect(text(root())).toContain("SarinBot atiende");
     expect(text(root())).toContain("No se pudo guardar");
     state.api.mockImplementationOnce(() => new Promise(() => {}));
     await act(async () => button("Tomar conversación").props.onClick());

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { SarinBrand } from "@/components/sarin-brand";
 
 export const metadata: Metadata = {
-  title: "Privacidad y datos · Sarin Bot",
-  description: "Qué datos utiliza Sarin para gestionar cuentas, reservas, pagos y respuestas de inteligencia artificial.",
+  title: "Privacidad y datos · SarinBot",
+  description: "Qué datos utiliza SarinBot para gestionar cuentas, reservas, pagos y respuestas de inteligencia artificial.",
 };
 
 const linkClass = "text-sarin-blue underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue";
@@ -15,8 +15,8 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-sarin-canvas text-sarin-ink">
       <a href="#contenido" className="sarin-skip">Saltar al contenido</a>
       <header className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-4 border-b border-sarin-line px-5 py-6 sm:px-8">
-        <Link href="/" aria-label="Sarin Bot, inicio"><SarinBrand /></Link>
-        <nav aria-label="Información de Sarin" className="flex flex-wrap gap-5 text-sm">
+        <Link href="/" aria-label="SarinBot, inicio"><SarinBrand /></Link>
+        <nav aria-label="Información de SarinBot" className="flex flex-wrap gap-5 text-sm">
           <Link href="/terminos" className={`inline-flex min-h-11 items-center ${linkClass}`}>T?rminos</Link>
           <Link href="/ayuda" className={`inline-flex min-h-11 items-center ${linkClass}`}>Ayuda</Link>
           <Link href="/privacidad" aria-current="page" className="inline-flex min-h-11 items-center font-semibold">Privacidad</Link>
@@ -24,14 +24,14 @@ export default function PrivacyPage() {
       </header>
       <main id="contenido" className="mx-auto max-w-3xl px-5 py-8 sm:px-8 sm:py-12">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Privacidad y datos</h1>
-        <p className="mt-3 text-sm leading-7 text-sarin-muted">Esta página explica el funcionamiento actual de Sarin. Última actualización: 16 de octubre de 2026.</p>
+        <p className="mt-3 text-sm leading-7 text-sarin-muted">Esta página explica el funcionamiento actual de SarinBot. Última actualización: 18 de octubre de 2026.</p>
         <div className="mt-8 space-y-8 rounded-2xl border border-sarin-line bg-sarin-paper p-5 text-sm leading-7 sm:p-8">
           {privacySections.map(section => <section key={section.id} aria-labelledby={section.id}>
             <h2 id={section.id} className="text-lg font-semibold">{section.title}</h2>
             {section.paragraphs.map(paragraph => <p key={paragraph} className="mt-3">{paragraph}</p>)}
           </section>)}
           <section aria-labelledby="contacto">
-            <h2 id="contacto" className="text-lg font-semibold">Responsable y contacto de Sarin</h2>
+            <h2 id="contacto" className="text-lg font-semibold">Responsable y contacto de SarinBot</h2>
             <p className="mt-2">ALS Dev Studio</p>
             <p className="mt-2">Nombre comercial de Andrés Leonardo Santiago González, persona natural que presta servicios de desarrollo web y software desde Medellín, Colombia.</p>
             <dl className="mt-3 space-y-3">

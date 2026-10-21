@@ -1,0 +1,12 @@
+# R5 — Published brand, contacts and public assets
+
+Base: `455575f3f6bcc43c29179dae0d8151eaa3b061a0`. Restored only the published v24 brand literals and separate `Sarin` + `Bot` wordmarks in the reviewed mappings. Existing R3 platform integration is preserved.
+
+- Public support contact comes from two pinned, statically parsed variants of module 88281 and is consumed only by marketing and help. Legal, business and administrative identities remain separate; contact values are omitted here.
+- Business contact links require an exact raw optional-plus, nonzero-leading 8–15 digit string. Invalid types, punctuation, whitespace and final newlines produce no callable links. Valid inputs offer telephone and WhatsApp destinations with the published labels and external attributes.
+- Published legal version is `2026-10-18.1`; privacy/terms arrays match the frozen AST hashes, legalContact is unchanged, and subject version remains `2026-10-16.subject.1`. Synthetic account/business fingerprints are independently reconstructed. Existing separate decisions, stale-fingerprint, revision, replay, withdrawal and restricted booking checks pass.
+- All 15 recovered public assets are verified: nine binary files match tracked Git blobs byte for byte; six text assets match after CRLF/LF normalization. The complete face PNG was already tracked and correct, so no asset is rewritten. Its original “absent from Git” evidence claim was corrected by the controller after independent large-buffer blob verification. Three emitted fonts and static CSS/preload references match. Metadata and the complete manifest match the frozen values, including its inherited description.
+
+Validation: 29 focused suites, **408/408 passed**; application TypeScript passed without diagnostics. New contact behavior observed RED with resolved placeholders before GREEN. Earlier stale assertions and one test-fixture table error are retained in private evidence. Existing react-test-renderer deprecation warnings are retained without suppression. Static checks verify 61 artifact/factory pins, 19 supporting anchors, 36 frozen source pins, 94 brand literals and four wordmark text edits.
+
+No app server, emulator, provider/backend operation, real acceptance, migration, activation or deployment was performed. Full suite/build/Worker gate and authenticated desktop/320 px visual QA remain R6/P2. Static/rendered tests do not establish browser layout or complete runtime parity. Private evidence and the full report are outside Git under the restoration package.

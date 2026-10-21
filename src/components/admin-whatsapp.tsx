@@ -94,7 +94,7 @@ export function AdminWhatsApp({ businesses }: { businesses: Pick<Business, "id" 
           </dl>
           {!data.usage.totals.sent && !data.usage.totals.delivered && !data.usage.totals.failed && !data.usage.totals.unknown && <p className="text-sm text-sarin-muted">Sin respuestas generadas registradas para ese mes.</p>}
           <p className="text-xs leading-5 text-sarin-muted">Estados observados de esas respuestas, aunque la entrega se confirme después. Las entregas incluyen los mensajes leídos. Los resultados inciertos todavía no tienen una confirmación definitiva.</p>
-          <p className="text-xs leading-5 text-sarin-muted">Costo no calculado. Consulta el consumo y la factura en Meta; este registro de estados no es una factura ni implica costo cero. El consumo de Meta es independiente de la suscripción de Sarin.</p>
+          <p className="text-xs leading-5 text-sarin-muted">Costo no calculado. Consulta el consumo y la factura en Meta; este registro de estados no es una factura ni implica costo cero. El consumo de Meta es independiente de la suscripción de SarinBot.</p>
         </div>}
         {businesses.length > 0 && <form onSubmit={event => void save(event)} className="space-y-3 border-t border-sarin-line pt-4">
           <div className="grid items-end gap-3 md:grid-cols-3">

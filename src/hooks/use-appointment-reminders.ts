@@ -9,7 +9,7 @@ const day = 86_400_000;
 function reminderError(cause: unknown): string {
   const message = errorMessage(cause);
   return /^(?:Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed|fetch failed)$/i.test(message)
-    ? 'No pudimos conectar con Sarin. Revisa tu conexión e inténtalo de nuevo.' : message;
+    ? 'No pudimos conectar con SarinBot. Revisa tu conexión e inténtalo de nuevo.' : message;
 }
 export function sameReminderOccurrence(a: ReminderOccurrence, b: ReminderOccurrence): boolean {
   return a.appointmentId === b.appointmentId && a.sourceRevision === b.sourceRevision && a.sourceStartAt === b.sourceStartAt && a.offsetMinutes === b.offsetMinutes;

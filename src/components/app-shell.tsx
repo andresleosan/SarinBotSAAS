@@ -17,7 +17,7 @@ const businessLinks: NavigationItem[] = [
   { href: "/dashboard/billing", label: "Suscripción", icon: CreditCard },
 ];
 const adminLinks: NavigationItem[] = [
-  { href: "/admin", label: "Control de Sarin", icon: LayoutDashboard },
+  { href: "/admin", label: "Control de SarinBot", icon: LayoutDashboard },
   { href: "/admin/assistant", label: "Asistente", icon: Bot },
   { href: "/dashboard", label: "Mi negocio", icon: CalendarDays },
 ];
@@ -40,7 +40,7 @@ export function AppShell({
       <a href="#workspace-content" className="sarin-skip">Saltar al contenido</a>
       <aside className="border-b border-sarin-line bg-sarin-paper lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-b-0">
         <div className="flex items-center justify-between px-5 py-5 lg:px-6 lg:py-8">
-          <Link href="/" aria-label="Sarin Bot, inicio"><SarinBrand /></Link>
+          <Link href="/" aria-label="SarinBot, inicio"><SarinBrand /></Link>
           <span className="rounded-full border border-sarin-line px-2.5 py-1 text-xs text-sarin-muted lg:hidden">{admin ? "ADMIN" : "NEGOCIO"}</span>
         </div>
         <p className="sarin-eyebrow mb-3 hidden px-7 text-sarin-muted lg:block">{admin ? "Administración" : "Espacio de trabajo"}</p>
@@ -54,7 +54,7 @@ export function AppShell({
       </aside>
       <div className="min-w-0">
         <header className="flex min-h-16 items-center justify-between gap-3 border-b border-sarin-line bg-sarin-paper px-4 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-2 text-xs text-sarin-muted"><span className="hidden sm:inline">{admin ? "Administración" : "Mi espacio"}</span><ChevronRight aria-hidden="true" className="hidden h-3.5 w-3.5 sm:block" /><span className="truncate text-sarin-ink">{active?.label ?? "Sarin Bot"}</span></div>
+          <div className="flex min-w-0 items-center gap-2 text-xs text-sarin-muted"><span className="hidden sm:inline">{admin ? "Administración" : "Mi espacio"}</span><ChevronRight aria-hidden="true" className="hidden h-3.5 w-3.5 sm:block" /><span className="truncate text-sarin-ink">{active?.label ?? "SarinBot"}</span></div>
           <div className="flex shrink-0 items-center gap-3"><UserAvatar name={name} photoURL={user?.photoURL} /><span className="hidden max-w-44 truncate text-xs text-sarin-muted sm:block">{name}</span><button onClick={() => void signOut()} aria-label="Cerrar sesión" title="Cerrar sesión" className="grid h-11 w-11 place-items-center rounded-[10px] text-sarin-muted hover:bg-sarin-soft hover:text-sarin-blue"><LogOut aria-hidden="true" className="h-4 w-4" /></button></div>
         </header>
         <main id="workspace-content" className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">{!admin && <ConsentPanel controller={accountConsent} title="Permisos de mi cuenta" />}{children}</main>

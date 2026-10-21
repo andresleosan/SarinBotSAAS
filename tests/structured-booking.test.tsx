@@ -287,7 +287,7 @@ it('health books while inference is offline without mounting a chat', async () =
   const health = { ...capability, dataMode: 'health' as const };
   vi.mocked(apiFetch).mockImplementation(async (path) => { const query = new URL(path, 'http://localhost').searchParams; return { required: true, active: false, revision: 0, capability: health, receipt: null, documents: { ...bookingSubjectContent(business, { bookingRequestId: query.get('bookingRequestId')!, subjectKind: 'self' }, health), fingerprint: 'a'.repeat(64) } }; });
   await act(async () => { renderer = create(createElement(StructuredBooking, { business, capability: health, onConfirmed: vi.fn() })); });
-  expect(JSON.stringify(renderer!.toJSON())).toContain('Reserva sin IA'); expect(renderer!.root.findAllByProps({ 'aria-label': 'Mensaje para Sarin' })).toHaveLength(0);
+  expect(JSON.stringify(renderer!.toJSON())).toContain('Reserva sin IA'); expect(renderer!.root.findAllByProps({ 'aria-label': 'Mensaje para SarinBot' })).toHaveLength(0);
 });
 it('retains the original uncertain request when minor capacity is disabled', async () => {
   const proposal = { id: 'demo-proposal', businessId: business.id, serviceName: 'Corte', resourceName: 'Recurso', dateKey: '2030-01-01', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 10000, intakeFields: [], expiresAt: Date.now() + 600000 };

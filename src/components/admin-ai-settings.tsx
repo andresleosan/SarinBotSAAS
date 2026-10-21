@@ -126,7 +126,7 @@ export function AdminAiSettings({ onSaved }: { onSaved?: () => void }) {
               </div>
               <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 shrink-0 items-center self-start rounded-lg px-2 text-sm text-sarin-blue hover:bg-sarin-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue">Abrir AI Studio<span className="sr-only"> (nueva pestaña)</span></a>
             </div>
-            <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Conexión separada para pruebas con datos ficticios. Para usar el nivel gratuito, utiliza un proyecto sin facturación y una clave propia. Sarin no comprueba su plan ni su cuota.</p>
+            <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Conexión separada para pruebas con datos ficticios. Para usar el nivel gratuito, utiliza un proyecto sin facturación y una clave propia. SarinBot no comprueba su plan ni su cuota.</p>
             <p className="max-w-3xl text-xs leading-5 text-sarin-muted">Este perfil no atiende a los negocios. Actualizar su estado solo revisa la configuración guardada; no envía mensajes a Google.</p>
           </section>
         </>

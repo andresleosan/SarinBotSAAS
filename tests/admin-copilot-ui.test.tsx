@@ -96,7 +96,7 @@ describe("private administrative copilot", () => {
     await act(async () => root().findByType("form").props.onSubmit({ preventDefault() {} }));
     expect(root().findByType("textarea").props.value).toBe("¿Qué pagos faltan?");
     expect(root().findAllByProps({ role: "alert" }).map(text).join("")).toContain("No se pudo consultar la IA");
-    expect(button("Preguntar a Sarin").props.disabled).toBe(false);
+    expect(button("Preguntar a SarinBot").props.disabled).toBe(false);
   });
 
   it("shows loading failure without invented zero metrics and can refresh", async () => {
@@ -125,7 +125,7 @@ describe("private administrative copilot", () => {
     expect(root().findByType("textarea").props.value).toBe("¿Qué pagos están pendientes?");
     expect(state.api.mock.calls.filter(([, init]) => init.method === "POST")).toHaveLength(0);
     await act(async () => root().findByType("textarea").props.onChange({ target: { value: "   " } }));
-    expect(button("Preguntar a Sarin").props.disabled).toBe(true);
+    expect(button("Preguntar a SarinBot").props.disabled).toBe(true);
     await act(async () => root().findByType("form").props.onSubmit({ preventDefault() {} }));
     expect(state.api.mock.calls.filter(([, init]) => init.method === "POST")).toHaveLength(0);
   });
