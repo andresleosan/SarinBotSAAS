@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SarinBrand } from "@/components/sarin-brand";
 import { sarinContact, sarinWhatsAppUrl } from "@/lib/sarin-contact";
+import { PlatformWhatsAppLink } from "@/components/platform-whatsapp-link";
 
 export const metadata: Metadata = {
   title: "Ayuda · SarinBot",
@@ -62,6 +63,7 @@ export default function HelpPage() {
             <p className="mt-3">Puedes consultar qué datos utiliza SarinBot y cómo solicitar su revisión en <Link href="/privacidad" className={linkClass}>Privacidad y datos</Link>.</p>
           </section>
         </div>
+        <div className="mt-8"><PlatformWhatsAppLink /></div>
         <footer className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <Link href="/privacidad" className={`inline-flex min-h-11 items-center ${linkClass}`}>Privacidad y datos</Link>
           <Link href="/" className={`inline-flex min-h-11 items-center ${linkClass}`}>Volver al inicio</Link>

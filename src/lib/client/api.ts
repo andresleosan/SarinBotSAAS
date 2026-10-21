@@ -18,10 +18,11 @@ export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
   expectedUid?: string,
+  isCurrentScope?: () => boolean,
 ): Promise<T> {
   const user = getFirebaseClient().auth.currentUser;
   if (!user) throw new ApiError("Inicia sesión para continuar.", 401);
-  const assertIdentity = () => { if (expectedUid && (user.uid !== expectedUid || getFirebaseClient().auth.currentUser?.uid !== expectedUid)) throw new ApiError('La cuenta cambió. Vuelve a revisar tus permisos.', 401, 'AUTH_IDENTITY_CHANGED'); };
+  const assertIdentity = () => { if ((expectedUid && (user.uid !== expectedUid || getFirebaseClient().auth.currentUser?.uid !== expectedUid)) || (isCurrentScope && !isCurrentScope())) throw new ApiError('La cuenta cambió. Vuelve a revisar tus permisos.', 401, 'AUTH_IDENTITY_CHANGED'); };
   assertIdentity();
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${await user.getIdToken()}`);
@@ -29,7 +30,9 @@ export async function apiFetch<T>(
     headers.set("Content-Type", "application/json");
   assertIdentity();
   const response = await fetch(path, { ...init, headers, cache: "no-store" });
+  if (isCurrentScope) assertIdentity();
   const data: unknown = await response.json().catch(() => null);
+  if (isCurrentScope) assertIdentity();
   if (!response.ok) {
     const message =
       data &&

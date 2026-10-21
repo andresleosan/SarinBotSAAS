@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { MarketingHome } from '@/components/marketing-home';
 import HelpPage from '@/app/ayuda/page';
+vi.mock('@/components/platform-whatsapp-link', () => ({ PlatformWhatsAppLink: () => null }));
 
 vi.mock('@/lib/sarin-contact', () => ({
   sarinContact: { phone: '+12345678', displayPhone: '+1 234 5678' },

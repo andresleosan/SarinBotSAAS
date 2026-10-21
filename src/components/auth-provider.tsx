@@ -3,149 +3,145 @@
 import { SarinBrand } from "@/components/sarin-brand";
 import { AccountConsentProvider, PreauthorizationChoices } from '@/components/consent-panel';
 import type { ConsentStatus } from '@/lib/legal';
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-  type ReactNode,
-} from "react";
-import {
-  GoogleAuthProvider,
-  onIdTokenChanged,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-  type User,
-} from "firebase/auth";
+import { createContext, useCallback, useContext, useEffect, useState, useRef, type ReactNode } from "react";
+import { GoogleAuthProvider, onIdTokenChanged, signInWithPopup, signOut as firebaseSignOut, type User } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase/client";
 import { apiFetch, errorMessage } from "@/lib/client/api";
-import {
-  signInLocalAccount,
-  type LocalAccountRole,
-} from "@/lib/firebase/local-auth";
+import { signInLocalAccount, type LocalAccountRole } from "@/lib/firebase/local-auth";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   isSuperadmin: boolean;
   error: string | null;
+  authEpoch: number;
+  signingOut: boolean;
+  isCurrentSession: (expectedUid: string, expectedEpoch: number) => boolean;
+  invalidateSession: (expectedUid: string, expectedEpoch: number) => void;
   signIn: (preauthorization?: string) => Promise<void>;
   signInLocal: (account: LocalAccountRole) => Promise<void>;
   signOut: () => Promise<void>;
 }
-
 const AuthContext = createContext<AuthContextValue | null>(null);
-const localEmulators =
-  process.env.NODE_ENV === "development" &&
-  process.env.NEXT_PUBLIC_FIREBASE_EMULATORS === "true";
+const localEmulators = process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_FIREBASE_EMULATORS === "true";
+const SESSION_VALIDATION_DEADLINE_MS = 10_000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isSuperadmin, setIsSuperadmin] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState({ user: null as User | null, loading: true, isSuperadmin: false, error: null as string | null, authEpoch: 0, signingOut: false });
   const [consentVersion, setConsentVersion] = useState(0);
+  const state = useRef({ active: false, uid: null as string | null, epoch: 0, verified: null as User | null, admin: false, signingOut: false, blocked: false, version: 0, logoutVersion: 0 });
+  const deadline = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const request = useRef<AbortController | null>(null);
+  const validate = useRef<(user: User | null) => Promise<void>>(async () => {});
   const signingIn = useRef(false);
-  useEffect(() => {
-    let active = true;
-    let version = 0;
-    let unsubscribe: (() => void) | undefined;
-    try {
-      unsubscribe = onIdTokenChanged(
-        getFirebaseClient().auth,
-        async (nextUser) => {
-          const currentVersion = ++version;
-          setUser(nextUser);
-          setIsSuperadmin(false);
-          setError(null);
-          setLoading(Boolean(nextUser));
-          if (!nextUser) return;
-          try {
-            const session = await apiFetch<{ isSuperadmin: boolean }>(
-              "/api/session",
-            );
-            if (active && version === currentVersion) {
-              setIsSuperadmin(session.isSuperadmin);
-              setError(null);
-            }
-          } catch (cause) {
-            if (active && version === currentVersion)
-              setError(errorMessage(cause));
-          } finally {
-            if (active && version === currentVersion) setLoading(false);
-          }
-        },
-      );
-    } catch (cause) {
-      setError(errorMessage(cause));
-      setLoading(false);
-    }
-    return () => {
-      active = false;
-      version++;
-      unsubscribe?.();
-    };
+  const clearPending = useCallback(() => {
+    if (deadline.current !== null) clearTimeout(deadline.current);
+    deadline.current = null;
+    request.current?.abort(); request.current = null;
   }, []);
+  const invalidate = useCallback((message: string | null, blocked: boolean) => {
+    const current = state.current;
+    clearPending(); current.version++; current.epoch++; current.verified = null; current.admin = false; current.blocked = blocked;
+    setSnapshot({ user: null, loading: false, isSuperadmin: false, error: message, authEpoch: current.epoch, signingOut: current.signingOut });
+  }, [clearPending]);
+  const isCurrentSession = useCallback((uid: string, epoch: number) => {
+    const current = state.current;
+    return current.active && !current.signingOut && !current.blocked && current.epoch === epoch && current.uid === uid && current.verified?.uid === uid && getFirebaseClient().auth.currentUser?.uid === uid;
+  }, []);
+  const invalidateSession = useCallback((uid: string, epoch: number) => {
+    if (isCurrentSession(uid, epoch)) invalidate('Tu sesión dejó de ser válida. Vuelve a iniciar sesión.', true);
+  }, [invalidate, isCurrentSession]);
+  useEffect(() => {
+    const current = state.current; current.active = true;
+    async function onUser(nextUser: User | null) {
+      if (!current.active) return;
+      const uid = nextUser?.uid ?? null;
+      if (uid !== current.uid) {
+        invalidate(null, false); current.uid = uid;
+      }
+      if (current.signingOut) return;
+      if (!nextUser) { setSnapshot({ user: null, loading: false, isSuperadmin: false, error: null, authEpoch: current.epoch, signingOut: false }); return; }
+      if (current.blocked) return;
+      const epoch = current.epoch, version = ++current.version;
+      const background = current.verified?.uid === uid;
+      request.current?.abort();
+      const abort = request.current = new AbortController();
+      const owns = () => current.active && current.version === version && current.epoch === epoch && current.uid === uid && !current.signingOut && !current.blocked && getFirebaseClient().auth.currentUser?.uid === uid;
+      if (!background) setSnapshot({ user: null, loading: true, isSuperadmin: false, error: null, authEpoch: epoch, signingOut: false });
+      if (deadline.current === null) deadline.current = setTimeout(() => {
+        if (current.active && current.epoch === epoch && current.uid === uid && !current.signingOut) invalidate('No se pudo verificar tu sesión a tiempo. Vuelve a iniciar sesión.', true);
+      }, SESSION_VALIDATION_DEADLINE_MS);
+      try {
+        const session = await apiFetch<{ isSuperadmin: boolean }>('/api/session', { signal: abort.signal }, nextUser.uid);
+        if (!owns()) return;
+        if (typeof session?.isSuperadmin !== 'boolean') throw new Error('No se pudo verificar tu sesión.');
+        clearPending(); current.verified = nextUser; current.admin = session.isSuperadmin;
+        setSnapshot({ user: nextUser, loading: false, isSuperadmin: session.isSuperadmin, error: null, authEpoch: epoch, signingOut: false });
+      } catch (cause) {
+        if (owns()) invalidate(errorMessage(cause), true);
+      }
+    }
+    validate.current = onUser;
+    let unsubscribe: (() => void) | undefined;
+    try { unsubscribe = onIdTokenChanged(getFirebaseClient().auth, onUser); }
+    catch (cause) { invalidate(errorMessage(cause), true); }
+    return () => { current.active = false; current.version++; current.verified = null; clearPending(); unsubscribe?.(); };
+  }, [clearPending, invalidate]);
   const signIn = useCallback(async (preauthorization?: string) => {
-    if (signingIn.current) return;
+    if (signingIn.current || state.current.signingOut) return;
     signingIn.current = true;
-    setError(null);
+    const logoutVersion = state.current.logoutVersion;
+    let actionEpoch = state.current.epoch;
+    let actionUid = getFirebaseClient().auth.currentUser?.uid ?? null;
+    setSnapshot(value => ({ ...value, error: null }));
     try {
       const credential = await signInWithPopup(getFirebaseClient().auth, new GoogleAuthProvider());
+      const owns = () => state.current.active && !state.current.signingOut && state.current.logoutVersion === logoutVersion && getFirebaseClient().auth.currentUser?.uid === credential.user.uid;
+      if (!owns()) return;
+      if (state.current.blocked) { state.current.blocked = false; void validate.current(credential.user); }
+      const epoch = state.current.epoch;
+      actionEpoch = epoch; actionUid = credential.user.uid;
+      const current = () => owns() && state.current.epoch === epoch;
       if (preauthorization) {
-        if (getFirebaseClient().auth.currentUser?.uid !== credential.user.uid) return;
-        const consent = await apiFetch<ConsentStatus>('/api/consent?scope=account', {}, credential.user.uid);
-        if (getFirebaseClient().auth.currentUser?.uid !== credential.user.uid) return;
-        await apiFetch('/api/consent', { method: 'POST', body: JSON.stringify({ scope: 'account', action: 'accept', requestId: crypto.randomUUID(), expectedRevision: consent.revision, fingerprint: consent.documents.fingerprint, termsAccepted: true, dataAuthorized: true, preauthorization }) }, credential.user.uid);
-        if (getFirebaseClient().auth.currentUser?.uid === credential.user.uid) setConsentVersion(value => value + 1);
+        const consent = await apiFetch<ConsentStatus>('/api/consent?scope=account', {}, credential.user.uid, current);
+        if (!current()) return;
+        await apiFetch('/api/consent', { method: 'POST', body: JSON.stringify({ scope: 'account', action: 'accept', requestId: crypto.randomUUID(), expectedRevision: consent.revision, fingerprint: consent.documents.fingerprint, termsAccepted: true, dataAuthorized: true, preauthorization }) }, credential.user.uid, current);
+        if (current()) setConsentVersion(value => value + 1);
       }
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (state.current.active && state.current.logoutVersion === logoutVersion && state.current.epoch === actionEpoch && (getFirebaseClient().auth.currentUser?.uid ?? null) === actionUid && !state.current.signingOut) setSnapshot(value => ({ ...value, error: errorMessage(cause) }));
     } finally { signingIn.current = false; }
   }, []);
   const signOut = useCallback(async () => {
-    setIsSuperadmin(false);
-    setError(null);
-    try {
-      await firebaseSignOut(getFirebaseClient().auth);
-    } catch (cause) {
-      setError(errorMessage(cause));
+    const current = state.current;
+    if (current.signingOut) return;
+    current.signingOut = true; current.logoutVersion++;
+    invalidate(null, false);
+    try { await firebaseSignOut(getFirebaseClient().auth); }
+    catch (cause) {
+      if (current.active) setSnapshot(value => ({ ...value, error: errorMessage(cause) }));
+    } finally {
+      if (current.active) {
+        current.signingOut = false;
+        setSnapshot(value => ({ ...value, signingOut: false }));
+        // Even a failed logout starts a new, code-free verified session.
+        await validate.current(getFirebaseClient().auth.currentUser);
+      }
     }
-  }, []);
+  }, [invalidate]);
   const signInLocal = useCallback(async (account: LocalAccountRole) => {
-    setError(null);
-    try {
-      await signInLocalAccount(account);
-    } catch (cause) {
-      setError(errorMessage(cause));
+    const version = state.current.logoutVersion, epoch = state.current.epoch;
+    try { await signInLocalAccount(account); }
+    catch (cause) {
+      if (state.current.active && state.current.logoutVersion === version && state.current.epoch === epoch) setSnapshot(value => ({ ...value, error: errorMessage(cause) }));
       throw cause;
     }
   }, []);
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        isSuperadmin,
-        error,
-        signIn,
-        signInLocal,
-        signOut,
-      }}
-    >
-      {localEmulators && (
-        <div
-          role="status"
-          className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900"
-        >
-          Entorno local · Firebase emulado · datos de negocio temporales
-        </div>
-      )}
-      <AccountConsentProvider uid={user?.uid} refreshVersion={consentVersion}>{children}</AccountConsentProvider>
-    </AuthContext.Provider>
-  );
+  const effectiveUser = snapshot.user && isCurrentSession(snapshot.user.uid, snapshot.authEpoch) ? snapshot.user : null;
+  return <AuthContext.Provider value={{ ...snapshot, user: effectiveUser, isSuperadmin: Boolean(effectiveUser && snapshot.isSuperadmin), isCurrentSession, invalidateSession, signIn, signInLocal, signOut }}>
+    {localEmulators && <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">Entorno local · Firebase emulado · datos de negocio temporales</div>}
+    <AccountConsentProvider key={snapshot.authEpoch} uid={effectiveUser?.uid} refreshVersion={consentVersion}>{children}</AccountConsentProvider>
+  </AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

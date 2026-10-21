@@ -22,11 +22,8 @@ import type { NormalizedYCloudEvent } from './ycloud-webhook';
 import { HttpError } from './http';
 
 type IncomingText = Extract<NormalizedYCloudEvent, { kind: 'incoming_text' }>;
-export interface PlatformWhatsAppLinkStatus {
-  available: boolean; revokeGeneration: string | null;
-  current: null | { linkId: string; revision: number; expiresAt: number; maskedPhone: string };
-  pending: null | { challengeId: string; revision: number; expiresAt: number; maskedPhone: string; proof: 'pending' | 'verified' };
-}
+import type { PlatformWhatsAppLinkStatus } from '@/types/platform-whatsapp-link';
+export type { PlatformWhatsAppLinkStatus } from '@/types/platform-whatsapp-link';
 const links = 'platformWhatsAppLinks', challenges = 'platformWhatsAppLinkChallenges';
 const unavailable = () => new HttpError(503, 'La vinculación no está disponible.', 'LINK_UNAVAILABLE');
 const conflict = () => new HttpError(409, 'La vinculación cambió. Consulta su estado.', 'LINK_CONFLICT');

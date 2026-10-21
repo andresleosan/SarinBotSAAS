@@ -14,7 +14,7 @@ vi.mock("firebase/auth", () => ({
   GoogleAuthProvider: class {},
   onIdTokenChanged: vi.fn(
     (_auth: unknown, listener: (user: User | null) => Promise<void>) => {
-      state.listener = listener;
+      state.listener = (user) => { state.currentUser = user; return listener(user); };
       return vi.fn();
     },
   ),
@@ -114,7 +114,7 @@ describe("authentication provider access state", () => {
     await act(async () => {
       await state.listener?.(user);
     });
-    expect(auth.user?.uid).toBe("owner");
+    expect(auth.user).toBeNull();
     expect(auth.isSuperadmin).toBe(false);
     expect(auth.loading).toBe(false);
     expect(auth.error).toBe("Servicio no disponible");
@@ -161,6 +161,7 @@ describe("authentication provider access state", () => {
       pending = auth.signOut();
     });
     expect(auth.isSuperadmin).toBe(false);
+    expect(auth.user).toBeNull();
     expect(auth.error).toBeNull();
     expect(JSON.stringify(renderer?.toJSON())).not.toContain(
       "PRIVATE_ADMIN_CONTENT",
@@ -173,6 +174,20 @@ describe("authentication provider access state", () => {
     expect(auth.user).toBeNull();
   });
 
+  it("keeps the verified AuthGate mounted during same-UID background validation", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ isSuperadmin: true });
+    await mount();
+    await act(async () => state.listener?.(user));
+    expect(JSON.stringify(renderer?.toJSON())).toContain("PRIVATE_ADMIN_CONTENT");
+    const refresh = deferred<{ isSuperadmin: boolean }>();
+    vi.mocked(apiFetch).mockImplementation((path) => path === '/api/session' ? refresh.promise : Promise.resolve({}));
+    let pending: Promise<void> | undefined;
+    act(() => { pending = state.listener?.(user); });
+    expect(auth.loading).toBe(false);
+    expect(JSON.stringify(renderer?.toJSON())).toContain("PRIVATE_ADMIN_CONTENT");
+    await act(async () => { refresh.resolve({ isSuperadmin: true }); await pending; });
+  });
+
   it("rejects direct local account access outside development emulation", async () => {
     await mount();
     await act(async () => {
@@ -183,5 +198,100 @@ describe("authentication provider access state", () => {
     expect(signInWithCredential).not.toHaveBeenCalled();
     expect(auth.user).toBeNull();
     expect(auth.isSuperadmin).toBe(false);
+  });
+
+  it.each([undefined, {}, { isSuperadmin: 'true' }, { isSuperadmin: null }])('rejects malformed session %j and does not reopen on a token event', async result => {
+    vi.mocked(apiFetch).mockResolvedValue(result);
+    await mount(); await act(async () => state.listener?.(user));
+    expect(auth.user).toBeNull(); expect(auth.isSuperadmin).toBe(false);
+    const calls = vi.mocked(apiFetch).mock.calls.length;
+    vi.mocked(apiFetch).mockResolvedValue({ isSuperadmin: true });
+    await act(async () => state.listener?.(user));
+    expect(auth.user).toBeNull(); expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(calls);
+  });
+
+  it('uses the latest literal false as a verified nonadmin session without borrowing an earlier role', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ isSuperadmin: true });
+    await mount(); await act(async () => state.listener?.(user));
+    const epoch = auth.authEpoch, predicate = auth.isCurrentSession;
+    vi.mocked(apiFetch).mockResolvedValue({ isSuperadmin: false });
+    await act(async () => state.listener?.(user));
+    expect(auth.user?.uid).toBe(user.uid); expect(auth.isSuperadmin).toBe(false);
+    expect(auth.authEpoch).toBe(epoch); expect(auth.isCurrentSession).toBe(predicate);
+    expect(predicate(user.uid, epoch)).toBe(true);
+    expect(JSON.stringify(renderer?.toJSON())).not.toContain('PRIVATE_ADMIN_CONTENT');
+    expect(vi.mocked(apiFetch).mock.calls.find(call => call[0] === '/api/session')?.[2]).toBe(user.uid);
+  });
+
+  it('rejects a captured session synchronously at logout start before React rerenders', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ isSuperadmin: true });
+    await mount(); await act(async () => state.listener?.(user));
+    const epoch = auth.authEpoch, predicate = auth.isCurrentSession;
+    const logout = deferred<void>(); vi.mocked(signOut).mockReturnValue(logout.promise);
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = auth.signOut();
+      expect(predicate(user.uid, epoch)).toBe(false);
+      logout.resolve(); await pending;
+    });
+    expect(auth.authEpoch).toBeGreaterThan(epoch);
+    expect(predicate(user.uid, epoch)).toBe(false);
+  });
+
+  it('does not extend the first pending deadline and ignores superseded or late validation', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(apiFetch).mockResolvedValue({ isSuperadmin: true });
+      await mount(); await act(async () => state.listener?.(user));
+      const epoch = auth.authEpoch;
+      const first = deferred<{ isSuperadmin: boolean }>(), second = deferred<{ isSuperadmin: boolean }>();
+      vi.mocked(apiFetch).mockImplementationOnce(() => first.promise);
+      act(() => { void state.listener?.(user); });
+      await act(async () => vi.advanceTimersByTimeAsync(9000));
+      vi.mocked(apiFetch).mockImplementationOnce(() => second.promise);
+      act(() => { void state.listener?.(user); });
+      await act(async () => vi.advanceTimersByTimeAsync(999));
+      expect(auth.isSuperadmin).toBe(true); expect(auth.authEpoch).toBe(epoch);
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      expect(auth.user).toBeNull(); expect(auth.authEpoch).toBeGreaterThan(epoch);
+      await act(async () => { second.resolve({ isSuperadmin: true }); first.resolve({ isSuperadmin: true }); });
+      expect(auth.user).toBeNull(); expect(auth.isSuperadmin).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('masks a UID transition while its new validation is pending and ignores an old true after current failure', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ isSuperadmin: true });
+    await mount(); await act(async () => state.listener?.(user));
+    const old = deferred<{ isSuperadmin: boolean }>();
+    vi.mocked(apiFetch).mockImplementationOnce(() => old.promise);
+    act(() => { void state.listener?.(user); });
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Revoked'));
+    await act(async () => state.listener?.({ ...user, uid: 'other' } as User));
+    await act(async () => old.resolve({ isSuperadmin: true }));
+    expect(auth.user).toBeNull(); expect(auth.isSuperadmin).toBe(false);
+  });
+  it('does not post a preauthorization after logout interrupts its consent read', async () => {
+    await mount(); await act(async () => state.listener?.(null));
+    state.currentUser = user; vi.mocked(signInWithPopup).mockResolvedValue({ user } as never);
+    const consent = deferred<unknown>();
+    vi.mocked(apiFetch).mockImplementation(path => path === '/api/consent?scope=account' ? consent.promise : Promise.resolve({ isSuperadmin: false }));
+    let signingIn!: Promise<void>;
+    act(() => { signingIn = auth.signIn('synthetic-preauthorization'); });
+    await act(async () => {
+      await auth.signOut();
+      consent.resolve({ revision: 0, documents: { fingerprint: 'a'.repeat(64) } }); await signingIn;
+    });
+    expect(vi.mocked(apiFetch).mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0);
+  });
+  it('rejects the current SDK UID mismatch synchronously and never grants the old role to a pending new user', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ isSuperadmin: true }); await mount(); await act(async () => state.listener?.(user));
+    const epoch = auth.authEpoch, predicate = auth.isCurrentSession;
+    state.currentUser = { ...user, uid: 'other' } as User;
+    expect(predicate(user.uid, epoch)).toBe(false);
+    const session = deferred<{ isSuperadmin: boolean }>(); vi.mocked(apiFetch).mockImplementationOnce(() => session.promise);
+    act(() => { void state.listener?.(state.currentUser); });
+    expect(auth.user).toBeNull(); expect(auth.isSuperadmin).toBe(false); expect(auth.loading).toBe(true);
+    await act(async () => session.resolve({ isSuperadmin: false }));
+    expect(auth.user?.uid).toBe('other'); expect(auth.isSuperadmin).toBe(false);
   });
 });
