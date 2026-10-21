@@ -6,7 +6,8 @@ import { runSarinChat } from './chat';
 import { commitResponseQuota } from './response-quota';
 import { bindingReady, parseWhatsAppBinding, readWhatsAppConfig } from './whatsapp-config';
 import { decryptWhatsApp, readBoundedBytes } from './whatsapp-security';
-import { cleanupWhatsAppRetention, inboundContentSchema, outboundContentSchema, persistWhatsAppReply, readWhatsAppHistory, updateWhatsAppOutbox, whatsappHash, WHATSAPP_TERMINAL, type WhatsAppInbox, type WhatsAppOutbox } from './whatsapp-store';
+import { claimWhatsAppOutbox, cleanupWhatsAppRetention, inboundContentSchema, outboundContentSchema, persistWhatsAppReply, readWhatsAppHistory, updateWhatsAppOutbox, whatsappHash, WHATSAPP_TERMINAL, type WhatsAppInbox, type WhatsAppOutbox } from './whatsapp-store';
+import { conversationAllowsReply, conversationPermitsReply, markConversationForReview, registerWhatsAppOperation } from './whatsapp-conversations';
 
 const processing = new WeakSet<Firestore>();
 const LEASE_MS = 5 * 60_000;
@@ -36,10 +37,15 @@ async function generateOne(db: Firestore) {
       if (row.nextAttemptAt > Date.now()) return null;
       if (row.state === 'processing') {
         // A restart cannot know whether inference or a booking already happened.
+        await markConversationForReview(row, db, transaction);
         transaction.set(reference, { ...row, state: 'review', nextAttemptAt: WHATSAPP_TERMINAL });
         return null;
       }
       if (row.state !== 'pending') return null;
+      const conversation = await transaction.get(db.collection('whatsappConversations').doc(row.conversationId));
+      if (!conversationPermitsReply(conversation.data(), row)) {
+        transaction.set(reference, { ...row, state: 'review', nextAttemptAt: WHATSAPP_TERMINAL }); return null;
+      }
       if (!row.content || row.windowEndsAt <= Date.now() || row.bodyExpiresAt <= Date.now()) {
         transaction.set(reference, { ...row, state: 'expired', nextAttemptAt: WHATSAPP_TERMINAL }); return null;
       }
@@ -47,14 +53,15 @@ async function generateOne(db: Firestore) {
       return row;
     });
     if (!inbox) continue;
+    const operation = registerWhatsAppOperation(inbox, db, 180_000);
     try {
-      if (!await activeNumber(inbox, db)) throw new Error('Binding paused');
+      if (!await activeNumber(inbox, db) || !await conversationAllowsReply(inbox, db)) throw new Error('Conversation paused');
       const source = inboundContentSchema.parse(decryptWhatsApp(inbox.content, reference.path));
       const history = await readWhatsAppHistory(inbox.conversationId, db);
       const messages = [...history, { role: 'user' as const, content: source.text }];
       while (messages.length > 20 || messages.reduce((sum, item) => sum + item.content.length, 0) > 60_000) messages.shift();
       await runSarinChat({ user: { uid: `wa_${whatsappHash(inbox.businessId, source.from)}`, phone: `+${source.from}`, ...(source.name ? { name: source.name } : {}) },
-        body: { mode: 'sarin_client', tenantId: inbox.businessId, requestId: candidate.id, messages }, channel: 'whatsapp', signal: AbortSignal.timeout(180_000),
+        body: { mode: 'sarin_client', tenantId: inbox.businessId, requestId: candidate.id, messages }, channel: 'whatsapp', signal: operation.signal,
         onResponse: (response, reservation) => persistWhatsAppReply(candidate.id, leaseId, response, reservation, db),
       });
     } catch {
@@ -62,9 +69,12 @@ async function generateOne(db: Firestore) {
       // by onResponse survives this failure and is independently reconciled below.
       await db.runTransaction(async transaction => {
         const current = await transaction.get(reference);
-        if (current.exists && current.data()?.state === 'processing' && current.data()?.leaseId === leaseId) transaction.set(reference, { ...current.data(), state: 'review', nextAttemptAt: WHATSAPP_TERMINAL });
+        if (current.exists && current.data()?.state === 'processing' && current.data()?.leaseId === leaseId) {
+          await markConversationForReview(current.data() as WhatsAppInbox, db, transaction);
+          transaction.set(reference, { ...current.data(), state: 'review', nextAttemptAt: WHATSAPP_TERMINAL });
+        }
       });
-    }
+    } finally { operation.dispose(); }
     return; // One inference at a time and per poll; outbound recovery stays bounded.
   }
 }
@@ -80,6 +90,9 @@ async function sendPending(db: Firestore) {
       await updateWhatsAppOutbox(candidate.id, row => row.state === 'sending' ? { state: 'unknown', nextAttemptAt: WHATSAPP_TERMINAL } : null, db); continue;
     }
     if (initial.state !== 'ready') continue;
+    if (!await conversationAllowsReply(initial, db)) {
+      await updateWhatsAppOutbox(candidate.id, row => row.state === 'ready' ? { state: 'cancelled', nextAttemptAt: WHATSAPP_TERMINAL } : null, db); continue;
+    }
     if (!initial.content || initial.windowEndsAt <= Date.now() || initial.bodyExpiresAt <= Date.now()) {
       await updateWhatsAppOutbox(candidate.id, () => ({ state: 'expired', nextAttemptAt: WHATSAPP_TERMINAL }), db); continue;
     }
@@ -93,20 +106,19 @@ async function sendPending(db: Firestore) {
     let content: ReturnType<typeof outboundContentSchema.parse>;
     try { content = outboundContentSchema.parse(decryptWhatsApp(initial.content, `whatsappOutbox/${candidate.id}`)); }
     catch { await updateWhatsAppOutbox(candidate.id, () => ({ state: 'failed', failed: true, nextAttemptAt: WHATSAPP_TERMINAL }), db); continue; }
-    let claimed = false;
-    await updateWhatsAppOutbox(candidate.id, row => {
-      // Transaction callbacks may retry; overwrite the local claim on each pass.
-      claimed = row.state === 'ready' && row.nextAttemptAt <= Date.now() && row.windowEndsAt > Date.now() && row.attempts < 3;
-      return claimed ? { state: 'sending', attempts: row.attempts + 1, nextAttemptAt: Date.now() + 60_000 } : null;
-    }, db);
-    if (!claimed) continue;
-    const config = readWhatsAppConfig();
+    const operation = registerWhatsAppOperation(initial, db, 15_000);
     try {
+      const claimed = await claimWhatsAppOutbox(candidate.id, db);
+      if (!claimed) continue;
+      if (!await conversationAllowsReply(initial, db) || operation.signal.aborted) {
+        await updateWhatsAppOutbox(candidate.id, row => row.state === 'sending' && !row.sent ? { state: 'cancelled', nextAttemptAt: WHATSAPP_TERMINAL } : null, db); continue;
+      }
+      const config = readWhatsAppConfig();
       const response = await fetch(`https://graph.facebook.com/${config.graphApiVersion}/${initial.phoneNumberId}/messages`, {
         method: 'POST', headers: { Authorization: `Bearer ${config.credentials[initial.phoneNumberId].accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: `+${content.to}`, type: 'text', text: { preview_url: false, body: content.reply },
           context: { message_id: content.messageId }, biz_opaque_callback_data: candidate.id }),
-        redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(15_000),
+        redirect: 'error', cache: 'no-store', signal: operation.signal,
       });
       const result = JSON.parse((await readBoundedBytes(response.body, 16_384)).toString('utf8'));
       const id = result?.messages?.[0]?.id;
@@ -122,7 +134,7 @@ async function sendPending(db: Firestore) {
       } else throw new Error('Ambiguous send result');
     } catch {
       await updateWhatsAppOutbox(candidate.id, row => row.sent ? null : { state: 'unknown', nextAttemptAt: WHATSAPP_TERMINAL }, db);
-    }
+    } finally { operation.dispose(); }
   }
 }
 

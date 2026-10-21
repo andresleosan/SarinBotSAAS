@@ -57,6 +57,6 @@ describe('Google account avatar', () => {
   it('keeps administration navigation focused on the commercial workspace', async () => {
     await act(async () => { renderer = create(createElement(AppShell, { admin: true, children: 'Contenido' })); });
     const navigation = renderer.root.findByProps({ 'aria-label': 'Navegación de administración' });
-    expect(navigation.findAllByType('a').map(link => link.props.href)).toEqual(['/admin', '/dashboard']);
+    expect(navigation.findAllByType('a').map(link => link.props.href)).toEqual(['/admin', '/admin/assistant', '/dashboard']);
   });
 });

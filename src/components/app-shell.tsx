@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, CalendarDays, ChevronRight, CreditCard, LayoutDashboard, LogOut, QrCode, Settings2, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, Bot, CalendarDays, ChevronRight, CreditCard, LayoutDashboard, LogOut, QrCode, Settings2, ShieldCheck, type LucideIcon } from "lucide-react";
 import { type ReactNode } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { SarinBrand } from "@/components/sarin-brand";
@@ -18,6 +18,7 @@ const businessLinks: NavigationItem[] = [
 ];
 const adminLinks: NavigationItem[] = [
   { href: "/admin", label: "Control de Sarin", icon: LayoutDashboard },
+  { href: "/admin/assistant", label: "Asistente", icon: Bot },
   { href: "/dashboard", label: "Mi negocio", icon: CalendarDays },
 ];
 

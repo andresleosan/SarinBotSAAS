@@ -74,6 +74,20 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
   };
   await assertAccess(false);
   const cacheKey = stableDocumentId(body.mode === 'sarin_onboarding' ? 'onboarding' : business.id, user.uid, body.mode, body.requestId, channel);
+  const prepareResponse = async (response: ChatResponse, reservation: ResponseQuotaReservation) => {
+    try { await onResponse?.(response, reservation); }
+    catch (error) {
+      // A rejected control epoch proves no outbox was created. Ambiguous
+      // storage failures retain the reservation and the recoverable reply.
+      if (channel === 'whatsapp' && error instanceof HttpError && error.code === 'WHATSAPP_CONTROL_CHANGED') {
+        const savedMutation = response.toolResults?.some(result => result.result.appointment || result.result.business);
+        if (savedMutation) await commitResponseQuota(reservation, response, db);
+        else await releaseResponseQuota(reservation, db);
+        responses.get(db)?.delete(cacheKey);
+      }
+      throw error;
+    }
+  };
   // Legacy payloads retain their exact historical fingerprint for durable replay.
   const fingerprint = createHash('sha256').update(JSON.stringify({ mode: body.mode, tenantId: body.tenantId, messages: body.stateVersion === undefined ? body.messages : [body.messages.at(-1)!], ...(body.stateVersion === undefined ? {} : { stateVersion: body.stateVersion }) })).digest('hex');
   const quotaInput = { businessId: business.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel };
@@ -110,7 +124,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     if (cached) {
       if (cached.fingerprint !== fingerprint) throw new HttpError(409, 'Este identificador ya se utilizó para otro mensaje.', 'AI_REQUEST_CONFLICT');
       const response = await recoverLegacyMutation(user, body, business) ?? structuredClone(cached.response);
-      await onResponse?.(response, cached.reservation);
+      await prepareResponse(response, cached.reservation);
       try { await commitResponseQuota(cached.reservation); } catch { /* keep held unit */ }
       return response;
     }
@@ -120,7 +134,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     const quota = await reserveResponseQuota(quotaInput, db, (tx, current) => assertNewProcessing(tx, current));
     if (quota.kind === 'replay') {
       const recovered = await recoverLegacyMutation(user, body, business);
-      if (recovered) { await onResponse?.(recovered, quota.reservation); try { await commitResponseQuota(quota.reservation); } catch { /* keep held unit */ } return recovered; }
+      if (recovered) { await prepareResponse(recovered, quota.reservation); try { await commitResponseQuota(quota.reservation); } catch { /* keep held unit */ } return recovered; }
       throw new HttpError(409, 'Esta solicitud ya fue atendida. Revisa la conversación o envía un mensaje nuevo.', 'REQUEST_ALREADY_COMPLETED');
     }
     let response: ChatResponse;
@@ -156,7 +170,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
       throw error;
     }
     rememberResponse(db, cacheKey, { fingerprint, response: structuredClone(response), reservation: quota.reservation, expiresAt: Date.now() + 15 * 60 * 1000 });
-    await onResponse?.(response, quota.reservation);
+    await prepareResponse(response, quota.reservation);
     try { await commitResponseQuota(quota.reservation, response); } catch { /* retain original unit; never repeat interpretation */ }
     return response;
   }, 'NORMAL', { signal }));

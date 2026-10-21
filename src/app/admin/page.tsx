@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -49,6 +49,10 @@ const subscriptionLabels: Record<Business["subscription"]["status"], string> = {
   past_due: "Pago pendiente",
   suspended: "Suspendida",
 };
+function adminReadPath() {
+  const focusPayment = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("focusPayment");
+  return focusPayment ? `/api/admin?focusPayment=${encodeURIComponent(focusPayment)}` : "/api/admin";
+}
 function Console() {
   const [data, setData] = useState<AdminData | null>(null);
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
@@ -58,10 +62,11 @@ function Console() {
   const [working, setWorking] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const focusedRecord = useRef(false);
   const engine = useEngineHealth();
   useEffect(() => {
     const controller = new AbortController();
-    void apiFetch<AdminData>("/api/admin", { signal: controller.signal })
+    void apiFetch<AdminData>(adminReadPath(), { signal: controller.signal })
       .then((response) => {
         setData(response);
         setSettings(response.settings);
@@ -74,11 +79,21 @@ function Console() {
       });
     return () => controller.abort();
   }, []);
+  useEffect(() => {
+    if (!data || focusedRecord.current || typeof window === "undefined") return;
+    const targetId = window.location.hash.slice(1);
+    if (!/^(business|payment)-[A-Za-z0-9_-]{1,128}$/.test(targetId)) return;
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    focusedRecord.current = true;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "center" });
+  }, [data]);
   async function refresh() {
     setWorking("refresh");
     setError(null);
     try {
-      const response = await apiFetch<AdminData>("/api/admin");
+      const response = await apiFetch<AdminData>(adminReadPath());
       setData(response);
     } catch (cause) {
       setError(errorMessage(cause));
@@ -188,6 +203,7 @@ function Console() {
             Administra las suscripciones, revisa pagos y elige la IA de los negocios.
           </p>
         </div>
+        <Link href="/admin/assistant" className={buttonClass}>Abrir asistente</Link>
       </header>
       {error && <Notice error>{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
@@ -270,6 +286,8 @@ function Console() {
               )
               .map((receipt) => (
                 <article
+                  id={`payment-${receipt.id}`}
+                  tabIndex={-1}
                   className="space-y-3 rounded-2xl border border-sarin-line bg-sarin-paper p-4"
                   key={receipt.id}
                 >
@@ -396,7 +414,7 @@ function Console() {
               </thead>
               <tbody className="divide-y divide-sarin-line">
                 {data.businesses.map((business) => (
-                  <tr key={business.id}>
+                  <tr key={business.id} id={`business-${business.id}`} tabIndex={-1}>
                     <td className="p-4">
                       {business.slug ? <Link
                         href={`/b/${business.slug}`}

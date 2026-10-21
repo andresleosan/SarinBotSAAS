@@ -23,6 +23,43 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe('durable encrypted WhatsApp inbox/outbox', () => {
+  const humanEcho = () => ({ object: 'whatsapp_business_account', entry: [{ id: '200001', changes: [{ field: 'smb_message_echoes', value: { messaging_product: 'whatsapp', metadata: { phone_number_id: phoneId }, message_echoes: [{ id: 'wamid.synthetic-human', from: '573009998877', to: sender, timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'Synthetic human reply' } }] } }] }] });
+  it('applies an app echo before an inbound turn and keeps human control without inference or send', async () => {
+    const { db, rows } = memoryFirestore(whatsappRows()); state.db = db;
+    const batch = inbound();
+    await ingestWhatsAppWebhook({ ...batch, entry: [...batch.entry, ...humanEcho().entry] }, db);
+    await processWhatsAppQueue(db);
+    expect(documents(rows, 'whatsappInbox')[0][1].data.state).toBe('review');
+    expect(documents(rows, 'whatsappConversations')[0][1].data).toMatchObject({ mode: 'human', revision: 1 });
+    expect(state.chat).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+    expect(JSON.stringify([...rows])).not.toMatch(/Synthetic human reply|573001112233/);
+  });
+  it('aborts in-flight generation on a human echo and refuses its stale persisted reply', async () => {
+    const { db, rows } = memoryFirestore(whatsappRows()); state.db = db;
+    state.chat.mockImplementationOnce(async input => {
+      await ingestWhatsAppWebhook(humanEcho(), db);
+      expect(input.signal.aborted).toBe(true);
+      await expect(input.onResponse({ reply: 'Stale synthetic reply' }, reservation)).rejects.toMatchObject({ code: 'WHATSAPP_CONTROL_CHANGED' });
+      throw input.signal.reason;
+    });
+    await ingestWhatsAppWebhook(inbound(), db); await processWhatsAppQueue(db);
+    expect(documents(rows, 'whatsappOutbox')).toHaveLength(0);
+    expect(documents(rows, 'whatsappInbox')[0][1].data.state).toBe('review');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('cancels an already persisted reply if the business app takes control before send', async () => {
+    const { db, rows } = memoryFirestore(whatsappRows()); state.db = db;
+    state.chat.mockImplementationOnce(async input => {
+      await input.onResponse({ reply: 'Synthetic pending reply' }, reservation);
+      await ingestWhatsAppWebhook(humanEcho(), db);
+    });
+    await ingestWhatsAppWebhook(inbound(), db); await processWhatsAppQueue(db);
+    expect(documents(rows, 'whatsappOutbox')[0][1].data.state).toBe('cancelled');
+    expect(fetch).not.toHaveBeenCalled();
+    const conversation = documents(rows, 'whatsappConversations')[0][1].data;
+    await cleanupWhatsAppRetention(db, Number(conversation.bodyExpiresAt) + 1);
+    expect(documents(rows, 'whatsappConversations')[0][1].data).toMatchObject({ content: null, contactContent: null });
+  });
   it('deduplicates concurrent deliveries before inference and stores no plaintext content or phone', async () => {
     const { db, rows } = memoryFirestore(whatsappRows()); state.db = db;
     await Promise.all([ingestWhatsAppWebhook(inbound(), db), ingestWhatsAppWebhook(inbound(), db)]);

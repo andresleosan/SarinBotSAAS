@@ -9,12 +9,18 @@ import type { ResponseQuotaReservation } from './response-quota';
 import { bindingReady, metaIdSchema, parseWhatsAppBinding, readWhatsAppConfig } from './whatsapp-config';
 import { decryptWhatsApp, encryptWhatsApp, type WhatsAppCiphertext } from './whatsapp-security';
 import { HttpError } from './http';
+import { appendConversationControl, cancelSupersededWhatsAppOperations, conversationContactSchema, conversationPermitsReply, parseConversationMetadata } from './whatsapp-conversations';
+export { getWhatsAppConversations, setWhatsAppConversationMode, whatsAppConversationControlSchema } from './whatsapp-conversations';
 
 export const WHATSAPP_DAY = 86_400_000;
 export const WHATSAPP_TERMINAL = Number.MAX_SAFE_INTEGER;
 export const whatsappHash = (...parts: string[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 const timestamp = z.string().regex(/^\d{1,13}$/).transform(value => Number(value) * 1000).refine(Number.isSafeInteger);
 const wamid = z.string().min(1).max(512);
+const echoPhone = z.string().regex(/^\+?[1-9]\d{7,14}$/).transform(value => value.replace(/^\+/, ''));
+const echoValueSchema = z.object({ messaging_product: z.literal('whatsapp'), metadata: z.object({ phone_number_id: metaIdSchema }),
+  message_echoes: z.array(z.object({ id: wamid, from: echoPhone, to: echoPhone, timestamp, type: z.string().min(1).max(64), text: z.object({ body: z.string().max(4096) }).optional() })).max(100),
+});
 const pricingSchema = z.object({ type: z.enum(['regular', 'free_customer_service', 'free_entry_point']), category: z.string().max(64) });
 const valueSchema = z.object({ messaging_product: z.literal('whatsapp'), metadata: z.object({ phone_number_id: metaIdSchema }),
   contacts: z.array(z.object({ wa_id: z.string(), profile: z.object({ name: z.string().max(256) }).optional() })).max(100).optional(),
@@ -25,13 +31,15 @@ const payloadSchema = z.object({ object: z.literal('whatsapp_business_account'),
 
 export interface WhatsAppInbox {
   businessId: string; phoneNumberId: string; wabaId: string; conversationId: string;
+  conversationRevision?: number;
   state: 'pending' | 'processing' | 'completed' | 'review' | 'expired';
   receivedAt: number; windowEndsAt: number; bodyExpiresAt: number; expiresAt: number; nextAttemptAt: number;
   content: WhatsAppCiphertext | null; leaseId?: string;
 }
 export interface WhatsAppOutbox {
   businessId: string; phoneNumberId: string; wabaId: string; conversationId: string;
-  state: 'ready' | 'sending' | 'accepted' | 'delivered' | 'unknown' | 'failed' | 'expired';
+  conversationRevision?: number;
+  state: 'ready' | 'sending' | 'accepted' | 'delivered' | 'unknown' | 'failed' | 'expired' | 'cancelled';
   createdAt: number; windowEndsAt: number; bodyExpiresAt: number; expiresAt: number; nextAttemptAt: number;
   content: WhatsAppCiphertext | null; reservation: ResponseQuotaReservation;
   sent: boolean; delivered: boolean; read: boolean; failed: boolean; attempts: number;
@@ -86,13 +94,61 @@ export async function ingestWhatsAppWebhook(payload: unknown, db: Firestore = ge
   let eventCount = 0;
   // Parse and bound the whole batch before writing any part of it.
   const events: { wabaId: string; value: z.infer<typeof valueSchema> }[] = [];
+  const echoes: { wabaId: string; value: z.infer<typeof echoValueSchema> }[] = [];
   for (const entry of parsed.data.entry) for (const change of entry.changes) {
+    if (change.field === 'smb_message_echoes') {
+      const value = echoValueSchema.safeParse(change.value);
+      if (!value.success) throw new HttpError(400, 'Webhook no válido.');
+      eventCount += value.data.message_echoes.length;
+      if (eventCount > 100) throw new HttpError(413, 'Demasiados eventos.');
+      echoes.push({ wabaId: entry.id, value: value.data });
+      continue;
+    }
     if (change.field !== 'messages') continue;
     const value = valueSchema.safeParse(change.value);
     if (!value.success) throw new HttpError(400, 'Webhook no válido.');
     eventCount += (value.data.messages?.length ?? 0) + (value.data.statuses?.length ?? 0);
     if (eventCount > 100) throw new HttpError(413, 'Demasiados eventos.');
     events.push({ wabaId: entry.id, value: value.data });
+  }
+  // Apply app-originated interventions before any inbound turn in the same batch.
+  for (const { wabaId, value } of echoes) {
+    const phoneNumberId = value.metadata.phone_number_id;
+    const numberRef = db.collection('whatsappNumbers').doc(phoneNumberId);
+    for (const message of value.message_echoes) {
+      if (message.timestamp > now + 300_000 || message.timestamp <= now - WHATSAPP_DAY) continue;
+      const echoRef = db.collection('whatsappMessageIds').doc(whatsappHash('echo', phoneNumberId, message.id));
+      const intervention = await db.runTransaction(async transaction => {
+        const [number, existing] = await Promise.all([transaction.get(numberRef), transaction.get(echoRef)]);
+        if (existing.exists || !number.exists) return;
+        const binding = parseWhatsAppBinding(number.data());
+        if (binding.wabaId !== wabaId) return;
+        const conversationId = whatsappHash(binding.businessId, phoneNumberId, message.to);
+        const reference = db.collection('whatsappConversations').doc(conversationId);
+        const snapshot = await transaction.get(reference);
+        const previous = snapshot.data();
+        const metadata = parseConversationMetadata(previous);
+        if (metadata && (metadata.businessId !== binding.businessId || metadata.phoneNumberId !== phoneNumberId || metadata.wabaId !== wabaId)) throw new HttpError(503, 'Conversación no válida.');
+        transaction.create(echoRef, { expiresAt: now + 30 * WHATSAPP_DAY });
+        const occurredAt = Math.min(now, message.timestamp);
+        // A delayed echo cannot undo an explicit, newer administrative resumption.
+        if (metadata && metadata.mode === 'bot' && occurredAt < Math.floor(metadata.controlChangedAt / 1000) * 1000) return;
+        if (metadata?.lastHumanAt && occurredAt < metadata.lastHumanAt) return;
+        const priorContact = previous?.contactContent && Number(previous.bodyExpiresAt) > now
+          ? conversationContactSchema.parse(decryptWhatsApp(previous.contactContent, `${reference.path}/contact`)) : null;
+        const bodyExpiresAt = priorContact ? Math.min(Number(previous!.bodyExpiresAt), occurredAt + WHATSAPP_DAY) : occurredAt + WHATSAPP_DAY;
+        const base = { ...previous, businessId: binding.businessId, phoneNumberId, wabaId,
+          mode: metadata?.mode ?? 'bot', revision: metadata?.revision ?? 0, updatedAt: occurredAt,
+          controlChangedAt: metadata?.controlChangedAt ?? 0, lastInboundAt: metadata?.lastInboundAt ?? null,
+          lastHumanAt: occurredAt, bodyExpiresAt, expiresAt: now + 30 * WHATSAPP_DAY,
+          content: null,
+          contactContent: bodyExpiresAt > now ? encryptWhatsApp({ phone: message.to, name: priorContact?.name ?? null,
+            lastMessage: message.type === 'text' ? message.text?.body ?? null : null }, `${reference.path}/contact`) : null };
+        transaction.set(reference, { ...base, ...appendConversationControl(base, 'human', null, 'business_app', now) });
+        return { conversationId, revision: base.revision + 1 };
+      });
+      if (intervention) cancelSupersededWhatsAppOperations(intervention.conversationId, intervention.revision, db);
+    }
   }
   for (const { wabaId, value } of events) {
     const phoneNumberId = value.metadata.phone_number_id;
@@ -107,16 +163,34 @@ export async function ingestWhatsAppWebhook(payload: unknown, db: Firestore = ge
       const reference = db.collection('whatsappInbox').doc(id);
       const receivedAt = Math.min(now, message.timestamp);
       const windowEndsAt = receivedAt + WHATSAPP_DAY;
+      const conversationId = whatsappHash(binding.businessId, phoneNumberId, message.from);
+      const conversationRef = db.collection('whatsappConversations').doc(conversationId);
+      const name = value.contacts?.find(contact => contact.wa_id === message.from)?.profile?.name;
       const content = windowEndsAt <= now ? null : encryptWhatsApp({ from: message.from, text: message.text.body, messageId: message.id,
         ...(value.contacts?.find(contact => contact.wa_id === message.from)?.profile?.name ? { name: value.contacts.find(contact => contact.wa_id === message.from)!.profile!.name } : {}),
       }, reference.path);
       await db.runTransaction(async transaction => {
-        const [existing, latestNumber] = await Promise.all([transaction.get(reference), transaction.get(numberRef)]);
+        const [existing, latestNumber, conversation] = await Promise.all([transaction.get(reference), transaction.get(numberRef), transaction.get(conversationRef)]);
         if (existing.exists || !latestNumber.exists) return;
         const latest = parseWhatsAppBinding(latestNumber.data());
         if (!bindingReady(latest, config) || latest.businessId !== binding.businessId || latest.wabaId !== wabaId) return;
-        const record: WhatsAppInbox = { businessId: binding.businessId, phoneNumberId, wabaId, conversationId: whatsappHash(binding.businessId, phoneNumberId, message.from),
-          state: content ? 'pending' : 'expired', receivedAt, windowEndsAt, bodyExpiresAt: windowEndsAt, expiresAt: now + 30 * WHATSAPP_DAY, nextAttemptAt: content ? now : WHATSAPP_TERMINAL, content };
+        const previous = conversation.data();
+        const metadata = parseConversationMetadata(previous);
+        if (metadata && (metadata.businessId !== binding.businessId || metadata.phoneNumberId !== phoneNumberId || metadata.wabaId !== wabaId)) throw new HttpError(503, 'Conversación no válida.');
+        const revision = metadata?.revision ?? 0;
+        const canReply = (metadata?.mode ?? 'bot') === 'bot' && Math.floor((metadata?.controlChangedAt ?? 0) / 1000) * 1000 <= receivedAt;
+        const record: WhatsAppInbox = { businessId: binding.businessId, phoneNumberId, wabaId, conversationId, conversationRevision: revision,
+          state: !content ? 'expired' : canReply ? 'pending' : 'review', receivedAt, windowEndsAt, bodyExpiresAt: windowEndsAt, expiresAt: now + 30 * WHATSAPP_DAY, nextAttemptAt: content && canReply ? now : WHATSAPP_TERMINAL, content };
+        const contactActive = previous?.contactContent && Number(previous.bodyExpiresAt) > now;
+        const contact = contactActive ? conversationContactSchema.parse(decryptWhatsApp(previous!.contactContent, `${conversationRef.path}/contact`)) : null;
+        const bodyExpiresAt = (previous?.content || contactActive) && Number(previous!.bodyExpiresAt) > now ? Math.min(Number(previous!.bodyExpiresAt), windowEndsAt) : windowEndsAt;
+        const newest = receivedAt >= Math.max(metadata?.lastInboundAt ?? 0, metadata?.lastHumanAt ?? 0);
+        transaction.set(conversationRef, { ...previous, businessId: binding.businessId, phoneNumberId, wabaId,
+          mode: metadata?.mode ?? 'bot', revision, controlChangedAt: metadata?.controlChangedAt ?? 0,
+          updatedAt: Math.max(metadata?.updatedAt ?? 0, receivedAt), lastInboundAt: Math.max(metadata?.lastInboundAt ?? 0, receivedAt), lastHumanAt: metadata?.lastHumanAt ?? null,
+          bodyExpiresAt, expiresAt: now + 30 * WHATSAPP_DAY,
+          content: previous?.content && Number(previous.bodyExpiresAt) > now ? previous.content : null,
+          contactContent: newest ? content ? encryptWhatsApp({ phone: message.from, name: name ?? contact?.name ?? null, lastMessage: message.text!.body }, `${conversationRef.path}/contact`) : null : previous?.contactContent ?? null });
         transaction.create(reference, record);
         transaction.set(numberRef, { ...latest, lastInboundAt: Math.max(latest.lastInboundAt ?? 0, receivedAt) });
       });
@@ -154,6 +228,23 @@ export async function readWhatsAppHistory(conversationId: string, db: Firestore,
   if (!snapshot.exists || Number(snapshot.data()?.bodyExpiresAt) <= now || !snapshot.data()?.content) return [];
   return historySchema.parse(decryptWhatsApp(snapshot.data()!.content, reference.path));
 }
+export async function claimWhatsAppOutbox(id: string, db: Firestore): Promise<boolean> {
+  const reference = db.collection('whatsappOutbox').doc(id);
+  return db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists) return false;
+    const row = snapshot.data() as WhatsAppOutbox;
+    if (row.state !== 'ready' || row.nextAttemptAt > Date.now() || row.windowEndsAt <= Date.now() || row.attempts >= 3) return false;
+    const conversation = await transaction.get(db.collection('whatsappConversations').doc(row.conversationId));
+    if (!conversationPermitsReply(conversation.data(), row)) {
+      transaction.set(reference, { ...row, state: 'cancelled', nextAttemptAt: WHATSAPP_TERMINAL });
+      return false;
+    }
+    transaction.set(reference, { ...row, state: 'sending', attempts: row.attempts + 1, nextAttemptAt: Date.now() + 60_000 });
+    return true;
+  });
+}
+
 export async function persistWhatsAppReply(id: string, leaseId: string, response: ChatResponse, reservation: ResponseQuotaReservation, db: Firestore): Promise<void> {
   const reference = db.collection('whatsappInbox').doc(id), outbox = db.collection('whatsappOutbox').doc(id);
   if (!response.reply.trim() || response.reply.length > 4096) throw new HttpError(503, 'La respuesta supera el límite de WhatsApp.');
@@ -166,18 +257,24 @@ export async function persistWhatsAppReply(id: string, leaseId: string, response
     const source = inboundContentSchema.parse(decryptWhatsApp(inbox.content, reference.path));
     const historyRef = db.collection('whatsappConversations').doc(inbox.conversationId);
     const historyDoc = await transaction.get(historyRef);
+    if (!conversationPermitsReply(historyDoc.data(), inbox)) throw new HttpError(409, 'La atención de la conversación cambió.', 'WHATSAPP_CONTROL_CHANGED');
     const activeHistory = historyDoc.exists && Number(historyDoc.data()?.bodyExpiresAt) > Date.now() && historyDoc.data()?.content;
     const history = activeHistory ? historySchema.parse(decryptWhatsApp(historyDoc.data()!.content, historyRef.path)) : [];
     history.push({ role: 'user', content: source.text }, { role: 'assistant', content: response.reply });
     while (history.length > 20 || history.reduce((total, message) => total + message.content.length, 0) > 55_000) history.shift();
-    const bodyExpiresAt = activeHistory ? Math.min(Number(historyDoc.data()!.bodyExpiresAt), inbox.bodyExpiresAt) : inbox.bodyExpiresAt;
+    // Contact identity survives a handoff even though the old bot history is
+    // discarded. Do not extend that identity's TTL (or resurrect expired data)
+    // when a later reply creates fresh history in the same document.
+    const retainedContent = historyDoc.exists && (historyDoc.data()?.content || historyDoc.data()?.contactContent);
+    const bodyExpiresAt = retainedContent ? Math.min(Number(historyDoc.data()!.bodyExpiresAt), inbox.bodyExpiresAt) : inbox.bodyExpiresAt;
     const record: WhatsAppOutbox = { businessId: inbox.businessId, phoneNumberId: inbox.phoneNumberId, wabaId: inbox.wabaId, conversationId: inbox.conversationId,
+      ...(inbox.conversationRevision !== undefined ? { conversationRevision: inbox.conversationRevision } : {}),
       state: 'ready', createdAt: Date.now(), windowEndsAt: inbox.windowEndsAt, bodyExpiresAt: inbox.bodyExpiresAt, expiresAt: inbox.expiresAt, nextAttemptAt: Date.now(),
       content: encryptWhatsApp({ to: source.from, reply: response.reply, messageId: source.messageId }, outbox.path), reservation,
       sent: false, delivered: false, read: false, failed: false, attempts: 0 };
     transaction.create(outbox, record);
     transaction.set(reference, { ...inbox, state: 'completed', nextAttemptAt: WHATSAPP_TERMINAL });
-    transaction.set(historyRef, { content: encryptWhatsApp(history, historyRef.path), bodyExpiresAt, expiresAt: inbox.expiresAt });
+    transaction.set(historyRef, { ...historyDoc.data(), content: encryptWhatsApp(history, historyRef.path), bodyExpiresAt, expiresAt: inbox.expiresAt });
   });
 }
 
@@ -188,7 +285,7 @@ export async function cleanupWhatsAppRetention(db: Firestore = getAdminDb(), now
     morePending ||= expiredBodies.size === 100;
     for (const document of expiredBodies.docs) await db.runTransaction(async transaction => {
       const reference = db.collection(collection).doc(document.id), fresh = await transaction.get(reference);
-      if (fresh.exists && Number(fresh.data()?.bodyExpiresAt) <= now) transaction.set(reference, { ...fresh.data(), content: null, bodyExpiresAt: WHATSAPP_TERMINAL });
+      if (fresh.exists && Number(fresh.data()?.bodyExpiresAt) <= now) transaction.set(reference, { ...fresh.data(), content: null, ...(collection === 'whatsappConversations' ? { contactContent: null } : {}), bodyExpiresAt: WHATSAPP_TERMINAL });
     });
   }
   for (const collection of ['whatsappInbox', 'whatsappOutbox', 'whatsappConversations', 'whatsappMessageIds']) {

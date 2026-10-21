@@ -16,6 +16,7 @@ import { businessIdForOwner, stableDocumentId } from '../src/lib/server/business
 import { getResponseQuota, reserveResponseQuota, commitResponseQuota } from '../src/lib/server/response-quota';
 import { createHash } from 'node:crypto';
 import { runSarinChat } from '../src/lib/server/chat';
+import { HttpError } from '../src/lib/server/http';
 const now = Date.parse('2030-01-01T12:00:00Z');
 const business: Business = { id: 'business', slug: 'real', ownerUid: 'owner', ownerEmail: '', name: 'Real', category: 'Barbería', phoneWhatsApp: '573001234567', timezone: 'America/Bogota', subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: now + 30 * 86400000 }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, resources: [{ id: 'chair', name: 'Silla', active: true }], services: [{ id: 'cut', name: 'Corte <QA>_[dos]', durationMinutes: 30, bufferMinutes: 15, price: 20000, resourceIds: ['chair'] }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '11:00' }] } }, createdAt: now };
 const body = { mode: 'sarin_client' as const, tenantId: 'business', requestId: 'request-one', messages: [{ role: 'user' as const, content: 'Agenda corte el lunes 7 a las 9.' }] };
@@ -125,6 +126,41 @@ describe('authorized closed business chat', () => {
   it('requires durable WhatsApp delivery and forbids owner modes on that channel', async () => {
     await expect(runSarinChat({ user: { uid: 'wa_verified', phone: '573009876543' }, body, channel: 'whatsapp' })).rejects.toMatchObject({ status: 503 });
     await expect(runSarinChat({ user: { uid: 'owner', phone: '573009876543' }, body: { ...body, mode: 'sarin_owner_copilot' }, channel: 'whatsapp', onResponse: async () => {} })).rejects.toMatchObject({ status: 403 });
+    expect(state.complete).not.toHaveBeenCalled();
+  });
+  async function enableWhatsAppPeriod() {
+    state.whatsappReady = true;
+    const db = state.db as ReturnType<typeof memoryFirestore>['db'];
+    await db.collection('responseQuotaScopes').doc('business_business').set({ initializedAt: now });
+    await db.collection('responseQuotaScopes').doc('business_business').collection('periods').doc('paid').set({ id: 'paid', source: 'subscription', planId: 'whatsapp', startsAt: now - 1000, endsAt: now + 86400000, includedResponses: 100, extraResponses: 0, usedResponses: 0, reservedResponses: 0 });
+    return db;
+  }
+  it('releases a reply cancelled by human control and does not replay its cached response', async () => {
+    await enableWhatsAppPeriod(); state.complete.mockResolvedValue(interpretation());
+    const input = { user: { uid: 'wa_verified', phone: '573009876543' }, body, channel: 'whatsapp' as const };
+    await expect(runSarinChat({ ...input, onResponse: async () => { throw new HttpError(409, 'Control changed', 'WHATSAPP_CONTROL_CHANGED'); } })).rejects.toMatchObject({ code: 'WHATSAPP_CONTROL_CHANGED' });
+    expect((await getResponseQuota('business')).currentPeriod).toMatchObject({ usedResponses: 0, reservedResponses: 0, remainingResponses: 100 });
+    await runSarinChat({ ...input, onResponse: async () => {} });
+    expect(state.complete).toHaveBeenCalledTimes(2);
+    expect((await getResponseQuota('business')).currentPeriod).toMatchObject({ usedResponses: 1, reservedResponses: 0 });
+  });
+  it('retains quota and cached output when durable WhatsApp persistence is ambiguous', async () => {
+    await enableWhatsAppPeriod(); state.complete.mockResolvedValue(interpretation());
+    const input = { user: { uid: 'wa_verified', phone: '573009876543' }, body, channel: 'whatsapp' as const };
+    await expect(runSarinChat({ ...input, onResponse: async () => { throw new Error('Ambiguous storage result'); } })).rejects.toThrow('Ambiguous storage result');
+    expect((await getResponseQuota('business')).currentPeriod).toMatchObject({ usedResponses: 0, reservedResponses: 1 });
+    await runSarinChat({ ...input, onResponse: async () => {} });
+    expect(state.complete).toHaveBeenCalledTimes(1);
+    expect((await getResponseQuota('business')).currentPeriod).toMatchObject({ usedResponses: 1, reservedResponses: 0 });
+  });
+  it('settles a saved appointment when human control cancels its recovered WhatsApp reply', async () => {
+    const db = await enableWhatsAppPeriod();
+    const fingerprint = createHash('sha256').update(JSON.stringify({ mode: body.mode, tenantId: body.tenantId, messages: body.messages })).digest('hex');
+    await reserveResponseQuota({ actorUid: 'wa_verified', businessId: 'business', mode: body.mode, channel: 'whatsapp', requestId: body.requestId, fingerprint });
+    const appointment = await createAppointment({ uid: 'wa_verified' }, 'business', { dateKey: '2030-01-07', startTimeStr: '09:00', serviceId: 'cut', resourceId: 'chair', clientPhone: '573009876543', intakeAnswers: {} }, stableDocumentId(body.requestId, 'crear_cita'), db);
+    await expect(runSarinChat({ user: { uid: 'wa_verified', phone: '573009876543' }, body, channel: 'whatsapp', onResponse: async () => { throw new HttpError(409, 'Control changed', 'WHATSAPP_CONTROL_CHANGED'); } })).rejects.toMatchObject({ code: 'WHATSAPP_CONTROL_CHANGED' });
+    expect((await getResponseQuota('business')).currentPeriod).toMatchObject({ usedResponses: 1, reservedResponses: 0 });
+    expect((await db.collection('businesses').doc('business').collection('appointments').get()).docs.map(row => row.id)).toEqual([appointment.id]);
     expect(state.complete).not.toHaveBeenCalled();
   });
 });
