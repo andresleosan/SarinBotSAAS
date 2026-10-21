@@ -19,6 +19,73 @@ describe('link ownership on actual local D1 with deterministic commit interleavi
   const start = (uid = token().uid, requestId = 'demo-start-1', at = now) => begin(token(uid, at), { phoneE164: phone, requestId }, db, at);
   async function proven(uid = token().uid, requestId = 'demo-start-1') { const c = await start(uid, requestId); expect(await verify(incoming({ text: c.code }), db, now)).toBe('verified'); return c; }
   function race(effect: () => Promise<unknown>) { let injected = false; return createCloudflareDatabase(async command => { if (command.action === 'commit' && !injected) { injected = true; await effect(); } return transport(command); }); }
+  async function durableSnapshot() {
+    return {
+      documents: (await runtime.db.prepare('SELECT path,parent,document_id,data,updated_at,blob FROM app_documents ORDER BY path').all()).results,
+      commits: (await runtime.db.prepare('SELECT request_id,fingerprint,revision,created_at FROM app_commits ORDER BY request_id').all()).results,
+      revision: await runtime.db.prepare('SELECT revision FROM app_revision WHERE id=1').first(),
+    };
+  }
+  it.each([false, true])('reclaims an expired phone before cleanup after its former owner begins again (different UID: %j)', async differentUid => {
+    const first = await proven(), original = await confirm(token(), { challengeId: first.challengeId, requestId: 'demo-original-confirm' }, db, now);
+    const oldPath = db.collection('platformWhatsAppLinks').doc('link_' + original.linkId), old = (await oldPath.get()).data()!;
+    const deadline = original.expiresAt, ownerChallenge = await begin(token(undefined, deadline), { phoneE164: differentUid ? '+12025550102' : phone, requestId: 'demo-owner-rebegin' }, db, deadline);
+    const afterBegin = (await oldPath.get()).data();
+    const claimant = token(differentUid ? 'demo-second' : token().uid, deadline);
+    const fresh = differentUid ? await begin(claimant, { phoneE164: phone, requestId: 'demo-claim-expired' }, second, deadline) : ownerChallenge;
+    expect(await verify(incoming({ text: fresh.code }), second, deadline)).toBe('verified');
+    const provenChallenge = (await db.collection('platformWhatsAppLinkChallenges').doc('challenge_' + fresh.challengeId).get()).data()!;
+    const previousOwner = (await db.collection('platformWhatsAppLinks').where('ownerUid', '==', claimant.uid).limit(2).get()).docs[0].data();
+    const claimed = await confirm(claimant, { challengeId: fresh.challengeId, requestId: 'demo-expired-confirm' }, second, deadline);
+    expect(afterBegin).toEqual({ ...old, status: 'revoked', revision: old.revision + 1 });
+    const link = (await db.collection('platformWhatsAppLinks').doc('link_' + claimed.linkId).get()).data()!;
+    const owner = (await db.collection('platformWhatsAppLinks').where('ownerUid', '==', claimant.uid).limit(2).get()).docs[0].data();
+    const pointer = (await db.collection('platformWhatsAppLinks').doc('phone_' + link.phoneIndex).get()).data();
+    expect(owner).toEqual({ ...previousOwner, currentLinkId: claimed.linkId, pendingChallengeId: null, revision: previousOwner.revision + 1,
+      revokeGeneration: expect.stringMatching(/^[0-9a-f-]{36}$/), createdAt: deadline, expiresAt: deadline + 2_592_000_000 });
+    expect(owner.revokeGeneration).not.toBe(previousOwner.revokeGeneration);
+    expect(pointer).toEqual({ version: 1, provider: 'ycloud', purpose: 'platform_support', wabaId: link.wabaId, phoneE164: link.phoneE164, phoneNumberId: link.phoneNumberId,
+      recordType: 'link_phone', uidIndex: link.uidIndex, phoneIndex: link.phoneIndex, linkId: claimed.linkId, linkRevision: claimed.revision, createdAt: deadline, expiresAt: deadline + 2_592_000_000 });
+    expect(link).toEqual({ version: 1, provider: 'ycloud', purpose: 'platform_support', wabaId: provenChallenge.wabaId, phoneE164: provenChallenge.phoneE164, phoneNumberId: provenChallenge.phoneNumberId,
+      recordType: 'link', uidIndex: provenChallenge.uidIndex, phoneIndex: provenChallenge.phoneIndex, status: 'active', revision: 1,
+      createdAt: deadline, validUntil: deadline + 2_592_000_000, expiresAt: deadline + 2_592_000_000, confirmedAuthTime: deadline / 1000,
+      phoneSuffix: provenChallenge.phoneSuffix, conversationId: provenChallenge.conversationId, account: provenChallenge.account, support: provenChallenge.support });
+    expect((await db.collection('platformWhatsAppLinkChallenges').doc('challenge_' + fresh.challengeId).get()).data()).toEqual({ ...provenChallenge, status: 'consumed', resultLinkId: claimed.linkId });
+    if (differentUid) expect((await status(token(undefined, deadline), db, deadline)).pending?.challengeId).toBe(ownerChallenge.challengeId);
+  });
+  it.each(['duplicate', 'unbound_uid'] as const)('refuses an ambiguous or unbound displaced owner (%s) with zero durable/journal changes', async corruption => {
+    const first = await proven(); await confirm(token(), { challengeId: first.challengeId, requestId: 'demo-original-confirm' }, db, now);
+    const deadline = now + 2_592_000_000, late = deadline - 1000;
+    const fresh = await begin(token('demo-second', late), { phoneE164: phone, requestId: 'demo-expired-challenge' }, second, late);
+    expect(await verify(incoming({ text: fresh.code }), second, late)).toBe('verified');
+    const incumbent = (await db.collection('platformWhatsAppLinks').where('ownerUid', '==', token().uid).limit(2).get()).docs[0];
+    if (corruption === 'duplicate') await db.collection('platformWhatsAppLinks').doc('uid_' + 'f'.repeat(64)).set({ ...incumbent.data(), uidIndex: 'f'.repeat(64) });
+    else await db.collection('platformWhatsAppLinks').doc(incumbent.id).set({ ...incumbent.data(), ownerUid: 'demo-unbound' });
+    const before = await durableSnapshot();
+    await expect(confirm(token('demo-second', deadline), { challengeId: fresh.challengeId, requestId: 'demo-corrupt-confirm' }, second, deadline)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
+    expect(await durableSnapshot()).toEqual(before);
+  });
+  it('rolls expired-link release back completely when begin meets a late create collision', async () => {
+    const first = await proven(); await confirm(token(), { challengeId: first.challengeId, requestId: 'demo-original-confirm' }, db, now);
+    await db.collection('users').doc('demo-expiry-collision').set({ sentinel: true });
+    const before = await durableSnapshot(), deadline = now + 2_592_000_000;
+    const broken = createCloudflareDatabase(async command => transport(command.action === 'commit' ? { ...command, writes: [...command.writes, { op: 'create', path: 'users/demo-expiry-collision', data: {} }] } : command));
+    await expect(begin(token(undefined, deadline), { phoneE164: phone, requestId: 'demo-expiry-collision' }, broken, deadline)).rejects.toMatchObject({ code: 'DATA_EXISTS' });
+    expect(await durableSnapshot()).toEqual(before);
+  });
+  it('rejects malformed controls with unavailable configuration without any D1 mutation and retains configured deduplication', async () => {
+    const c = await start(), pieces = c.code.split(':'), secretBad = [...pieces], macBad = [...pieces];
+    secretBad[2] += '='; macBad[3] = '';
+    const before = await durableSnapshot(); vi.stubEnv('PLATFORM_WHATSAPP_LINK_HMAC_KEY', undefined);
+    for (const text of [secretBad.join(':'), macBad.join(':')]) expect(await verify(incoming({ text }), second, now)).toBe('rejected');
+    await expect(verify(incoming({ text: c.code }), second, now)).rejects.toMatchObject({ status: 503 });
+    expect(await durableSnapshot()).toEqual(before);
+    configureLink(); expect(await verify(incoming({ text: secretBad.join(':') }), second, now)).toBe('rejected');
+    const counted = await durableSnapshot();
+    expect(await verify(incoming({ text: secretBad.join(':') }), createCloudflareDatabase(transport), now)).toBe('rejected');
+    expect(await durableSnapshot()).toEqual(counted);
+    expect((await db.collection('platformWhatsAppLinkChallenges').doc('challenge_' + c.challengeId).get()).data()?.attempts).toHaveLength(1);
+  });
   it('serializes two proven UIDs claiming one phone without partial owner/link rows', async () => {
     const a = await proven(), b = await proven('demo-second');
     const racing = race(() => confirm(token('demo-second'), { challengeId: b.challengeId, requestId: 'demo-confirm-b' }, second, now));

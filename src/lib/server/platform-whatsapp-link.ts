@@ -66,14 +66,19 @@ function configuration() {
 }
 type Config = NonNullable<ReturnType<typeof configuration>>;
 function requireConfiguration() { const config = configuration(); if (!config) throw unavailable(); return config; }
-async function readMarker(tx: Transaction, db: Database, config: Config): Promise<boolean> {
+async function readMarkerState(tx: Transaction, db: Database, config: Config): Promise<'matching' | 'empty' | 'unavailable'> {
   const value = (await tx.get(db.collection('serverSettings').doc(config.markerId))).data();
   if (value !== undefined) {
-    if (!isPlatformWhatsAppLinkKeyMarker(value) || value.scopeDigest !== config.scopeDigest || value.keyFingerprint !== config.digest('link-key-marker-v1', [])) throw unavailable();
-    return false;
+    if (!isPlatformWhatsAppLinkKeyMarker(value) || value.scopeDigest !== config.scopeDigest || value.keyFingerprint !== config.digest('link-key-marker-v1', [])) return 'unavailable';
+    return 'matching';
   }
   const first = await tx.get(db.collection(links).limit(1)), second = await tx.get(db.collection(challenges).limit(1));
-  if (!first.empty || !second.empty) throw unavailable(); return true;
+  return !first.empty || !second.empty ? 'unavailable' : 'empty';
+}
+async function readMarker(tx: Transaction, db: Database, config: Config): Promise<boolean> {
+  const state = await readMarkerState(tx, db, config);
+  if (state === 'unavailable') throw unavailable();
+  return state === 'empty';
 }
 function requestId(id: string) { if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{8,128}(?![\s\S])/.test(id) || id.startsWith('revoke_v1_')) throw new HttpError(400, 'Solicitud no válida.', 'LINK_INVALID'); }
 async function read<T>(tx: Transaction, db: Database, collection: string, id: string, guard: (v: unknown) => v is T): Promise<T | null> {
@@ -116,6 +121,13 @@ async function readOwner(tx: Transaction, db: Database, owner: Owner | null, now
   return { owner, link, challenge, phone, current: link && now < link.validUntil ? link : null, pending: challenge && now < challenge.validUntil ? challenge : null };
 }
 type Facts = Awaited<ReturnType<typeof readOwner>>;
+function stageExpiredLinkRelease(tx: Transaction, db: Database, facts: Facts) {
+  if (!facts.owner?.currentLinkId || !facts.link || facts.current) return;
+  tx.set(db.collection(links).doc('link_' + facts.owner.currentLinkId), { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 });
+  if (facts.phone?.uidIndex === facts.owner.uidIndex && facts.phone.linkId === facts.owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) {
+    tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex));
+  }
+}
 async function anchors(tx: Transaction, db: Database, uid: string) {
   const account = await readVerifiedConsentAnchor(uid, 'account', undefined, db, tx), support = await readVerifiedConsentAnchor(uid, 'platform_support', undefined, db, tx);
   if (!account.active || !support.active || !account.receiptId || !support.receiptId) throw new HttpError(428, 'Se requieren las autorizaciones vigentes.', 'CONSENT_REQUIRED');
@@ -155,6 +167,7 @@ export async function beginPlatformWhatsAppLink(user: DecodedIdToken, input: { p
     const c: Challenge = { ...platformWhatsAppIdentity(config.scope), recordType: 'link_challenge', createdAt: now, expiresAt: now + LINK_TTL, validUntil: now + LINK_CHALLENGE_TTL, uidIndex, phoneIndex, revision: (owner?.revision ?? 0) + 1, status: 'pending', phoneSuffix: input.phoneE164.slice(-4), conversationId: conversation(config, input.phoneE164), secretHash: createHash('sha256').update(secret).digest('hex'), ...consent, attempts: [], verifiedAt: null, resultLinkId: null };
     const code = 'sarinbot.link.v1:' + id + ':' + secret.toString('base64url') + ':' + Buffer.from(issuance(config, id, c), 'hex').toString('base64url');
     const request: RequestRecord = { ...platformWhatsAppIdentity(config.scope), recordType: 'link_request', createdAt: now, expiresAt: now + LINK_TTL, uidIndex, requestDigest, fingerprint, action: 'begin', challengeId: id, linkId: null, resultRevision: null };
+    stageExpiredLinkRelease(tx, db, facts);
     if (bootstrap) tx.create(db.collection('serverSettings').doc(config.markerId), { version: 1, scopeDigest: config.scopeDigest, keyFingerprint: config.digest('link-key-marker-v1', []) });
     if (facts.challenge) tx.set(db.collection(challenges).doc('challenge_' + owner!.pendingChallengeId), { ...facts.challenge, status: 'replaced' });
     tx.create(db.collection(challenges).doc('challenge_' + id), c); tx.create(db.collection(challenges).doc('request_' + requestDigest), request);
@@ -168,11 +181,15 @@ export async function verifyPlatformWhatsAppLinkInbound(event: IncomingText, db:
   // Parse a safe challenge identity before configuration/storage; malformed reserved text is always consumed.
   const parts = event.text.split(':');
   if (parts.length !== 4 || parts[0] !== 'sarinbot.link.v1' || !LINK_UUID.test(parts[1])) return 'rejected';
-  assertPlatformWhatsAppNow(now); const config = requireConfiguration();
+  const secret = decoded(parts[2]), mac = decoded(parts[3]), malformed = !secret || !mac;
+  assertPlatformWhatsAppNow(now); const config = configuration();
+  if (!config) { if (malformed) return 'rejected'; throw unavailable(); }
   if (event.provider !== 'ycloud' || event.kind !== 'incoming_text' || event.sourceEventType !== 'whatsapp.inbound_message.received' || event.wabaId !== config.scope.wabaId || event.businessPhone !== config.scope.phoneE164 || !PLATFORM_PHONE_PATTERN.test(event.customerPhone) || event.customerPhone === config.scope.phoneE164 || ![event.eventId, event.messageId].every(v => typeof v === 'string' && /^[\x21-\x7e]{1,256}(?![\s\S])/.test(v)) || !(event.whatsappMessageId === null || typeof event.whatsappMessageId === 'string' && event.whatsappMessageId.length > 0 && event.whatsappMessageId.length <= 1024)) return 'rejected';
   const id = parts[1], phoneIndex = config.digest('link-phone-v1', [event.customerPhone]);
   const discover = async (tx: Transaction) => {
-    await readMarker(tx, db, config); const c = await read(tx, db, challenges, 'challenge_' + id, isPlatformWhatsAppLinkChallengeRecord);
+    const marker = await readMarkerState(tx, db, config);
+    if (marker === 'unavailable') { if (malformed) return null; throw unavailable(); }
+    const c = await read(tx, db, challenges, 'challenge_' + id, isPlatformWhatsAppLinkChallengeRecord);
     if (!c || c.phoneIndex !== phoneIndex || !samePlatformWhatsAppScope(c, config.scope) || c.validUntil <= now) return null;
     const owner = await read(tx, db, links, 'uid_' + c.uidIndex, isPlatformWhatsAppLinkUidRecord);
     if (!owner || owner.uidIndex !== c.uidIndex || owner.pendingChallengeId !== id || config.digest('link-uid-v1', [owner.ownerUid]) !== c.uidIndex || !samePlatformWhatsAppScope(owner, config.scope)) return null;
@@ -190,7 +207,6 @@ export async function verifyPlatformWhatsAppLinkInbound(event: IncomingText, db:
     const overlap = c.attempts.filter(a => a.aliases.some(v => aliases.includes(v)));
     if (overlap.length) return overlap.length === 1 && overlap[0].fingerprint === fingerprint && overlap[0].accepted ? 'verified' : 'rejected';
     if (c.status !== 'pending' || c.attempts.length >= 5) return 'rejected';
-    const secret = decoded(parts[2]), mac = decoded(parts[3]);
     const hashMatches = !!secret && sameBytes(createHash('sha256').update(secret).digest(), Buffer.from(c.secretHash, 'hex'));
     const macMatches = !!mac && sameBytes(mac, Buffer.from(issuance(config, id, c), 'hex'));
     const accepted = hashMatches && macMatches;
@@ -221,6 +237,10 @@ export async function confirmPlatformWhatsAppLink(user: DecodedIdToken, input: {
       const oldLink = await read(tx, db, links, 'link_' + destination.linkId, isPlatformWhatsAppLinkRecord);
       const oldOwner = await read(tx, db, links, 'uid_' + destination.uidIndex, isPlatformWhatsAppLinkUidRecord);
       if (!oldLink || !oldOwner || oldOwner.uidIndex !== destination.uidIndex || oldLink.uidIndex !== destination.uidIndex || oldLink.phoneIndex !== c.phoneIndex || oldOwner.currentLinkId !== destination.linkId || oldLink.revision !== destination.linkRevision || oldLink.expiresAt !== destination.expiresAt || oldLink.createdAt !== destination.createdAt || !samePlatformWhatsAppScope(oldLink, config.scope)) throw unavailable();
+      const uniqueOwner = await ownerLookup(tx, db, oldOwner.ownerUid);
+      if (!uniqueOwner || uniqueOwner.uidIndex !== oldOwner.uidIndex
+        || !samePlatformWhatsAppScope(oldOwner, config.scope)
+        || config.digest('link-uid-v1', [oldOwner.ownerUid]) !== oldOwner.uidIndex) throw unavailable();
       displaced = await readOwner(tx, db, oldOwner, now);
       if (destination.uidIndex !== uidIndex && displaced.current) throw conflict();
     }
@@ -296,11 +316,17 @@ export async function resolvePlatformWhatsAppActor(phoneE164: string, conversati
   } catch (error) { if (error instanceof HttpError && ['LINK_UNAVAILABLE', 'LINK_AUTH_REQUIRED', 'CONSENT_REQUIRED'].includes(error.code ?? '')) return null; throw error; }
 }
 export async function assertPlatformWhatsAppAuthorization(actor: PlatformActor, tx?: Transaction, db: Database = getAdminDb(), now = Date.now()): Promise<void> {
-  assertPlatformWhatsAppNow(now); const config = requireConfiguration(), user = await currentUser(actor.uid);
+  assertPlatformWhatsAppNow(now);
+  const config = requireConfiguration(), user = tx ? null : await currentUser(actor.uid);
   const check = async (transaction: Transaction) => {
     const found = await actorFacts(transaction, db, config, config.digest('link-uid-v1', [actor.uid]), now);
-    if (found) { checkCutoff(user, authTime(found.link.confirmedAuthTime, now, false)); if (found.actor.linkId !== actor.linkId || found.actor.linkRevision !== actor.linkRevision || !sameAnchors(found.actor, actor) || found.actor.connectionRevision !== actor.connectionRevision || found.actor.conversationRevision !== actor.conversationRevision) throw new HttpError(403, 'La autorización cambió.', 'LINK_AUTHORIZATION_DENIED'); }
-    // A1 has only human/review modes. No identity or connection flag authorizes automation.
+    if (found) {
+      if (user) checkCutoff(user, authTime(found.link.confirmedAuthTime, now, false));
+      if (found.actor.linkId !== actor.linkId || found.actor.linkRevision !== actor.linkRevision
+        || !sameAnchors(found.actor, actor) || found.actor.connectionRevision !== actor.connectionRevision
+        || found.actor.conversationRevision !== actor.conversationRevision) throw new HttpError(403, 'La autorización cambió.', 'LINK_AUTHORIZATION_DENIED');
+    }
+    // A1 always denies automation. Future effect authorization must prepare current identity outside a caller's transaction.
     throw new HttpError(403, 'La automatización no está autorizada.', 'LINK_AUTHORIZATION_DENIED');
   };
   if (tx) await check(tx); else await db.runTransaction(check);

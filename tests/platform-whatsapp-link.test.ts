@@ -8,6 +8,8 @@ import { incoming, memoryStore, now, scope } from './platform-whatsapp-test-fixt
 import { ingestPlatformWhatsAppEvent } from '@/lib/server/platform-whatsapp-ingress';
 import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config';
 import { isPlatformWhatsAppLinkRecord } from '../shared/platform-whatsapp-link-records';
+import { createCloudflareDatabase } from '@/lib/storage/database';
+import { HttpError } from '@/lib/server/http';
 
 describe('durable platform linking', () => {
   let store: ReturnType<typeof memoryStore>;
@@ -123,8 +125,106 @@ describe('durable platform linking', () => {
     await ingestPlatformWhatsAppEvent(incoming(), getPlatformWhatsAppConfig(), store.db, now);
     const actor = await resolve(phone, row.conversationId, store.db, now); expect(actor).toMatchObject({ uid: token().uid, linkId: link.linkId, linkRevision: 1 });
     const db = { ...store.db, runTransaction: async () => { throw new Error('Nested transaction forbidden'); } };
-    await store.db.runTransaction(async tx => { await expect(authorize(actor!, tx, db, now)).rejects.toMatchObject({ status: 403 }); });
+    await store.db.runTransaction(async tx => {
+      auth.getUser.mockImplementation(async () => { throw new Error('Firebase inside caller transaction forbidden'); });
+      const before = store.seen.length, authCalls = auth.getUser.mock.calls.length;
+      await expect(authorize(actor!, tx, db, now)).rejects.toMatchObject({ status: 403, code: 'LINK_AUTHORIZATION_DENIED' });
+      expect(auth.getUser.mock.calls).toHaveLength(authCalls);
+      const reads = store.seen.slice(before).filter(c => c.action === 'read');
+      expect(reads.some(c => c.action === 'read' && c.read.path === 'platformWhatsAppConversations/' + row.conversationId)).toBe(true);
+      expect(store.seen.slice(before).every(c => c.action === 'read')).toBe(true);
+    });
+    const beforeOwnTransaction = store.seen.length;
+    await expect(authorize(actor!, undefined, store.db, now)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
+    expect(store.seen).toHaveLength(beforeOwnTransaction);
     expect(await resolve(phone, row.conversationId, store.db, now + 2_592_000_000)).toBeNull();
+  });
+  it.each([undefined, 'invalid', Buffer.alloc(31).toString('base64')])('rejects malformed secret/MAC without durable allocation when the dedicated key is %j', async key => {
+    const c = await start(), parts = c.code.split(':');
+    vi.stubEnv('PLATFORM_WHATSAPP_LINK_HMAC_KEY', key);
+    const before = store.seen.length;
+    for (const index of [2, 3]) for (const malformed of ['', 'A', parts[index] + '=', 'B'.repeat(43)]) {
+      const changed = [...parts]; changed[index] = malformed;
+      expect(await verify(incoming({ text: changed.join(':') }), store.db, now)).toBe('rejected');
+    }
+    expect(store.seen).toHaveLength(before);
+    await expect(verify(incoming({ text: c.code }), store.db, now)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
+  });
+  it('rejects malformed controls with absent fixed scope or content key but still counts configured identifiable malformed attempts', async () => {
+    const c = await start(), parts = c.code.split(':'), changed = [...parts]; changed[2] += '=';
+    const malformed = changed.join(':');
+    for (const name of ['PLATFORM_WHATSAPP_WABA_ID', 'PLATFORM_WHATSAPP_CONTENT_KEY']) {
+      configureLink(); vi.stubEnv(name, undefined); const before = store.seen.length;
+      expect(await verify(incoming({ text: malformed }), store.db, now)).toBe('rejected'); expect(store.seen).toHaveLength(before);
+    }
+    configureLink();
+    expect(await verify(incoming({ text: malformed }), store.db, now)).toBe('rejected');
+    expect(await verify(incoming({ text: malformed }), store.db, now)).toBe('rejected');
+    expect(store.rows.get('platformWhatsAppLinkChallenges/challenge_' + c.challengeId)?.attempts).toHaveLength(1);
+  });
+  it('rejects malformed controls when the persistent marker is unusable, while canonical controls fail closed', async () => {
+    const c = await start(), malformed = c.code + '=', markerPath = [...store.rows.keys()].find(path => path.includes('platform_whatsapp_link_key_'))!;
+    const marker = store.rows.get(markerPath)!;
+    for (const value of [null, { version: 99 }, { ...marker, keyFingerprint: 'f'.repeat(64) }]) {
+      if (value) store.seed(markerPath, value); else store.rows.delete(markerPath);
+      const before = structuredClone([...store.rows]);
+      expect(await verify(incoming({ text: malformed }), store.db, now)).toBe('rejected');
+      await expect(verify(incoming({ text: c.code }), store.db, now)).rejects.toMatchObject({ status: 503 });
+      expect([...store.rows]).toEqual(before);
+    }
+  });
+  it('propagates marker-read dependency failures even when they carry the unavailable marker code', async () => {
+    const c = await start(), failure = new HttpError(503, 'Synthetic storage failure', 'LINK_UNAVAILABLE');
+    const failing = createCloudflareDatabase(async command => {
+      if (command.action === 'read' && command.read.path?.includes('platform_whatsapp_link_key_')) throw failure;
+      return store.transport(command);
+    });
+    const before = structuredClone([...store.rows]);
+    for (const text of [c.code + '=', c.code]) await expect(verify(incoming({ text }), failing, now)).rejects.toBe(failure);
+    expect([...store.rows]).toEqual(before);
+    auth.getUser.mockRejectedValue(failure);
+    await expect(verify(incoming({ text: c.code + '=' }), store.db, now)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
+    expect([...store.rows]).toEqual(before);
+  });
+  it('terminalizes expired ownership in begin before same-phone confirmation without cleanup', async () => {
+    const prior = await linked(), path = 'platformWhatsAppLinks/link_' + prior.linkId, old = store.rows.get(path)!;
+    const deadline = now + 2_592_000_000, c = await start('demo-expiry-rebegin', deadline);
+    const afterBegin = structuredClone(store.rows.get(path));
+    expect(await verify(incoming({ text: c.code }), store.db, deadline)).toBe('verified');
+    const result = await confirm(token(undefined, deadline), { challengeId: c.challengeId, requestId: 'demo-expiry-confirm' }, store.db, deadline);
+    expect(afterBegin).toEqual({ ...old, status: 'revoked', revision: Number(old.revision) + 1 });
+    expect((await status(token(undefined, deadline), store.db, deadline)).current?.linkId).toBe(result.linkId);
+  });
+  it.each(['duplicate', 'unbound_uid'] as const)('rejects displaced owner %s before any writes', async corruption => {
+    await linked(); await seedConsents(store.db, 'demo-second');
+    const deadline = now + 2_592_000_000;
+    const fresh = await begin(token('demo-second', deadline), { phoneE164: phone, requestId: 'demo-displace-begin' }, store.db, deadline);
+    await verify(incoming({ text: fresh.code }), store.db, deadline);
+    const incumbent = [...store.rows].find(([, row]) => row.recordType === 'link_uid' && row.ownerUid === token().uid)!;
+    if (corruption === 'duplicate') store.seed('platformWhatsAppLinks/uid_' + 'f'.repeat(64), { ...incumbent[1], uidIndex: 'f'.repeat(64) });
+    else store.seed(incumbent[0], { ...incumbent[1], ownerUid: 'demo-unbound' });
+    const before = structuredClone([...store.rows]), operations = store.seen.length;
+    await expect(confirm(token('demo-second', deadline), { challengeId: fresh.challengeId, requestId: 'demo-displace-confirm' }, store.db, deadline)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
+    expect([...store.rows]).toEqual(before);
+    expect(store.seen.slice(operations).every(command => command.action === 'read')).toBe(true);
+  });
+  it('preserves a validated newer phone claim when begin releases a retained expired owner', async () => {
+    const original = await linked(), oldPath = 'platformWhatsAppLinks/link_' + original.linkId, oldLink = store.rows.get(oldPath)!;
+    const oldOwner = [...store.rows].find(([, row]) => row.recordType === 'link_uid' && row.ownerUid === token().uid)!;
+    await seedConsents(store.db, 'demo-second');
+    const deadline = now + 2_592_000_000;
+    const c = await begin(token('demo-second', deadline), { phoneE164: phone, requestId: 'demo-newer-begin' }, store.db, deadline);
+    await verify(incoming({ text: c.code }), store.db, deadline);
+    const result = await confirm(token('demo-second', deadline), { challengeId: c.challengeId, requestId: 'demo-newer-confirm' }, store.db, deadline);
+    // Retained old controls can coexist with a coherent newer claim; release must be conditional.
+    store.seed(oldPath, oldLink); store.seed(oldOwner[0], oldOwner[1]);
+    const newLinkPath = 'platformWhatsAppLinks/link_' + result.linkId;
+    const newOwner = [...store.rows].find(([, row]) => row.recordType === 'link_uid' && row.ownerUid === 'demo-second')!;
+    const pointer = [...store.rows].find(([, row]) => row.recordType === 'link_phone')!;
+    const retained = structuredClone([store.rows.get(newLinkPath), newOwner[1], pointer[1]]);
+    await begin(token(undefined, deadline), { phoneE164: '+12025550102', requestId: 'demo-retained-begin' }, store.db, deadline);
+    expect([store.rows.get(newLinkPath), store.rows.get(newOwner[0]), store.rows.get(pointer[0])]).toEqual(retained);
+    expect(store.rows.get(oldPath)).toEqual({ ...oldLink, status: 'revoked', revision: Number(oldLink.revision) + 1 });
   });
   it('blocks missing marker with any control, changed key even after controls expire, and colliding owner records', async () => {
     await start(); const marker = [...store.rows.keys()].find(p => p.includes('platform_whatsapp_link_key_'))!; const saved = store.rows.get(marker)!;
