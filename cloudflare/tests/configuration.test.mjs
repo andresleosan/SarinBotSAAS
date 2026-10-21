@@ -26,7 +26,7 @@ test('build preparation writes only public build args to an isolated destination
   const directory = mkdtempSync(join(tmpdir(), 'sarin-cloudflare-config-'));
   try {
     const destination = join(directory, 'wrangler.build.json');
-    configureBuild({ NEXT_PUBLIC_FIREBASE_API_KEY: 'public-key', NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'project.firebaseapp.com', NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'project-production', NEXT_PUBLIC_FIREBASE_APP_ID: '1:123:web:abc', FIREBASE_ADMIN_PRIVATE_KEY: 'do-not-write', CLOUDFLARE_API_TOKEN: 'do-not-write' }, destination);
+    configureBuild({ NEXT_PUBLIC_FIREBASE_API_KEY: 'public-key', NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'project.firebaseapp.com', NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'project-production', NEXT_PUBLIC_FIREBASE_APP_ID: '1:123:web:abc', FIREBASE_ADMIN_PRIVATE_KEY: 'do-not-write', CLOUDFLARE_API_TOKEN: 'do-not-write', PLATFORM_WHATSAPP_LINK_HMAC_KEY: 'do-not-write' }, destination);
     const output = readFileSync(destination, 'utf8');
     const config = JSON.parse(output);
     assert.equal(Object.keys(config.containers[0].image_vars).length, 4);
@@ -47,6 +47,7 @@ test('launch uses workload identity and leaves background WhatsApp services disa
   assert.equal(config.vars?.WHATSAPP_RETENTION_ENABLED, 'false');
   assert.equal(config.vars?.FIREBASE_ADMIN_PRIVATE_KEY, undefined);
   assert.equal(config.vars?.GOOGLE_APPLICATION_CREDENTIALS, undefined);
+  assert.equal(config.vars?.PLATFORM_WHATSAPP_LINK_HMAC_KEY, undefined);
   assert.equal(config.vars?.SARIN_DATA_BACKEND, 'd1');
   assert.equal(config.vars?.SARIN_MAINTENANCE, 'false');
   assert.equal(config.vars?.PILOT_AI_BUDGET_ENFORCED, 'true');

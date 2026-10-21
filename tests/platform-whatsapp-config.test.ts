@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPlatformWhatsAppConfig, publicPlatformWhatsAppConfig, requirePlatformWhatsAppReception } from '@/lib/server/platform-whatsapp-config';
 import { HttpError } from '@/lib/server/http';
+import * as configuration from '@/lib/server/platform-whatsapp-config';
 
 const names = ['PLATFORM_WHATSAPP_RECEIVE_ENABLED', 'PLATFORM_WHATSAPP_RETENTION_ENABLED', 'PLATFORM_WHATSAPP_AI_ENABLED', 'PLATFORM_WHATSAPP_SEND_ENABLED', 'PLATFORM_YCLOUD_WEBHOOK_SECRET', 'PLATFORM_WHATSAPP_CONTENT_KEY', 'PLATFORM_WHATSAPP_WABA_ID', 'PLATFORM_WHATSAPP_PHONE_E164', 'PLATFORM_WHATSAPP_PHONE_NUMBER_ID'];
 const valid = { PLATFORM_WHATSAPP_RETENTION_ENABLED: 'true', PLATFORM_YCLOUD_WEBHOOK_SECRET: ' synthetic secret ', PLATFORM_WHATSAPP_CONTENT_KEY: Buffer.alloc(32, 7).toString('base64'), PLATFORM_WHATSAPP_WABA_ID: '12345', PLATFORM_WHATSAPP_PHONE_E164: '+15550000001', PLATFORM_WHATSAPP_PHONE_NUMBER_ID: '67890' };
@@ -9,6 +10,19 @@ beforeEach(() => { for (const name of names) vi.stubEnv(name, undefined); });
 afterEach(() => vi.unstubAllEnvs());
 
 describe('platform configuration', () => {
+  it('parses a dedicated canonical 32-byte link key without exposing it or requiring it for reception', () => {
+    configure(); vi.stubEnv(names[0], 'true');
+    vi.stubEnv('PLATFORM_WHATSAPP_LINK_HMAC_KEY', Buffer.alloc(32, 11).toString('base64'));
+    const parse = Reflect.get(configuration, 'getPlatformWhatsAppLinkKey');
+    expect(typeof parse).toBe('function');
+    expect(parse()).toEqual(Buffer.alloc(32, 11));
+    for (const key of [undefined, '', 'A'.repeat(42) + 'B=', Buffer.alloc(31).toString('base64'), Buffer.alloc(33).toString('base64'), Buffer.alloc(32).toString('base64').slice(0, -1)]) {
+      vi.stubEnv('PLATFORM_WHATSAPP_LINK_HMAC_KEY', key);
+      expect(parse()).toBeNull();
+      expect(requirePlatformWhatsAppReception(getPlatformWhatsAppConfig())).toBeUndefined();
+      expect(JSON.stringify(publicPlatformWhatsAppConfig(getPlatformWhatsAppConfig())).includes('LINK_HMAC_KEY')).toBe(false);
+    }
+  });
   it('reports exact missing names in evaluation order without revealing values', () => {
     const config = getPlatformWhatsAppConfig();
     expect(config).toEqual({ receiveEnabled: false, retentionEnabled: false, aiEnabled: false, sendEnabled: false, configured: false, missingConfiguration: [names[1], ...names.slice(4)], scope: null, signingSecret: '', contentKey: Buffer.alloc(0) });

@@ -27,8 +27,8 @@ describe('platform domain on the real local Worker D1 fixture', () => {
     seen.length = 0; db = createCloudflareDatabase(transport); second = createCloudflareDatabase(transport);
   });
   afterEach(() => vi.unstubAllEnvs());
-  it('permits exactly the two platform parents and rejects children, malformed paths and unrelated fields', async () => {
-    for (const parent of ['platformWhatsAppEvents', 'platformWhatsAppConversations']) {
+  it('permits the platform parents including link controls and rejects children, malformed paths and unrelated fields', async () => {
+    for (const parent of ['platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppLinks', 'platformWhatsAppLinkChallenges']) {
       expect(isDataPath(parent, false)).toBe(true); expect(isDataPath(`${parent}/demo`, true)).toBe(true);
       expect(isDataPath(`${parent}/demo/children/one`, true)).toBe(false);
       await db.collection(parent).doc('demo').set({ updatedAt: 2, phoneNumberId: scope.phoneNumberId });

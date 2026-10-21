@@ -70,3 +70,11 @@ export function requirePlatformWhatsAppReception(config: PlatformWhatsAppConfig)
     throw new HttpError(503, 'La recepción de WhatsApp de plataforma no está habilitada y configurada.');
   }
 }
+
+/** Dedicated optional key; never part of reception diagnostics or public config. */
+export function getPlatformWhatsAppLinkKey(): Buffer | null {
+  const encoded = process.env.PLATFORM_WHATSAPP_LINK_HMAC_KEY;
+  if (typeof encoded !== 'string') return null;
+  const key = Buffer.from(encoded, 'base64');
+  return key.length === 32 && key.toString('base64') === encoded ? key : null;
+}

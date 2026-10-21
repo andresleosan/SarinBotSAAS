@@ -10,8 +10,9 @@ const names = [
   'PLATFORM_WHATSAPP_RECEIVE_ENABLED', 'PLATFORM_WHATSAPP_RETENTION_ENABLED', 'PLATFORM_WHATSAPP_AI_ENABLED', 'PLATFORM_WHATSAPP_SEND_ENABLED',
   'PLATFORM_YCLOUD_WEBHOOK_SECRET', 'PLATFORM_WHATSAPP_CONTENT_KEY', 'PLATFORM_WHATSAPP_WABA_ID', 'PLATFORM_WHATSAPP_PHONE_E164', 'PLATFORM_WHATSAPP_PHONE_NUMBER_ID',
   'PLATFORM_YCLOUD_DIAGNOSTIC_ENABLED', 'PLATFORM_YCLOUD_DIAGNOSTIC_RUN_ID', 'PLATFORM_YCLOUD_DIAGNOSTIC_EXPIRES_AT', 'PLATFORM_YCLOUD_DIAGNOSTIC_SENDER', 'PLATFORM_YCLOUD_DIAGNOSTIC_NONCE',
+  'PLATFORM_WHATSAPP_LINK_HMAC_KEY',
 ];
-test('forwards fourteen original platform strings unchanged without Worker validation or defaults', () => {
+test('forwards platform strings and the optional private link key unchanged without defaults', () => {
   const values = Object.fromEntries(names.map((key, i) => [key, `  synthetic arbitrary ${i}  `]));
   const result = runtimeEnvironment({ ...baseline, ...values, PLATFORM_UNLISTED: 'private', SARIN_PUBLIC_BOOKING_ORIGIN: 'https://synthetic.example', PILOT_AI_BUDGET_ENFORCED: 'false' });
   for (const key of names) assert.equal(result[key], values[key]);

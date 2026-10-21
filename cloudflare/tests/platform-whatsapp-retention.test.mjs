@@ -5,6 +5,23 @@ import { isPlatformWhatsAppEventRecord, isPlatformWhatsAppConversationRecord } f
 import { executeDataCommand } from '../src/data.ts';
 import { fixture, now, event, conversation, set, seed, get, read, scope, observeDatabase } from './platform-whatsapp-fixture.mjs';
 
+test('removes expired link request metadata at equality without erasing the persistent marker', async context => {
+  const env = await fixture(context);
+  const path = 'platformWhatsAppLinkChallenges/request_' + 'a'.repeat(64);
+  const record = { ...scope, recordType: 'link_request', createdAt: now - 2_592_000_000, expiresAt: now,
+    uidIndex: 'b'.repeat(64), requestDigest: 'a'.repeat(64), fingerprint: 'c'.repeat(64), action: 'begin',
+    challengeId: '00000000-0000-4000-8000-000000000001', linkId: null, resultRevision: null };
+  // Raw fixture insertion isolates cleanup omission from the independently tested allowlist omission.
+  await env.SARIN_DB.prepare('INSERT INTO app_documents(path,parent,document_id,data,updated_at) VALUES(?,?,?,?,?)')
+    .bind(path, 'platformWhatsAppLinkChallenges', path.split('/')[1], JSON.stringify(record), now).run();
+  const markerPath = 'serverSettings/platform_whatsapp_link_key_' + 'd'.repeat(64);
+  const marker = { version: 1, scopeDigest: 'd'.repeat(64), keyFingerprint: 'e'.repeat(64) };
+  await seed(env, [set(markerPath, marker)]);
+  assert.deepEqual(await cleanupPlatformWhatsAppRetention(env, { now }), { clearedBodies: 0, deletedMetadata: 1, morePending: false });
+  assert.equal(await env.SARIN_DB.prepare('SELECT path FROM app_documents WHERE path=?').bind(path).first(), null);
+  assert.deepEqual(await get(env, markerPath), marker);
+});
+
 test('erases both bodies at equality across scopes, preserving metadata, TTL and record revisions', async context => {
   const env = await fixture(context);
   const originalEvent = event();
@@ -143,7 +160,7 @@ test('bounds each of four phases to fifty confirmed writes and leaves a backlog'
   assert.equal((await get(env, 'platformWhatsAppEvents/row_50')).state, 'body_present');
 });
 
-test('executes exactly four ordered selections and conservatively marks a single full lot pending', async context => {
+test('executes original erasure phases before bounded link control cleanup and marks a single full lot pending', async context => {
   const env = await fixture(context);
   await seed(env, [set('platformWhatsAppEvents/a', event())]);
   const queries = [];
@@ -155,6 +172,7 @@ test('executes exactly four ordered selections and conservatively marks a single
   assert.deepEqual(queries.map(({ values }) => values), [
     ['platformWhatsAppEvents', 'body_present', now, 1], ['platformWhatsAppConversations', 'body_present', now, 1],
     ['platformWhatsAppEvents', now, 1], ['platformWhatsAppConversations', now, 1],
+    ['platformWhatsAppLinkChallenges', now, 1], ['platformWhatsAppLinks', now, 1],
   ]);
   assert.match(queries[0].sql, /ORDER BY json_extract\(data,'\$\.bodyExpiresAt'\) ASC,path ASC LIMIT \?/);
   assert.match(queries[2].sql, /ORDER BY json_extract\(data,'\$\.expiresAt'\) ASC,path ASC LIMIT \?/);
@@ -191,10 +209,53 @@ test('retries a rolled-back commit three times with the same UUID and then compl
   assert.deepEqual(await cleanupPlatformWhatsAppRetention(failing, { now }), { clearedBodies: 1, deletedMetadata: 0, morePending: true });
   assert.equal(attempts.length, 3);
   assert.deepEqual(attempts[1], attempts[0]); assert.deepEqual(attempts[2], attempts[0]);
-  assert.deepEqual(queries, ['platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppEvents', 'platformWhatsAppConversations']);
+  assert.deepEqual(queries, ['platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppLinkChallenges', 'platformWhatsAppLinks']);
   assert.deepEqual(warnings, [{ event: 'platform_whatsapp_retention_incomplete', invalidRecords: 0, failedPhases: 1 }]);
   assert.equal((await get(env, 'platformWhatsAppEvents/a')).state, 'body_present');
   assert.equal((await get(env, 'platformWhatsAppConversations/a')).contactContent, null);
   assert.equal((await executeDataCommand(read('platformWhatsAppEvents/a'), env)).revision, 2);
   assert.equal((await env.SARIN_DB.prepare('SELECT COUNT(*) AS n FROM app_commits').first()).n, 2);
+});
+
+test('drains more than one bounded batch of link requests and retains malformed rows with count-only incomplete evidence', async context => {
+  const env = await fixture(context);
+  const data = { ...scope, recordType: 'link_request', createdAt: now - 2_592_000_000, expiresAt: now,
+    uidIndex: 'b'.repeat(64), requestDigest: 'a'.repeat(64), fingerprint: 'c'.repeat(64), action: 'begin',
+    challengeId: '00000000-0000-4000-8000-000000000001', linkId: null, resultRevision: null };
+  await seed(env, Array.from({ length: 26 }, (_, i) => { const digest = i.toString(16).padStart(64, '0'); return set('platformWhatsAppLinkChallenges/request_' + digest, { ...data, requestDigest: digest }); }));
+  const first = await cleanupPlatformWhatsAppRetention(env, { now }); assert.equal(first.morePending, true); assert.equal(first.deletedMetadata, 25);
+  assert.equal((await cleanupPlatformWhatsAppRetention(env, { now })).deletedMetadata, 1);
+  const corruptPath = 'platformWhatsAppLinkChallenges/request_' + 'e'.repeat(64);
+  await seed(env, [set(corruptPath, { ...data, requestDigest: 'e'.repeat(64), secret: 'synthetic-private' })]);
+  const warnings = []; context.mock.method(console, 'warn', v => warnings.push(v));
+  assert.equal((await cleanupPlatformWhatsAppRetention(env, { now })).morePending, true);
+  assert.deepEqual(warnings, [{ event: 'platform_whatsapp_retention_incomplete', invalidRecords: 1, failedPhases: 0 }]);
+  assert.equal((await get(env, corruptPath)).secret, 'synthetic-private');
+});
+
+test('expired old link cleanup conditionally releases its UID but preserves a newer scoped phone owner', async context => {
+  const env = await fixture(context), oldId = '00000000-0000-4000-8000-000000000001', newId = '00000000-0000-4000-8000-000000000002';
+  const a = 'a'.repeat(64), b = 'b'.repeat(64), p = 'c'.repeat(64), anchor = { revision: 1, fingerprint: a, receiptId: 'demo_receipt' };
+  const old = { ...scope, recordType: 'link', createdAt: now - 2_592_000_000, expiresAt: now, validUntil: now, uidIndex: a, phoneIndex: p, revision: 1, status: 'active', phoneSuffix: '0101', conversationId: a, account: anchor, support: anchor, confirmedAuthTime: (now - 2_592_000_000) / 1000 };
+  const fresh = { ...old, createdAt: now, expiresAt: now + 2_592_000_000, validUntil: now + 2_592_000_000, uidIndex: b, confirmedAuthTime: now / 1000 };
+  const owner = (uidIndex, currentLinkId, link) => ({ ...scope, recordType: 'link_uid', ownerUid: 'demo-' + uidIndex[0], uidIndex, revision: 1, revokeGeneration: newId, currentLinkId, pendingChallengeId: null, issues: [], createdAt: link.createdAt, expiresAt: link.expiresAt });
+  const phoneRow = { ...scope, recordType: 'link_phone', uidIndex: b, phoneIndex: p, linkId: newId, linkRevision: 1, createdAt: now, expiresAt: fresh.expiresAt };
+  await seed(env, [set('platformWhatsAppLinks/link_' + oldId, old), set('platformWhatsAppLinks/link_' + newId, fresh), set('platformWhatsAppLinks/uid_' + a, owner(a, oldId, old)), set('platformWhatsAppLinks/uid_' + b, owner(b, newId, fresh)), set('platformWhatsAppLinks/phone_' + p, phoneRow)]);
+  const result = await cleanupPlatformWhatsAppRetention(env, { now }); assert.equal(result.morePending, false);
+  assert.equal(await get(env, 'platformWhatsAppLinks/link_' + oldId), undefined); assert.equal(await get(env, 'platformWhatsAppLinks/uid_' + a), undefined);
+  assert.deepEqual(await get(env, 'platformWhatsAppLinks/phone_' + p), phoneRow); assert.deepEqual(await get(env, 'platformWhatsAppLinks/link_' + newId), fresh);
+});
+
+test('retains corrupt expired ownership relationships without deleting guessed link or UID records', async context => {
+  const env = await fixture(context), id = '00000000-0000-4000-8000-000000000001', a = 'a'.repeat(64), p = 'b'.repeat(64);
+  const anchor = { revision: 1, fingerprint: a, receiptId: 'demo_receipt' }, createdAt = now - 2_592_000_000;
+  const link = { ...scope, recordType: 'link', createdAt, expiresAt: now, validUntil: now, uidIndex: a, phoneIndex: p, revision: 1, status: 'active', phoneSuffix: '0101', conversationId: a, account: anchor, support: anchor, confirmedAuthTime: createdAt / 1000 };
+  const owner = { ...scope, recordType: 'link_uid', ownerUid: 'demo-a', uidIndex: a, revision: 1, revokeGeneration: id, currentLinkId: id, pendingChallengeId: null, issues: [], createdAt, expiresAt: now };
+  const corrupt = { ...scope, recordType: 'link_phone', uidIndex: a, phoneIndex: p, linkId: id, linkRevision: 2, createdAt, expiresAt: now };
+  const rows = [set('platformWhatsAppLinks/link_' + id, link), set('platformWhatsAppLinks/uid_' + a, owner), set('platformWhatsAppLinks/phone_' + p, corrupt)];
+  await seed(env, rows); const warnings = []; context.mock.method(console, 'warn', value => warnings.push(value));
+  const result = await cleanupPlatformWhatsAppRetention(env, { now });
+  assert.equal(result.morePending, true); assert.equal(result.deletedMetadata, 0);
+  for (const row of rows) assert.deepEqual(await get(env, row.path), row.data);
+  assert.ok(warnings[0].invalidRecords > 0);
 });
