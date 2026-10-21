@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCipheriv, createHmac } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { decryptPlatformWorkerContent, platformWorkerDigest, decodeAudioBase64 } from '../../shared/platform-whatsapp-worker-crypto.ts';
 const raw=Buffer.alloc(32,11), key=raw.toString('base64'), path='platformWhatsAppEvents/synthetic-event';
 function encrypt(value,bytes) {
@@ -27,4 +29,18 @@ test('conversation scope uses exact two-stage content-key HMAC, never unkeyed or
   const expected=createHmac('sha256',derived).update(JSON.stringify(parts)).digest('hex');
   assert.equal(await platformWorkerDigest('conversation',parts,key),expected);
   for(let i=0;i<parts.length;i++){const other=[...parts];other[i]+='x';assert.notEqual(await platformWorkerDigest('conversation',other,key),expected);}
+});
+
+test('actual local Workerd WebCrypto decrypts Node ciphertext and matches the scoped Node HMAC',async context=>{
+  const require=createRequire(import.meta.url), wranglerRequire=createRequire(require.resolve('wrangler/package.json'));
+  const {build}=wranglerRequire('esbuild'),{Miniflare,convertV4MiniflareOptions}=wranglerRequire('miniflare');
+  const bundle=await build({stdin:{resolveDir:fileURLToPath(new URL('../../',import.meta.url)),contents:`
+    import {decryptPlatformWorkerContent,platformWorkerDigest} from './shared/platform-whatsapp-worker-crypto.ts';
+    export default {async fetch(request){const input=await request.json();try{return Response.json({value:await decryptPlatformWorkerContent(input.envelope,input.path,input.key),digest:await platformWorkerDigest('conversation',input.parts,input.key)});}catch{return Response.json({denied:true},{status:400});}}};
+  `},bundle:true,write:false,format:'esm',platform:'browser'});
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-10-13'}));context.after(()=>mf.dispose());
+  const value={text:'Consulta ñ 😀',nested:{n:1}},parts=['111111','+12025550000','222222','+12025550100'];
+  const invoke=p=>mf.dispatchFetch('http://synthetic-crypto.test/',{method:'POST',body:JSON.stringify({envelope:encrypt(value),path,key,parts,...p})});
+  const response=await invoke({});assert.equal(response.status,200);assert.deepEqual(await response.json(),{value,digest:await platformWorkerDigest('conversation',parts,key)});
+  assert.equal((await invoke({path:path+'wrong'})).status,400);assert.equal((await invoke({key:Buffer.alloc(32,12).toString('base64')})).status,400);
 });
