@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import type { Database } from '@/lib/storage/types';
+import type { Database, DocumentReference } from '@/lib/storage/types';
 import { HttpError } from './http';
 import { readBoundedRequestBody } from './read-bounded-body';
 import { readYCloudWebhook } from './ycloud-webhook';
@@ -78,12 +78,16 @@ export async function readYCloudRetryDiagnosticSummary(database: Database) {
   return { status, expiresAt: new Date(expiresAt).toISOString(), requests, attempts };
 }
 
-export async function closeYCloudRetryDiagnostic(database: Database): Promise<void> {
-  const ref = database.collection('serverSettings').doc(documentId);
+async function closeDurableDiagnostic(database: Database, ref: DocumentReference): Promise<void> {
   await database.runTransaction(async transaction => {
     const state = parseState((await transaction.get(ref)).data());
     transaction.set(ref, { ...state, status: 'closed', attempts: [] });
   });
+}
+
+export async function closeYCloudRetryDiagnostic(database: Database): Promise<void> {
+  const ref = database.collection('serverSettings').doc(documentId);
+  await closeDurableDiagnostic(database, ref);
 }
 
 function createObserver(config: DiagnosticConfig, database: Database, instanceBootId = bootId): DiagnosticObserver {
@@ -108,10 +112,7 @@ function createObserver(config: DiagnosticConfig, database: Database, instanceBo
     },
     async read() { return parseState((await ref.get()).data()); },
     async close() {
-      await database.runTransaction(async transaction => {
-        const state = parseState((await transaction.get(ref)).data());
-        transaction.set(ref, { ...state, status: 'closed', attempts: [] });
-      });
+      await closeDurableDiagnostic(database, ref);
       closed = true;
     },
     async observe(request) {
