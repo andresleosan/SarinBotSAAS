@@ -58,6 +58,7 @@ export function usePlatformWhatsAppLink(account: ConsentController, support: Con
   const [secret, setSecret] = useState<{ scope: object; grant: object; data: PlatformWhatsAppLinkBegin; read: number; revision: number | null } | null>(null);
   const secretRef = useRef(secret); secretRef.current = secret;
   const [clock, setClock] = useState(Date.now());
+  const now = Math.max(clock, Date.now());
   const [copied, setCopied] = useState<object | null>(null);
   function loseAccess() {
     if (!alive()) return;
@@ -72,6 +73,7 @@ export function usePlatformWhatsAppLink(account: ConsentController, support: Con
       const value = await apiFetch<unknown>(endpoint, { signal }, uid, current);
       if (!current()) throw new Error('Lectura obsoleta.');
       const result = statusResult(value); reads.current++;
+      setClock(Date.now());
       latest.current = result;
       return result;
     } catch (cause) {
@@ -88,7 +90,7 @@ export function usePlatformWhatsAppLink(account: ConsentController, support: Con
   if (liveSecret && reads.current > liveSecret.read) {
     if (status?.pending?.challengeId !== liveSecret.data.challengeId || liveSecret.revision !== null && status.pending.revision !== liveSecret.revision) liveSecret = null;
   }
-  if (liveSecret && clock >= liveSecret.data.expiresAt) liveSecret = null;
+  if (liveSecret && now >= liveSecret.data.expiresAt) liveSecret = null;
   useEffect(() => {
     if (secret && !liveSecret) setSecret(null);
     else if (secret && reads.current > secret.read && secret.revision === null && status?.pending?.challengeId === secret.data.challengeId) {
@@ -97,12 +99,12 @@ export function usePlatformWhatsAppLink(account: ConsentController, support: Con
   }, [secret, liveSecret, status]);
   const ownActivity = activity?.scope === scope ? activity : null;
   let retry = ownActivity?.retry ?? null;
-  if (retry && (retry.scope !== scope || retry.action !== 'revoke' && retry.grant !== grant || retry.action === 'confirm' && (retry.target !== pendingKey || !status?.pending || clock >= status.pending.expiresAt))) retry = null;
+  if (retry && (retry.scope !== scope || retry.action !== 'revoke' && retry.grant !== grant || retry.action === 'confirm' && (retry.target !== pendingKey || !status?.pending || now >= status.pending.expiresAt))) retry = null;
   const active = alive();
   const canGrant = active && permission && blockedAnchors !== anchors && status?.available === true;
   const busy = ownActivity?.busy ?? false;
   const notice = ownActivity?.notice ?? null;
-  const canRetry = !!retry && active && !busy && (!notice?.retryAt || clock >= notice.retryAt) && (retry.action === 'revoke' || canGrant);
+  const canRetry = !!retry && active && !busy && (!notice?.retryAt || now >= notice.retryAt) && (retry.action === 'revoke' || canGrant);
   useEffect(() => () => { request.current?.abort(); operation.current = null; retrySlot.current = null; readVersion.current++; writeVersion.current++; }, [scope]);
   useEffect(() => {
     if (retrySlot.current?.action === 'confirm' && (retrySlot.current.target !== pendingKey || !status?.pending || Date.now() >= status.pending.expiresAt)) {
@@ -148,6 +150,14 @@ export function usePlatformWhatsAppLink(account: ConsentController, support: Con
       if (!current()) return;
       if (op.action === 'begin') {
         const result = beginResult(value);
+        const receivedAt = Date.now();
+        setClock(receivedAt);
+        if (receivedAt >= result.expiresAt) {
+          setSecret(null); retrySlot.current = null;
+          setActivity({ scope, busy: false, notice: { message: 'El código recibido ya venció. Crea otro código para continuar.' }, retry: null });
+          poll.refresh();
+          return;
+        }
         if (reads.current > op.read && latest.current?.pending?.challengeId !== result.challengeId) {
           retrySlot.current = null;
           setActivity({ scope, busy: false, notice: { message: 'La solicitud cambió. No se muestra un código anterior al estado actual.' }, retry: null });
@@ -218,6 +228,8 @@ export function usePlatformWhatsAppLink(account: ConsentController, support: Con
   async function copy() {
     const value = liveSecret;
     if (!value || !alive()) return;
+    const copiedAt = Date.now();
+    if (copiedAt >= value.data.expiresAt) { setClock(copiedAt); setSecret(null); return; }
     try {
       await navigator.clipboard.writeText(value.data.code);
       if (alive() && grantRef.current === grant && secretRef.current === value && Date.now() < value.data.expiresAt) setCopied(value);
@@ -225,6 +237,6 @@ export function usePlatformWhatsAppLink(account: ConsentController, support: Con
       if (alive() && grantRef.current === grant && secretRef.current === value) setActivity({ scope, busy: false, notice: { message: 'No se pudo copiar. Selecciona el comando y cópialo manualmente.' }, retry });
     }
   }
-  return { status: active ? status : null, loading: poll.loading, error: active ? poll.error : null, active, canGrant, busy, notice, retry, canRetry, code: active ? liveSecret?.data ?? null : null, copied: copied === liveSecret, clock, begin, confirm, revoke, reauthenticate, copy, retryOperation: () => { if (canRetry && retry) void run(retry); }, refresh: () => { if (alive()) poll.refresh(); } };
+  return { status: active ? status : null, loading: poll.loading, error: active ? poll.error : null, active, canGrant, busy, notice, retry, canRetry, code: active ? liveSecret?.data ?? null : null, copied: copied === liveSecret, clock: now, begin, confirm, revoke, reauthenticate, copy, retryOperation: () => { if (canRetry && retry) void run(retry); }, refresh: () => { if (alive()) poll.refresh(); } };
 }
 

@@ -352,3 +352,48 @@ it('never exposes an old begin command after a newer GET has replaced its challe
   await act(async () => wait.resolve(response({ challengeId: ids.challenge, code: syntheticCommand, expiresAt: Date.now() + 600000 })));
   expect(h.command() === null).toBe(true); expect(h.writes()).toHaveLength(1);
 });
+
+describe('review I1 late-expiry boundaries through the actual owner panel', () => {
+  it.each([0, 1])('never publishes a begin response arriving expiry+%sms while the follow-up GET is held', async lateBy => {
+    await h.mount();
+    const expiresAt = Date.now() + 10000, wait = deferred<Response>();
+    h.setMutation(async () => wait.promise); await h.begin();
+    h.page.visibilityState = 'hidden';
+    await act(async () => h.page.dispatchEvent(new Event('visibilitychange')));
+    await act(async () => vi.advanceTimersByTimeAsync(10000 + lateBy));
+    const backend = h.transport.getMockImplementation()!;
+    h.transport.mockImplementation((path, init) => path === '/api/platform-whatsapp/link' && !init?.method ? new Promise<Response>(() => {}) : backend(path, init));
+    h.page.visibilityState = 'visible';
+    await act(async () => wait.resolve(response({ challengeId: ids.challenge, code: syntheticCommand, expiresAt, whatsappUrl: 'https://wa.me/573000000099' })));
+    expect(h.command() === null).toBe(true);
+    expect(h.button('Copiar comando') === undefined).toBe(true);
+    expect(h.clipboard.mock.calls.length).toBe(0); expect(h.writes()).toHaveLength(1);
+  });
+  const expiredStatuses = (['pending', 'current'] as const).flatMap(kind => [0, 1].map(lateBy => ({ kind, lateBy })));
+  it.each(expiredStatuses)('renders delayed $kind status as expired at expiry+$lateBy ms', async ({ kind, lateBy }) => {
+    await h.mount();
+    const expiresAt = Date.now() + 10000, wait = deferred<Response>(), backend = h.transport.getMockImplementation()!;
+    const status = { available: true, revokeGeneration: ids.generation, current: kind === 'current' ? { linkId: ids.link, revision: 1, expiresAt, maskedPhone: '••••0001' } : null, pending: kind === 'pending' ? { challengeId: ids.challenge, revision: 1, expiresAt, maskedPhone: '••••0001', proof: 'verified' as const } : null };
+    h.transport.mockImplementation((path, init) => path === '/api/platform-whatsapp/link' && !init?.method ? wait.promise : backend(path, init));
+    await h.focus();
+    vi.setSystemTime(expiresAt + lateBy);
+    await act(async () => wait.resolve(response(status)));
+    if (kind === 'pending') {
+      expect(h.content().includes('Código vencido.')).toBe(true);
+      expect(h.button('Confirmar este número en la web').props.disabled).toBe(true);
+    } else {
+      expect(h.content().includes('Vencida')).toBe(true);
+      expect(h.content().includes('Vigente hasta')).toBe(false);
+    }
+    expect(h.writes()).toHaveLength(0); expect(h.command() === null).toBe(true);
+  });
+  it.each([0, 1])('rejects a captured copy callback before clipboard at expiry+%sms', async lateBy => {
+    await h.mount(); await h.begin();
+    const copy = h.button('Copiar comando').props.onClick;
+    const expiresAt = h.data.status.pending!.expiresAt;
+    vi.setSystemTime(expiresAt + lateBy);
+    await act(async () => copy());
+    expect(h.clipboard.mock.calls.length).toBe(0);
+    expect(h.writes()).toHaveLength(1);
+  });
+});
