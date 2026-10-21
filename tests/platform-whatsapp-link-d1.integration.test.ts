@@ -8,7 +8,7 @@ import type { Database } from '@/lib/storage/types';
 import { beginPlatformWhatsAppLink as begin, verifyPlatformWhatsAppLinkInbound as verify, confirmPlatformWhatsAppLink as confirm, revokePlatformWhatsAppLink as revoke, readPlatformWhatsAppLinkStatus as status } from '@/lib/server/platform-whatsapp-link';
 import { configureLink, token, phone, seedConsents } from './platform-whatsapp-link-fixtures';
 import { incoming, now } from './platform-whatsapp-test-fixtures';
-import { isPlatformWhatsAppLinkRecord, isPlatformWhatsAppLinkPhoneRecord } from '../shared/platform-whatsapp-link-records';
+import { isPlatformWhatsAppLinkRecord, isPlatformWhatsAppLinkPhoneRecord, isPlatformWhatsAppLinkChallengeRecord } from '../shared/platform-whatsapp-link-records';
 
 describe('link ownership on actual local D1 with deterministic commit interleaving', () => {
   let runtime: Awaited<ReturnType<typeof createDataTestRuntime>>, db: Database, second: Database;
@@ -88,6 +88,72 @@ describe('link ownership on actual local D1 with deterministic commit interleavi
     const before = await durableSnapshot(), deadline = original.expiresAt;
     await expect(begin(token(undefined, deadline), { phoneE164: phone, requestId: 'demo-max-revision-begin' }, second, deadline)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
     expect(await durableSnapshot()).toEqual(before);
+  });
+  it('replaces a MAX_SAFE pending challenge without incrementing its revision', async () => {
+    const first = await start(), ref = db.collection('platformWhatsAppLinkChallenges').doc('challenge_' + first.challengeId);
+    const maximal = { ...(await ref.get()).data()!, revision: Number.MAX_SAFE_INTEGER };
+    expect(isPlatformWhatsAppLinkChallengeRecord(maximal)).toBe(true); await ref.set(maximal);
+    expect((await status(token(), db, now)).pending?.revision).toBe(Number.MAX_SAFE_INTEGER);
+    const replacement = await start(token().uid, 'demo-max-pending-replace');
+    const terminal = (await ref.get()).data();
+    expect(terminal).toEqual({ ...maximal, status: 'replaced' });
+    expect(isPlatformWhatsAppLinkChallengeRecord(terminal)).toBe(true);
+    expect((await status(token(), db, now)).pending).toMatchObject({ challengeId: replacement.challengeId, revision: 2 });
+  });
+  it('rejects current-link revision overflow before revoke changes any D1 documents, journals or revision', async () => {
+    const c = await proven(), original = await confirm(token(), { challengeId: c.challengeId, requestId: 'demo-max-revoke-confirm' }, db, now);
+    const linkRef = db.collection('platformWhatsAppLinks').doc('link_' + original.linkId), saved = (await linkRef.get()).data()!;
+    const phoneRef = db.collection('platformWhatsAppLinks').doc('phone_' + saved.phoneIndex), savedPhone = (await phoneRef.get()).data()!;
+    const maximalLink = { ...saved, revision: Number.MAX_SAFE_INTEGER }, maximalPhone = { ...savedPhone, linkRevision: Number.MAX_SAFE_INTEGER };
+    expect(isPlatformWhatsAppLinkRecord(maximalLink)).toBe(true); expect(isPlatformWhatsAppLinkPhoneRecord(maximalPhone)).toBe(true);
+    await linkRef.set(maximalLink); await phoneRef.set(maximalPhone);
+    const owner = (await db.collection('platformWhatsAppLinks').where('ownerUid', '==', token().uid).limit(2).get()).docs[0].data();
+    expect(owner.revision).toBe(2);
+    expect((await status(token(), second, now)).current?.revision).toBe(Number.MAX_SAFE_INTEGER);
+    const before = await durableSnapshot();
+    await expect(revoke(token(), 'revoke_v1_' + owner.revokeGeneration + '_' + randomUUID(), second, now)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
+    expect(await durableSnapshot()).toEqual(before);
+  });
+  it.each(['owner', 'incumbent'] as const)('rejects MAX_SAFE link displacement by confirm (%s) with zero D1 document, journal or revision changes', async kind => {
+    const c = await proven(), original = await confirm(token(), { challengeId: c.challengeId, requestId: 'demo-max-displace-original' }, db, now);
+    const claimantUid = kind === 'owner' ? token().uid : 'demo-second', at = kind === 'owner' ? now : original.expiresAt;
+    const issuedAt = kind === 'owner' ? now : at - 1000;
+    const fresh = await begin(token(claimantUid, issuedAt), { phoneE164: phone, requestId: 'demo-max-displace-begin' }, second, issuedAt);
+    expect(await verify(incoming({ text: fresh.code }), second, issuedAt)).toBe('verified');
+    const linkRef = db.collection('platformWhatsAppLinks').doc('link_' + original.linkId), saved = (await linkRef.get()).data()!;
+    const phoneRef = db.collection('platformWhatsAppLinks').doc('phone_' + saved.phoneIndex), savedPhone = (await phoneRef.get()).data()!;
+    const maximalLink = { ...saved, revision: Number.MAX_SAFE_INTEGER }, maximalPhone = { ...savedPhone, linkRevision: Number.MAX_SAFE_INTEGER };
+    expect(isPlatformWhatsAppLinkRecord(maximalLink)).toBe(true); expect(isPlatformWhatsAppLinkPhoneRecord(maximalPhone)).toBe(true);
+    await linkRef.set(maximalLink); await phoneRef.set(maximalPhone);
+    const owner = (await db.collection('platformWhatsAppLinks').where('ownerUid', '==', token().uid).limit(2).get()).docs[0].data();
+    expect(owner.revision).toBe(kind === 'owner' ? 3 : 2);
+    expect((await status(token(undefined, issuedAt), db, issuedAt)).current?.revision).toBe(Number.MAX_SAFE_INTEGER);
+    const before = await durableSnapshot();
+    await expect(confirm(token(claimantUid, at), { challengeId: fresh.challengeId, requestId: 'demo-max-displace-confirm' }, second, at)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
+    expect(await durableSnapshot()).toEqual(before);
+  });
+  it('revokes a MAX_SAFE pending challenge without incrementing its revision', async () => {
+    const first = await start(), ref = db.collection('platformWhatsAppLinkChallenges').doc('challenge_' + first.challengeId);
+    const maximal = { ...(await ref.get()).data()!, revision: Number.MAX_SAFE_INTEGER };
+    expect(isPlatformWhatsAppLinkChallengeRecord(maximal)).toBe(true); await ref.set(maximal);
+    const state = await status(token(), db, now);
+    expect(state.pending?.revision).toBe(Number.MAX_SAFE_INTEGER);
+    await revoke(token(), 'revoke_v1_' + state.revokeGeneration + '_' + randomUUID(), second, now);
+    const terminal = (await ref.get()).data();
+    expect(terminal).toEqual({ ...maximal, status: 'revoked' });
+    expect(isPlatformWhatsAppLinkChallengeRecord(terminal)).toBe(true);
+    expect((await status(token(), db, now)).pending).toBeNull();
+  });
+  it('consumes a MAX_SAFE verified challenge without incrementing its revision', async () => {
+    const first = await proven(), ref = db.collection('platformWhatsAppLinkChallenges').doc('challenge_' + first.challengeId);
+    const maximal = { ...(await ref.get()).data()!, revision: Number.MAX_SAFE_INTEGER };
+    expect(isPlatformWhatsAppLinkChallengeRecord(maximal)).toBe(true); await ref.set(maximal);
+    expect((await status(token(), db, now)).pending).toMatchObject({ revision: Number.MAX_SAFE_INTEGER, proof: 'verified' });
+    const result = await confirm(token(), { challengeId: first.challengeId, requestId: 'demo-max-consume-confirm' }, second, now);
+    const terminal = (await ref.get()).data();
+    expect(terminal).toEqual({ ...maximal, status: 'consumed', resultLinkId: result.linkId });
+    expect(isPlatformWhatsAppLinkChallengeRecord(terminal)).toBe(true);
+    expect((await status(token(), db, now)).current).toMatchObject({ linkId: result.linkId, revision: 1 });
   });
   it('rejects malformed controls with unavailable configuration without any D1 mutation and retains configured deduplication', async () => {
     const c = await start(), pieces = c.code.split(':'), secretBad = [...pieces], macBad = [...pieces];

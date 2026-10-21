@@ -121,11 +121,20 @@ async function readOwner(tx: Transaction, db: Database, owner: Owner | null, now
   return { owner, link, challenge, phone, current: link && now < link.validUntil ? link : null, pending: challenge && now < challenge.validUntil ? challenge : null };
 }
 type Facts = Awaited<ReturnType<typeof readOwner>>;
+function stageLink(tx: Transaction, db: Database, id: string, value: Link, create = false) {
+  if (!isPlatformWhatsAppLinkRecord(value)) throw unavailable();
+  const ref = db.collection(links).doc('link_' + id);
+  if (create) tx.create(ref, value); else tx.set(ref, value);
+}
+function stageChallenge(tx: Transaction, db: Database, id: string, value: Challenge, create = false) {
+  if (!isPlatformWhatsAppLinkChallengeRecord(value)) throw unavailable();
+  const ref = db.collection(challenges).doc('challenge_' + id);
+  if (create) tx.create(ref, value); else tx.set(ref, value);
+}
 function stageExpiredLinkRelease(tx: Transaction, db: Database, facts: Facts) {
   if (!facts.owner?.currentLinkId || !facts.link || facts.current) return;
   const terminal: Link = { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 };
-  if (!isPlatformWhatsAppLinkRecord(terminal)) throw unavailable();
-  tx.set(db.collection(links).doc('link_' + facts.owner.currentLinkId), terminal);
+  stageLink(tx, db, facts.owner.currentLinkId, terminal);
   if (facts.phone?.uidIndex === facts.owner.uidIndex && facts.phone.linkId === facts.owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) {
     tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex));
   }
@@ -171,8 +180,8 @@ export async function beginPlatformWhatsAppLink(user: DecodedIdToken, input: { p
     const request: RequestRecord = { ...platformWhatsAppIdentity(config.scope), recordType: 'link_request', createdAt: now, expiresAt: now + LINK_TTL, uidIndex, requestDigest, fingerprint, action: 'begin', challengeId: id, linkId: null, resultRevision: null };
     stageExpiredLinkRelease(tx, db, facts);
     if (bootstrap) tx.create(db.collection('serverSettings').doc(config.markerId), { version: 1, scopeDigest: config.scopeDigest, keyFingerprint: config.digest('link-key-marker-v1', []) });
-    if (facts.challenge) tx.set(db.collection(challenges).doc('challenge_' + owner!.pendingChallengeId), { ...facts.challenge, status: 'replaced' });
-    tx.create(db.collection(challenges).doc('challenge_' + id), c); tx.create(db.collection(challenges).doc('request_' + requestDigest), request);
+    if (facts.challenge) stageChallenge(tx, db, owner!.pendingChallengeId!, { ...facts.challenge, status: 'replaced' });
+    stageChallenge(tx, db, id, c, true); tx.create(db.collection(challenges).doc('request_' + requestDigest), request);
     stageOwner(tx, db, owner ?? { ...platformWhatsAppIdentity(config.scope), recordType: 'link_uid', ownerUid: user.uid, uidIndex, revision: 0, revokeGeneration: generation, currentLinkId: null, pendingChallengeId: null, issues: [], createdAt: now, expiresAt: now + LINK_ISSUE_TTL }, liveLink(facts), { id, value: c }, now, generation, [...issues, { issuedAt: now, expiresAt: now + LINK_ISSUE_TTL }]);
     return { challengeId: id, code, expiresAt: c.validUntil };
   });
@@ -213,7 +222,7 @@ export async function verifyPlatformWhatsAppLinkInbound(event: IncomingText, db:
     const macMatches = !!mac && sameBytes(mac, Buffer.from(issuance(config, id, c), 'hex'));
     const accepted = hashMatches && macMatches;
     const updated: Challenge = { ...c, attempts: [...c.attempts, { aliases, fingerprint, accepted, at: now }], status: accepted ? 'verified' : 'pending', verifiedAt: accepted ? now : null };
-    tx.set(db.collection(challenges).doc('challenge_' + id), updated); return accepted ? 'verified' : 'rejected';
+    stageChallenge(tx, db, id, updated); return accepted ? 'verified' : 'rejected';
   });
 }
 
@@ -249,13 +258,13 @@ export async function confirmPlatformWhatsAppLink(user: DecodedIdToken, input: {
     const link: Link = { ...platformWhatsAppIdentity(config.scope), recordType: 'link', uidIndex, phoneIndex: c.phoneIndex, revision: 1, status: 'active', createdAt: now, validUntil: now + LINK_TTL, expiresAt: now + LINK_TTL, phoneSuffix: c.phoneSuffix, conversationId: c.conversationId, ...consent, confirmedAuthTime: at };
     const phone: Phone = { ...platformWhatsAppIdentity(config.scope), recordType: 'link_phone', uidIndex, phoneIndex: c.phoneIndex, linkId: id, linkRevision: 1, createdAt: now, expiresAt: link.expiresAt };
     const request: RequestRecord = { ...platformWhatsAppIdentity(config.scope), recordType: 'link_request', uidIndex, requestDigest, fingerprint, action: 'confirm', challengeId: input.challengeId, linkId: id, resultRevision: 1, createdAt: now, expiresAt: now + LINK_TTL };
-    if (facts.link) { tx.set(db.collection(links).doc('link_' + owner.currentLinkId), { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 }); if (facts.phone?.linkId === owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex)); }
+    if (facts.link) { stageLink(tx, db, owner.currentLinkId!, { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 }); if (facts.phone?.linkId === owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex)); }
     if (displaced?.owner && displaced.owner.uidIndex !== uidIndex) {
-      if (displaced.link) tx.set(db.collection(links).doc('link_' + displaced.owner.currentLinkId), { ...displaced.link, status: 'revoked', revision: displaced.link.revision + 1 });
+      if (displaced.link) stageLink(tx, db, displaced.owner.currentLinkId!, { ...displaced.link, status: 'revoked', revision: displaced.link.revision + 1 });
       stageOwner(tx, db, displaced.owner, null, displaced.pending ? { id: displaced.owner.pendingChallengeId!, value: displaced.pending } : null, now, displacedGeneration);
     }
-    tx.set(db.collection(challenges).doc('challenge_' + input.challengeId), { ...c, status: 'consumed', resultLinkId: id });
-    tx.create(db.collection(links).doc('link_' + id), link); tx.set(db.collection(links).doc('phone_' + c.phoneIndex), phone); tx.create(db.collection(challenges).doc('request_' + requestDigest), request);
+    stageChallenge(tx, db, input.challengeId, { ...c, status: 'consumed', resultLinkId: id });
+    stageLink(tx, db, id, link, true); tx.set(db.collection(links).doc('phone_' + c.phoneIndex), phone); tx.create(db.collection(challenges).doc('request_' + requestDigest), request);
     stageOwner(tx, db, owner, { id, value: link }, null, now, generation);
     return { linkId: id, revision: 1, expiresAt: link.validUntil };
   });
@@ -283,8 +292,8 @@ export async function revokePlatformWhatsAppLink(user: DecodedIdToken, input: st
     const owner = await ownerLookup(tx, db, user.uid), facts = await readOwner(tx, db, owner, now);
     if (!owner || owner.revokeGeneration !== parsed[1] || !facts.current && !facts.pending) throw conflict();
     const record: RevokeRecord = { ...platformWhatsAppIdentity(owner), recordType: 'link_revoke_request', createdAt: now, expiresAt: now + LINK_TTL, actorUid: user.uid, generation: parsed[1], requestDigest, challengeId: facts.pending ? owner.pendingChallengeId : null, linkId: facts.current ? owner.currentLinkId : null, resultRevision: facts.current ? facts.current.revision + 1 : null };
-    if (facts.link) { tx.set(db.collection(links).doc('link_' + owner.currentLinkId), { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 }); if (facts.phone?.uidIndex === owner.uidIndex && facts.phone.linkId === owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex)); }
-    if (facts.challenge) tx.set(db.collection(challenges).doc('challenge_' + owner.pendingChallengeId), { ...facts.challenge, status: 'revoked' });
+    if (facts.link) { stageLink(tx, db, owner.currentLinkId!, { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 }); if (facts.phone?.uidIndex === owner.uidIndex && facts.phone.linkId === owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex)); }
+    if (facts.challenge) stageChallenge(tx, db, owner.pendingChallengeId!, { ...facts.challenge, status: 'revoked' });
     stageOwner(tx, db, owner, null, null, now, generation); tx.create(db.collection(challenges).doc('revoke_' + requestDigest), record);
   });
 }
