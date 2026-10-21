@@ -1,6 +1,7 @@
 import { Container, ContainerProxy, getContainer } from '@cloudflare/containers';
 import { handleIdentityOutbound, handlePublicIdentityRequest } from './identity.ts';
 import { handleDataOutbound } from './data.ts';
+import { cleanupPlatformWhatsAppRetention } from './platform-whatsapp-retention.ts';
 import { backgroundWorkEnabled, forwardToSingleton, runtimeEnvironment, wakeBackgroundSingleton } from './router.ts';
 
 export { SarinIdentity } from './identity.ts';
@@ -46,7 +47,12 @@ export default {
     if (identity) return identity;
     return forwardToSingleton(request, (name) => getContainer(env.SARIN_APP, name), { ...env });
   },
-  scheduled(_controller: ScheduledController, env: CloudflareBindings): Promise<void> {
-    return wakeBackgroundSingleton({ ...env }, (name) => getContainer(env.SARIN_APP, name));
+  async scheduled(_controller: ScheduledController, env: CloudflareBindings): Promise<void> {
+    const flags: Record<string, unknown> = { ...env };
+    if (flags.PLATFORM_WHATSAPP_RETENTION_ENABLED === 'true' && flags.SARIN_MAINTENANCE !== 'true') {
+      const result = await cleanupPlatformWhatsAppRetention(env);
+      console.info({ event: 'platform_whatsapp_retention', ...result });
+    }
+    await wakeBackgroundSingleton(flags, (name) => getContainer(env.SARIN_APP, name));
   },
 } satisfies ExportedHandler<CloudflareBindings>;
