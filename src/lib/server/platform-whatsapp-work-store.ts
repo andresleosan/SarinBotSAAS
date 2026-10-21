@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Database, Transaction } from '@/lib/storage/types';
 import { isPlatformWhatsAppConversationRecord } from '../../../shared/platform-whatsapp-records';
 import { createPlatformMenu, parsePlatformMenuChoice } from '../../../shared/platform-whatsapp-menu';
-import { WORK_DEADLINE_MS, WORK_LEASE_MS, workCatalog, workText, emptyUsage, outboxMatchesJob, type DeliveryResult, type Lease, type PlatformJob, type PlatformOutbox, type Usage } from '../../../shared/platform-whatsapp-work';
+import { WORK_DEADLINE_MS, WORK_LEASE_MS, workCatalog, workText, emptyUsage, outboxMatchesJob, type ControlHead, type CostStage, type DeliveryResult, type Lease, type PlatformJob, type PlatformOutbox, type Usage } from '../../../shared/platform-whatsapp-work';
 import { maximumPlatformCost } from '../../../shared/platform-whatsapp-policy';
 import { getPlatformWhatsAppConfig } from './platform-whatsapp-config';
 import { encryptPlatformWhatsAppContent, platformWhatsAppDigest } from './platform-whatsapp-crypto';
@@ -13,8 +13,29 @@ import { prepareWorkIdentity, readWorkAuthority, workPayload, workActor } from '
 import { currentPlatformWorkPolicy, readPlatformReservation, stagePlatformReservation, stagePlatformCostStart, readPlatformSettlement, stagePlatformSettlement } from './platform-whatsapp-budget';
 import { dueWork, prepareHeadAdvance } from './platform-whatsapp-work-queue';
 import { readWorkCancellation, stageWorkCancellation } from './platform-whatsapp-work-cancellation';
+import { HttpError } from './http';
 
 const liveLease = (job: PlatformJob, lease: Lease, now: number) => job.jobId === lease.jobId && job.epoch === lease.epoch && job.leaseToken === lease.token && job.leaseExpiresAt !== null && now < job.leaseExpiresAt && job.processingDeadlineAt !== null && now < job.processingDeadlineAt && ['leased', 'reply_saved'].includes(job.status);
+async function claimBudgetOpen(job: PlatformJob, stage: CostStage, tx: Transaction, db: Database, now: number): Promise<boolean> {
+  try {
+    const policy = currentPlatformWorkPolicy();
+    await readPlatformReservation(job, stage, maximumPlatformCost(policy.policy, stage), tx, db, now);
+    return true;
+  } catch (error) {
+    if (!(error instanceof HttpError) || error.code !== 'PLATFORM_WORK_CLOSED') throw error;
+    return false;
+  }
+}
+/** Terminal closure frees the bounded due page; it never reprices/retries a consumed effect. */
+async function terminateClaim(job: PlatformJob, head: ControlHead | null, consumed: boolean, tx: Transaction, db: Database, now: number) {
+  const outbox = job.outboxId ? await readWork(tx, db, 'platformWhatsAppOutbox/' + job.outboxId) : null;
+  const advance = head && head.headJobId === job.jobId && head.controlEpoch === job.controlEpoch && head.controlRevision === job.controlRevision ? await prepareHeadAdvance(head, job, tx, db, now) : null;
+  const terminal = { ...job, status: consumed ? 'unknown' as const : 'cancelled' as const, nextAttemptAt: null };
+  for (const p of ['audio', 'generation'] as const) if (['preparing', 'started', 'result_pending'].includes(terminal[`${p}State`])) { terminal[`${p}State`] = 'unknown'; terminal[`${p}FinishedAt`] = now; }
+  stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, terminal);
+  if (outbox?.recordType === 'outbox' && !['accepted', 'rejected', 'unknown', 'cancelled'].includes(outbox.status)) stageWork(tx, db, 'platformWhatsAppOutbox/' + outbox.outboxId, { ...outbox, status: outbox.status === 'started' ? 'unknown' : 'cancelled', sendFinishedAt: now });
+  advance?.();
+}
 export async function preparedLease(lease: Lease, db: Database, now: number) {
   const job = await db.runTransaction(tx => readWork(tx, db, 'platformWhatsAppJobs/' + lease.jobId));
   if (job?.recordType !== 'job' || !liveLease(job, lease, now)) return null;
@@ -66,22 +87,16 @@ export function createPlatformWorkStore(db: Database, clock: () => number = Date
             const consumed = job.outboxId !== null || [job.audioState, job.generationState].some(s => !['not_applicable', 'not_started', 'completed'].includes(s));
             const deadline = job.processingDeadlineAt ?? Math.min(now + WORK_DEADLINE_MS, job.bodyExpiresAt, job.windowExpiresAt ?? 0);
             if (authority && now < deadline && job.authorityKind === 'actor' && job.sourceKind === 'audio' && job.outboxId === null && job.generationState === 'not_started' && ['preparing', 'started', 'result_pending', 'failed', 'unknown'].includes(job.audioState)) {
-              const policy = currentPlatformWorkPolicy(); await readPlatformReservation(job, 'send', maximumPlatformCost(policy.policy, 'send'), tx, db, now);
+              if (!await claimBudgetOpen(job, 'send', tx, db, now)) { await terminateClaim(job, authority.head, consumed, tx, db, now); return null; }
               const expiry = Math.min(now + WORK_LEASE_MS, deadline);
               stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, { ...job, status: 'leased', leaseToken: token, leaseClaimedAt: now, leaseExpiresAt: expiry, nextAttemptAt: expiry, audioState: job.audioState === 'failed' ? 'failed' : 'unknown', audioFinishedAt: job.audioFinishedAt ?? now, generationState: 'not_applicable', catalogId: 'audio_fallback', catalogVersion: 1 });
               return { jobId: job.jobId, epoch: job.epoch, token };
             }
             if (!authority || now >= deadline || consumed) {
-              const outbox = job.outboxId ? await readWork(tx, db, 'platformWhatsAppOutbox/' + job.outboxId) : null;
-              const advance = head?.recordType === 'control_head' && head.headJobId === job.jobId && head.controlEpoch === job.controlEpoch && head.controlRevision === job.controlRevision ? await prepareHeadAdvance(head, job, tx, db, now) : null;
-              const terminal = { ...job, status: consumed ? 'unknown' as const : 'cancelled' as const, nextAttemptAt: null };
-              for (const p of ['audio', 'generation'] as const) if (['preparing', 'started', 'result_pending'].includes(terminal[p + 'State' as `${typeof p}State`])) { terminal[`${p}State`] = 'unknown'; terminal[`${p}FinishedAt`] = now; }
-              stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, terminal);
-              if (outbox?.recordType === 'outbox' && !['accepted', 'rejected', 'unknown', 'cancelled'].includes(outbox.status)) stageWork(tx, db, 'platformWhatsAppOutbox/' + outbox.outboxId, { ...outbox, status: outbox.status === 'started' ? 'unknown' : 'cancelled', sendFinishedAt: now });
-              advance?.(); return null;
+              await terminateClaim(job, head?.recordType === 'control_head' ? head : null, consumed, tx, db, now); return null;
             }
-            const policy = currentPlatformWorkPolicy(), stage = job.catalogId ? 'send' : job.sourceKind === 'audio' && job.audioState !== 'completed' ? 'audio' : 'generation';
-            await readPlatformReservation(job, stage, maximumPlatformCost(policy.policy, stage), tx, db, now);
+            const stage = job.catalogId ? 'send' : job.sourceKind === 'audio' && job.audioState !== 'completed' ? 'audio' : 'generation';
+            if (!await claimBudgetOpen(job, stage, tx, db, now)) { await terminateClaim(job, authority.head, consumed, tx, db, now); return null; }
             const updated: PlatformJob = { ...job, status: 'leased', processingStartedAt: job.processingStartedAt ?? now, processingDeadlineAt: deadline, leaseToken: token, leaseClaimedAt: now, leaseExpiresAt: Math.min(now + WORK_LEASE_MS, deadline), nextAttemptAt: Math.min(now + WORK_LEASE_MS, deadline) };
             stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, updated); return { jobId: job.jobId, epoch: job.epoch, token };
           });

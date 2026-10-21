@@ -68,6 +68,44 @@ describe('independent durable platform budgets', () => {
     await reservePlatformCost(s.j.jobId, 'send', 10, s.db);
     const commits = s.seen.filter(c => c.action === 'commit'); expect(commits).toHaveLength(2); expect(commits[0]).toEqual(commits[1]);
   });
+  it('durably blocks combined overflow with eleven safe outstanding audio holds', async () => {
+    const s = fixture(), { reservationId } = await reservePlatformCost(s.j.jobId, 'audio', 1, s.db);
+    for (let i = 2; i <= 11; i++) {
+      const j = workJob({ jobId: 'job_' + i.toString(16).padStart(64, '0') });
+      s.seed('platformWhatsAppJobs/' + j.jobId, j); await reservePlatformCost(j.jobId, 'audio', 1, s.db);
+    }
+    await s.db.runTransaction(async tx => { const facts = await readPlatformReservation(s.j, 'audio', 1, tx, s.db, now); stagePlatformCostStart(facts, leaseToken, tx, s.db, now); });
+    const ids = budgetIds(s.j, 'audio', now), beforeCall = structuredClone(s.rows.get('platformWhatsAppBudgetCalls/' + reservationId)), beforePeriod = structuredClone(s.rows.get('platformWhatsAppBudgetPeriods/' + ids.periodId));
+    expect(beforePeriod).toMatchObject({ usedMicros: 0, heldMicros: 11 });
+    await expect(settlePlatformCost(reservationId, Number.MAX_SAFE_INTEGER, s.db)).rejects.toMatchObject({ status: 503 });
+    expect(s.rows.get('platformWhatsAppBudgetCalls/' + reservationId)).toEqual(beforeCall);
+    expect(s.rows.get('platformWhatsAppBudgetPeriods/' + ids.periodId)).toEqual(beforePeriod);
+    expect(s.rows.get('platformWhatsAppBudgetPeriods/' + ids.circuitId)).toMatchObject({ status: 'blocked', reason: 'accounting_invalid' });
+  });
+  it.each(['day', 'circuit', 'job'] as const)('rejects inconsistent settlement %s relationships without writes', async target => {
+    const s = fixture(), { reservationId } = await reservePlatformCost(s.j.jobId, 'send', 10, s.db), ids = budgetIds(s.j, 'send', now);
+    const callPath = 'platformWhatsAppBudgetCalls/' + reservationId, call = s.rows.get(callPath)!;
+    if (target === 'day') {
+      const day = s.rows.get('platformWhatsAppBudgetPeriods/' + ids.periodId)!, other = budgetIds(s.j, 'send', now + 86_400_000);
+      s.seed('platformWhatsAppBudgetPeriods/' + other.periodId, { ...day, periodId: other.periodId, dayStart: other.dayStart, dayEnd: other.dayStart + 86_400_000, expiresAt: other.dayStart + 2_592_000_000 });
+      s.seed(callPath, { ...call, periodId: other.periodId });
+    } else if (target === 'circuit') {
+      const circuitId = 'circuit_' + 'f'.repeat(64);
+      s.seed('platformWhatsAppBudgetPeriods/' + circuitId, { ...s.rows.get('platformWhatsAppBudgetPeriods/' + ids.circuitId), circuitId });
+      s.seed(callPath, { ...call, circuitId });
+    } else s.seed('platformWhatsAppJobs/' + s.j.jobId, { ...s.j, requestFingerprint: 'e'.repeat(64) });
+    const before = structuredClone([...s.rows]);
+    await expect(settlePlatformCost(reservationId, 0, s.db)).rejects.toMatchObject({ status: 503 });
+    expect([...s.rows]).toEqual(before);
+  });
+  it('settles known late usage against the original UTC day without repricing today', async () => {
+    const s = fixture(), { reservationId } = await reservePlatformCost(s.j.jobId, 'send', 10, s.db);
+    await s.db.runTransaction(async tx => { const facts = await readPlatformReservation(s.j, 'send', 10, tx, s.db, now); stagePlatformCostStart(facts, leaseToken, tx, s.db, now); });
+    vi.mocked(Date.now).mockReturnValue(now + 86_400_000);
+    await settlePlatformCost(reservationId, 7, s.db);
+    expect([...s.rows.values()].filter(isBudgetPeriod)).toHaveLength(1);
+    expect(s.rows.get('platformWhatsAppBudgetPeriods/' + budgetIds(s.j, 'send', now).periodId)).toMatchObject({ usedMicros: 7, heldMicros: 0 });
+  });
   it('validates exact records, safe numbers and original source deadlines', () => {
     const j = workJob(); expect(isPlatformJob(j)).toBe(true);
     for (const change of [{ customerPhone: '+12025550101' }, { expiresAt: j.expiresAt + 1 }, { connectionRevision: Number.MAX_SAFE_INTEGER + 1 }, { windowExpiresAt: null }, { nextJobId: j.jobId }, { generationState: 'started' }]) expect(isPlatformJob({ ...j, ...change })).toBe(false);

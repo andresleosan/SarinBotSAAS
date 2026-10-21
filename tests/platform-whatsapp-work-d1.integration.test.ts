@@ -12,6 +12,7 @@ import { configure, connection, connectionPath, incoming, now } from './platform
 import { configureWork, workCircuit } from './platform-whatsapp-work-fixtures';
 import { ingestPlatformWhatsAppEvent as ingest } from '@/lib/server/platform-whatsapp-ingress';
 import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config';
+import { reservePlatformCost, budgetIds } from '@/lib/server/platform-whatsapp-budget';
 import type { Database } from '@/lib/storage/types';
 import type { DataCommand, DataReadResult, DataCommitResult } from '../shared/data-protocol';
 
@@ -113,5 +114,70 @@ describe('A3 actual two-handle local D1 and Worker stage transactions', () => {
   it('uses the additive due/body indexes for the exact generated query expressions', async () => {
     const plans = await Promise.all([runtime.db.prepare("EXPLAIN QUERY PLAN SELECT path FROM app_documents WHERE parent = ? AND json_extract(data,'$.status') = ? AND json_extract(data,'$.nextAttemptAt') <= ? ORDER BY json_extract(data,'$.nextAttemptAt') ASC,path ASC LIMIT ?").bind('platformWhatsAppJobs', 'ready', now, 25).all(), runtime.db.prepare("EXPLAIN QUERY PLAN SELECT path FROM app_documents WHERE parent = ? AND json_extract(data,'$.bodyState') = ? AND json_extract(data,'$.bodyExpiresAt') <= ? ORDER BY json_extract(data,'$.bodyExpiresAt') ASC,path ASC LIMIT ?").bind('platformWhatsAppOutbox', 'body_present', now, 50).all()]);
     expect(JSON.stringify(plans[0])).toContain('app_platform_work_due'); expect(JSON.stringify(plans[1])).toContain('app_platform_work_body');
+  });
+  it('serializes distinct genuine jobs competing for the final send allowance behind a commit barrier', async () => {
+    configure(); configureWork(); vi.stubEnv('PLATFORM_WHATSAPP_SEND_DAILY_BUDGET_MICROS', '10');
+    await db.collection('serverSettings').doc('platform_whatsapp').set({ ...connection({ providerConnection: 'connected' }), observationStatus: 'connected', observationRevision: 0, observedAt: now });
+    const c = workCircuit(); await db.collection('platformWhatsAppBudgetPeriods').doc(c.circuitId).set(c);
+    for (let i = 0; i < 2; i++) await ingest(incoming({ eventId: 'demo-budget-' + i, messageId: 'demo-budget-' + i, whatsappMessageId: null, customerPhone: '+1202555020' + i, customerSentAt: now }), getPlatformWhatsAppConfig(), db, now);
+    const jobs = (await db.collection('platformWhatsAppJobs').get()).docs.map(d => d.data()).filter(isPlatformJob); expect(jobs).toHaveLength(2);
+    let arrivals = 0, release!: () => void;
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    const racing: DataTransport = async command => {
+      if (command.action === 'commit' && command.writes.some(w => w.op !== 'delete' && w.data.recordType === 'budget_call') && arrivals < 2) { arrivals++; if (arrivals === 2) release(); await barrier; }
+      return transport(command);
+    };
+    const results = await Promise.allSettled(jobs.map(j => reservePlatformCost(j.jobId, 'send', 10, createCloudflareDatabase(racing))));
+    expect(arrivals).toBe(2); expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find(r => r.status === 'rejected')).toMatchObject({ reason: { status: 503, code: 'PLATFORM_WORK_CLOSED' } });
+    expect((await db.collection('platformWhatsAppBudgetCalls').get()).size).toBe(1);
+    expect((await db.collection('platformWhatsAppBudgetPeriods').doc(budgetIds(jobs[0], 'send', now).periodId).get()).data()).toMatchObject({ usedMicros: 0, heldMicros: 10 });
+  });
+  it('persists Worker accounting_invalid on combined overflow and preserves eleven original holds', async () => {
+    const lease = await audio(), p = (await preparePlatformAudio(lease, env(), now))!;
+    await startPlatformAudio(lease, p.audioToken, env(), now);
+    for (let i = 0; i < 10; i++) {
+      const later = now + 60_000 + i; vi.mocked(Date.now).mockReturnValue(later);
+      const { text: _text, ...base } = incoming({ eventId: 'demo-overflow-' + i, messageId: 'demo-overflow-' + i, whatsappMessageId: null, occurredAt: later, customerSentAt: later });
+      await ingest({ ...base, kind: 'incoming_audio', audio: { id: '123456789', link: 'https://api.ycloud.com/v2/whatsapp/media/download/123456789', sha256: Buffer.alloc(32, 7).toString('base64'), mimeType: 'audio/ogg; codecs=opus' } }, getPlatformWhatsAppConfig(), db, later);
+      const j = (await db.collection('platformWhatsAppJobs').get()).docs.map(d => d.data()).filter(isPlatformJob).find(j => j.sourceOccurredAt === later)!;
+      expect(j).toBeDefined(); await reservePlatformCost(j.jobId, 'audio', 1, db);
+    }
+    const job = (await db.collection('platformWhatsAppJobs').doc(lease.jobId).get()).data()!;
+    if (!isPlatformJob(job)) throw new Error('Invalid actual job');
+    const ids = budgetIds(job, 'audio', now);
+    const beforeCall = (await db.collection('platformWhatsAppBudgetCalls').doc(ids.reservationId).get()).data(), beforePeriod = (await db.collection('platformWhatsAppBudgetPeriods').doc(ids.periodId).get()).data();
+    expect(beforePeriod).toMatchObject({ usedMicros: 0, heldMicros: 11 });
+    expect(await finishPlatformAudio(lease, p.audioToken, { status: 'completed', actualMicros: Number.MAX_SAFE_INTEGER, usage: { ...emptyUsage, usageAudioMilliseconds: 1000 } }, env(), now + 60_010)).toBe(false);
+    expect((await db.collection('platformWhatsAppBudgetCalls').doc(ids.reservationId).get()).data()).toEqual(beforeCall);
+    expect((await db.collection('platformWhatsAppBudgetPeriods').doc(ids.periodId).get()).data()).toEqual(beforePeriod);
+    expect((await db.collection('platformWhatsAppBudgetPeriods').doc(ids.circuitId).get()).data()).toMatchObject({ status: 'blocked', reason: 'accounting_invalid' });
+  }, 30_000);
+  it.each(['prepare', 'start'] as const)('reports corrupt Worker controls as unavailable before %s, preserving all stored rows', async stage => {
+    for (const target of ['source', 'head', 'link', 'duplicate_owner']) {
+      await runtime.db.exec('DELETE FROM app_documents; DELETE FROM app_commits;');
+      const lease = await audio(), p = stage === 'start' ? (await preparePlatformAudio(lease, env(), now))! : null;
+      const job = (await db.collection('platformWhatsAppJobs').doc(lease.jobId).get()).data()!;
+      if (target === 'duplicate_owner') {
+        const owner = (await db.collection('platformWhatsAppLinks').where('ownerUid', '==', job.uid).get()).docs[0].data();
+        await db.collection('platformWhatsAppLinks').doc('uid_' + 'f'.repeat(64)).set({ ...owner, uidIndex: 'f'.repeat(64) });
+      } else {
+        const [root, id] = target === 'source' ? ['platformWhatsAppEvents', job.sourceEventId] : target === 'head' ? ['platformWhatsAppJobs', 'head_' + job.conversationId] : ['platformWhatsAppLinks', 'link_' + job.linkId];
+        const ref = db.collection(root).doc(id); await ref.set({ ...(await ref.get()).data(), unexpected: true });
+      }
+      const before = await runtime.db.prepare('SELECT path,data FROM app_documents ORDER BY path').all();
+      const revision = await runtime.db.prepare('SELECT revision FROM app_revision WHERE id=1').first(), commits = await runtime.db.prepare('SELECT COUNT(*) AS n FROM app_commits').first();
+      const operation = stage === 'prepare' ? preparePlatformAudio(lease, env(), now) : startPlatformAudio(lease, p!.audioToken, env(), now);
+      await expect(operation, target).rejects.toMatchObject({ status: 503, code: 'DATA_UNAVAILABLE' });
+      expect((await runtime.db.prepare('SELECT path,data FROM app_documents ORDER BY path').all()).results).toEqual(before.results);
+      expect(await runtime.db.prepare('SELECT revision FROM app_revision WHERE id=1').first()).toEqual(revision);
+      expect(await runtime.db.prepare('SELECT COUNT(*) AS n FROM app_commits').first()).toEqual(commits);
+    }
+  }, 30_000);
+  it.each(['revoked', 'expired'] as const)('keeps valid %s Worker controls an ordinary denial', async reason => {
+    const lease = await audio(), job = (await db.collection('platformWhatsAppJobs').doc(lease.jobId).get()).data()!;
+    if (reason === 'revoked') { const ref = db.collection('platformWhatsAppLinks').doc('link_' + job.linkId); await ref.set({ ...(await ref.get()).data(), status: 'revoked', revision: 2 }); }
+    else { const ref = db.collection('platformWhatsAppJobs').doc('head_' + job.conversationId); await ref.set({ ...(await ref.get()).data(), receivedAt: now - 2_592_000_000, expiresAt: now }); }
+    expect(await preparePlatformAudio(lease, env(), now)).toBeNull();
   });
 });

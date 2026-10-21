@@ -6,6 +6,7 @@ import { maximumPlatformCost, parsePlatformWorkPolicy, platformPolicyTuple, type
 import { assertPlatformWhatsAppNow, platformWhatsAppConflictError, platformWhatsAppIdentity, platformWhatsAppUnavailableError, samePlatformWhatsAppScope } from './platform-whatsapp-store';
 import { checkedAdd, readWork, stageWork, workHash } from './platform-whatsapp-work-records';
 import { HttpError } from './http';
+import { platformSettlementPeriod } from '../../../shared/platform-whatsapp-accounting';
 const closed = () => new HttpError(503, 'El presupuesto de plataforma no está habilitado.', 'PLATFORM_WORK_CLOSED');
 
 export function currentPlatformWorkPolicy(): { policy: WorkPolicy; fingerprint: string } {
@@ -70,8 +71,11 @@ export function stagePlatformCostStart(facts: BudgetFacts, token: string, tx: Tr
 export async function readPlatformSettlement(id: string, tx: Transaction, db: Database) {
   const call = await readWork(tx, db, 'platformWhatsAppBudgetCalls/' + id);
   if (call?.recordType !== 'budget_call') throw platformWhatsAppUnavailableError();
-  const [period, circuit] = await Promise.all([readWork(tx, db, 'platformWhatsAppBudgetPeriods/' + call.periodId), readWork(tx, db, 'platformWhatsAppBudgetPeriods/' + call.circuitId)]);
+  const [period, circuit, job] = await Promise.all([readWork(tx, db, 'platformWhatsAppBudgetPeriods/' + call.periodId), readWork(tx, db, 'platformWhatsAppBudgetPeriods/' + call.circuitId), readWork(tx, db, 'platformWhatsAppJobs/' + call.jobId)]);
   if (period?.recordType !== 'budget_period' || circuit?.recordType !== 'budget_circuit' || !samePlatformWhatsAppScope(call, period) || !samePlatformWhatsAppScope(call, circuit) || call.stage !== period.stage || call.stage !== circuit.stage) throw platformWhatsAppUnavailableError();
+  if (job?.recordType !== 'job' || !samePlatformWhatsAppScope(call, job) || call.epoch !== job.epoch || call.requestFingerprint !== job.requestFingerprint || call.expiresAt !== job.expiresAt || call.createdAt < job.createdAt || call.createdAt >= job.expiresAt) throw platformWhatsAppUnavailableError();
+  const original = budgetIds(job, call.stage, call.createdAt);
+  if (call.reservationId !== original.reservationId || call.periodId !== original.periodId || call.circuitId !== original.circuitId || period.dayStart !== original.dayStart || call.createdAt >= period.dayEnd) throw platformWhatsAppUnavailableError();
   return { call, period, circuit };
 }
 export function stagePlatformSettlement(facts: Awaited<ReturnType<typeof readPlatformSettlement>>, actual: number | null, usage: Usage, token: string | null, tx: Transaction, db: Database, now: number): boolean {
@@ -92,12 +96,8 @@ export function stagePlatformSettlement(facts: Awaited<ReturnType<typeof readPla
     if (call.status !== 'uncertain') stageWork(tx, db, 'platformWhatsAppBudgetCalls/' + call.reservationId, { ...call, status: 'uncertain', finishedAt: now });
     return true;
   }
-  let updated: BudgetPeriod;
-  try {
-    if (!workInteger(actual) || period.heldMicros < call.maximumMicros) throw platformWhatsAppUnavailableError();
-    updated = { ...period, heldMicros: period.heldMicros - call.maximumMicros, usedMicros: checkedAdd(period.usedMicros, actual), overrunMicros: checkedAdd(period.overrunMicros, Math.max(0, actual - call.maximumMicros)) };
-    for (const k of Object.keys(emptyUsage) as Array<keyof Usage>) if (usage[k] !== null) updated[k] = checkedAdd(period[k] ?? 0, usage[k]!);
-  } catch {
+  const updated = platformSettlementPeriod(period, call.maximumMicros, actual, usage);
+  if (!updated) {
     stageWork(tx, db, 'platformWhatsAppBudgetPeriods/' + circuit.circuitId, { ...circuit, status: 'blocked', reason: 'accounting_invalid', trippedAt: circuit.trippedAt ?? now });
     return false;
   }

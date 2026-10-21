@@ -110,4 +110,19 @@ describe('original actor authority and supplied transaction cancellation', () =>
     expect(await work.readAuthorized(lease)).toBeNull();
     expect([...s.rows.values()].find(r => r.recordType === 'budget_call' && r.stage === 'generation')).toMatchObject({ status: 'started', actualMicros: null });
   });
+  it('drains more than twenty-five budget-closed notices so another funded stage progresses', async () => {
+    await enter();
+    for (let i = 0; i < 37; i++) await ingest(event({ customerPhone: '+1202555' + String(1000 + i) }), getPlatformWhatsAppConfig(), s.db, now);
+    for (let i = 0; i < 7; i++) await deliver();
+    const closed = [...s.rows.values()].filter(isPlatformJob).filter(j => j.status === 'ready');
+    expect(closed).toHaveLength(30);
+    await ingest(event({ text: 'Funded generation behind closed send jobs', occurredAt: now + 1, customerSentAt: now + 1 }), getPlatformWhatsAppConfig(), s.db, now + 1);
+    const clocked = createPlatformWorkStore(s.db, () => now + 1);
+    let claimed: Lease | null = null;
+    for (let i = 0; i < 3 && !claimed; i++) claimed = await clocked.claimNext();
+    expect(claimed).not.toBeNull();
+    expect(await clocked.readAuthorized(claimed!)).toMatchObject({ authorityKind: 'actor', catalogId: null, generationState: 'not_started' });
+    for (const original of closed) expect(s.rows.get('platformWhatsAppJobs/' + original.jobId)).toMatchObject({ status: 'cancelled', nextAttemptAt: null, processingStartedAt: null, processingDeadlineAt: null, bodyExpiresAt: original.bodyExpiresAt, expiresAt: original.expiresAt });
+    expect([...s.rows.values()].filter(r => r.recordType === 'outbox' && r.status === 'accepted')).toHaveLength(10);
+  });
 });

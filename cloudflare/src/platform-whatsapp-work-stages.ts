@@ -1,11 +1,12 @@
 import { executeDataCommand, DataError } from './data.ts';
 import type { DataCommand, DataWrite } from '../../shared/data-protocol.ts';
-import { isWorkRecordAtPath, isPlatformJob, type Lease, type PlatformJob, type BudgetCall, type BudgetPeriod, type BudgetCircuit, type Usage, emptyUsage, validUsage, workInteger, workObject } from '../../shared/platform-whatsapp-work.ts';
-import { isPlatformWhatsAppEventRecord } from '../../shared/platform-whatsapp-records.ts';
-import { isPlatformWhatsAppLinkRecord } from '../../shared/platform-whatsapp-link-records.ts';
+import { isWorkRecordAtPath, isPlatformJob, type Lease, type PlatformJob, type BudgetCall, type BudgetPeriod, type BudgetCircuit, type Usage, emptyUsage, validUsage, workDigest, workInteger, workObject } from '../../shared/platform-whatsapp-work.ts';
+import { isPlatformWhatsAppEventRecord, isPlatformWhatsAppConnectionRecord, isPlatformWhatsAppConversationRecord } from '../../shared/platform-whatsapp-records.ts';
+import { isPlatformWhatsAppLinkRecord, isPlatformWhatsAppLinkPhoneRecord, isPlatformWhatsAppLinkUidRecord, isPlatformWhatsAppLinkKeyMarker, isPlatformWhatsAppLinkChallengeRecord } from '../../shared/platform-whatsapp-link-records.ts';
 import { currentWorkProjection, currentWorkLink, workScopeEqual } from '../../shared/platform-whatsapp-work-authorization.ts';
 import { parsePlatformWorkPolicy, platformPolicyTuple, maximumPlatformCost } from '../../shared/platform-whatsapp-policy.ts';
 import { consentContent } from '../../src/lib/legal.ts';
+import { platformSettlementPeriod } from '../../shared/platform-whatsapp-accounting.ts';
 
 type Env = Pick<CloudflareBindings, 'SARIN_DB' | 'SARIN_FILES'> & PlatformWhatsAppBindings;
 const unavailable = () => new DataError(503, 'DATA_UNAVAILABLE');
@@ -57,28 +58,53 @@ async function readJob(lease: Lease, tx: Reader): Promise<PlatformJob | null> {
 async function authorized(job: PlatformJob, lease: Lease, env: Env, tx: Reader, now: number): Promise<boolean> {
   if (job.authorityKind !== 'actor' || job.kind !== 'customer_reply' || job.sourceKind !== 'audio' || job.status !== 'leased' || job.leaseToken !== lease.token || job.leaseExpiresAt === null || job.leaseExpiresAt <= now || job.processingDeadlineAt === null || job.processingDeadlineAt <= now) return false;
   const [head, source, conversation, connection, link] = await Promise.all([tx.get('platformWhatsAppJobs/head_' + job.conversationId), tx.get('platformWhatsAppEvents/' + job.sourceEventId), tx.get('platformWhatsAppConversations/' + job.conversationId), tx.get('serverSettings/platform_whatsapp'), tx.get('platformWhatsAppLinks/link_' + job.linkId)]);
+  if (head !== undefined && !isWorkRecordAtPath('platformWhatsAppJobs/head_' + job.conversationId, head)
+    || source !== undefined && !isPlatformWhatsAppEventRecord(source)
+    || conversation !== undefined && !isPlatformWhatsAppConversationRecord(conversation)
+    || connection !== undefined && !isPlatformWhatsAppConnectionRecord(connection)
+    || link !== undefined && !isPlatformWhatsAppLinkRecord(link)) throw unavailable();
+  if (isPlatformWhatsAppEventRecord(source) && (!workScopeEqual(source, job) || source.conversationId !== job.conversationId || source.fingerprint !== job.requestFingerprint || source.receivedAt !== job.sourceReceivedAt || source.occurredAt !== job.sourceOccurredAt || source.bodyExpiresAt !== job.bodyExpiresAt || source.expiresAt !== job.expiresAt || source.connectionRevision !== job.connectionRevision || source.kind !== 'incoming_audio' || source.ingressDisposition !== 'descriptor_retained' || source.customerSentAt !== job.customerSentAt)) throw unavailable();
+  if (isPlatformWhatsAppLinkRecord(link) && (!workScopeEqual(link, job) || link.conversationId !== job.conversationId || link.createdAt > now)) throw unavailable();
   if (!currentWorkProjection(job, { head, source, conversation, connection }, now) || !isPlatformWhatsAppEventRecord(source) || source.kind !== 'incoming_audio' || source.ingressDisposition !== 'descriptor_retained' || source.state !== 'body_present' || !isPlatformWhatsAppLinkRecord(link)) return false;
+  if (link.status === 'revoked' || link.validUntil <= now) return false;
   const scope = [job.wabaId, job.phoneE164, job.phoneNumberId];
   if (env.PLATFORM_WHATSAPP_WABA_ID !== job.wabaId || env.PLATFORM_WHATSAPP_PHONE_E164 !== job.phoneE164 || env.PLATFORM_WHATSAPP_PHONE_NUMBER_ID !== job.phoneNumberId) return false;
   const scopeDigest = await hash(['sarin-link-scope', 1, ...scope]), expectedUidIndex = await keyed('link-uid-v1', [...scope, job.uid], env.PLATFORM_WHATSAPP_LINK_HMAC_KEY), keyFingerprint = await keyed('link-key-marker-v1', scope, env.PLATFORM_WHATSAPP_LINK_HMAC_KEY);
   const [marker, owner, phone, owners] = await Promise.all([tx.get('serverSettings/platform_whatsapp_link_key_' + scopeDigest), tx.get('platformWhatsAppLinks/uid_' + expectedUidIndex), tx.get('platformWhatsAppLinks/phone_' + link.phoneIndex), tx.owner(job.uid)]);
-  if (owners.length !== 1 || owners[0].path !== 'platformWhatsAppLinks/uid_' + expectedUidIndex || !currentWorkLink(job, { link, owner, phone, marker, expectedUidIndex, scopeDigest, keyFingerprint }, now)) return false;
+  if (owners.length > 1 || owners.some(row => !isPlatformWhatsAppLinkUidRecord(row.data) || row.data.ownerUid !== job.uid || row.path !== 'platformWhatsAppLinks/uid_' + row.data.uidIndex)
+    || owner !== undefined && (!isPlatformWhatsAppLinkUidRecord(owner) || owner.uidIndex !== expectedUidIndex || owner.ownerUid !== job.uid || !workScopeEqual(owner, job))
+    || phone !== undefined && (!isPlatformWhatsAppLinkPhoneRecord(phone) || phone.phoneIndex !== link.phoneIndex || !workScopeEqual(phone, job))
+    || marker !== undefined && (!isPlatformWhatsAppLinkKeyMarker(marker) || marker.scopeDigest !== scopeDigest || marker.keyFingerprint !== keyFingerprint)) throw unavailable();
+  if (link.uidIndex !== expectedUidIndex || !isPlatformWhatsAppLinkUidRecord(owner) || owners.length !== 1 || owners[0].path !== 'platformWhatsAppLinks/uid_' + expectedUidIndex) throw unavailable();
+  const currentLink = owner.currentLinkId === job.linkId ? link : owner.currentLinkId ? await tx.get('platformWhatsAppLinks/link_' + owner.currentLinkId) : undefined;
+  const challenge = owner.pendingChallengeId ? await tx.get('platformWhatsAppLinkChallenges/challenge_' + owner.pendingChallengeId) : undefined;
+  if (owner.currentLinkId && (!isPlatformWhatsAppLinkRecord(currentLink) || currentLink.uidIndex !== owner.uidIndex || !workScopeEqual(currentLink, owner) || currentLink.status !== 'active')
+    || owner.pendingChallengeId && (!isPlatformWhatsAppLinkChallengeRecord(challenge) || challenge.uidIndex !== owner.uidIndex || !workScopeEqual(challenge, owner) || !['pending', 'verified'].includes(challenge.status))) throw unavailable();
+  const dates = [...owner.issues.map(i => ({ createdAt: i.issuedAt, expiresAt: i.expiresAt })), ...isPlatformWhatsAppLinkRecord(currentLink) ? [currentLink] : [], ...isPlatformWhatsAppLinkChallengeRecord(challenge) ? [{ createdAt: challenge.createdAt, expiresAt: challenge.validUntil }] : []];
+  if (!dates.length || owner.createdAt > now || owner.createdAt !== Math.max(...dates.map(d => d.createdAt)) || owner.expiresAt !== Math.max(...dates.map(d => d.expiresAt))) throw unavailable();
+  if (owner.currentLinkId === job.linkId && (!isPlatformWhatsAppLinkPhoneRecord(phone) || phone.linkId !== job.linkId || phone.uidIndex !== owner.uidIndex || phone.linkRevision !== link.revision || phone.createdAt !== link.createdAt || phone.expiresAt !== link.expiresAt)) throw unavailable();
+  if (!currentWorkLink(job, { link, owner, phone, marker, expectedUidIndex, scopeDigest, keyFingerprint }, now)) return false;
   const fingerprint = await workHash('bot-authority', job.uid, job.confirmedAuthTime, job.linkId, job.linkRevision, job.accountRevision, job.accountFingerprint, job.accountReceiptId, job.supportRevision, job.supportFingerprint, job.supportReceiptId);
   if (head?.botAuthorityFingerprint !== fingerprint) return false;
   for (const scopeName of ['account', 'platform_support'] as const) {
     const prefix = scopeName === 'account' ? 'account' : 'support', stateId = 'consent_state_' + await hash(canonical([job.uid, scopeName, null]));
-    const [state, receipt] = await Promise.all([tx.get('serverSettings/' + stateId), tx.get('serverSettings/' + job[`${prefix}ReceiptId`])]);
+    const state = await tx.get('serverSettings/' + stateId);
+    if (!state) return false;
+    if (state.version !== 1 || state.uid !== job.uid || state.scope !== scopeName || state.businessId !== null || typeof state.active !== 'boolean' || !workInteger(state.revision) || state.revision >= Number.MAX_SAFE_INTEGER || !workDigest(state.fingerprint) || typeof state.receiptId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(state.receiptId) || ['__proto__', 'constructor', 'prototype'].includes(state.receiptId)) throw unavailable();
+    const receipt = await tx.get('serverSettings/' + state.receiptId);
     const expected = await hash(canonical(consentContent(scopeName)));
-    if (!state || state.version !== 1 || state.uid !== job.uid || state.scope !== scopeName || state.businessId !== null || state.active !== true || state.revision !== job[`${prefix}Revision`] || state.receiptId !== job[`${prefix}ReceiptId`] || state.fingerprint !== job[`${prefix}Fingerprint`] || state.fingerprint !== expected || !receipt || receipt.uid !== job.uid || receipt.scope !== scopeName || receipt.businessId !== null || receipt.revision !== state.revision || receipt.action !== 'accept' || receipt.termsAccepted !== true || receipt.dataAuthorized !== true || !workInteger(receipt.occurredAt) || !workObject(receipt.documents)) return false;
+    if (!receipt || receipt.uid !== job.uid || receipt.scope !== scopeName || receipt.businessId !== null || receipt.revision !== state.revision || receipt.action !== (state.active ? 'accept' : 'revoke') || receipt.termsAccepted !== state.active || receipt.dataAuthorized !== state.active || !workInteger(receipt.occurredAt) || !workObject(receipt.documents)) throw unavailable();
     const { fingerprint: saved, ...documents } = receipt.documents;
-    if (saved !== expected || await hash(canonical(documents)) !== expected) return false;
+    if (saved !== state.fingerprint || await hash(canonical(documents)) !== saved) throw unavailable();
+    if (!state.active || state.revision !== job[`${prefix}Revision`] || state.receiptId !== job[`${prefix}ReceiptId`] || state.fingerprint !== job[`${prefix}Fingerprint`] || state.fingerprint !== expected) return false;
   }
   return true;
 }
 async function budget(job: PlatformJob, tx: Reader, env: Env, now: number, current: boolean) {
   const scope = [job.wabaId, job.phoneE164, job.phoneNumberId], id = 'call_' + await workHash('cost', scope, job.jobId, job.epoch, 'audio');
   const call = await tx.get('platformWhatsAppBudgetCalls/' + id);
-  if (!call || !isWorkRecordAtPath('platformWhatsAppBudgetCalls/' + id, call) || call.recordType !== 'budget_call') return null;
+  if (!call) return null;
+  if (!isWorkRecordAtPath('platformWhatsAppBudgetCalls/' + id, call) || call.recordType !== 'budget_call') throw unavailable();
   const c = call as unknown as BudgetCall;
   const [period, circuit] = await Promise.all([tx.get('platformWhatsAppBudgetPeriods/' + c.periodId), tx.get('platformWhatsAppBudgetPeriods/' + c.circuitId)]);
   if (!period || !circuit || !isWorkRecordAtPath('platformWhatsAppBudgetPeriods/' + c.periodId, period) || !isWorkRecordAtPath('platformWhatsAppBudgetPeriods/' + c.circuitId, circuit) || period.recordType !== 'budget_period' || circuit.recordType !== 'budget_circuit' || c.jobId !== job.jobId || c.epoch !== job.epoch || c.stage !== 'audio' || c.requestFingerprint !== job.requestFingerprint || c.expiresAt !== job.expiresAt) throw unavailable();
@@ -130,12 +156,13 @@ export async function finishPlatformAudio(lease: Lease, audioToken: string, outc
     else if (b.call.status === 'started' && b.call.effectToken === audioToken) {
       if (outcome.actualMicros === null) call = { ...b.call, status: 'uncertain', finishedAt: now, ...emptyUsage };
       else {
-        const actual = outcome.actualMicros, used = b.period.usedMicros + actual, overrun = b.period.overrunMicros + Math.max(0, actual - b.call.maximumMicros), usage = (b.period.usageAudioMilliseconds ?? 0) + (outcome.usage.usageAudioMilliseconds ?? 0);
-        if (!workInteger(actual) || !workInteger(used) || !workInteger(overrun) || !workInteger(usage) || b.period.heldMicros < b.call.maximumMicros) { state = 'unknown'; circuit = { ...b.circuit, status: 'blocked', reason: 'accounting_invalid', trippedAt: b.circuit.trippedAt ?? now }; }
-        else { call = { ...b.call, status: 'settled', actualMicros: actual, finishedAt: now, ...outcome.usage }; period = { ...b.period, usedMicros: used, overrunMicros: overrun, heldMicros: b.period.heldMicros - b.call.maximumMicros, usageAudioMilliseconds: outcome.usage.usageAudioMilliseconds === null ? b.period.usageAudioMilliseconds : usage }; if (actual > b.call.maximumMicros) circuit = { ...b.circuit, status: 'blocked', reason: 'overrun', trippedAt: b.circuit.trippedAt ?? now }; }
+        const actual = outcome.actualMicros;
+        period = platformSettlementPeriod(b.period, b.call.maximumMicros, actual, outcome.usage);
+        if (!period) { state = 'unknown'; circuit = { ...b.circuit, status: 'blocked', reason: 'accounting_invalid', trippedAt: b.circuit.trippedAt ?? now }; }
+        else { call = { ...b.call, status: 'settled', actualMicros: actual, finishedAt: now, ...outcome.usage }; if (actual > b.call.maximumMicros) circuit = { ...b.circuit, status: 'blocked', reason: 'overrun', trippedAt: b.circuit.trippedAt ?? now }; }
       }
     } else throw unavailable();
-    tx.set('platformWhatsAppBudgetCalls/' + call.reservationId, call); if (period) tx.set('platformWhatsAppBudgetPeriods/' + period.periodId, period); if (circuit) tx.set('platformWhatsAppBudgetPeriods/' + circuit.circuitId, circuit);
+    if (call !== b.call) tx.set('platformWhatsAppBudgetCalls/' + call.reservationId, call); if (period) tx.set('platformWhatsAppBudgetPeriods/' + period.periodId, period); if (circuit) tx.set('platformWhatsAppBudgetPeriods/' + circuit.circuitId, circuit);
     tx.set('platformWhatsAppJobs/' + j.jobId, { ...j, audioState: state, audioFinishedAt: now });
     tx.set('platformWhatsAppEvents/' + j.sourceEventId, { ...source, state: 'body_erased', content: null });
     return state === 'result_pending';
