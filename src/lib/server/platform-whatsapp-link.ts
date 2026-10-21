@@ -123,7 +123,9 @@ async function readOwner(tx: Transaction, db: Database, owner: Owner | null, now
 type Facts = Awaited<ReturnType<typeof readOwner>>;
 function stageExpiredLinkRelease(tx: Transaction, db: Database, facts: Facts) {
   if (!facts.owner?.currentLinkId || !facts.link || facts.current) return;
-  tx.set(db.collection(links).doc('link_' + facts.owner.currentLinkId), { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 });
+  const terminal: Link = { ...facts.link, status: 'revoked', revision: facts.link.revision + 1 };
+  if (!isPlatformWhatsAppLinkRecord(terminal)) throw unavailable();
+  tx.set(db.collection(links).doc('link_' + facts.owner.currentLinkId), terminal);
   if (facts.phone?.uidIndex === facts.owner.uidIndex && facts.phone.linkId === facts.owner.currentLinkId && facts.phone.linkRevision === facts.link.revision) {
     tx.delete(db.collection(links).doc('phone_' + facts.link.phoneIndex));
   }

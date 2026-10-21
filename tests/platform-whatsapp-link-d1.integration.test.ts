@@ -8,6 +8,7 @@ import type { Database } from '@/lib/storage/types';
 import { beginPlatformWhatsAppLink as begin, verifyPlatformWhatsAppLinkInbound as verify, confirmPlatformWhatsAppLink as confirm, revokePlatformWhatsAppLink as revoke, readPlatformWhatsAppLinkStatus as status } from '@/lib/server/platform-whatsapp-link';
 import { configureLink, token, phone, seedConsents } from './platform-whatsapp-link-fixtures';
 import { incoming, now } from './platform-whatsapp-test-fixtures';
+import { isPlatformWhatsAppLinkRecord, isPlatformWhatsAppLinkPhoneRecord } from '../shared/platform-whatsapp-link-records';
 
 describe('link ownership on actual local D1 with deterministic commit interleaving', () => {
   let runtime: Awaited<ReturnType<typeof createDataTestRuntime>>, db: Database, second: Database;
@@ -71,6 +72,21 @@ describe('link ownership on actual local D1 with deterministic commit interleavi
     const before = await durableSnapshot(), deadline = now + 2_592_000_000;
     const broken = createCloudflareDatabase(async command => transport(command.action === 'commit' ? { ...command, writes: [...command.writes, { op: 'create', path: 'users/demo-expiry-collision', data: {} }] } : command));
     await expect(begin(token(undefined, deadline), { phoneE164: phone, requestId: 'demo-expiry-collision' }, broken, deadline)).rejects.toMatchObject({ code: 'DATA_EXISTS' });
+    expect(await durableSnapshot()).toEqual(before);
+  });
+  it('rejects expired-link revision overflow before begin changes any D1 documents, journals or revision', async () => {
+    const challenge = await proven();
+    const original = await confirm(token(), { challengeId: challenge.challengeId, requestId: 'demo-max-revision-confirm' }, db, now);
+    const linkRef = db.collection('platformWhatsAppLinks').doc('link_' + original.linkId), savedLink = (await linkRef.get()).data()!;
+    const phoneRef = db.collection('platformWhatsAppLinks').doc('phone_' + savedLink.phoneIndex), savedPhone = (await phoneRef.get()).data()!;
+    const maximalLink = { ...savedLink, revision: Number.MAX_SAFE_INTEGER }, maximalPhone = { ...savedPhone, linkRevision: Number.MAX_SAFE_INTEGER };
+    expect(isPlatformWhatsAppLinkRecord(maximalLink)).toBe(true);
+    expect(isPlatformWhatsAppLinkPhoneRecord(maximalPhone)).toBe(true);
+    await linkRef.set(maximalLink); await phoneRef.set(maximalPhone);
+    const owner = (await db.collection('platformWhatsAppLinks').where('ownerUid', '==', token().uid).limit(2).get()).docs[0].data();
+    expect(owner.revision).toBe(2); expect(owner.currentLinkId).toBe(original.linkId);
+    const before = await durableSnapshot(), deadline = original.expiresAt;
+    await expect(begin(token(undefined, deadline), { phoneE164: phone, requestId: 'demo-max-revision-begin' }, second, deadline)).rejects.toMatchObject({ status: 503, code: 'LINK_UNAVAILABLE' });
     expect(await durableSnapshot()).toEqual(before);
   });
   it('rejects malformed controls with unavailable configuration without any D1 mutation and retains configured deduplication', async () => {
