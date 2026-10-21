@@ -5,6 +5,47 @@ import { isPlatformWhatsAppEventRecord, isPlatformWhatsAppConversationRecord } f
 import { executeDataCommand } from '../src/data.ts';
 import { fixture, now, event, conversation, set, seed, get, read, scope, observeDatabase } from './platform-whatsapp-fixture.mjs';
 
+test('erases retained audio at original deadline and deletes exact terminal audio/choice metadata at equality', async context => {
+  const env = await fixture(context);
+  const audio = { ...event(), kind: 'incoming_audio', customerSentAt: null, ingressDisposition: 'descriptor_retained' };
+  const receivedAt = now - 2_592_000_000;
+  const denied = { ...event(receivedAt), kind: 'incoming_audio', customerSentAt: null, ingressDisposition: 'control_only', state: 'body_erased', content: null };
+  const choice = { ...denied, kind: 'incoming_choice' };
+  for (const row of [audio, denied, choice]) assert.equal(isPlatformWhatsAppEventRecord(row), true);
+  await seed(env, [set('platformWhatsAppEvents/audio', audio), set('platformWhatsAppEvents/denied', denied), set('platformWhatsAppEvents/choice', choice)]);
+  assert.deepEqual(await cleanupPlatformWhatsAppRetention(env, { now }), { clearedBodies: 1, deletedMetadata: 2, morePending: false });
+  assert.deepEqual(await get(env, 'platformWhatsAppEvents/audio'), { ...audio, state: 'body_erased', content: null });
+  assert.equal(await get(env, 'platformWhatsAppEvents/denied'), undefined); assert.equal(await get(env, 'platformWhatsAppEvents/choice'), undefined);
+});
+
+test('retains impossible choice ciphertext and counts malformed new variants without exposing fields', async context => {
+  const env = await fixture(context), invalid = { ...event(), kind: 'incoming_choice', customerSentAt: null, ingressDisposition: 'descriptor_retained' };
+  await seed(env, [set('platformWhatsAppEvents/invalid-choice', invalid)]);
+  const warnings = []; context.mock.method(console, 'warn', value => warnings.push(value));
+  assert.deepEqual(await cleanupPlatformWhatsAppRetention(env, { now }), { clearedBodies: 0, deletedMetadata: 0, morePending: true });
+  assert.deepEqual(warnings, [{ event: 'platform_whatsapp_retention_incomplete', invalidRecords: 1, failedPhases: 0 }]);
+  assert.deepEqual(await get(env, 'platformWhatsAppEvents/invalid-choice'), invalid);
+});
+
+test('bounds retained audio cleanup across two batches and replays an ambiguous original batch', async context => {
+  const env = await fixture(context);
+  const audio = { ...event(), kind: 'incoming_audio', customerSentAt: null, ingressDisposition: 'descriptor_retained' };
+  await seed(env, Array.from({ length: 51 }, (_, index) => set('platformWhatsAppEvents/audio_' + index.toString().padStart(2, '0'), audio)));
+  const database = env.SARIN_DB; let batches = 0, hideJournal = false;
+  const ambiguous = { ...env, SARIN_DB: {
+    prepare(sql) {
+      if (hideJournal && sql.startsWith('SELECT fingerprint')) { hideJournal = false; return { bind() { return { first: async () => { throw new Error('synthetic journal response lost'); } }; } }; }
+      return database.prepare(sql);
+    },
+    batch: async statements => { const result = await database.batch(statements); if (++batches === 3) { hideJournal = true; throw new Error('synthetic audio batch response lost'); } return result; },
+  } };
+  assert.deepEqual(await cleanupPlatformWhatsAppRetention(ambiguous, { now }), { clearedBodies: 50, deletedMetadata: 0, morePending: true });
+  assert.equal((await get(env, 'platformWhatsAppEvents/audio_50')).state, 'body_present');
+  assert.equal((await database.prepare('SELECT COUNT(*) AS n FROM app_commits').first()).n, 2);
+  assert.deepEqual(await cleanupPlatformWhatsAppRetention(env, { now }), { clearedBodies: 1, deletedMetadata: 0, morePending: false });
+  assert.deepEqual(await get(env, 'platformWhatsAppEvents/audio_50'), { ...audio, state: 'body_erased', content: null });
+});
+
 test('removes expired link request metadata at equality without erasing the persistent marker', async context => {
   const env = await fixture(context);
   const path = 'platformWhatsAppLinkChallenges/request_' + 'a'.repeat(64);

@@ -27,6 +27,20 @@ describe('platform domain on the real local Worker D1 fixture', () => {
     seen.length = 0; db = createCloudflareDatabase(transport); second = createCloudflareDatabase(transport);
   });
   afterEach(() => vi.unstubAllEnvs());
+  it.each(['descriptor', 'time', 'choice', 'kind'])('keeps terminal audio/choice aliases coherent and detects changed %s on real D1', async mutation => {
+    const { text: _text, ...base } = incoming();
+    const audio = { ...base, kind: 'incoming_audio', customerSentAt: now - 1, audio: { id: '123456789', link: 'https://api.ycloud.com/v2/whatsapp/media/download/123456789', sha256: Buffer.alloc(32, 7).toString('base64'), mimeType: 'audio/ogg; codecs=opus' } };
+    const choice = { ...base, kind: 'incoming_choice', customerSentAt: null, choiceId: 'sarinbot.menu.v1:human:12345678-1234-4234-8234-123456789abc' };
+    const first = mutation === 'choice' ? choice : audio;
+    const results = await Promise.all([ingest(first, configure(), db, now), ingest(first, configure(), second, now)]);
+    expect(results.map(result => result.outcome).sort()).toEqual(['duplicate', 'stored']);
+    const before = (await db.collection('platformWhatsAppEvents').get()).docs.find(doc => doc.data().recordType === 'event')!;
+    const changed = mutation === 'descriptor' ? { ...audio, audio: { ...audio.audio, link: audio.audio.link + '?sig=changed' } }
+      : mutation === 'time' ? { ...audio, customerSentAt: now } : mutation === 'choice' ? { ...choice, choiceId: choice.choiceId.replace('human', 'stop') } : choice;
+    expect((await ingest(changed, configure(), second, now + 1)).outcome).toBe('conflict');
+    expect((await db.collection('platformWhatsAppEvents').doc(before.id).get()).data()).toEqual(before.data());
+    expect((await db.collection('platformWhatsAppConversations').get()).size).toBe(0);
+  });
   it('permits the platform parents including link controls and rejects children, malformed paths and unrelated fields', async () => {
     for (const parent of ['platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppLinks', 'platformWhatsAppLinkChallenges']) {
       expect(isDataPath(parent, false)).toBe(true); expect(isDataPath(`${parent}/demo`, true)).toBe(true);

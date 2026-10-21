@@ -37,6 +37,15 @@ it('signed ordinary ingress persists once and exposes only received on replay', 
   expect([...store.rows.keys()].some(key => key.startsWith('platformWhatsAppConversations/'))).toBe(true);
   expect(store.rows.has('serverSettings/ycloud_retry_diagnostic')).toBe(false);
 });
+it.each(['audio', 'interactive'])('signed %s flows through the real reader into terminal control metadata without identity effects', async type => {
+  const message = { id: 'demo-a2-message', wabaId: scope.wabaId, from: '+12025550101', to: scope.phoneE164, type,
+    audio: { id: '123456789', link: 'https://api.ycloud.com/v2/whatsapp/media/download/123456789', sha256: Buffer.alloc(32, 7).toString('base64'), mime_type: 'audio/ogg' },
+    interactive: { type: 'button_reply', button_reply: { id: 'sarinbot.menu.v1:accept:12345678-1234-4234-8234-123456789abc', title: 'sarinbot.link.fake' } } };
+  const result = await POST(signed({ whatsappInboundMessage: message })); expect(result.status).toBe(200); expect(await result.json()).toEqual({ received: true });
+  const rows = [...store.rows.values()]; expect(rows.filter(row => row.recordType === 'event')).toEqual([expect.objectContaining({ kind: type === 'audio' ? 'incoming_audio' : 'incoming_choice', ingressDisposition: 'control_only', content: null })]);
+  expect(rows).toHaveLength(2); expect(admin.getUser).not.toHaveBeenCalled();
+  const before = structuredClone([...store.rows]); expect((await POST(signed({ whatsappInboundMessage: message }))).status).toBe(200); expect([...store.rows]).toEqual(before);
+});
 it('strict public MIME differs from admin JSON prefix parsing', async () => {
   const result = await POST(signed({}, { 'content-type': 'application/json-extra' })); expect(result.status).toBe(415); expect(admin.db).not.toHaveBeenCalled();
   const req = authorized('PATCH', { action: 'pause', expectedRevision: 0, requestId: 'demo-pause-http' }); req.headers.set('content-type', 'application/json-extra');

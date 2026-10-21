@@ -41,16 +41,20 @@ export interface PlatformWhatsAppConnectionRecord extends PlatformWhatsAppIdenti
   lastHumanEchoAt: number | null;
   lastDeliveryAt: null;
 }
-export type PlatformWhatsAppEventRecord = ExpiringMetadata & ContentState<'content'> & {
+export type PlatformWhatsAppEventRecord = ExpiringMetadata & {
   recordType: 'event';
   connectionRevision: number;
   conversationId: string;
-  kind: 'incoming_text' | 'human_echo';
   occurredAt: number;
   canonicalIdentity: string;
   fingerprint: string;
   bodyExpiresAt: number;
-};
+} & (
+  | (ContentState<'content'> & { kind: 'incoming_text'; customerSentAt?: number | null })
+  | (ContentState<'content'> & { kind: 'human_echo' })
+  | (ContentState<'content'> & { kind: 'incoming_audio'; customerSentAt: number | null; ingressDisposition: 'descriptor_retained' })
+  | { state: 'body_erased'; content: null; kind: 'incoming_audio' | 'incoming_choice'; customerSentAt: number | null; ingressDisposition: 'control_only' }
+);
 export interface PlatformWhatsAppAliasRecord extends ExpiringMetadata {
   recordType: 'alias';
   state: 'metadata';
@@ -136,9 +140,15 @@ export function isPlatformWhatsAppConnectionRecord(value: unknown): value is Pla
     && (value.providerConnection !== 'disconnected' || (value.paused && value.pausedReason === 'disconnected'));
 }
 export function isPlatformWhatsAppEventRecord(value: unknown): value is PlatformWhatsAppEventRecord {
-  return isMetadata(value) && hasExactKeys(value, [...metadataKeys, 'recordType', 'state', 'connectionRevision', 'conversationId', 'kind', 'occurredAt', 'canonicalIdentity', 'fingerprint', 'bodyExpiresAt', 'content'])
+  if (!isMetadata(value)) return false;
+  const newer = value.kind === 'incoming_audio' || value.kind === 'incoming_choice';
+  const timed = newer || (value.kind === 'incoming_text' && Object.hasOwn(value, 'customerSentAt'));
+  const keys = [...metadataKeys, 'recordType', 'state', 'connectionRevision', 'conversationId', 'kind', 'occurredAt', 'canonicalIdentity', 'fingerprint', 'bodyExpiresAt', 'content', ...timed ? ['customerSentAt'] : [], ...newer ? ['ingressDisposition'] : []];
+  return hasExactKeys(value, keys)
     && value.recordType === 'event' && hasContent(value, 'content') && isInteger(value.connectionRevision)
-    && isDigest(value.conversationId) && ['incoming_text', 'human_echo'].includes(value.kind as string)
+    && isDigest(value.conversationId) && ['incoming_text', 'human_echo', 'incoming_audio', 'incoming_choice'].includes(value.kind as string)
+    && (!timed || (isNullableInteger(value.customerSentAt) && (value.customerSentAt === null || (value.customerSentAt as number) <= value.receivedAt)))
+    && (!newer || (value.ingressDisposition === 'control_only' ? value.state === 'body_erased' && value.content === null : value.kind === 'incoming_audio' && value.ingressDisposition === 'descriptor_retained'))
     && isInteger(value.occurredAt) && isDigest(value.canonicalIdentity) && isDigest(value.fingerprint)
     && value.bodyExpiresAt === Math.min(value.occurredAt, value.receivedAt) + PLATFORM_BODY_TTL;
 }

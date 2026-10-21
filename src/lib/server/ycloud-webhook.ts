@@ -3,6 +3,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { HttpError } from '@/lib/server/http';
 import { readBoundedRequestBody } from '@/lib/server/read-bounded-body';
+import { validatePlatformAudioDescriptor, type AudioDescriptor } from '../../../shared/platform-whatsapp-audio';
+import { parsePlatformMenuChoice } from '../../../shared/platform-whatsapp-menu';
 
 export interface YCloudReaderScope { wabaId: string; phoneE164: string }
 export interface YCloudWebhookOptions { signingSecret: string; scope: YCloudReaderScope; now?: number }
@@ -16,7 +18,9 @@ interface NormalizedBase {
   whatsappMessageId: string | null;
 }
 export type NormalizedYCloudEvent = NormalizedBase & (
-  | { kind: 'incoming_text'; sourceEventType: 'whatsapp.inbound_message.received'; customerPhone: string; text: string }
+  | { kind: 'incoming_text'; sourceEventType: 'whatsapp.inbound_message.received'; customerPhone: string; customerSentAt: number | null; text: string }
+  | { kind: 'incoming_audio'; sourceEventType: 'whatsapp.inbound_message.received'; customerPhone: string; customerSentAt: number | null; audio: AudioDescriptor }
+  | { kind: 'incoming_choice'; sourceEventType: 'whatsapp.inbound_message.received'; customerPhone: string; customerSentAt: number | null; choiceId: string }
   | { kind: 'human_echo'; sourceEventType: 'whatsapp.smb.message.echoes' | 'whatsapp.smb.message.created'; customerPhone: string; messageType: string; text: string | null }
   | { kind: 'message_status'; sourceEventType: 'whatsapp.message.updated'; customerPhone: string | null; status: 'accepted' | 'sent' | 'delivered' | 'read' | 'failed' }
 );
@@ -28,6 +32,8 @@ const scopeSchema = z.object({ wabaId: wabaSchema, phoneE164: phoneSchema }).str
 const eventSchema = z.object({ id: idSchema, type: idSchema, apiVersion: z.string().min(1).max(32), createTime: z.iso.datetime({ offset: true }).max(40), whatsappInboundMessage: z.unknown().optional(), whatsappMessage: z.unknown().optional() });
 const messageSchema = z.object({ id: idSchema, wamid: z.string().min(1).max(1024).optional(), wabaId: wabaSchema, from: phoneSchema, to: phoneSchema });
 const textMessageSchema = messageSchema.extend({ type: z.string().min(1).max(64), text: z.unknown().optional() });
+const inboundSchema = textMessageSchema.extend({ sendTime: z.unknown().optional(), audio: z.unknown().optional(), interactive: z.unknown().optional() });
+const sendTimeSchema = z.iso.datetime({ offset: true }).max(40);
 const statusMessageSchema = messageSchema.partial({ wabaId: true, from: true, to: true }).extend({ status: z.string().min(1).max(64) });
 const textSchema = z.object({ body: z.string().min(1).max(4096) });
 const statusSchema = z.enum(['accepted', 'sent', 'delivered', 'read', 'failed']);
@@ -50,14 +56,29 @@ function verifySignature(bytes: Buffer, header: string | null, signingSecret: st
   const expected = createHmac('sha256', signingSecret).update(timestamp + '.').update(bytes).digest();
   if (!signatures.some((signature) => timingSafeEqual(expected, Buffer.from(signature.slice(2), 'hex')))) throw invalid();
 }
-function normalize(value: unknown, scope: YCloudReaderScope): NormalizedYCloudEvent | null {
+function normalize(value: unknown, scope: YCloudReaderScope, now: number): NormalizedYCloudEvent | null {
   const event = parseEvent(eventSchema, value);
   if (event.apiVersion !== 'v2') return null;
   const common = { provider: 'ycloud' as const, eventId: event.id, occurredAt: Date.parse(event.createTime), wabaId: scope.wabaId, businessPhone: scope.phoneE164 };
   if (event.type === 'whatsapp.inbound_message.received') {
-    const message = parseEvent(textMessageSchema, event.whatsappInboundMessage);
-    if (message.wabaId !== scope.wabaId || message.to !== scope.phoneE164 || message.from === scope.phoneE164 || message.type !== 'text') return null;
-    return { ...common, kind: 'incoming_text', sourceEventType: event.type, customerPhone: message.from, messageId: message.id, whatsappMessageId: message.wamid ?? null, text: parseEvent(textSchema, message.text).body };
+    const message = parseEvent(inboundSchema, event.whatsappInboundMessage);
+    if (message.wabaId !== scope.wabaId || message.to !== scope.phoneE164 || message.from === scope.phoneE164) return null;
+    const parsedTime = sendTimeSchema.safeParse(message.sendTime), time = parsedTime.success ? Date.parse(parsedTime.data) : NaN;
+    const inbound = { ...common, sourceEventType: event.type as 'whatsapp.inbound_message.received', customerPhone: message.from, messageId: message.id, whatsappMessageId: message.wamid ?? null,
+      customerSentAt: Number.isSafeInteger(time) && time >= 0 && time <= now ? time : null };
+    if (message.type === 'text') return { ...inbound, kind: 'incoming_text', text: parseEvent(textSchema, message.text).body };
+    if (message.type === 'audio') {
+      const raw = message.audio as Record<string, unknown> | null | undefined;
+      const audio = validatePlatformAudioDescriptor(raw && { id: raw.id, link: raw.link, sha256: raw.sha256, mimeType: raw.mime_type });
+      if (!audio) throw new HttpError(400, 'El evento de YCloud no es válido.');
+      return { ...inbound, kind: 'incoming_audio', audio };
+    }
+    if (message.type === 'interactive') {
+      const interactive = message.interactive as { type?: unknown; button_reply?: { id?: unknown } } | null | undefined;
+      const choiceId = interactive?.type === 'button_reply' ? interactive.button_reply?.id : null;
+      return parsePlatformMenuChoice(choiceId) ? { ...inbound, kind: 'incoming_choice', choiceId: choiceId as string } : null;
+    }
+    return null;
   }
   if (event.type === 'whatsapp.smb.message.echoes' || event.type === 'whatsapp.smb.message.created') {
     const message = parseEvent(textMessageSchema, event.whatsappMessage);
@@ -90,5 +111,5 @@ export async function readYCloudWebhook(request: Request, options: YCloudWebhook
   let value: unknown;
   try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)); }
   catch { throw new HttpError(400, 'JSON no válido.'); }
-  return normalize(value, scope.data);
+  return normalize(value, scope.data, now);
 }

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     requirePlatformWhatsAppReception(config);
     const event = await readYCloudWebhook(request, { signingSecret: config.signingSecret, scope: { wabaId: config.scope!.wabaId, phoneE164: config.scope!.phoneE164 } });
     if (event?.kind === 'incoming_text' && await verifyPlatformWhatsAppLinkInbound(event) !== 'not_control') return NextResponse.json({ received: true }, { headers });
-    if (event && (event.kind === 'incoming_text' || event.kind === 'human_echo')) await ingestPlatformWhatsAppEvent(event, config, getAdminDb());
+    if (event && event.kind !== 'message_status') await ingestPlatformWhatsAppEvent(event, config, getAdminDb());
     return NextResponse.json({ received: true }, { headers });
   } catch (error) { return apiError(error); }
 }

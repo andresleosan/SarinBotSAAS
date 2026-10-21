@@ -9,6 +9,41 @@ beforeEach(configure); afterEach(() => vi.unstubAllEnvs());
 const events = (store: ReturnType<typeof memoryStore>) => [...store.rows].filter(([path]) => path.startsWith('platformWhatsAppEvents/'));
 const canonicals = (store: ReturnType<typeof memoryStore>) => events(store).filter(([, row]) => row.recordType === 'event');
 describe('authenticated normalized platform ingress', () => {
+  it('stores recognized choices as terminal control only with no conversation or raw action', async () => {
+    const store = memoryStore(), { text: _text, ...base } = incoming();
+    const choice = { ...base, kind: 'incoming_choice', choiceId: 'sarinbot.menu.v1:accept:12345678-1234-4234-8234-123456789abc', customerSentAt: now - 1 };
+    expect((await ingest(choice, configure(), store.db, now)).outcome).toBe('stored');
+    expect(canonicals(store)[0][1]).toMatchObject({ kind: 'incoming_choice', ingressDisposition: 'control_only', state: 'body_erased', content: null, customerSentAt: now - 1 });
+    expect(store.rows.size).toBe(3); expect(JSON.stringify([...store.rows])).not.toContain('accept');
+    const before = structuredClone([...store.rows]); expect((await ingest(choice, configure(), store.db, now + 1)).outcome).toBe('duplicate'); expect([...store.rows]).toEqual(before);
+    expect((await ingest({ ...choice, choiceId: choice.choiceId.replace('accept', 'human') }, configure(), store.db, now + 2)).outcome).toBe('conflict');
+    expect([...store.rows.keys()].some(path => path.startsWith('platformWhatsAppConversations/'))).toBe(false);
+  });
+  it('never fills legacy canonical customer time and conflicts on changed new canonical evidence', async () => {
+    const store = memoryStore(), config = configure(); await ingest(incoming(), config, store.db, now);
+    expect((await ingest(incoming({ customerSentAt: now - 1 }), config, store.db, now + 1)).outcome).toBe('duplicate');
+    expect(canonicals(store)[0][1]).not.toHaveProperty('customerSentAt');
+    const fresh = incoming({ eventId: 'demo-new-timed', messageId: 'demo-new-timed', whatsappMessageId: null, customerSentAt: now - 1 });
+    await ingest(fresh, config, store.db, now);
+    expect((await ingest({ ...fresh, customerSentAt: now }, config, store.db, now + 1)).outcome).toBe('conflict');
+    expect(canonicals(store).find(([, row]) => Object.hasOwn(row, 'customerSentAt'))![1].customerSentAt).toBe(now - 1);
+  });
+  it('rejects cross-kind reuse without retaining a descriptor or fabricating a denied contact', async () => {
+    const store = memoryStore(), config = configure(); await ingest(incoming(), config, store.db, now);
+    const { text: _text, ...base } = incoming();
+    const choice = { ...base, kind: 'incoming_choice', choiceId: 'sarinbot.menu.v1:stop:12345678-1234-4234-8234-123456789abc', customerSentAt: null, customerPhone: '+12025550102' };
+    const result = await ingest(choice, config, store.db, now + 1); expect(result.outcome).toBe('conflict');
+    expect(store.rows.has('platformWhatsAppConversations/' + result.conversationId)).toBe(false); expect(canonicals(store)).toHaveLength(1);
+  });
+  it('keeps new choice conflicts from changing a related conversation in another scope', async () => {
+    const store = memoryStore(), config = configure(); const first = await ingest(incoming(), config, store.db, now);
+    const path = 'platformWhatsAppConversations/' + first.conversationId, before = structuredClone(store.rows.get(path));
+    store.rows.delete(connectionPath); const { text: _text, ...base } = incoming();
+    const other = { ...config, scope: { ...scope, wabaId: '99999' } };
+    expect((await ingest({ ...base, wabaId: '99999', kind: 'incoming_choice', customerSentAt: null, choiceId: 'sarinbot.menu.v1:stop:12345678-1234-4234-8234-123456789abc' }, other, store.db, now + 1)).outcome).toBe('conflict');
+    expect(store.rows.get(path)).toEqual(before);
+    expect([...store.rows.keys()].filter(path => path.startsWith('platformWhatsAppConversations/'))).toHaveLength(1);
+  });
   it('stores unverified ingress atomically with separate path-bound ciphertext and no raw identifiers', async () => {
     const store = memoryStore(), result = await ingest(incoming(), configure(), store.db, now);
     expect(result.outcome).toBe('stored'); expect(result.conversationId).toMatch(/^[a-f0-9]{64}$/);

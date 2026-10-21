@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import type { DecodedIdToken, UserRecord } from 'firebase-admin/auth';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import type { Database, Transaction } from '@/lib/storage/types';
+import { StorageError } from '@/lib/storage/database';
 import type { ConsentAnchor, PlatformActor } from '../../../shared/platform-whatsapp-authorization';
 import {
   LINK_TTL, LINK_CHALLENGE_TTL, LINK_ISSUE_TTL, LINK_UUID,
@@ -21,7 +22,7 @@ import { readVerifiedConsentAnchor } from './consent';
 import type { NormalizedYCloudEvent } from './ycloud-webhook';
 import { HttpError } from './http';
 
-type IncomingText = Extract<NormalizedYCloudEvent, { kind: 'incoming_text' }>;
+type IncomingText = Omit<Extract<NormalizedYCloudEvent, { kind: 'incoming_text' }>, 'customerSentAt'> & { customerSentAt?: number | null };
 import type { PlatformWhatsAppLinkStatus } from '@/types/platform-whatsapp-link';
 export type { PlatformWhatsAppLinkStatus } from '@/types/platform-whatsapp-link';
 const links = 'platformWhatsAppLinks', challenges = 'platformWhatsAppLinkChallenges';
@@ -338,4 +339,67 @@ export async function assertPlatformWhatsAppAuthorization(actor: PlatformActor, 
     throw new HttpError(403, 'La automatización no está autorizada.', 'LINK_AUTHORIZATION_DENIED');
   };
   if (tx) await check(tx); else await db.runTransaction(check);
+}
+
+/** Ephemeral read facts authorize encrypted descriptor retention only. */
+export interface AudioRetentionIdentity {
+  uid: string;
+  confirmedAuthTime: number;
+  linkId: string;
+  linkRevision: number;
+  account: ConsentAnchor;
+  support: ConsentAnchor;
+  conversationId: string;
+}
+async function audioRetentionFacts(customerPhone: string, scope: PlatformWhatsAppScope, tx: Transaction, db: Database, config: Config, now: number): Promise<AudioRetentionIdentity | null> {
+  if (!samePlatformWhatsAppScope(config.scope, scope) || !PLATFORM_PHONE_PATTERN.test(customerPhone) || customerPhone === scope.phoneE164) return null;
+  const marker = await readMarkerState(tx, db, config);
+  if (marker !== 'matching') {
+    // Missing bootstrap is a known absence; a nonempty/malformed marker is corruption.
+    if (marker === 'unavailable') throw unavailable();
+    return null;
+  }
+  const phoneIndex = config.digest('link-phone-v1', [customerPhone]);
+  const phone = await read(tx, db, links, 'phone_' + phoneIndex, isPlatformWhatsAppLinkPhoneRecord);
+  if (!phone) return null;
+  if (phone.phoneIndex !== phoneIndex || !samePlatformWhatsAppScope(phone, scope)) throw unavailable();
+  const owner = await read(tx, db, links, 'uid_' + phone.uidIndex, isPlatformWhatsAppLinkUidRecord);
+  if (!owner || owner.uidIndex !== phone.uidIndex || !samePlatformWhatsAppScope(owner, scope) || config.digest('link-uid-v1', [owner.ownerUid]) !== phone.uidIndex) throw unavailable();
+  if ((await ownerLookup(tx, db, owner.ownerUid))?.uidIndex !== owner.uidIndex) throw unavailable();
+  const facts = await readOwner(tx, db, owner, now);
+  if (!facts.current || phone.expiresAt <= now) return null;
+  const link = facts.current, conversationId = conversation(config, customerPhone);
+  if (owner.currentLinkId !== phone.linkId || link.phoneIndex !== phoneIndex || link.revision !== phone.linkRevision || link.conversationId !== conversationId) throw unavailable();
+  let consent: Awaited<ReturnType<typeof anchors>>;
+  try { consent = await anchors(tx, db, owner.ownerUid); }
+  catch (error) { if (error instanceof HttpError && error.code === 'CONSENT_REQUIRED') return null; throw error; }
+  if (!sameAnchors(link, consent)) return null;
+  const conv = (await tx.get(db.collection('platformWhatsAppConversations').doc(conversationId))).data();
+  if (conv !== undefined && (!isPlatformWhatsAppConversationRecord(conv) || !samePlatformWhatsAppScope(conv, scope))) throw unavailable();
+  return { uid: owner.ownerUid, confirmedAuthTime: link.confirmedAuthTime, linkId: phone.linkId, linkRevision: link.revision, account: { ...consent.account }, support: { ...consent.support }, conversationId };
+}
+export async function preparePlatformWhatsAppAudioRetentionIdentity(customerPhone: string, scope: PlatformWhatsAppScope, db: Database = getAdminDb(), now = Date.now()): Promise<AudioRetentionIdentity | null> {
+  assertPlatformWhatsAppNow(now); const config = configuration(); if (!config) return null;
+  try {
+    const prepared = await db.runTransaction(tx => audioRetentionFacts(customerPhone, scope, tx, db, config, now));
+    if (!prepared) return null;
+    // Firebase must stay outside every caller/storage callback. D1 and Firebase are not atomic.
+    checkCutoff(await currentUser(prepared.uid), authTime(prepared.confirmedAuthTime, now, false));
+    return prepared;
+  } catch (error) {
+    if (error instanceof HttpError && error.code === 'LINK_AUTH_REQUIRED') return null;
+    throw unavailable();
+  }
+}
+export async function readPlatformWhatsAppAudioRetentionIdentityInTransaction(prepared: AudioRetentionIdentity, customerPhone: string, scope: PlatformWhatsAppScope, tx: Transaction, db: Database, now: number): Promise<AudioRetentionIdentity | null> {
+  assertPlatformWhatsAppNow(now); const config = configuration(); if (!config) return null;
+  try {
+    const current = await audioRetentionFacts(customerPhone, scope, tx, db, config, now);
+    return current && current.uid === prepared.uid && current.confirmedAuthTime === prepared.confirmedAuthTime && current.linkId === prepared.linkId
+      && current.linkRevision === prepared.linkRevision && current.conversationId === prepared.conversationId && sameAnchors(current, prepared) ? current : null;
+  } catch (error) {
+    // The supplied Database owns snapshot/CAS retries; do not disguise its retry signal.
+    if (error instanceof StorageError && error.code === 'DATA_CONFLICT') throw error;
+    throw unavailable();
+  }
 }

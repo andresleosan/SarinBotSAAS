@@ -146,7 +146,7 @@ describe('public diagnostic precedence and ordinary dispatch', () => {
     expect(mocks.reader).toHaveBeenCalledWith(req, { signingSecret: normal.signingSecret, scope: { wabaId: '10001', phoneE164: '+12025550100' } });
     expect(mocks.database).not.toHaveBeenCalled(); expect(mocks.ingress).not.toHaveBeenCalled();
   });
-  it.each(['incoming_text', 'human_echo'])('dispatches%s only after signed reader and hides outcome', async kind => {
+  it.each(['incoming_text', 'human_echo', 'incoming_audio', 'incoming_choice'])('dispatches%s only after signed reader and hides outcome', async kind => {
     const event = { kind }; mocks.reader.mockResolvedValue(event);
     for (const outcome of ['stored', 'duplicate', 'conflict']) {
       mocks.ingress.mockResolvedValue({ outcome }); await response(await webhook.POST(request()), 200, { received: true });
@@ -183,11 +183,11 @@ describe('signed control dispatch boundary', () => {
     expect(mocks.reader.mock.invocationCallOrder[0]).toBeLessThan(mocks.linkVerifier.mock.invocationCallOrder[0]);
     expect(mocks.linkVerifier.mock.invocationCallOrder[0]).toBeLessThan(mocks.database.mock.invocationCallOrder[0]);
   });
-  it.each([null, { kind: 'message_status' }, { kind: 'human_echo' }])('never verifies non-incoming event %j', async (event) => {
+  it.each([null, { kind: 'message_status' }, { kind: 'human_echo' }, { kind: 'incoming_audio' }, { kind: 'incoming_choice' }])('never verifies non-incoming event %j', async (event) => {
     mocks.reader.mockResolvedValue(event);
     await response(await webhook.POST(request()), 200, { received: true });
     expect(mocks.linkVerifier).not.toHaveBeenCalled();
-    if (event?.kind === 'human_echo')
+    if (event && ['human_echo', 'incoming_audio', 'incoming_choice'].includes(event.kind))
       expect(mocks.ingress).toHaveBeenCalledExactlyOnceWith(event, normal, db);
     else
       expect(mocks.database).not.toHaveBeenCalled();

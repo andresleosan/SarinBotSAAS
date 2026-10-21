@@ -13,6 +13,23 @@ const control = () => ({ ...metadata, recordType: 'control', state: 'connection_
 const conversation = () => ({ ...identity, recordType: 'conversation', state: 'body_present', mode: 'human', revision: 0, updatedAt: 0, lastInboundAt: null, lastHumanAt: null, bodyExpiresAt: 86401000, expiresAt: 0, previewOccurredAt: 1000, previewReceivedAt: 2000, canonicalIdentity: digest, contactContent: { ...cipher }, conflictAt: null });
 
 describe('frozen platform record contracts', () => {
+  it('accepts exact new inbound time keys while preserving legacy and echo shapes', () => {
+    for (const customerSentAt of [null, 0, 2000]) expect(eventGuard({ ...event(), customerSentAt })).toBe(true);
+    for (const customerSentAt of [-1, 1.5, 2001, undefined, '0']) expect(eventGuard({ ...event(), customerSentAt })).toBe(false);
+    expect(eventGuard({ ...event(), kind: 'human_echo', customerSentAt: null })).toBe(false);
+    expect(eventGuard({ ...event(), customerSentAt: null, extra: true })).toBe(false);
+  });
+  it('admits only bounded exact audio/choice disposition and ciphertext combinations', () => {
+    const base = { ...event(), kind: 'incoming_audio', customerSentAt: null, ingressDisposition: 'descriptor_retained' };
+    expect(eventGuard(base)).toBe(true); expect(eventGuard({ ...base, state: 'body_erased', content: null })).toBe(true);
+    expect(eventGuard({ ...base, ingressDisposition: 'control_only' })).toBe(false);
+    const denied = { ...base, state: 'body_erased', content: null, ingressDisposition: 'control_only' };
+    expect(eventGuard(denied)).toBe(true); expect(eventGuard({ ...denied, kind: 'incoming_choice' })).toBe(true);
+    expect(eventGuard({ ...base, kind: 'incoming_choice' })).toBe(false);
+    expect(eventGuard({ ...denied, customerSentAt: undefined })).toBe(false);
+    expect(eventGuard({ ...denied, audio: {} })).toBe(false);
+    expect(eventGuard({ ...event(), ingressDisposition: 'control_only' })).toBe(false);
+  });
   it('exposes the retained structural scope/ciphertext guards', () => {
     expect(isPlatformWhatsAppScope(identity)).toBe(true);
     expect(isPlatformWhatsAppScope({ ...identity, phoneNumberId: undefined })).toBe(false);

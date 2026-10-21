@@ -9,6 +9,9 @@ import { beginPlatformWhatsAppLink as begin, verifyPlatformWhatsAppLinkInbound a
 import { configureLink, token, phone, seedConsents } from './platform-whatsapp-link-fixtures';
 import { incoming, now } from './platform-whatsapp-test-fixtures';
 import { isPlatformWhatsAppLinkRecord, isPlatformWhatsAppLinkPhoneRecord, isPlatformWhatsAppLinkChallengeRecord } from '../shared/platform-whatsapp-link-records';
+import { ingestPlatformWhatsAppEvent as ingest } from '@/lib/server/platform-whatsapp-ingress';
+import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config';
+import { applyPlatformWhatsAppConnectionControl as connectionControl } from '@/lib/server/platform-whatsapp-store';
 
 describe('link ownership on actual local D1 with deterministic commit interleaving', () => {
   let runtime: Awaited<ReturnType<typeof createDataTestRuntime>>, db: Database, second: Database;
@@ -27,6 +30,54 @@ describe('link ownership on actual local D1 with deterministic commit interleavi
       revision: await runtime.db.prepare('SELECT revision FROM app_revision WHERE id=1').first(),
     };
   }
+  const descriptor = { id: '123456789', link: 'https://api.ycloud.com/v2/whatsapp/media/download/123456789?sig=synthetic', sha256: Buffer.alloc(32, 7).toString('base64'), mimeType: 'audio/ogg; codecs=opus' };
+  function audio(patch = {}) { const { text: _text, ...base } = incoming(); return { ...base, kind: 'incoming_audio', customerSentAt: now - 1, audio: descriptor, ...patch }; }
+  async function linkedAudio() { const c = await proven(); return confirm(token(), { challengeId: c.challengeId, requestId: 'demo-audio-confirm' }, db, now); }
+  const canonicalAudio = async () => (await db.collection('platformWhatsAppEvents').get()).docs.find(doc => doc.data().recordType === 'event')!;
+  it('serializes two real handles for authorized audio dedup and immutable aliases', async () => {
+    await linkedAudio();
+    const results = await Promise.all([ingest(audio(), getPlatformWhatsAppConfig(), db, now), ingest(audio(), getPlatformWhatsAppConfig(), second, now)]);
+    expect(results.map(result => result.outcome).sort()).toEqual(['duplicate', 'stored']);
+    const original = (await canonicalAudio()).data(); expect(original).toMatchObject({ ingressDisposition: 'descriptor_retained', state: 'body_present' });
+    await ingest(audio({ eventId: 'demo-audio-alias' }), getPlatformWhatsAppConfig(), second, now + 1);
+    const rows = (await db.collection('platformWhatsAppEvents').get()).docs.map(doc => doc.data());
+    expect(rows.filter(row => row.recordType === 'event')).toHaveLength(1); expect(rows.filter(row => row.recordType === 'alias')).toHaveLength(3);
+    expect(rows.every(row => row.receivedAt === now && row.expiresAt === original.expiresAt && row.bodyExpiresAt === original.bodyExpiresAt)).toBe(true);
+  });
+  it('retries a real D1 revision conflict arising inside the supplied-TX retention read', async () => {
+    await linkedAudio(); let markers = 0, injected = false;
+    const racing = createCloudflareDatabase(async command => {
+      if (command.action === 'read' && command.read.kind === 'document' && command.read.path.startsWith('serverSettings/platform_whatsapp_link_key_') && ++markers === 2) {
+        injected = true; await second.collection('users').doc('demo-audio-midread').set({ sentinel: true });
+      }
+      return transport(command);
+    });
+    expect((await ingest(audio(), getPlatformWhatsAppConfig(), racing, now)).outcome).toBe('stored'); expect(injected).toBe(true);
+    expect((await canonicalAudio()).data()).toMatchObject({ ingressDisposition: 'descriptor_retained' });
+    expect((await db.collection('platformWhatsAppConversations').get()).size).toBe(1);
+  });
+  it.each(['revoke', 'reaccept', 'pause'] as const)('%s winning a deterministic D1 barrier prevents old-snapshot descriptor persistence', async effect => {
+    await linkedAudio(); const generation = (await status(token(), db, now)).revokeGeneration;
+    const racing = race(() => effect === 'revoke' ? revoke(token(), 'revoke_v1_' + generation + '_' + randomUUID(), second, now)
+      : effect === 'reaccept' ? seedConsents(second, token().uid, 2) : connectionControl({ action: 'pause', expectedRevision: 0, requestId: 'demo-audio-pause' }, 'demo-admin', second, now));
+    if (effect === 'pause') await expect(ingest(audio(), getPlatformWhatsAppConfig(), racing, now)).rejects.toMatchObject({ status: 503 });
+    else { await ingest(audio(), getPlatformWhatsAppConfig(), racing, now); expect((await canonicalAudio()).data()).toMatchObject({ ingressDisposition: 'control_only', state: 'body_erased', content: null }); }
+    expect((await db.collection('platformWhatsAppConversations').get()).size).toBe(0);
+  });
+  it('does not reopen denied audio through fresh handles after a real link is created', async () => {
+    await ingest(audio(), getPlatformWhatsAppConfig(), db, now); const first = (await canonicalAudio()).data(); await linkedAudio();
+    expect((await ingest(audio(), getPlatformWhatsAppConfig(), createCloudflareDatabase(transport), now + 1)).outcome).toBe('duplicate');
+    expect((await canonicalAudio()).data()).toEqual(first); expect((await db.collection('platformWhatsAppConversations').get()).size).toBe(0);
+  });
+  it('retries a lost audio response with identical ciphertext and UUID and rolls back a late write collision', async () => {
+    await linkedAudio(); let dropped = false; const commits: DataCommand[] = [];
+    const ambiguous = createCloudflareDatabase(async command => { if (command.action === 'commit') commits.push(structuredClone(command)); const result = await transport(command); if (command.action === 'commit' && !dropped) { dropped = true; throw new Error('synthetic lost audio response'); } return result; });
+    await ingest(audio(), getPlatformWhatsAppConfig(), ambiguous, now); expect(commits).toHaveLength(2); expect(commits[0]).toEqual(commits[1]);
+    await db.collection('users').doc('demo-audio-collision').set({ sentinel: true }); const before = await durableSnapshot();
+    const broken = createCloudflareDatabase(async command => transport(command.action === 'commit' ? { ...command, writes: [...command.writes, { op: 'create', path: 'users/demo-audio-collision', data: {} }] } : command));
+    await expect(ingest(audio({ eventId: 'demo-audio-second', messageId: 'demo-audio-second', whatsappMessageId: null }), getPlatformWhatsAppConfig(), broken, now)).rejects.toMatchObject({ code: 'DATA_EXISTS' });
+    expect(await durableSnapshot()).toEqual(before);
+  });
   it.each([false, true])('reclaims an expired phone before cleanup after its former owner begins again (different UID: %j)', async differentUid => {
     const first = await proven(), original = await confirm(token(), { challengeId: first.challengeId, requestId: 'demo-original-confirm' }, db, now);
     const oldPath = db.collection('platformWhatsAppLinks').doc('link_' + original.linkId), old = (await oldPath.get()).data()!;

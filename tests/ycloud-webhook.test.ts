@@ -20,9 +20,43 @@ async function fails(promise: Promise<unknown>, status: number, message?: string
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('YCloud authenticated normalization', () => {
+  it('A2 normalizes signed audio without text coercion', async () => {
+    const audio = { id: '123456789', link: 'https://api.ycloud.com/v2/whatsapp/media/download/123456789?sig=synthetic', sha256: Buffer.alloc(32, 7).toString('base64'), mime_type: 'audio/ogg' };
+    const value = { ...envelope(), whatsappInboundMessage: { ...message(), type: 'audio', text: undefined, audio } };
+    expect(await read(request(value), options)).toMatchObject({ kind: 'incoming_audio', customerPhone: '+15550000002', customerSentAt: null, audio: { id: audio.id, link: audio.link, sha256: audio.sha256, mimeType: 'audio/ogg; codecs=opus' } });
+  });
+  it('A2 preserves original customer sendTime independently of event createTime', async () => {
+    const value = { ...envelope(), whatsappInboundMessage: { ...message(), sendTime: '2023-11-14T17:13:19-05:00' } };
+    expect(await read(request(value), options)).toMatchObject({ kind: 'incoming_text', occurredAt: 1577836800000, customerSentAt: 1699999999000 });
+  });
+  it.each([undefined, null, '', '2023-11-14', '2023-11-14T22:13Z', '2023-02-31T22:13:19Z', '2023-11-14T22:13:20.001Z', 1699999999000])('uses null for missing, invalid or future customer time %j', async sendTime => {
+    expect(await read(request({ ...envelope(), whatsappInboundMessage: { ...message(), sendTime } }), options)).toMatchObject({ customerSentAt: null });
+  });
+  it('accepts an old or equality customer time without substituting the event clock', async () => {
+    for (const [sendTime, expected] of [['2020-01-01T00:00:00Z', 1577836800000], ['2023-11-14T22:13:20Z', options.now]] as const) {
+      expect(await read(request({ ...envelope(), whatsappInboundMessage: { ...message(), sendTime } }), options)).toMatchObject({ customerSentAt: expected });
+    }
+  });
+  it('normalizes only recognized button IDs, ignoring visible title and context', async () => {
+    const choiceId = 'sarinbot.menu.v1:accept:12345678-1234-4234-8234-123456789abc';
+    const base = { ...message(), type: 'interactive', text: undefined, interactive: { type: 'button_reply', button_reply: { id: choiceId, title: 'sarinbot.link.fake' } }, context: { forged: true } };
+    const result = await read(request({ ...envelope(), whatsappInboundMessage: base }), options);
+    expect(result).toMatchObject({ kind: 'incoming_choice', choiceId, customerSentAt: null }); expect(result).not.toHaveProperty('text'); expect(result).not.toHaveProperty('context');
+    for (const id of ['foreign', 'Aceptar', choiceId + '\n', 'sarinbot.menu.v2:accept:12345678-1234-4234-8234-123456789abc']) {
+      expect(await read(request({ ...envelope(), whatsappInboundMessage: { ...base, interactive: { type: 'button_reply', button_reply: { id, title: 'Aceptar' } } } }), options)).toBeNull();
+    }
+    expect(await read(request({ ...envelope(), whatsappInboundMessage: { ...base, interactive: { type: 'list_reply', button_reply: { id: choiceId } } } }), options)).toBeNull();
+  });
+  it('rejects malformed local audio only after filtering foreign and self scope', async () => {
+    const base = { ...message(), type: 'audio', audio: { id: 'bad' }, text: undefined };
+    await fails(read(request({ ...envelope(), whatsappInboundMessage: base }), options), 400);
+    for (const change of [{ wabaId: '99999' }, { to: '+15550000003' }, { from: options.scope.phoneE164 }]) {
+      expect(await read(request({ ...envelope(), whatsappInboundMessage: { ...base, ...change } }), options)).toBeNull();
+    }
+  });
   it('normalizes only public fields and does not apply signature freshness to event time', async () => {
     const value = { ...envelope(), extra: 'stripped', whatsappInboundMessage: { ...message(), extra: 'stripped', text: { body: '  \n', ignored: true } } };
-    expect(await read(request(value), options)).toEqual({ provider: 'ycloud', eventId: 'synthetic-event', occurredAt: 1577836800000, wabaId: '12345', businessPhone: '+15550000001', kind: 'incoming_text', sourceEventType: incomingType, customerPhone: '+15550000002', messageId: 'synthetic-message', whatsappMessageId: null, text: '  \n' });
+    expect(await read(request(value), options)).toEqual({ provider: 'ycloud', eventId: 'synthetic-event', occurredAt: 1577836800000, wabaId: '12345', businessPhone: '+15550000001', kind: 'incoming_text', sourceEventType: incomingType, customerSentAt: null, customerPhone: '+15550000002', messageId: 'synthetic-message', whatsappMessageId: null, text: '  \n' });
     expect(await read(request({ ...value, createTime: '2099-01-01T00:00:00+01:00' }), options)).toMatchObject({ occurredAt: 4070905200000 });
   });
   it.each([{ scope: { ...options.scope, phoneNumberId: '67890' } }, { scope: { ...options.scope, wabaId: '12345\n' } }, { scope: { ...options.scope, phoneE164: '+15550000001\n' } }, { signingSecret: '' }, { signingSecret: ' ' }, { signingSecret: 'a'.repeat(4097) }, { now: -1 }, { now: 1.5 }, { now: Number.MAX_SAFE_INTEGER + 1 }])('validates reader options before body or headers: %j', async (changes) => {
@@ -100,7 +134,7 @@ describe('YCloud authenticated normalization', () => {
     for (const changes of [{ id: '' }, { id: 'has space' }, { id: 'x'.repeat(257) }, { type: 'bad\n' }, { apiVersion: '' }, { apiVersion: 'v'.repeat(33) }, { createTime: '2020-01-01' }, { createTime: '2020-02-31T00:00:00Z' }]) await fails(read(request({ ...envelope('ignored'), ...changes }), options), 400, 'El evento de YCloud no es válido.');
   });
   it('filters valid inbound direction, scope, self and non-text before text parsing', async () => {
-    for (const changes of [{ wabaId: '99999' }, { to: '+15550000003' }, { from: '+15550000001' }, { type: 'audio' }]) expect(await read(request({ ...envelope(), whatsappInboundMessage: { ...message(), ...changes, text: null } }), options)).toBeNull();
+    for (const changes of [{ wabaId: '99999' }, { to: '+15550000003' }, { from: '+15550000001' }, { type: 'image' }]) expect(await read(request({ ...envelope(), whatsappInboundMessage: { ...message(), ...changes, text: null } }), options)).toBeNull();
     await fails(read(request({ ...envelope(), whatsappInboundMessage: { ...message(), wabaId: 'bad' } }), options), 400);
   });
   it('preserves frozen Zod codepoint limits and optional wamid', async () => {
