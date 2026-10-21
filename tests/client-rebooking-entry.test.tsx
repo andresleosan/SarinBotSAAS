@@ -70,7 +70,7 @@ it('starts a fresh calendar case with current catalog data and no historical boo
   expect(text(field('Detalles del servicio'))).toContain('42.000 COP');
   expect(text(field('Detalles del servicio'))).toContain('40 minutos');
   expect(caseIds().at(-1)).not.toBe(before);
-  expect(renderer!.root.findAllByProps({ 'aria-pressed': true }).map(text)).not.toContain('Hablar con Sarin');
+  expect(renderer!.root.findAllByProps({ 'aria-pressed': true }).map(text)).not.toContain('Hablar con SarinBot');
   expect(vi.mocked(apiFetch).mock.calls.every(([path, init]) => (path.startsWith('/api/booking-subject-consent?') || path.endsWith('/waitlist')) && !init?.method)).toBe(true);
 });
 
@@ -156,7 +156,7 @@ it('preserves an uncertain structured confirmation and its exact retry while reb
 
 it.each(['waiting', 'generating', 'confirming', 'uncertain'])('preserves the chat operation while %s and starts the calendar only after unlocking', async lock => {
   await render(); const retained = history().props.onRebook;
-  await act(async () => button('Hablar con Sarin').props.onClick());
+  await act(async () => button('Hablar con SarinBot').props.onClick());
   state.chatLock = lock; await update();
   expect(history().props.rebookingEnabled).toBe(false);
   await act(async () => retained('haircut'));

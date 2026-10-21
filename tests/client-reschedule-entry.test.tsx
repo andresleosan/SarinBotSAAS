@@ -53,7 +53,7 @@ it('allows an exhausted paid trial schedule change while fresh rebooking stays p
 it.each(['account', 'consent', 'ready', 'local-action', 'chat'])('blocks a retained entry after the current %s gate closes', async gate => {
   await mount(); const retained = history().props.onReschedule;
   if (gate === 'local-action') await act(async () => history().props.onActionLockChange(true));
-  else if (gate === 'chat') { await act(async () => button('Hablar con Sarin').props.onClick()); state.chatLock = true; await update(); }
+  else if (gate === 'chat') { await act(async () => button('Hablar con SarinBot').props.onClick()); state.chatLock = true; await update(); }
   else { state[gate as 'account' | 'consent' | 'ready'] = false; await update(); }
   await act(async () => retained(source)); expect(renderer!.root.findAllByType(AppointmentReschedule)).toHaveLength(0);
 });
