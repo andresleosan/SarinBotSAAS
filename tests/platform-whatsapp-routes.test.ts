@@ -9,7 +9,7 @@ import * as webhook from '@/app/api/whatsapp/ycloud/platform/webhook/route';
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(), database: vi.fn(), status: vi.fn(), connection: vi.fn(), list: vi.fn(), control: vi.fn(),
   config: vi.fn(), observer: vi.fn(), summary: vi.fn(), close: vi.fn(), arm: vi.fn(), observe: vi.fn(),
-  normalConfig: vi.fn(), guard: vi.fn(), reader: vi.fn(), ingress: vi.fn(),
+  normalConfig: vi.fn(), guard: vi.fn(), reader: vi.fn(), ingress: vi.fn(), linkVerifier: vi.fn(),
 }));
 // Keep real requireSuperadmin/readJson/apiError and real R3a schemas; isolate only external/domain effects.
 vi.mock('@/lib/firebase/admin', () => ({ getAdminAuth: () => ({ verifyIdToken: mocks.verify }), getAdminDb: mocks.database }));
@@ -19,6 +19,7 @@ vi.mock('@/lib/server/ycloud-retry-diagnostic', () => ({ getYCloudRetryDiagnosti
 vi.mock('@/lib/server/platform-whatsapp-config', () => ({ getPlatformWhatsAppConfig: mocks.normalConfig, requirePlatformWhatsAppReception: mocks.guard }));
 vi.mock('@/lib/server/ycloud-webhook', () => ({ readYCloudWebhook: mocks.reader }));
 vi.mock('@/lib/server/platform-whatsapp-ingress', () => ({ ingestPlatformWhatsAppEvent: mocks.ingress }));
+vi.mock('@/lib/server/platform-whatsapp-link', () => ({ verifyPlatformWhatsAppLinkInbound: mocks.linkVerifier }));
 
 const db = { synthetic: true };
 const normal = { scope: { wabaId: '10001', phoneE164: '+12025550100', phoneNumberId: '20001' }, signingSecret: 'demo-only-secret' };
@@ -39,7 +40,7 @@ beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv('SUPERADMIN_UID', 'demo-admin');
   mocks.verify.mockResolvedValue({ uid: 'demo-admin' }); mocks.database.mockReturnValue(db);
   mocks.status.mockResolvedValue(statusBody); mocks.connection.mockResolvedValue(statusBody); mocks.list.mockResolvedValue(listBody); mocks.control.mockResolvedValue(view);
-  mocks.config.mockReturnValue(null); mocks.normalConfig.mockReturnValue(normal); mocks.reader.mockResolvedValue(null);
+  mocks.linkVerifier.mockResolvedValue('not_control'); mocks.config.mockReturnValue(null); mocks.normalConfig.mockReturnValue(normal); mocks.reader.mockResolvedValue(null);
   mocks.observer.mockReturnValue({ arm: mocks.arm, observe: mocks.observe }); mocks.observe.mockResolvedValue(204);
   mocks.summary.mockResolvedValue({ status: 'armed', expiresAt: '2030-01-01T00:00:00.000Z', requests: 0, attempts: [] });
 });
@@ -158,5 +159,63 @@ describe('public diagnostic precedence and ordinary dispatch', () => {
     await response(await webhook.POST(request()), 503, { error: 'demo-disabled' }); expect(mocks.reader).not.toHaveBeenCalled();
     mocks.reader.mockRejectedValueOnce(new HttpError(401, 'La firma de YCloud no es válida.'));
     await response(await webhook.POST(request()), 401, { error: 'La firma de YCloud no es válida.' }); expect(mocks.database).not.toHaveBeenCalled(); expect(mocks.ingress).not.toHaveBeenCalled();
+  });
+});
+
+describe('signed control dispatch boundary', () => {
+  it.each(['verified', 'rejected'])('%s control acknowledges without normal DB initialization or ingress', async (outcome) => {
+    const event = { kind: 'incoming_text' };
+    mocks.reader.mockResolvedValue(event);
+    mocks.linkVerifier.mockResolvedValue(outcome);
+    await response(await webhook.POST(request()), 200, { received: true });
+    expect(mocks.linkVerifier).toHaveBeenCalledWith(event);
+    expect(mocks.reader.mock.invocationCallOrder[0]).toBeLessThan(mocks.linkVerifier.mock.invocationCallOrder[0]);
+    expect(mocks.database).not.toHaveBeenCalled();
+    expect(mocks.ingress).not.toHaveBeenCalled();
+  });
+  it('passes noncontrol to normal persistence once and in authenticated order', async () => {
+    const event = { kind: 'incoming_text' };
+    mocks.reader.mockResolvedValue(event);
+    await response(await webhook.POST(request()), 200, { received: true });
+    expect(mocks.ingress).toHaveBeenCalledExactlyOnceWith(event, normal, db);
+    expect(mocks.config.mock.invocationCallOrder[0]).toBeLessThan(mocks.normalConfig.mock.invocationCallOrder[0]);
+    expect(mocks.guard.mock.invocationCallOrder[0]).toBeLessThan(mocks.reader.mock.invocationCallOrder[0]);
+    expect(mocks.reader.mock.invocationCallOrder[0]).toBeLessThan(mocks.linkVerifier.mock.invocationCallOrder[0]);
+    expect(mocks.linkVerifier.mock.invocationCallOrder[0]).toBeLessThan(mocks.database.mock.invocationCallOrder[0]);
+  });
+  it.each([null, { kind: 'message_status' }, { kind: 'human_echo' }])('never verifies non-incoming event %j', async (event) => {
+    mocks.reader.mockResolvedValue(event);
+    await response(await webhook.POST(request()), 200, { received: true });
+    expect(mocks.linkVerifier).not.toHaveBeenCalled();
+    if (event?.kind === 'human_echo')
+      expect(mocks.ingress).toHaveBeenCalledExactlyOnceWith(event, normal, db);
+    else
+      expect(mocks.database).not.toHaveBeenCalled();
+  });
+  it.each([new Error('synthetic private failure'), new HttpError(409, 'synthetic controlled failure', 'LINK_CONFLICT', 7)])('does not acknowledge operational verifier failure', async (error) => {
+    mocks.reader.mockResolvedValue({ kind: 'incoming_text' });
+    mocks.linkVerifier.mockRejectedValue(error);
+    const result = await webhook.POST(request());
+    expect(result.status).toBe(error instanceof HttpError ? 409 : 503);
+    if (error instanceof HttpError)
+      expect(result.headers.get('retry-after')).toBe('7');
+    expect(mocks.ingress).not.toHaveBeenCalled();
+    expect(mocks.database).not.toHaveBeenCalled();
+    expect(JSON.stringify(await result.json())).not.toContain('private failure');
+  });
+  it('keeps diagnostic and reception/signature errors ahead of verification', async () => {
+    mocks.config.mockReturnValue({ synthetic: true });
+    await response(await webhook.POST(request()), 204, null);
+    expect(mocks.linkVerifier).not.toHaveBeenCalled();
+    mocks.config.mockReturnValue(null);
+    mocks.guard.mockImplementationOnce(() => {
+      throw new HttpError(503, 'disabled');
+    });
+    await response(await webhook.POST(request()), 503, { error: 'disabled' });
+    expect(mocks.linkVerifier).not.toHaveBeenCalled();
+    mocks.reader.mockRejectedValueOnce(new HttpError(401, 'invalid signature'));
+    await response(await webhook.POST(request()), 401, { error: 'invalid signature' });
+    expect(mocks.linkVerifier).not.toHaveBeenCalled();
+    expect(mocks.ingress).not.toHaveBeenCalled();
   });
 });
