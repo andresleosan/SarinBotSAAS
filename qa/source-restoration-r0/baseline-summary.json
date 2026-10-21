@@ -1,0 +1,60 @@
+{
+  "fileCounts": {
+    "total": 160,
+    "failed": 16,
+    "passed": 140,
+    "skipped": 4
+  },
+  "tests": {
+    "total": 1652,
+    "passed": 1565,
+    "failed": 46,
+    "skipped": 41
+  },
+  "focused": [
+    {
+      "path": "tests/admin-copilot-ui.test.tsx",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "tests/admin-copilot.test.ts",
+      "passed": 20,
+      "failed": 1,
+      "skipped": 0
+    },
+    {
+      "path": "tests/admin-deep-links.test.ts",
+      "passed": 3,
+      "failed": 5,
+      "skipped": 0
+    },
+    {
+      "path": "tests/admin-whatsapp-conversations.test.tsx",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "tests/whatsapp-conversation-routes.test.ts",
+      "passed": 3,
+      "failed": 2,
+      "skipped": 0
+    }
+  ],
+  "commands": [
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit --incremental false",
+      "exitStatus": 2
+    },
+    {
+      "command": "node qa/source-restoration-r0/run-vitest.mjs",
+      "exitStatus": 1
+    }
+  ],
+  "versions": {
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  }
+}

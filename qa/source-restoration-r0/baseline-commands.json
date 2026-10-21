@@ -1,0 +1,39 @@
+{
+  "nodeVersion": "v24.22.0",
+  "packageManager": "pnpm@11.23.0 required; pnpm absent from PATH; existing locked Node runners used without install",
+  "records": [
+    {
+      "name": "typecheck",
+      "args": [
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "--incremental",
+        "false"
+      ],
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "command": "node node_modules/typescript/bin/tsc --noEmit --incremental false",
+      "startedAt": "2026-10-21T03:30:59.152Z",
+      "finishedAt": "2026-10-21T03:31:18.877Z",
+      "exitStatus": 2,
+      "signal": null,
+      "error": null,
+      "stdout": "qa/source-restoration-r0/typecheck.stdout.log",
+      "stderr": "qa/source-restoration-r0/typecheck.stderr.log"
+    },
+    {
+      "name": "vitest",
+      "args": [
+        "qa/source-restoration-r0/run-vitest.mjs"
+      ],
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "command": "node qa/source-restoration-r0/run-vitest.mjs",
+      "startedAt": "2026-10-21T03:31:18.881Z",
+      "finishedAt": "2026-10-21T03:32:19.911Z",
+      "exitStatus": 1,
+      "signal": null,
+      "error": null,
+      "stdout": "qa/source-restoration-r0/vitest.stdout.log",
+      "stderr": "qa/source-restoration-r0/vitest.stderr.log"
+    }
+  ]
+}

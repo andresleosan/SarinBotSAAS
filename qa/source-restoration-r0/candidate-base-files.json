@@ -1,0 +1,3058 @@
+[
+  {
+    "path": ".dockerignore",
+    "sha256": "bb3f574bb9efec846fa0b723c3d051b68e1c38a0793ae5b107afd6575e6896c6"
+  },
+  {
+    "path": ".env.local.example",
+    "sha256": "e38d81af480fbbaa8d04ae52439497b0591191b1d68f22b692e656990fe042f5"
+  },
+  {
+    "path": ".gitattributes",
+    "sha256": "05de7649814df4fa0a771b00e53eb116b13a8242f1b788ae2db3a4b1ef0a294b"
+  },
+  {
+    "path": ".github/workflows/verify.yml",
+    "sha256": "355f3b0170a59a5b2ed061a7305f96f5de7bf12ac11b94d4c0fcea4ea39efb07"
+  },
+  {
+    "path": ".gitignore",
+    "sha256": "d76ae546dbb953c3f367d5f5b03b593c613af85597bc0a3f4e104c3b5b47eabe"
+  },
+  {
+    "path": "AGENTS.md",
+    "sha256": "0c807352ce830de9e7c710ef6506b1172f80092f7d5a3f60f22f176fd202a3bc"
+  },
+  {
+    "path": "AUDITORIA.md",
+    "sha256": "87fe957afdde1757e00d3978049130d1a10103f2db1bedda74787e95e8fd92b7"
+  },
+  {
+    "path": "Dockerfile",
+    "sha256": "9d0b49924974afa6fe3021b59743bd3f6a81bd908f0e64d38778f806f46a8a3c"
+  },
+  {
+    "path": "README.md",
+    "sha256": "18cb4f26a45fdc5ab78e6aac8a8d538b8cbc20bd4753a0d4cf38c2670b145f9d"
+  },
+  {
+    "path": "STACK.md",
+    "sha256": "00d3d357a2f17f9c54784ea305ee172b898930e712170646d772b931784ced65"
+  },
+  {
+    "path": "arquitectura_maestro_sarin_bot.md",
+    "sha256": "8cbf53d595093fe918b67026fd43ff0f62abb418ab63bd24cd4e736759b09dc5"
+  },
+  {
+    "path": "cloudflare/.gitignore",
+    "sha256": "cebf34a0d289c3e66c5615ab38573cab82897faa5b3c1ba4812259169d70bc1f"
+  },
+  {
+    "path": "cloudflare/README.md",
+    "sha256": "e82f21913432bb1813a84d01254f37ad55b67190fc30a78c41303542efb41bd6"
+  },
+  {
+    "path": "cloudflare/migrations/0001_data.sql",
+    "sha256": "516b4a86f985d908deaa68da4fc2f0a0f7981e62316146dca8d805c0232acf51"
+  },
+  {
+    "path": "cloudflare/migrations/0002_appointment_reminder_window.sql",
+    "sha256": "ee24ed8c9176933d7712b29051c915d5dcd96a4db569f40c5b60d7c9e60cc318"
+  },
+  {
+    "path": "cloudflare/package.json",
+    "sha256": "cf5ec2f4eeeb35c034da0748e86e7e769d2ba249b515aa6d9c37f79157eadf30"
+  },
+  {
+    "path": "cloudflare/scripts/configure-build.mjs",
+    "sha256": "4c167fc958b7948aae05dac5d43ff2cfcdc58fd8e883bf25b5a9b6a4e4d352b5"
+  },
+  {
+    "path": "cloudflare/src/data.ts",
+    "sha256": "2993ace546293b699c1bf7a1a113fbf740ea7f6978bea9e2070ef0bc83bab34d"
+  },
+  {
+    "path": "cloudflare/src/identity-core.ts",
+    "sha256": "a1531ea2061047ec365494ca30b305c97079abf1ecf14bccd73062d835b9ca57"
+  },
+  {
+    "path": "cloudflare/src/identity.ts",
+    "sha256": "7595102108e0b8ccde24d8bfceb6ebfcdc96a9880856d0c6e3565b0f26eb4878"
+  },
+  {
+    "path": "cloudflare/src/index.ts",
+    "sha256": "6a69de6ce5b85188615b8d19dc0f02f14cdf73a68b2b2d68dc940bd81dcc2ec1"
+  },
+  {
+    "path": "cloudflare/src/router.ts",
+    "sha256": "fa5c42a69f9628eade8171d4a73286d169898af2d6c9d37f6c902e4ad1439fad"
+  },
+  {
+    "path": "cloudflare/tests/configuration.test.mjs",
+    "sha256": "c23aa2e5e51bb7298d344e16d7ea6bd612b107a02ee04b1f3691d3cb47af8424"
+  },
+  {
+    "path": "cloudflare/tests/data-runtime.mjs",
+    "sha256": "082c88a08c53a7162f31ce84e57ccd4d9abd698330b9f2b7913e9dbc98af67f8"
+  },
+  {
+    "path": "cloudflare/tests/data.test.mjs",
+    "sha256": "224c1125981db041ef90f0eb96a6aaed1a39e60e1f0ad0dbd270ce2a0a1b8d4f"
+  },
+  {
+    "path": "cloudflare/tests/identity.test.mjs",
+    "sha256": "74a0ee7705be0efba1fb2058d46171cdf04ed3fc8f6e384e95c365dac3135060"
+  },
+  {
+    "path": "cloudflare/tests/lifecycle.test.mjs",
+    "sha256": "43bba085b4dc2d805e4475c7f084d5105374ca5960fff5552b39f709646a9a6b"
+  },
+  {
+    "path": "cloudflare/tests/router.test.mjs",
+    "sha256": "6952d8eb03a9f7ba51b9487f259a56ad0427bcbfb041cdb0c352071b5490ce95"
+  },
+  {
+    "path": "cloudflare/tests/wif-setup.test.mjs",
+    "sha256": "d0d1d8e371be62b0193351908f7dc1805b6f47e50836ae71666f29b7f364da37"
+  },
+  {
+    "path": "cloudflare/tsconfig.json",
+    "sha256": "f0cdbebbe18b46cd6691e82aeb1dbe66121760b078384e433228095afdc80b5a"
+  },
+  {
+    "path": "cloudflare/worker-configuration.d.ts",
+    "sha256": "28c25e4e52fabce5b95257c39d16a5219cca44a261af31db973b6be5aa7bac0a"
+  },
+  {
+    "path": "cloudflare/wrangler.jsonc",
+    "sha256": "a56c1e3cfd7f5b42da63b3674ebc975e68cd3b0cb534ec9c175089aecdee9a67"
+  },
+  {
+    "path": "compose.yaml",
+    "sha256": "4a8d2378751d70c0d3a23b29353d182861b81e36a192c84ec794c93edbed3b39"
+  },
+  {
+    "path": "deploy/Caddyfile.example",
+    "sha256": "89e3573e37bb6432bf195100c6530b52dca3c8ece17329e7cca7c9fe957d4072"
+  },
+  {
+    "path": "deploy/README.md",
+    "sha256": "0bb7ebb5d98bffc6989337fec9ee73b9a074e656c39218b432019a69a30a1018"
+  },
+  {
+    "path": "deploy/cloudflared/config.yml.example",
+    "sha256": "f337c39f4f9c9bee45303681cb1a21d9fe6dc928d912e0d543ea4a025e42eb04"
+  },
+  {
+    "path": "deploy/firebase.public.env.example",
+    "sha256": "ecefc15f251978f260a706d61c002940311dd9f250baf9daadb01f1334fda2dd"
+  },
+  {
+    "path": "deploy/macos/serve-ollama.sh",
+    "sha256": "e23e3d7fa09fd3985f179676de348867bd210804a9d370071538a59251100cc6"
+  },
+  {
+    "path": "deploy/ollama.env.example",
+    "sha256": "2e40043e1f25429c762e609dcbe8aedcf2d2608f676e6f6c95377a269a65831c"
+  },
+  {
+    "path": "deploy/runtime.env.example",
+    "sha256": "1421cdc31a81f5ce62673a5b5f3e8b2050d17e2c9590abf1b3f0a091a413a32a"
+  },
+  {
+    "path": "design-system.md",
+    "sha256": "4af6f748ea75408f2f9050a74329ce04290ffae47a12f655cba3cf911e535246"
+  },
+  {
+    "path": "docs/adr/001-firebase-region-and-local-identity.md",
+    "sha256": "728af968f7b5ce96d6de30fbfcb7c311fcb04056e985b0d80ffd715d99a148c6"
+  },
+  {
+    "path": "docs/ai-usage-meter.md",
+    "sha256": "619766be082316b29bc9e92a763f90422870b727d53666f401e68b54a204becd"
+  },
+  {
+    "path": "docs/cloudflare-data-migration.md",
+    "sha256": "f84172b19746e2e412ce6032ec9e1abae22984a474e3a22a7cceb7b1e8ad1f3c"
+  },
+  {
+    "path": "docs/cloudflare-no-vps-runbook.md",
+    "sha256": "d342bdb88dd617d71ab04b3c3e5fb134aa0f4119370bf7618685662879e43f27"
+  },
+  {
+    "path": "docs/commercial-opening-notice-draft.md",
+    "sha256": "bc3f11fdf76fcf2aed77a5608e0cc69948e63aa0a27e3643fc20eb4763b88106"
+  },
+  {
+    "path": "docs/commercial-plans.md",
+    "sha256": "54e71bce1a04db9aa7af9b49b6316f30f36f643430570a6bdf2ed8f12f42d470"
+  },
+  {
+    "path": "docs/deepseek-option-b.md",
+    "sha256": "f870da1d50e758cfc87296d3ca973994a79b4325f730bbb8d414f8dd1622244d"
+  },
+  {
+    "path": "docs/design-system.md",
+    "sha256": "fbc257dd66a4e27bfe3444795bee28a3de9ce881608b7d3fe90a5df18c8d0bcf"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/README.md",
+    "sha256": "1f63597d49fa365d6de16f101f78285ad8521fda535bb2f51655562f743ba254"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/comparativa-tres-opciones.png",
+    "sha256": "113b95f8b5181c30ef030f2675ce0a30147c9ac6a1fc2d86799427e68ca3b785"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/generate.py",
+    "sha256": "7c4dc4e921b321d3be84bf451a90f957517c2498e37296ce3789743ddf29d372"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/opcion-a-agenda-clara.pdf",
+    "sha256": "8a1bf7a00e963bd37e5ad36bb96a35ef2289d748e2378581a4684a4faaa889d2"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/opcion-a-agenda-clara.png",
+    "sha256": "76de2257639d01e030aba1e2858cc1f840450537b4cc293880eb7525814e87a3"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/opcion-b-norte-nocturno.pdf",
+    "sha256": "f854118dc04fc5befce6d721cfa1f44c5c3e5c1ba26fc8eea0e6e88f48962941"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/opcion-b-norte-nocturno.png",
+    "sha256": "80680913a943cc98fca8c59b316d867f80f22c5d276aee795372eaf89172d056"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/opcion-c-taller-calido.pdf",
+    "sha256": "361e575a0ca97f74f7b1cd7219dd8ca95988e698436411fb47416d7ce2900776"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/opcion-c-taller-calido.png",
+    "sha256": "b4ba94082d7045207545a91ba1171e5b156004cfe5fa92bc70a8acc98459d4ee"
+  },
+  {
+    "path": "docs/design/2026-10-16-qr-cards/verification.json",
+    "sha256": "30e2fdf946f2f530aa3942adf8e54902cecbc15573bb371e01532d4a6e6008cb"
+  },
+  {
+    "path": "docs/design/2026-10-17-booking-service-entry.md",
+    "sha256": "612f24a91df405b246cd231e665339005bc1f41aa01d769ef77f2a40a4d24d7f"
+  },
+  {
+    "path": "docs/design/2026-10-17-calendar-service-details.md",
+    "sha256": "245ae51182621ea8fa28b1e4437eb962947ed47ef0d079846aaff03285a2ab9d"
+  },
+  {
+    "path": "docs/design/2026-10-17-direct-booking-calendar.md",
+    "sha256": "02d0f500c8f315c86718dbf60bde8f027026f2d1ffff00b94d34d4680e72d4f3"
+  },
+  {
+    "path": "docs/design/2026-10-17-public-business-profile.md",
+    "sha256": "2120804d1ef679cbee39f10c3df18ed21180451e9543b19dfa44adddaf0049b9"
+  },
+  {
+    "path": "docs/design/2026-10-17-rebook-from-history.md",
+    "sha256": "bbfd94a49dbbcd6ccf16735e489dd3d493b9bf5ff25e4e9291b0cc51f3467a82"
+  },
+  {
+    "path": "docs/design/2026-10-17-service-catalog.md",
+    "sha256": "0aaa15fbfa83673673d1e6fdb35124e116295c3fde72be13e8bed2c6a234f35a"
+  },
+  {
+    "path": "docs/gemini-provider.md",
+    "sha256": "448ec9a50af574e319e4d37cc887120fb2ef4a5078a9cdca8d4af1a96abae0c9"
+  },
+  {
+    "path": "docs/pages-vps-gateway.md",
+    "sha256": "ac22832f71128206fa61d545d2903d1b657758976995d6d9d592728bc6ba02c7"
+  },
+  {
+    "path": "docs/paid-trial.md",
+    "sha256": "4d06ea0f267fdc7d34a279da8be70ba18e00f4295e1ebb0f6a785fd32e1d51cd"
+  },
+  {
+    "path": "docs/product/2026-10-16-legal-consent-review.md",
+    "sha256": "e9e4759b439453bb4cbd2fc07944d236e86280057ad3b27aacd5afda6fabf447"
+  },
+  {
+    "path": "docs/product/2026-10-16-pilot-operation.md",
+    "sha256": "d1465cda3134dac05a94654045e0633a32ccc50a5b666ac25a52b7e6d8590676"
+  },
+  {
+    "path": "docs/product/2026-10-16-production-pilot-operation.md",
+    "sha256": "f488be36ff53b15621907d386b5b9a6a4e8bd3a86c0b1afedbe528e9a6ea146c"
+  },
+  {
+    "path": "docs/product/BRIEF.md",
+    "sha256": "db17d5d249fad92d9dcc7843cff3781a5dc28a86ed7a9bc57be8077da55f6573"
+  },
+  {
+    "path": "docs/product/marketplace-after-ten-businesses.md",
+    "sha256": "955adada9ece4918c18fbf35cc57850bbc7e4de9940673b70f51c4f2299f3c98"
+  },
+  {
+    "path": "docs/qa/2026-10-13-agenda-clara.md",
+    "sha256": "2011f87e5badad1ecdeaf8df729227a63346d1770d8088b8b73ac0ae4047f713"
+  },
+  {
+    "path": "docs/qa/2026-10-13-design-review.md",
+    "sha256": "9c7033c2f9a1393d85e9a7584598d02df073edca81983849e467dd8dbbf1ace0"
+  },
+  {
+    "path": "docs/qa/2026-10-13-favicon-cara-sarin.md",
+    "sha256": "ba3ead43e5c3b69f44efd16c0e542c6b279c2cc1582885627aef7c1209bf52b5"
+  },
+  {
+    "path": "docs/qa/2026-10-13-favicon.md",
+    "sha256": "396c459a3a4a67809d451666a9084a8989a620f65edf9f25ce0f5c180fc281e6"
+  },
+  {
+    "path": "docs/qa/2026-10-13-landing-temporal.md",
+    "sha256": "377951a2d4eddebc09772abaa278a771d6e994e130bf9b7cf28bcd3aa7440e25"
+  },
+  {
+    "path": "docs/qa/2026-10-14-agenda-clara-interna-y-ci.md",
+    "sha256": "f222e64c6f69d6b5ff65a07c3dd5f2d25c2baf2853fe22a2895e07fc7594d4b1"
+  },
+  {
+    "path": "docs/qa/2026-10-14-cinco-mensajes-sarin.md",
+    "sha256": "f7d09fe3a4ad130897ee3846b3220d0f08a9735c9fe890af129774ee210e82f4"
+  },
+  {
+    "path": "docs/qa/2026-10-14-migracion-pnpm.md",
+    "sha256": "ab1b927f6144a5a6c182c3c0a585f5ba636902160369957e77a9cc2eefad7d03"
+  },
+  {
+    "path": "docs/qa/2026-10-14-saludo-sin-boton.md",
+    "sha256": "4a4be0bac17b8fa6d1b85c50a9854d39816ebf72509945cf106bdda4559d002e"
+  },
+  {
+    "path": "docs/qa/2026-10-14-saludo-sin-contador.md",
+    "sha256": "a0d924e80c3e9584365d957d860c8962c945edbc3ec3c6eafb42e0bbd14514b6"
+  },
+  {
+    "path": "docs/qa/2026-10-14-sarin-vuelo-y-marca.md",
+    "sha256": "fedcded778fbb71dfa31f11413f8fb75b24d7cfb1d255f80c84a751ac7c2d25c"
+  },
+  {
+    "path": "docs/qa/2026-10-14-seccion-sin-iconos.md",
+    "sha256": "ce7a649111ff73202e73bdd5d5be9297087de93a146398161ec62945a78ce564"
+  },
+  {
+    "path": "docs/qa/2026-10-14-vps-pre-dns.md",
+    "sha256": "d18f90271122f1bf43811ad30cf8ac20fbc90e61e41b0fe97c0f3dd79e5c8f09"
+  },
+  {
+    "path": "docs/qa/2026-10-14-vuelo-con-desplazamiento.md",
+    "sha256": "e4bf85c0058921aae7cbecfc98fb9525e59547cc1b800f8f92f5cbd12ce9230c"
+  },
+  {
+    "path": "docs/qa/2026-10-15-admin-ai.md",
+    "sha256": "4f54aff5719a733e3a9e514293fd26d43415017317f6c1097b0d46ce97465136"
+  },
+  {
+    "path": "docs/qa/2026-10-15-ai-usage.md",
+    "sha256": "a8fe970433605f6766694032bf9f03b4fa28c63caac4536f2f1475f9501ffb63"
+  },
+  {
+    "path": "docs/qa/2026-10-15-billing-plans.md",
+    "sha256": "4d2e10597e6d2b174429b9cb5d2b084ce084008649eb2f6202f57bf6f4eb6a46"
+  },
+  {
+    "path": "docs/qa/2026-10-15-business-form-labels.md",
+    "sha256": "1737cbc0b8412e0b9a933265d76f36ec3ba41500fbde58d2e2ae5940be41330c"
+  },
+  {
+    "path": "docs/qa/2026-10-15-commercial-quotas.md",
+    "sha256": "2bff2a4472e7357161551634637472d6f8b7611c2fc5e7340cfd92a245d3905a"
+  },
+  {
+    "path": "docs/qa/2026-10-15-compact-forms.md",
+    "sha256": "c5caeeb16b7c837a63e2b9f959ad282f6c9cbaeeee09a357ce4889a34db3f7d8"
+  },
+  {
+    "path": "docs/qa/2026-10-15-deepseek-option-b.md",
+    "sha256": "f3e99c6087a9cdd351b669831e775eb578cebccaa204dc425da27fa995b0adcd"
+  },
+  {
+    "path": "docs/qa/2026-10-15-dns-cutover.md",
+    "sha256": "017679afb4fd12842bbd9e43d434800aa507d5429186d4600ddccbb3c2fb11dd"
+  },
+  {
+    "path": "docs/qa/2026-10-15-private-journey.md",
+    "sha256": "2ef5cbff72b71b16277c230ba51e341582a386807a5f757f53c0c30d9bda4757"
+  },
+  {
+    "path": "docs/qa/2026-10-15-private-pilot.md",
+    "sha256": "b2a89ee2171fa68a91632a804a41526ae0c4bd166f5376c2655053ede910e439"
+  },
+  {
+    "path": "docs/qa/2026-10-15-whatsapp-country-selector.md",
+    "sha256": "7f5cb5f124f01d8485ce95a4e658fe6596fa38048004b9fddded6cb54a378b0c"
+  },
+  {
+    "path": "docs/qa/2026-10-16-appointment-image-example.png",
+    "sha256": "9b551b8283f613b07856607108cd22b4e94af0f97c0ae9b0540e06fe79cc0bad"
+  },
+  {
+    "path": "docs/qa/2026-10-16-appointment-image-live-copy.png",
+    "sha256": "68c705a5a8dae40aec5742ff2fbd1e44fde6ef641ef06aa4630f580d7cccdc7e"
+  },
+  {
+    "path": "docs/qa/2026-10-16-appointment-image-long.png",
+    "sha256": "a276439f5561459325ab7df7f0c3962b8090f89843f879125f9f82d4928241bd"
+  },
+  {
+    "path": "docs/qa/2026-10-16-appointment-image-mobile.png",
+    "sha256": "a4076c7d4d84dd58297c7076101e1ff43d1080ed60c96addea8571958496534c"
+  },
+  {
+    "path": "docs/qa/2026-10-16-appointment-image.md",
+    "sha256": "927a42aaf9a78b1f89ce8bbd689e78b61b838b3ead4bf85029b553b99c96abca"
+  },
+  {
+    "path": "docs/qa/2026-10-16-business-ai-budget-controls.jpg",
+    "sha256": "f870b659bb81a2ee70acfc0514968eaa591ac0efb1856fbf48dc51e47e76ca83"
+  },
+  {
+    "path": "docs/qa/2026-10-16-business-ai-budget-desktop.jpg",
+    "sha256": "d2bd80f141db047e0256c759e3607e66e5864424014f81f533486b48630661a2"
+  },
+  {
+    "path": "docs/qa/2026-10-16-business-ai-budget-mobile.jpg",
+    "sha256": "051533fc4f6ff377f16b5c8c2fb5c3698cc963ba814fddb14d4dd78b595cffe7"
+  },
+  {
+    "path": "docs/qa/2026-10-16-business-ai-budget-release.json",
+    "sha256": "40b08c2fd44d20e859484b705987453d23da7490fdf133a68bad5968d3906793"
+  },
+  {
+    "path": "docs/qa/2026-10-16-business-ai-budget.md",
+    "sha256": "8246e7600cb237c5ba1700a41f040b4a76434e1eb0ae7e6ddcbae977e3fa84f0"
+  },
+  {
+    "path": "docs/qa/2026-10-16-business-branding.md",
+    "sha256": "e04ab9e430010ae1d37cb60712ae7a675ab08bf3a2eeb9a1b8c40abd7d7793c0"
+  },
+  {
+    "path": "docs/qa/2026-10-16-business-logo-desktop.png",
+    "sha256": "eb1c473e4e50a9570ff61491b1517a07319238b53fe5e7e23102ea23c1bbcc66"
+  },
+  {
+    "path": "docs/qa/2026-10-16-business-profile-mobile.png",
+    "sha256": "10ba09d5182b6fe8760ef52b4dc6e6371c1b14778fe70b9fabece5190d7e8563"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-als-footer-browser.png",
+    "sha256": "6f4d939b427d0074319048b26aaa27e8e6b725366bab73ae3eb599b90b7b2723"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-als-footer-pdf-render.png",
+    "sha256": "8f348ed31331c8d4b3e1fe3aa6f5b94888ea1758f617820c15e94d88491cc874"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-als-footer-verification.json",
+    "sha256": "7fdec1cef8eefa382dc23aa6be188cd820907c9e1c289c4dfe648007438bfe1c"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-als-footer.developer-qr.svg",
+    "sha256": "78d0a0b4c1ce00dda909918bd57abe402d51457cb206eaea510ec7d75bf44ade"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-als-footer.pdf",
+    "sha256": "e295524e79810172d410942e9dfea43223af6ba251524ac89e5190c8edb4ab22"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-als-footer.png",
+    "sha256": "df8a1857e72eb50460ad34fbfdc2e845cbcdd42dae4e9a191818d54280210b6f"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-als-footer.svg",
+    "sha256": "56bb8ae2ab805068903e70df719f0c910bccc6d4e85c03afac40267cc076be9c"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-kit-desktop.png",
+    "sha256": "ae58db2cc5c38b2d81607e17f89bfe62b94ad0f347c7f20681776542318db52b"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-kit-mobile.png",
+    "sha256": "2f5dc38bdff8fd8861ef69ab65257c967ad18c0875a9935ec818b9f9c55b976f"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-local-render.png",
+    "sha256": "f59e44e0c07e4ca36ec7bef1aa5f71e4cbac4699dab34ab63446a47ef321922e"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-local.pdf",
+    "sha256": "aa53caebd22551e96a4c7b1417c34717f0f0cfe67cae330e3050dd3c55dd4afc"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-local.png",
+    "sha256": "4a7544f3bab940875549d384eb4eb3e78f3e6dca487be9141b40b937e456fa1d"
+  },
+  {
+    "path": "docs/qa/2026-10-16-card-a-local.svg",
+    "sha256": "c450f501b3d003e33ea1555cb760b17135cf9880d48ddf85864662d3a3e779f1"
+  },
+  {
+    "path": "docs/qa/2026-10-16-client-history-mobile.png",
+    "sha256": "b40ab0dc9c9ed485a36924b5f3a4174fd9d8a1ee32caf6bd036ad597ddf03a5b"
+  },
+  {
+    "path": "docs/qa/2026-10-16-cloudflare-client-calendar.png",
+    "sha256": "d09b26c4455977e5b1bad55144e4a4dc1d3562711203317ea39cc976af8f22cb"
+  },
+  {
+    "path": "docs/qa/2026-10-16-cloudflare-data-migration.md",
+    "sha256": "d093e0889cb6847ca63d6505e365c74383d4f435a1abf830743263cdd6713db1"
+  },
+  {
+    "path": "docs/qa/2026-10-16-cloudflare-live-landing.png",
+    "sha256": "43fd6515d0a3633ae8dea8284c0d3649ceb65ee5aa55bb7c37faa3aa38abf045"
+  },
+  {
+    "path": "docs/qa/2026-10-16-cloudflare-migration.md",
+    "sha256": "b32c999321a2d083fc940fb2fe42c5d83977b54ff19e19294de958159d74a6ee"
+  },
+  {
+    "path": "docs/qa/2026-10-16-cloudflare-ollama-online.png",
+    "sha256": "36ddad59bb8055c617427219c68eb3ead000d2452583c21f17af931652bc0f2c"
+  },
+  {
+    "path": "docs/qa/2026-10-16-commercial-acceptance-plan.md",
+    "sha256": "d2274d1ed26ae234fc4ff97b864103ddb5da78233a2fc9a1ae9807b697e2d401"
+  },
+  {
+    "path": "docs/qa/2026-10-16-commercial-admin-live.png",
+    "sha256": "d8eeba859c79f748401777f14ee5c512209e73d90a75ad19870c801c17fdbc79"
+  },
+  {
+    "path": "docs/qa/2026-10-16-commercial-admin-local.png",
+    "sha256": "7da32956daa6f76bd6ee5c0011a5b3d1dfff9362f0987c8d26d16f1715090532"
+  },
+  {
+    "path": "docs/qa/2026-10-16-commercial-e2e.md",
+    "sha256": "04a6becd0474497b38ea8349e2b86facbfb15fcef0cb44a64905c6020fee292a"
+  },
+  {
+    "path": "docs/qa/2026-10-16-commercial-focus.md",
+    "sha256": "22e54b3cfb5c7abef00438da663db1c5754e42e1060d028c47a6cf3e6688b364"
+  },
+  {
+    "path": "docs/qa/2026-10-16-commercial-pilot-acceptance.md",
+    "sha256": "ad70948905a2aceadadd16d60018d330d89a65f186d141da2a64911987724013"
+  },
+  {
+    "path": "docs/qa/2026-10-16-commercial-pilot-release.json",
+    "sha256": "6afe8a87cdb92c387f7ce62de3469ab15e549ec30952a570299ed67eedf418e2"
+  },
+  {
+    "path": "docs/qa/2026-10-16-compact-suggestions.md",
+    "sha256": "4274e642dc99599dfd1ae2841aa415f285f2efdb2c2f88027b0fbfccc5be7a68"
+  },
+  {
+    "path": "docs/qa/2026-10-16-consent-acceptance.md",
+    "sha256": "a16ea023dcf1f1294560101d807ce04b3fe54f9287961b541c071d97e9d0cb5b"
+  },
+  {
+    "path": "docs/qa/2026-10-16-consent-accepted.png",
+    "sha256": "a064775908625149cdf615e584da4ce19074f98e731f4cb6b674f139057788f1"
+  },
+  {
+    "path": "docs/qa/2026-10-16-consent-client-accepted.png",
+    "sha256": "123452f099b89ae60914ceabd655fafc7bdb05aec8f057173cebec293fa5f632"
+  },
+  {
+    "path": "docs/qa/2026-10-16-consent-client-mobile.png",
+    "sha256": "3e95ce679586d397f479c7d3663d24f2554acc46efe9eb836d3152fb14df3b23"
+  },
+  {
+    "path": "docs/qa/2026-10-16-consent-history.png",
+    "sha256": "1ed3b1a92346f5990dd4bca0686bfb05c8505e4c9a81b0c7f743b4c78f8b6196"
+  },
+  {
+    "path": "docs/qa/2026-10-16-consent-login.png",
+    "sha256": "b2c8115b690cd1e9bb36a9b415582f0b8d0acd33757c48f1308ab77be5a81033"
+  },
+  {
+    "path": "docs/qa/2026-10-16-consent-release.json",
+    "sha256": "ece4e11172c7cd35950a8aee89f54400b986e9732e5f71047c52e77022efc193"
+  },
+  {
+    "path": "docs/qa/2026-10-16-consent-release.md",
+    "sha256": "9be6f7f29b480659407b11912ff0f68f4ee6c454e46dd2cf82af79b708ed5695"
+  },
+  {
+    "path": "docs/qa/2026-10-16-d1-client-calendar.png",
+    "sha256": "d3aedcae3ff9545cd2d4329ed41f7b36bed5f8e970efddf93be996acb3fbb70a"
+  },
+  {
+    "path": "docs/qa/2026-10-16-d1-recovery-drill.md",
+    "sha256": "2e8ff638575e25021089ab569932cf72270c4c115ee49dcd69d7fbf0f41a7ab5"
+  },
+  {
+    "path": "docs/qa/2026-10-16-deepseek-balance-alert.png",
+    "sha256": "c1f2aa91593b6c6426dae9845352a7d09b2baeef9866c17a056775ca20659679"
+  },
+  {
+    "path": "docs/qa/2026-10-16-deepseek-live.png",
+    "sha256": "fde55f9baaa285f7847d24835b3774658687aac2b0b0407e4c0248be7652677b"
+  },
+  {
+    "path": "docs/qa/2026-10-16-deepseek-owner-agenda.png",
+    "sha256": "8c5f221ee06d8bbd15b1c0392ec82a3d7a07c465cb0b8833c26f8f89797e6be7"
+  },
+  {
+    "path": "docs/qa/2026-10-16-deepseek-synthetic-results.json",
+    "sha256": "d9408294b35ebea69707ef4f1fe86a7fa70a9df0879d7020481a44019cc3f7f3"
+  },
+  {
+    "path": "docs/qa/2026-10-16-fresha-analysis.md",
+    "sha256": "4a449150f1c8e1e1aedbc5c17549917c5e231e11331fe7b8120d95a682543a81"
+  },
+  {
+    "path": "docs/qa/2026-10-16-fresha-location-followup.jpg",
+    "sha256": "5f886f3252da16f1b0df01cda7dcbaa7d89d2d15e5ab920fe2f89ca30f39be11"
+  },
+  {
+    "path": "docs/qa/2026-10-16-fresha-onboarding-followup.md",
+    "sha256": "56c126ad41d32d2885d6d00a182eeb4a5058c290a98c1a9c58a622cf73bb24d2"
+  },
+  {
+    "path": "docs/qa/2026-10-16-fresha-online-service-settings.jpg",
+    "sha256": "a580d23fd50c41ba64ca15da2454ae22939527f671320c5508c0b47b69ab9279"
+  },
+  {
+    "path": "docs/qa/2026-10-16-fresha-publication-overview.jpg",
+    "sha256": "f05e04961326fceb61ab9cf92b86df3e75879ebff75fa7592d9b39200491a883"
+  },
+  {
+    "path": "docs/qa/2026-10-16-fresha-qr-requires-publication.jpg",
+    "sha256": "ad2a289b526dc3553b960a076f77ae2dde1598dc2a0f90658a49ba4e91e4fea2"
+  },
+  {
+    "path": "docs/qa/2026-10-16-fresha-service-editor.jpg",
+    "sha256": "919d8f347fe4cd6866e1881a5c1306e15599e77061001b667d6ad4a6d3cb709f"
+  },
+  {
+    "path": "docs/qa/2026-10-16-fresha-workspace-review.md",
+    "sha256": "6f5a6672f7b20382f0f08858afa8e41c7c6111146bf1e8f2991946d6228ba661"
+  },
+  {
+    "path": "docs/qa/2026-10-16-gemini-assistance.md",
+    "sha256": "2f28d96ba1b25586eefc85a4714b08c7f0e8bd075c1e5c5905670eed1b02534e"
+  },
+  {
+    "path": "docs/qa/2026-10-16-gemini-preflight.md",
+    "sha256": "1a4fa1db11a5353d39bcab4f71303e584fb1e5a08fdf2a415d4108b554c658f8"
+  },
+  {
+    "path": "docs/qa/2026-10-16-gemini-profiles.md",
+    "sha256": "2e5045f5d492921a261ada7a13f280e23258ce9458aba678ee35fec3ad8cb86a"
+  },
+  {
+    "path": "docs/qa/2026-10-16-health-and-represented-booking-release.json",
+    "sha256": "c8119ad46c9ca0e82b1f37ec1ec8f1ec1aad8f0470f97a0108622c80f448ac7c"
+  },
+  {
+    "path": "docs/qa/2026-10-16-health-and-represented-booking.md",
+    "sha256": "6c28800c74032f14c94153071caa6b98366a1d7ce799b81f16bc4f4ba0ed5ff0"
+  },
+  {
+    "path": "docs/qa/2026-10-16-help-local-mobile.png",
+    "sha256": "cb1e3e307d62665d95b4b65516b43e7d8cd38e5f4cb5c21e201d86e4a9e9d2c1"
+  },
+  {
+    "path": "docs/qa/2026-10-16-ollama-client-calendar.png",
+    "sha256": "e800af29873009af0d4deb3b65b4f02edf733b9f388d99d5ece9b5b65dcb4909"
+  },
+  {
+    "path": "docs/qa/2026-10-16-ollama-client-history.png",
+    "sha256": "7c5fc5556aecc30eae90e271470663125ab49cc9fb2992bc805c0d89bf0d5b9f"
+  },
+  {
+    "path": "docs/qa/2026-10-16-onboarding-openai.md",
+    "sha256": "5543d42a69e2b85d654bf9b6d4a3462e8cfb0b66341c1a53894bfc45934a4776"
+  },
+  {
+    "path": "docs/qa/2026-10-16-paid-trial.md",
+    "sha256": "238da5c87540d5e1697d9b57d63dfce1eb8d59ee2c83e045f8be19ebd7270ab2"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-abuse-controls.md",
+    "sha256": "226c6231957c7b1dd8c41218a9b92df3dcae81c74f1ad5fa3001bfb874424691"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-cancelled-desktop.png",
+    "sha256": "e12045e73bf9e8ad412193f2dfaa9d8054c819fba02ec865440a92e5e685017c"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-confirmed-desktop.png",
+    "sha256": "2b0a3324f813d6045dad8f408f25b54c7d221fb91cba5f6974e3c3cff76a3cc2"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-followup-release.json",
+    "sha256": "4656d6c802b352e01ed185940bb0130fa49366ba8ab5a91878a6a3ebdc49b6c7"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-followup.md",
+    "sha256": "78b09b033ba61a30759bad3985dd39f89b5f4283dc05fb1ad416de68bf43eb25"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-invitations-admin.png",
+    "sha256": "fa2d0ef7f5b6d8c2cd57d631cfa3b7f77e3aed5115ddbaa4f74c981b7cd4a9fe"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-invitations-consumption.png",
+    "sha256": "3a313d10867edd6bf86d6bfc7b5324b7bbd1210b0a81bb5f35d27a638ba49af8"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-invitations-redeemed.png",
+    "sha256": "ed68e7409f6472a5e458fe5bc8fc92e68853295382f2075911b48b995f04c669"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-invitations.md",
+    "sha256": "f409dce7f1d12bbe6ece49093de9c51ae5c4e0c659e91654c403c003adf152c3"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-proposal-desktop.png",
+    "sha256": "eb5573d3360be0097974b13cfb95e067589b642aacffbf5e5c5d16051a2b4de3"
+  },
+  {
+    "path": "docs/qa/2026-10-16-pilot-scope-desktop.png",
+    "sha256": "101bd7b266866bbaf2b3b6a0040924fde5a666f12a1f1e6c167197bb2902f3ed"
+  },
+  {
+    "path": "docs/qa/2026-10-16-privacy-local-desktop.png",
+    "sha256": "b3f833b2f09db113632bcf03d73be65df3cc9f049006030149cf225329389ccd"
+  },
+  {
+    "path": "docs/qa/2026-10-16-privacy-local-mobile.png",
+    "sha256": "75111e2e693776edde9a4b3161a80a932c52b2a088f55c1c6c54d323250cbfaf"
+  },
+  {
+    "path": "docs/qa/2026-10-16-product-landing-desktop.png",
+    "sha256": "d964ec3261d671ee57e7e7c9b789b993a5fac1adc4090f9280f33704e2764cb7"
+  },
+  {
+    "path": "docs/qa/2026-10-16-product-landing-mobile.png",
+    "sha256": "a73488aaea603c1426173499dd6d6fc7d94fc4497cabe421f1b78ff1b9088217"
+  },
+  {
+    "path": "docs/qa/2026-10-16-product-plans-mobile.png",
+    "sha256": "23c72ac775041012e97f2aad427a669f76938f6f6656a238d497e36835a4dd2f"
+  },
+  {
+    "path": "docs/qa/2026-10-16-production-commercial-pilot-release.json",
+    "sha256": "a0f3ef271acf5297a75adf4fc910651d61fd9df1d2a555913d0b702f62ac51d0"
+  },
+  {
+    "path": "docs/qa/2026-10-16-production-commercial-pilot.md",
+    "sha256": "73a00a6ed0ace63550d439c152c91e64e227964f1b396ef6e9a338a41648394c"
+  },
+  {
+    "path": "docs/qa/2026-10-16-production-readiness.md",
+    "sha256": "1b132e4915962dcdd1673c6bdef08b47ebce5b4518aa7583f16e077784439ede"
+  },
+  {
+    "path": "docs/qa/2026-10-16-recorded-private-journey.md",
+    "sha256": "f394f8d4decfe677ac8dfa45256ced15a339b4f75bd2d23c6952857f2d04c04d"
+  },
+  {
+    "path": "docs/qa/2026-10-16-remove-openai.md",
+    "sha256": "695f4de848f401c0f13c9551b5f1b97813b9b0f4f0dfaa1836664a3b39947e61"
+  },
+  {
+    "path": "docs/qa/2026-10-16-spending-alerts-enabled.png",
+    "sha256": "c8fa33e42c84e10733acd68e3fc6eb23e4ddb730b548d3d2919e6a578a2dd2cd"
+  },
+  {
+    "path": "docs/qa/2026-10-16-spending-alerts-live.png",
+    "sha256": "9135340a0bcf999fdeb53beeb2b9263adab8acb05bd6a393f4aa35717d2f65b2"
+  },
+  {
+    "path": "docs/qa/2026-10-16-spending-controls.md",
+    "sha256": "6e37d07478349d1b4373d523ed671bd28a230a0f1f30f92d9f37073377ae33eb"
+  },
+  {
+    "path": "docs/qa/2026-10-17-appointment-reschedule-comparison-320.jpg",
+    "sha256": "8ac224aca16c7a4df0fc5571ce47db6ba4ac086120a2e2426451524fed5b5d24"
+  },
+  {
+    "path": "docs/qa/2026-10-17-appointment-reschedule-desktop.jpg",
+    "sha256": "db4212e4d9331f853ea01adcae59f0865d9df3b4cae84d33beedbe37c6b3c0cd"
+  },
+  {
+    "path": "docs/qa/2026-10-17-appointment-reschedule-summary-390.jpg",
+    "sha256": "bfbc486382090490365b9b55cd30271b68f60bba3a36fe8a74a1aa997870dc97"
+  },
+  {
+    "path": "docs/qa/2026-10-17-appointment-reschedule.md",
+    "sha256": "5cb137facea5537dc5eb5102e6b466c3ffc7aa734b801b38f86217284cceb387"
+  },
+  {
+    "path": "docs/qa/2026-10-17-booking-entry-calendar-320.png",
+    "sha256": "7386c7bf87994ae0d2d4263913e327bbcfc689a466d53e39dad48f9d87856db9"
+  },
+  {
+    "path": "docs/qa/2026-10-17-booking-entry-desktop.png",
+    "sha256": "86f8fee44111c864bdabe254d6548829804082e1b9e4df45b335475df087915b"
+  },
+  {
+    "path": "docs/qa/2026-10-17-booking-entry-empty-390.png",
+    "sha256": "08a585813d623aab9e3695ab7b53f592683e1201aece0c54cfd64ae71ab5cb30"
+  },
+  {
+    "path": "docs/qa/2026-10-17-booking-entry-profile-320.png",
+    "sha256": "169d0f6c06edf4e615d0a6ba805fbf9897d0275ad6923c6d7a095366c9be48ee"
+  },
+  {
+    "path": "docs/qa/2026-10-17-booking-entry-selected-390.png",
+    "sha256": "f9f07a1a2f7fb54fcde4582dc5bfbd0a03a391072d7b7a231ae9e95d661e25a6"
+  },
+  {
+    "path": "docs/qa/2026-10-17-booking-service-entry.md",
+    "sha256": "f848a78b34ca98629e0fc8ae6d47c31c1726ba400a85a9b416b834d50e121fb3"
+  },
+  {
+    "path": "docs/qa/2026-10-17-business-location-desktop.jpg",
+    "sha256": "6cc7b12e44f6cc427aa388ad7c8c0ee5c8cd0b3e0fcca4bb287a68a34e9d5dd0"
+  },
+  {
+    "path": "docs/qa/2026-10-17-business-location-editor-390.jpg",
+    "sha256": "d48f664944949c5352c728f7828762f5d11432f4d89a30c5dfbcd25d9cb30728"
+  },
+  {
+    "path": "docs/qa/2026-10-17-business-location-production.jpg",
+    "sha256": "44923082210a4605cba04bba766986ad66e565db8dd94a05eab886e6a3819d2b"
+  },
+  {
+    "path": "docs/qa/2026-10-17-business-location-public-320.jpg",
+    "sha256": "ba4bde0fd28cb2f2e6a40d18fd6356599ea35f1c39d05736808e62ed02f90f7b"
+  },
+  {
+    "path": "docs/qa/2026-10-17-business-location.md",
+    "sha256": "94aeaf08bae6b9220e85a6d95ae0285ac4325dadf84a0ce59950f98c2fcc6cbc"
+  },
+  {
+    "path": "docs/qa/2026-10-17-calendar-export-320.jpg",
+    "sha256": "38e1e7087832eb2090f05aae2883fa4318389da1a5358a0425b458da19668725"
+  },
+  {
+    "path": "docs/qa/2026-10-17-calendar-export-390.jpg",
+    "sha256": "e29f2b5892ab108b6188be56b33ed3e66bff5b0e61d53418a2b201e7245d1ace"
+  },
+  {
+    "path": "docs/qa/2026-10-17-calendar-export-desktop.jpg",
+    "sha256": "eb2e202b9469b6c66b3c52b86e54fdf62c177264860577d911c744426259be85"
+  },
+  {
+    "path": "docs/qa/2026-10-17-calendar-export-production.jpg",
+    "sha256": "b547e247521d5a31d07df7de949bbdb0be37659397a7d315ff43fff6d2be072f"
+  },
+  {
+    "path": "docs/qa/2026-10-17-calendar-export.md",
+    "sha256": "7b6559086a8f0019f851301e498838dcad2549139139f72c03242bfd4122a669"
+  },
+  {
+    "path": "docs/qa/2026-10-17-calendar-service-details.md",
+    "sha256": "0c3235caf080c9380cfac7123b8b25871ec42eb8cbf5748ff37c8b0f2381e250"
+  },
+  {
+    "path": "docs/qa/2026-10-17-direct-booking-calendar.md",
+    "sha256": "df04a606c6bcf110beb35543ad11410766d246ff378166d933a0f90a8e46f91e"
+  },
+  {
+    "path": "docs/qa/2026-10-17-direct-calendar-320.png",
+    "sha256": "279e45a66118822ba4597eab7eb8d2d358e7843c367d65888cab35a3fc40c97e"
+  },
+  {
+    "path": "docs/qa/2026-10-17-direct-calendar-confirmed.png",
+    "sha256": "30e87456048240fae254ebdd241b37a68a1bedfc001c4523f2129a09de679537"
+  },
+  {
+    "path": "docs/qa/2026-10-17-direct-calendar-desktop.png",
+    "sha256": "677e235410113b87e23298f5f6b077e5327913e26dc98a53e13b63e65cd348a3"
+  },
+  {
+    "path": "docs/qa/2026-10-17-direct-calendar-entry-320.png",
+    "sha256": "16bffa7290f5da76988ece00c8e605b8ae39574d920b563eb3e487dec0359353"
+  },
+  {
+    "path": "docs/qa/2026-10-17-direct-calendar-proposal-390.png",
+    "sha256": "8ed8f19d3bd558dc29d1c15c67deac1f22924a9ab9fc105cc66bc97a2586ebd1"
+  },
+  {
+    "path": "docs/qa/2026-10-17-fresha-availability.jpg",
+    "sha256": "83cc5a5168f105c22b94ec74ebf3bc187634bfc92b4eea7e771bf9246a8acf81"
+  },
+  {
+    "path": "docs/qa/2026-10-17-fresha-booking-followup.md",
+    "sha256": "1906dbaa109be233becb390be1f306d67960b53690fa67c924c136d0ce929891"
+  },
+  {
+    "path": "docs/qa/2026-10-17-fresha-next-adaptations.md",
+    "sha256": "efb0e2b5f7d3e8e3481f415376c86747afa739a34a5eca03f4584e8e18da103b"
+  },
+  {
+    "path": "docs/qa/2026-10-17-fresha-service-availability.jpg",
+    "sha256": "f3c81306fc0ccfbadc5bd00f9d882502313992ba875c99389de85288caeee8f3"
+  },
+  {
+    "path": "docs/qa/2026-10-17-fresha-services-and-team.md",
+    "sha256": "36ceeb9451d012a8eebb80a6a7a8e323608d00cd66a71679932ca2e17dfcc061"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-reminders-desktop-1280.png",
+    "sha256": "13868c6cdadb8c6022d905ece557fa72c2a2542d66e1706e53076e272c42de05"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-reminders-disabled-final-390.png",
+    "sha256": "04d050950ec3580734c6872a5caf7064a946294fc5e1afd00b1817db35cf9336"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-reminders-pending-320.png",
+    "sha256": "b140151ffcec1494f225e7ca2be676eea9d2366a417f37ae40235760f0d008ae"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-reminders-production-390.png",
+    "sha256": "e732f92c96156ea39004bc0f4f33d8889cc59a353792f63dab171063e35d26a8"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-reminders.md",
+    "sha256": "7f0d689188651f8c3c48d92c7bb4b216cbbeb0cbe07efe433e61035447c3d678"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-waitlist-available-1280.png",
+    "sha256": "241682c4514aeaa0cdf016ed657cb853073a2ef29eac330bba50491000e9346f"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-waitlist-cancelled-390.png",
+    "sha256": "27286711da0685b0b04a3ae9eadcb086d97b84b6c8184d441456d66490e1f18f"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-waitlist-production.png",
+    "sha256": "ace2537025062bc8497b6d9d171a4767abcc81089d531504acb361b15396d05f"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-waitlist-waiting-320.png",
+    "sha256": "2c5d512032c7429c6f6b6391c35d43a4f083b05bcde022bb3679e68909a31c84"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-waitlist-waiting-390.png",
+    "sha256": "b6a3f51b6393695aeb8f27402d641af2666d6ca382a7d0e53810cf6b02a74340"
+  },
+  {
+    "path": "docs/qa/2026-10-17-in-app-waitlist.md",
+    "sha256": "e33a7680082f2d2ee5614240c055a9f087c69ca021264d11df06235273679585"
+  },
+  {
+    "path": "docs/qa/2026-10-17-next-available-date.md",
+    "sha256": "12e30469b134cbf44d1cf7916197275306634cd4b801cc50b99b7a5ddf7f7e96"
+  },
+  {
+    "path": "docs/qa/2026-10-17-next-available-desktop.jpg",
+    "sha256": "da58a9f35c47f6538ba0d96e59ebe5524e31da138e4bb8d2a7fdcd4726f4a444"
+  },
+  {
+    "path": "docs/qa/2026-10-17-next-available-empty-320.jpg",
+    "sha256": "8dd39dfbc3805fe82783ec411e89749c365a80188c8acb04ea86f2fbb1fdc4b2"
+  },
+  {
+    "path": "docs/qa/2026-10-17-next-available-found-320.jpg",
+    "sha256": "ac2b93fb36bb7e40af840df2b4d24aca72601bd7e356d8f31b99be82bb721960"
+  },
+  {
+    "path": "docs/qa/2026-10-17-next-available-loading-390.jpg",
+    "sha256": "8a1d2872bdc0facfa280e7076a1a7836406181b6ca7d7aaab3a1c64ff8571f0f"
+  },
+  {
+    "path": "docs/qa/2026-10-17-next-available-production.jpg",
+    "sha256": "9f90ad045a8dec0e9e5860110e28c3aaea9f65d88d1b5b50cca5977957319179"
+  },
+  {
+    "path": "docs/qa/2026-10-17-public-business-profile.md",
+    "sha256": "d351d84b4f639a534c9b102f79c5624db778ae198e6b1dd04f76b8908b848820"
+  },
+  {
+    "path": "docs/qa/2026-10-17-public-profile-320.png",
+    "sha256": "daf0a2441340ffe7a333320fe46fb8962e0789792c2bcbd55d0d5fe0e8a2930d"
+  },
+  {
+    "path": "docs/qa/2026-10-17-public-profile-390.png",
+    "sha256": "9f22accddf091f23e2d4a86a22a07e5a7538045812944d1751074b5aaab4bb3c"
+  },
+  {
+    "path": "docs/qa/2026-10-17-public-profile-desktop.png",
+    "sha256": "42a94c63404e9261727683836184d01e90441ccf91864e65031b927f5eb3d3b1"
+  },
+  {
+    "path": "docs/qa/2026-10-17-public-profile-live-desktop.png",
+    "sha256": "9b506769fe1ca96098036bf6338df6648a4690b59e0afac87814e8c5a7dfa3db"
+  },
+  {
+    "path": "docs/qa/2026-10-17-public-profile-live-mobile.png",
+    "sha256": "01222bf2ae0488b16017de1e09d7c1aa1c1d5d406c12d1c9195708cbf20c1b3f"
+  },
+  {
+    "path": "docs/qa/2026-10-17-pwa-favicon.md",
+    "sha256": "ccff0e4c8c7fd4c9b5e48f89dffa01810b4b41a7149cdf3639b78870f45d124e"
+  },
+  {
+    "path": "docs/qa/2026-10-17-pwa-icon-live.jpg",
+    "sha256": "c57d8b1328cd7734438247c8f99fb10ffc2b83a8d3c6bb3cf0434401ff56a9cf"
+  },
+  {
+    "path": "docs/qa/2026-10-17-rebook-from-history.md",
+    "sha256": "35bab3dc548ad9259667e747ababd011d93231e7b812d38e499c38b7d2b8bf8f"
+  },
+  {
+    "path": "docs/qa/2026-10-17-rebooking-current-390.jpg",
+    "sha256": "3bea7980b37182c5de1cd739317f89d2c13abee745b1ad47372bc9afe4712fdb"
+  },
+  {
+    "path": "docs/qa/2026-10-17-rebooking-desktop.jpg",
+    "sha256": "545dbe338b6ff363b7c5ac73a2bb31c12749c860197ebc6f22bb36c296baa95c"
+  },
+  {
+    "path": "docs/qa/2026-10-17-rebooking-history-320.jpg",
+    "sha256": "74e67681b64cd0072358ff87103107c3183c3031e9ef02134ab5f21ca9fdf617"
+  },
+  {
+    "path": "docs/qa/2026-10-17-rebooking-selected-320.jpg",
+    "sha256": "5104a44046c86495f6bf0ffa44d5e3e5b959f5d7563f03a084a994a850ca02a5"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-catalog-320.png",
+    "sha256": "21bd3d24cce5ca1864cc799cd4b0a9f48cfb7cb35f6e9ebf9466748393835210"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-catalog-clear-390.png",
+    "sha256": "4091dac4527fbc8594777766ee91cf8f98cea07656c4943756121e9ba99ad357"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-catalog-desktop.png",
+    "sha256": "ef7dd38554493cf48c0c876dd8bb53dd0a37740a485c9212fb64f46b0a1f3079"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-catalog-edit-320.png",
+    "sha256": "413f1dedb380bde13fe9fe861f166bfb55fffbd67cbdd1f16575881e8afcec74"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-catalog-live-edit.png",
+    "sha256": "9a40718980bece0bc1c0efd35a20204edad59b5442c840a8f86760d2995a8084"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-catalog.md",
+    "sha256": "3a4e2379cbbcf0c5fcee236a6f4d7ef1cb5e32857b14bb94095431529e0146bb"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-details-320.png",
+    "sha256": "6ac4bd158b5333015fcc558f842457ff5e1dd6efb12958bde1908def0afec248"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-details-390.png",
+    "sha256": "ca31fd22a66990ecc0422c218f13e1edc1cedf9a9f84c374a42e02f2e914ac19"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-details-desktop.png",
+    "sha256": "223ea18a5e1af8667f36ff401951a558f23b04c8af0dc4113d20dc41da7e4101"
+  },
+  {
+    "path": "docs/qa/2026-10-17-service-details-long-390.png",
+    "sha256": "e3633daa66b8705e6a974d7d79ef3a3017dd41a04e08724d138527ee97a40475"
+  },
+  {
+    "path": "docs/qa/agenda-clara-publicada.png",
+    "sha256": "316bef263b576c09baa9292ffd48e2a22fe5796c5eff50ecb10cf5722d645543"
+  },
+  {
+    "path": "docs/qa/assets/health-20261016/browser-readback.json",
+    "sha256": "b45a5c41585ed5f6db42dd08f469bec9abd3c4e0917d34cb292dff144c74d937"
+  },
+  {
+    "path": "docs/qa/assets/health-20261016/owner-manual.jpg",
+    "sha256": "ad421d87e79ffa8bd731bc6428b61fc475ab520fa701b95783d8e3c36616984d"
+  },
+  {
+    "path": "docs/qa/assets/health-20261016/owner-review.jpg",
+    "sha256": "50aeab9bfe9fb157ce009cf3b7048ea3af3a7f0c8cbfa965304c06af8200879c"
+  },
+  {
+    "path": "docs/qa/assets/health-20261016/pediatria-320.jpg",
+    "sha256": "b434d1786cb0c5f240ad5ef4b46013f1e6eb0ca939481a1d6c578b00d9dc418d"
+  },
+  {
+    "path": "docs/qa/assets/health-20261016/pediatria-390.jpg",
+    "sha256": "536c032f43c35487abd2f3efab21c67e33e585e6e7a3863cb6c2257af8ffa38d"
+  },
+  {
+    "path": "docs/qa/assets/health-20261016/pediatria-cancelada.jpg",
+    "sha256": "6c2e8d7e85cc9bfcab32235fc1d97b589d45ed49aaaa2c376705d22ef226b846"
+  },
+  {
+    "path": "docs/qa/assets/production-20261016/admin-budget.jpg",
+    "sha256": "cddf62417ef7244217b494037130d827f116ff43e91a093b358bf5f2fe3be088"
+  },
+  {
+    "path": "docs/qa/assets/production-20261016/landing-plans.jpg",
+    "sha256": "f886174cb70176ff3dbf6ff89fde24d9b0b849d29565a3fde6a8757cbe08ed7e"
+  },
+  {
+    "path": "docs/qa/dashboard-als-desktop.png",
+    "sha256": "aef8aa2eb795808cc6780983059b3c5006cd17d19bd1c46744c6dd9e9914af4b"
+  },
+  {
+    "path": "docs/qa/favicon-cara-sarin-publicado.png",
+    "sha256": "1912c4621149a75fa2ab7b047e3ef926aab63937551024b2dc3c7b14494ca8a6"
+  },
+  {
+    "path": "docs/qa/favicon-publicado.png",
+    "sha256": "70712472449af5f832ec5bb490a6bddaca4fbbd2563a9c234674a36bbf710118"
+  },
+  {
+    "path": "docs/qa/landing-als-desktop.png",
+    "sha256": "7db9186da4e63c328d32339265c19593cecd6a9d07880bfec30cc38cd532bec4"
+  },
+  {
+    "path": "docs/qa/landing-als-mobile.png",
+    "sha256": "38515a8b6424e5a147657c396f6387dbace2cd51bed11b20e28106fc26d634c0"
+  },
+  {
+    "path": "docs/qa/landing-temporal-desktop.png",
+    "sha256": "e6d025bf81219ff62dd4dad0b0e624a4d4457731f58a7cfc6cb9c06048b5dc08"
+  },
+  {
+    "path": "docs/qa/landing-temporal-mobile.png",
+    "sha256": "2dc74fc9faa3c411ca214d2faf3114f26399fcc5f3cfa3323a0d7a57fb161095"
+  },
+  {
+    "path": "docs/qa/landing-temporal-publicada.png",
+    "sha256": "9c0a68aa31675a57fe3d872327c9404e50f76a58b8f73d41737bc6b4fcdf7efe"
+  },
+  {
+    "path": "docs/qa/pnpm-pages-deployment.png",
+    "sha256": "803c124f79270ddfe815782651ddc2b603cf850e375c801028f7057a045cefd7"
+  },
+  {
+    "path": "docs/qa/pnpm-pages-settings.png",
+    "sha256": "86c9f9d22a186c84287fc37b1d397d47c75ddbcdcc1a005629d8d330cab0c6e2"
+  },
+  {
+    "path": "docs/qa/sarin-cara-cabecera-publicada.png",
+    "sha256": "290b05eafff4b233a6c470f0c19c47a43b9cd85e7c4c4b63af4238e2a03d50f3"
+  },
+  {
+    "path": "docs/qa/sarin-cara-pie-publicada.png",
+    "sha256": "e5dca8333ea1ed65942bd2c6df19631f1e96d6fbb6d2603b7b0e56892fd26574"
+  },
+  {
+    "path": "docs/qa/sarin-cinco-mensajes-publicado.png",
+    "sha256": "f59d53d6787370e5a7a343612c60b0d1d3842d6e4fcfd511d70ca84557b951f8"
+  },
+  {
+    "path": "docs/qa/sarin-dashboard-agenda-clara.png",
+    "sha256": "ded842b45ad879e68eaed17b4653aa2b1e39b59b0231c01ff5c8cfa017168150"
+  },
+  {
+    "path": "docs/qa/sarin-deepseek-chat-verified.jpg",
+    "sha256": "8390762d333eb4509838dc2411eb383333a68721b84b10d22463f850064f5520"
+  },
+  {
+    "path": "docs/qa/sarin-deepseek-login-pending.jpg",
+    "sha256": "f27dd9923f17952e1dab96200ae4006b5b70e9cd912972e62da031aea113bd12"
+  },
+  {
+    "path": "docs/qa/sarin-isla-agenda-clara-mobile.png",
+    "sha256": "b6630abcf89d28979bf2c5dd8a4d9f4d6d02530195a39ebf04688f26f05d1e58"
+  },
+  {
+    "path": "docs/qa/sarin-ollama-chat-verified.jpg",
+    "sha256": "ff75d82722f20e30e0d418819d6508f705ea9414994c5137ca9e0f050fef1096"
+  },
+  {
+    "path": "docs/qa/sarin-saludo-publicado.png",
+    "sha256": "745a216523eeda2b9d5dc41680daf1464afc8c1c1e7e5b4ec16d5a34495c18fc"
+  },
+  {
+    "path": "docs/qa/sarin-saludo-sin-boton-publicado.png",
+    "sha256": "0bab56eaf9eca108110b741577b080c07daca3e0f8c2fea5965bc007f60794f6"
+  },
+  {
+    "path": "docs/qa/sarin-saludo-sin-contador-publicado.png",
+    "sha256": "42284530fe89d29c9c2d17cfad207bbeb3cc78036bb7659ae7fcc0f0bb358566"
+  },
+  {
+    "path": "docs/qa/sarin-seccion-sin-iconos-publicada.png",
+    "sha256": "19feecfbc1b917e590c16f31f61d248c920bc2780f45f96b7bb7ed1497f1dba2"
+  },
+  {
+    "path": "docs/qa/sarin-vault-agenda-clara.png",
+    "sha256": "4a5eb720dc95bfffa9f1bcdfe13f71a46f91e8e51fb9e6d3dc07fcb733177506"
+  },
+  {
+    "path": "docs/qa/sarin-vps-private-dashboard.jpg",
+    "sha256": "473cd22e4211a7de583532a58bdfab99fada5e5b78cf8e20c6a250e1b370a47b"
+  },
+  {
+    "path": "docs/qa/sarin-vuelo-lateral-publicado.png",
+    "sha256": "0017ef3955a75768e6b8a843b92a1bb3c682723c6a080b2cb52cba3c6a894c97"
+  },
+  {
+    "path": "docs/qa/vault-als-desktop.png",
+    "sha256": "616569ee941e500a4410bb038ec507fd942632ab9a54a60065f48dc40c40aa11"
+  },
+  {
+    "path": "docs/qa/vault-als-mobile.png",
+    "sha256": "624d42ad6c9527e60310a0cb405a9ff91cf109143110d237deb91776bc700899"
+  },
+  {
+    "path": "docs/qa/vault-local.png",
+    "sha256": "24bed96d67f7dbaa3c4e457ec549cdceeed8ea71ef98e367d06f35f7f0772e1a"
+  },
+  {
+    "path": "docs/reminder-data-lifecycle.md",
+    "sha256": "476b1d223a02fafccb54e19c5d60196c60bc8f44b7557464af5af1f0c66c2086"
+  },
+  {
+    "path": "docs/remote-ollama-connection.md",
+    "sha256": "18b4ed6b9d6ef0c92ed1171bbfe057052ea73e778120e061d5f824ce8606b512"
+  },
+  {
+    "path": "docs/response-quotas.md",
+    "sha256": "bbc79aaf8cd88c9c75551bc6e513babde91e20b5598ea3e7042d6cf06b060e0a"
+  },
+  {
+    "path": "docs/reusing-local-engine.md",
+    "sha256": "c261b6529e367d8f5d3c536205baf1ec88e26d2668334d250ec616e7de6b243b"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-13-sarin-production.md",
+    "sha256": "3c1a73fdeb670152e638a17e82eadabb40e130c644790f9ad6655a5635a9565e"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-14-adelantos-sin-firebase.md",
+    "sha256": "d2db939dc243484f45e2622f6325ab2b822e64c64dc1d10ddc23c9764f4bbfc6"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-14-migracion-pnpm.md",
+    "sha256": "9ed7f416449e35e4639128716748a257d0d16677bd50a36e417b6d5cb7216cd9"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-14-vps-firebase-x509.md",
+    "sha256": "0239eb56cc61be9422e0dc9158bad231597a737c4b1a5408ad50df2704d308de"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-15-commercial-quotas-and-whatsapp.md",
+    "sha256": "aee04432c88555c26d698b6d7f827e965fe84407d5e39c2f513bbcc1baac3ec5"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-cloudflare-data.md",
+    "sha256": "4cf85e714ceef388ead65113cf3c188e057c0519e4583d51a3171085ac859664"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-cloudflare-no-vps.md",
+    "sha256": "d461c89ee54a2f95ea3421b7975a3d7e327fe8ee20033a2131476c5d7f4f07b7"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-commercial-pilot.md",
+    "sha256": "efef9781323ba9f3e3dc1ee082e77593ffe9d50e0f30eb928a552c1761fa9a39"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-consent.md",
+    "sha256": "090ae58d2a54fb62845c44dd294391e5084a6a881b9d9848631c1d62d9658fc4"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-health-and-represented-booking.md",
+    "sha256": "4a5dee6b7a2a2b872cd27ea4006bce8ca82e5d38613998e7274f6da66bc9f948"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-paid-trial.md",
+    "sha256": "69a58bd6642261031864eaf25440a058d20f57da84e1bd33a18f2850860cb34f"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-pilot-abuse-controls.md",
+    "sha256": "c91c094d09f3579a212bad4e21d19e04b08498394da2e6cd9903cc01c98d5838"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-pilot-business-branding.md",
+    "sha256": "1b99dbe7978d5297f7d4073d6543a72b6416ef38bff07e5a0d38ef1d284fbd64"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-pilot-invitations.md",
+    "sha256": "ec8b44ce26f44de8ce957a064d5813c56deec39f6a981f845b4bde2f2c73d9cd"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-16-pilot-pricing.md",
+    "sha256": "6d6bb2e2af86836d7c511c8e6eaacb04e8707260be8ce42190e6ef227c3c8278"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-17-in-app-reminders.md",
+    "sha256": "6c5cd79cebda464e9bea5b92b9a2c053db78bdc0791a07446ee42935d18f71be"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-17-in-app-waitlist.md",
+    "sha256": "9de626f72a3310ae5852e963c4a7fa1db66551a8db7c7f37056ead6556dd250f"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-16-cloudflare-data-design.md",
+    "sha256": "59258e8871e65d89a3933655c56b9f6220c414e199eb2e2c44ac565f8ebaf0de"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-16-cloudflare-no-vps-design.md",
+    "sha256": "2ef018f5507aae5b782f590318ae8a3c789318aec967631c8e21953a7308f764"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-16-health-and-represented-booking-design.md",
+    "sha256": "57abbc1abcafade8aa2ea318fe82bbdf728f2ed45356c5fcfdfca32ce75ac44a"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-16-paid-trial-design.md",
+    "sha256": "eb369d52fa30a10f94242ddc91f0c93eb9eff7cc7b3b02728ebfac4dc89d66d9"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-17-in-app-reminders-design.md",
+    "sha256": "dd9bdd19f50eeee9d2037208bd0c1822068f1ec632cef5fc773b257a9f6a3021"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-17-in-app-waitlist-design.md",
+    "sha256": "564f8b10ef33835e8ab1e25eb6327e3552a04251e1b1a6d5a5206df76a07b081"
+  },
+  {
+    "path": "docs/waitlist-data-lifecycle.md",
+    "sha256": "b57ba7ea7f84ea745b6ffdf4a1e6e78d2959cee461f0ca0b1d94849db8ea710a"
+  },
+  {
+    "path": "docs/whatsapp-cloud-api.md",
+    "sha256": "9e876bcbb7e551fdbf7285155f5d8a4dc9a53bf3c32b834d56b70d3f0430bc30"
+  },
+  {
+    "path": "docs/whatsapp-premium-proposal.md",
+    "sha256": "69b235306b80eb13e4aaf911ddcdc957abc4ea95c8bc4461fc397ed6e03bfb57"
+  },
+  {
+    "path": "firebase.json",
+    "sha256": "8ec8162924551e8fb2e9ffa04bf6537453693bd7cbd50c1233bbf83780b9be6f"
+  },
+  {
+    "path": "firestore.indexes.json",
+    "sha256": "f5d1990a875d08693733c93a6e50951a5de3e5e75564844f8b7068b2ce3de08e"
+  },
+  {
+    "path": "firestore.rules",
+    "sha256": "45e443e8fbf4a653959f4e0a79f0b06d6592998c295f8d0b6d0dddff04a3f952"
+  },
+  {
+    "path": "landing/README.md",
+    "sha256": "861942c4ab1c8ffea46384ce0f5b725aa129195c202f93f804b703a828edfe85"
+  },
+  {
+    "path": "landing/app/globals.css",
+    "sha256": "505e3a44d80abc11d1a5ef8570492f464faf1635a0b8f613c3d4682de5371786"
+  },
+  {
+    "path": "landing/app/layout.tsx",
+    "sha256": "5cae6d9323b8c9cd109fc069e7bf7afa312a927ac33379940411745537d8b3a2"
+  },
+  {
+    "path": "landing/app/not-found.tsx",
+    "sha256": "1bcbac749af6de836d6325e912d4cf195e4994d3764ce64bfdf9dd64f2b6a800"
+  },
+  {
+    "path": "landing/app/page.tsx",
+    "sha256": "3fa8526203d619374d45fe6292f2729d2d58decbe13fd88191d74ec99c82d8a2"
+  },
+  {
+    "path": "landing/app/robots.ts",
+    "sha256": "cc11a00661f232721771df7be68822f5373767cb7c1529a558888678f1fd03c2"
+  },
+  {
+    "path": "landing/app/sitemap.ts",
+    "sha256": "7e643103c67951a4f9e5867509d95dc3faa6a11e3f7a17ca2a642a407f5c509d"
+  },
+  {
+    "path": "landing/next-env.d.ts",
+    "sha256": "1b59d4c6b83807db275d43f3cf2cc8e9323f465fab764eea091cc5becd5bad37"
+  },
+  {
+    "path": "landing/next.config.mjs",
+    "sha256": "d9e1c93baa6764c3d97066136af117da389cea998968156ae799a8a6cce8b8b5"
+  },
+  {
+    "path": "landing/postcss.config.mjs",
+    "sha256": "215ce6401c6aefadd2a299f1742e5fcebe8778b2e8117973aea6f8567abdda8f"
+  },
+  {
+    "path": "landing/public/_headers",
+    "sha256": "21a255bcc18358ff7cb9fc017481cd9123ddab871db1068020367c174d74526b"
+  },
+  {
+    "path": "landing/public/apple-touch-icon.png",
+    "sha256": "23aec55fed7323f5853ab475adf9f9a2530a34930d828f6f5052336a7ede55d9"
+  },
+  {
+    "path": "landing/public/favicon.ico",
+    "sha256": "b30c672396aceca3067bec88363d2c65465d678cbffd4cc17704364d507efd25"
+  },
+  {
+    "path": "landing/public/favicon.png",
+    "sha256": "8c8bc43c63436d1e9c1c6497d78a0a020fa4aafeac2a14f9f65ef532d2000ade"
+  },
+  {
+    "path": "landing/public/sarin-face-32.png",
+    "sha256": "8c8bc43c63436d1e9c1c6497d78a0a020fa4aafeac2a14f9f65ef532d2000ade"
+  },
+  {
+    "path": "landing/public/sarin-face-48.png",
+    "sha256": "e103dce274bdea1e992b304003644bf22a799e85e2cbf4e63280bf0b52dc7eae"
+  },
+  {
+    "path": "landing/public/sarin-face-apple.png",
+    "sha256": "23aec55fed7323f5853ab475adf9f9a2530a34930d828f6f5052336a7ede55d9"
+  },
+  {
+    "path": "landing/public/sarin-face.ico",
+    "sha256": "b30c672396aceca3067bec88363d2c65465d678cbffd4cc17704364d507efd25"
+  },
+  {
+    "path": "landing/tsconfig.json",
+    "sha256": "ce5229015a036ff6aa692bcee409b9f397b5c8fd1279fc67271a4c7f71ba1bb3"
+  },
+  {
+    "path": "next-env.d.ts",
+    "sha256": "b8b3a344484b959af5e4e3fc1a1609dac3cb9ece0cdeb6c145be29bc4c491000"
+  },
+  {
+    "path": "next.config.mjs",
+    "sha256": "f02326f4646b282aada0695e41c173d5caf9d2b60f2b2a27656debcf47ccceeb"
+  },
+  {
+    "path": "package.json",
+    "sha256": "daac38bb0aae01fff8a5bfa93a334e541a583fbf86983661d81d47951cdea094"
+  },
+  {
+    "path": "pages-gateway/tests/package.test.mjs",
+    "sha256": "bf7dc7253faf56424b14a2d70c1dcce7778a7b5e451d525e15f4831c038937de"
+  },
+  {
+    "path": "pages-gateway/tests/worker.test.mjs",
+    "sha256": "f572bf5ca9250cfc31c56c8b9166ebd21bc4720dd8c672a36a75877bc3f31bbe"
+  },
+  {
+    "path": "pages-gateway/worker.mjs",
+    "sha256": "a94de8aa33fa4b6fedaf13088bcc8b3dfa18dca713ecc3c246c28b63d6c3d857"
+  },
+  {
+    "path": "pnpm-lock.yaml",
+    "sha256": "a3f8547b80ebdce563a4cc605c78984a0bf78e6ac0c9bdf8bda04f0ad33c323b"
+  },
+  {
+    "path": "pnpm-workspace.yaml",
+    "sha256": "2229b5bba40058937e0419c0873f2ff4bb58f1b5e90cff5ec5401e3fee1273b7"
+  },
+  {
+    "path": "postcss.config.mjs",
+    "sha256": "344f8f0310fff44b3ea45fd7b8eda48b62f2bafc77cf84fee8d5191eef0298d7"
+  },
+  {
+    "path": "public/brand/README.md",
+    "sha256": "2b50c20be8e94dcb35d5e773318a10511281b79676d799e58425067e86f4df15"
+  },
+  {
+    "path": "public/brand/sarin-face-192.png",
+    "sha256": "bec2324dd74f8d0dbc476b5b580c5b2eca65aff171426574706071a40724541e"
+  },
+  {
+    "path": "public/brand/sarin-face-512.png",
+    "sha256": "bfe3c69878d4089d14076be0394acb67bc42fc879a0111e1bbfb855b70e85482"
+  },
+  {
+    "path": "public/brand/sarin-face-mark.png",
+    "sha256": "23aec55fed7323f5853ab475adf9f9a2530a34930d828f6f5052336a7ede55d9"
+  },
+  {
+    "path": "public/brand/sarin-face.png",
+    "sha256": "56543737aa55174c19802cebbdda9a775c2a3bcc2a0b343fd5105920b9c20a87"
+  },
+  {
+    "path": "public/brand/sarin-flight.png",
+    "sha256": "443d289fb324e41330ea173d24cfdec0c478b37a34952f5b423094ac99964fc1"
+  },
+  {
+    "path": "public/brand/sarin-welcome.png",
+    "sha256": "68674b6751a81188a947a46a42e911c25f548c0ae3dc0449e2dbabe4ce8e52d2"
+  },
+  {
+    "path": "public/fonts/DM-Sans-OFL.txt",
+    "sha256": "9af36190332437f5ecd09974de43c1f7c77a310a996cdd8ceb25628b458840e1"
+  },
+  {
+    "path": "public/fonts/IBM-Plex-Mono-OFL.txt",
+    "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+  },
+  {
+    "path": "public/fonts/README.md",
+    "sha256": "f2c91eb2b8f98cf1fff761986591904baeaa4602680b7cac8cbf05295891bf47"
+  },
+  {
+    "path": "public/fonts/Space-Grotesk-OFL.txt",
+    "sha256": "564ce565c371c5e5bbf286006565a7c9aa55a9f56e7ca58d56e05d649dd61a72"
+  },
+  {
+    "path": "public/fonts/dm-sans-latin.woff2",
+    "sha256": "9fea608a947e67020c33cad9a6fe3d60c54119dfb8cff87768a8117a15ed7543"
+  },
+  {
+    "path": "public/fonts/ibm-plex-mono-latin.woff2",
+    "sha256": "08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7"
+  },
+  {
+    "path": "public/fonts/space-grotesk-latin.woff2",
+    "sha256": "0640890476fc1198ab4de571fb658de443c4d85b66466ec09534a8737ab1ce9d"
+  },
+  {
+    "path": "public/sarin-mark.svg",
+    "sha256": "9166a2ed17d61021d7512c5ddeea320a7fd43676f61fd4a9ebaabd58ed6bd1dc"
+  },
+  {
+    "path": "qa/tests/appointment-reschedule.md",
+    "sha256": "b4f8b31ae41a40b0251e31b399e664db6dbbead9de8016d7671077726b992e85"
+  },
+  {
+    "path": "qa/tests/booking-service-entry.md",
+    "sha256": "88b0c1c20143f384896ad6d1489dd3b5b4d01ec4894d753858d7990c44c04a6b"
+  },
+  {
+    "path": "qa/tests/business-location.md",
+    "sha256": "2314f3c1df554981891d33d64fe79f56e98e842fc5d94225a8f2fdb03a56d481"
+  },
+  {
+    "path": "qa/tests/calendar-export.md",
+    "sha256": "34ea49cdb2ff1bc6af848ccebbdbdffa20f6a26576ef1558348745d1c8dab3ec"
+  },
+  {
+    "path": "qa/tests/calendar-service-details.md",
+    "sha256": "ca4f4236aea4c2536dc027312b9cad51793422e70f819b0927c06f2b25cbf5c0"
+  },
+  {
+    "path": "qa/tests/direct-booking-calendar.md",
+    "sha256": "80b9c81b95308e0dc2261dc5114f284270bd4a458f4dc9c96699329db2fa6f73"
+  },
+  {
+    "path": "qa/tests/in-app-reminders.md",
+    "sha256": "214789f45e4979a00b48eaf9c577a6eb5a90ca33e964ec8f94e953777d884312"
+  },
+  {
+    "path": "qa/tests/in-app-waitlist.md",
+    "sha256": "0540817066d5ab5d6f40eb3f9196da7e8b7d8a9eb4910282bed33f9ed8ed1adc"
+  },
+  {
+    "path": "qa/tests/next-available-date.md",
+    "sha256": "396ab8a983579e7beab7579ec614e000949046a442108baacd5a3e206efdc08f"
+  },
+  {
+    "path": "qa/tests/public-business-profile.md",
+    "sha256": "55818a742578f3b5584ca3c3126ae46377ced2ac383b47ea1e5a90a096e80a9e"
+  },
+  {
+    "path": "qa/tests/rebook-from-history.md",
+    "sha256": "48e4b2ec2144773769407743e71d63db1e2f1aa753b1f48b23c8c576207bda68"
+  },
+  {
+    "path": "qa/tests/service-catalog.md",
+    "sha256": "452ef58cd66c6c9f9aa55b5df213ca96938419e5d376d065c29858b054637c23"
+  },
+  {
+    "path": "scripts/build-landing.mjs",
+    "sha256": "dc2f00356de75b8fe862618c52bd2cc7c44552ca3a5587303ec03324f980a5d0"
+  },
+  {
+    "path": "scripts/build-pages.mjs",
+    "sha256": "64116d32059ef4bc7d0879d0357e022846965a93a4fb3bdd004a253b8b51a491"
+  },
+  {
+    "path": "scripts/cloudflare-data-migration.mjs",
+    "sha256": "383af5268d4d1c2f4c762bcc59ee8fb120b7c7db3a48268fcd7bbba4d39bd69b"
+  },
+  {
+    "path": "scripts/cloudflare-wif-setup.mjs",
+    "sha256": "7ba2e2349a37720c794848af1109a2eadfdf766ffc1cb9d52fe36499fd4e5194"
+  },
+  {
+    "path": "scripts/container-start.mjs",
+    "sha256": "be698f8dc92555098d383bc0f3528a4533e615ce36a68efba451ded0d3f2f947"
+  },
+  {
+    "path": "scripts/dev-local.mjs",
+    "sha256": "6b1e98bf5a18614ea2cffa42445e9b9736a12ae60fffa2c08df738ce93b8ae57"
+  },
+  {
+    "path": "scripts/doctor.mjs",
+    "sha256": "e9574a65d4810ceaaa2a270a19a58f075e3d853e01bb0df229e096ce6cfa65bc"
+  },
+  {
+    "path": "scripts/firestore-emulator-tests.mjs",
+    "sha256": "8a4e68ebbc743ff9a97271b7aa9bc8c000232a38e2e217ff350316e49b94dd7d"
+  },
+  {
+    "path": "scripts/journey-local.mjs",
+    "sha256": "8812a59ddb46245d02fb9d58f541fd4b42218af7e3cfe5c62afae0fa8c48e881"
+  },
+  {
+    "path": "scripts/journey.vitest.config.mts",
+    "sha256": "98b674a6f29cf63baad464724a4f3bca90e72cb1cc04087f2398677d1bb80ae3"
+  },
+  {
+    "path": "scripts/lib/cloudflare-credentials.mjs",
+    "sha256": "88b34f51cd1b31c809fc1fa79dfef781c63d7b877e8dd76f9cc3c0379658cea4"
+  },
+  {
+    "path": "scripts/lib/data-migration.mjs",
+    "sha256": "3abf264f97db2e2d745131a7ae82654547e0c643f7be4736ddc92830ff63683c"
+  },
+  {
+    "path": "scripts/lib/doctor.mjs",
+    "sha256": "264a2f3ba4707d35b24668af562ffa505326cce2cd1e15aa2f02a9145b167674"
+  },
+  {
+    "path": "scripts/lib/local-development.mjs",
+    "sha256": "1e6cfc1e39f1785b61500c131f1634f585c4726072aa1501488c3f7cd6ee9a11"
+  },
+  {
+    "path": "scripts/lib/local-journey.mjs",
+    "sha256": "5a50c4a372a9912172d4c91c98eaf93410ffeb6f2eca3556e3863fc23fd52631"
+  },
+  {
+    "path": "scripts/package-pages-gateway.mjs",
+    "sha256": "e47956fc59fb3cc939fd138cec5225e6e2eab9ffef4720a4ec79c424bd061b4f"
+  },
+  {
+    "path": "scripts/seed-local.mjs",
+    "sha256": "5dcf421af8b9a4e617c9271327c195450d5b2e3a42f11f717ada35c692ad3884"
+  },
+  {
+    "path": "scripts/smoke-local.mjs",
+    "sha256": "e8c4108266bf42b23eee361fc5f36b2b116d492b9bd86dccb6b57b01fbc9f3b9"
+  },
+  {
+    "path": "scripts/verify-d1-backup.mjs",
+    "sha256": "d521b5d371fddd49915647915a80fb964e05ea7fec5e38f467fef4c63f5a325a"
+  },
+  {
+    "path": "scripts/verify-landing.mjs",
+    "sha256": "cf77cbae88a37589a598d0af19ff486812094af46a55c1f24c01d517eba1f241"
+  },
+  {
+    "path": "shared/data-protocol.ts",
+    "sha256": "899d031ad36e7913dec3958eeae63ecbf895df85075f33e2bb7147ddf6668e57"
+  },
+  {
+    "path": "src/app/admin/page.tsx",
+    "sha256": "9d7383d8faaea048e525e8b294b45a8ef15c2f880579f0febd1517af4e6b9843"
+  },
+  {
+    "path": "src/app/api/admin/abuse/route.ts",
+    "sha256": "b163bfd99eb7f00251995b1e01ec3484216296b18b6bf5499c961e1f00aa0634"
+  },
+  {
+    "path": "src/app/api/admin/ai/route.ts",
+    "sha256": "59aed7f795fb02b9c601e409f8b985c51f497a5ddff84c0768ac91032d0989e1"
+  },
+  {
+    "path": "src/app/api/admin/ai/usage/route.ts",
+    "sha256": "389079b71125102673cc6bf094524d5e7606bb867a1d04663ff6dfaa1b2e88af"
+  },
+  {
+    "path": "src/app/api/admin/booking-data-policy/route.ts",
+    "sha256": "f25a53e9ed04284d80c4f78c04106f69b11443b84c9e3651ba4d0949fc0d7dba"
+  },
+  {
+    "path": "src/app/api/admin/invitations/route.ts",
+    "sha256": "381ff477216785a27199170e8a43cabed36e1a1df4479d0b6417dd95a36e4fa2"
+  },
+  {
+    "path": "src/app/api/admin/route.ts",
+    "sha256": "b0e956c26d64dd57dfa01d179fdc80cbebbb75035534e4931bd9466368d48f41"
+  },
+  {
+    "path": "src/app/api/admin/whatsapp/cleanup/route.ts",
+    "sha256": "07ab2ecb09773cd34d59d8521c5faa2196907be190812b0e4c18a1c96c3a6c24"
+  },
+  {
+    "path": "src/app/api/admin/whatsapp/route.ts",
+    "sha256": "71eeb7b7465fa8be3fa5e8c073d7d935c1e76fd95c90b45b62bf87970ae3919e"
+  },
+  {
+    "path": "src/app/api/billing/route.ts",
+    "sha256": "6de2b087d3776e9b4522f8dec9211b4f2c8d2c7588ddf23debe674a447eb5f39"
+  },
+  {
+    "path": "src/app/api/booking-subject-consent/route.ts",
+    "sha256": "2918aef6a41ccc0705cf73c88f8f1ea4f8da420f62ee5da34b8a247662a5e3e3"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/appointments/[appointmentId]/representation-review/route.ts",
+    "sha256": "e29146690eabb54bbae736e0504e0c24cc17fa154e8c37e2cbeeebbd3663f2a2"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/appointments/route.ts",
+    "sha256": "1c8595f31fe62dd6a8c75940553db3c995771645d2c68d6ee55ffafd5798a8df"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/availability/next/route.ts",
+    "sha256": "4ded1d4a2c4ef751620be5ed8199a5f69af194151631e248523a8be7c82e3a07"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/availability/route.ts",
+    "sha256": "858797f4b0db01445972f8bd69c2275ad4d3ce9d3c3639b1414040a2ad1bf366"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/booking-policy/route.ts",
+    "sha256": "5fd07f4532c4dcb3c5894ac8a311977a4c6108eb80fe3c1861ff74c01b5cff05"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/booking-proposals/[proposalId]/confirm/route.ts",
+    "sha256": "a45f76ea1910ee2389089f63fc1173ee8581d51ef6c63cb16498672dfbd24228"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/booking-proposals/route.ts",
+    "sha256": "2a626bf668ae0f711a7c66852edd0b6f1bf090264a8c8ac224d0ea94a0af4d50"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/client-policy/route.ts",
+    "sha256": "44279fb27abfa112944c505e1334f40e8fd80cb9bc85b06f4d70556af5bb041a"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/reminders/preference/route.ts",
+    "sha256": "c77254a91295c42559b6bcb0247d1f68f87003e129bb9d467bd592d353501ada"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/reminders/route.ts",
+    "sha256": "eb3c8b476751c4121c25fcfc825ea678e9f2664143ce40f926000527f6841f3d"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/reminders/seen/route.ts",
+    "sha256": "7cb3eb6f3c7d0451a9f662e1f9da40a05570410766f15a70c3e396025a700545"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/reschedule/availability/route.ts",
+    "sha256": "1e42b82d00ac0a02712ba7ea37dfd84a45a5011fd56d9c64292c86c285c49dc0"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/reschedule/proposals/route.ts",
+    "sha256": "10c27537f6c1d7304ee60338a4b7957721d7e4a0fae5daff1b2f72d1d70cf35f"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/waitlist/cancel/route.ts",
+    "sha256": "59237414a5c62b1fd82aeb5a1e6052a57e6827e9594b8e90c40405d101a63c11"
+  },
+  {
+    "path": "src/app/api/businesses/[id]/waitlist/route.ts",
+    "sha256": "74ed3089470796c530ff82e216be92674be29f356cfb6f708fd39746dfb1ed8d"
+  },
+  {
+    "path": "src/app/api/businesses/logo/route.ts",
+    "sha256": "33eb4945cf1b2d0bcb77f4e431706d6b2e1d5c02085b64dda404ef50e98cc9e2"
+  },
+  {
+    "path": "src/app/api/businesses/qr-kit/route.ts",
+    "sha256": "b7870c8e93a7bd1d88fa68bd3b20bc0b4c7c1e30de7d09c133b3b40a672022c0"
+  },
+  {
+    "path": "src/app/api/businesses/route.ts",
+    "sha256": "ed2a884a06e40f390628d00d71b5dd9cd063e86ce725daa49d81b426969428cf"
+  },
+  {
+    "path": "src/app/api/consent/preauthorize/route.ts",
+    "sha256": "867e1a7f65c5047a54f2334fa8f313bf3a19f5976a03b0a20fdbbca5f9224aea"
+  },
+  {
+    "path": "src/app/api/consent/route.ts",
+    "sha256": "8c0b5a3622837a431ac6e63051e692d209e6866ebd077b721be96de1d551f3f8"
+  },
+  {
+    "path": "src/app/api/invitations/redeem/route.ts",
+    "sha256": "b286caa624a12873e18a967c02aaa613d84ff39c5a38be0e72bdd97fb279a31e"
+  },
+  {
+    "path": "src/app/api/public/businesses/[slug]/logo/[sha256]/route.ts",
+    "sha256": "318e4dedd22feb080bd60bef730f4c5fae3432fb29a3901806afac8a16edc4c5"
+  },
+  {
+    "path": "src/app/api/public/businesses/[slug]/route.ts",
+    "sha256": "d28cf353e0165aaae744e9bfcac5d7d26b85db2125ee6182b53e31c329a8b5f1"
+  },
+  {
+    "path": "src/app/api/public/commercial-offer/route.ts",
+    "sha256": "cccfcfda82dc210b23d0049be8b1f753507dec8cbd4e4ee29a2b8be5531025d6"
+  },
+  {
+    "path": "src/app/api/sarin/chat/route.ts",
+    "sha256": "ad751f5af4223cbb48fcc95f9a306f6c06d78e982cce82c63d96201f80e43839"
+  },
+  {
+    "path": "src/app/api/sarin/health/route.ts",
+    "sha256": "20015eb7040c33dacb63d966738fd28d5b5da522a37ccf5088cd1840ad48661a"
+  },
+  {
+    "path": "src/app/api/session/route.ts",
+    "sha256": "26fb5e176d5655143eaafafe0ee6af1e3c9963bc5f420992db6b183e802694e5"
+  },
+  {
+    "path": "src/app/api/whatsapp/webhook/route.ts",
+    "sha256": "d8981c714634a3e6f386cbdab9d8f7f2c20f8b8e814c60bc39a0f8ccf9e8fbef"
+  },
+  {
+    "path": "src/app/ayuda/page.tsx",
+    "sha256": "71c43379a668f08693dccc7f303de37d2cd3a4ccd747bfb1b9a2f6937b2748a7"
+  },
+  {
+    "path": "src/app/b/[slug]/page.tsx",
+    "sha256": "b87339c8d725c9b5b1d0cb6bb6801ae51478d7560274f3d60e0d02163fe6b966"
+  },
+  {
+    "path": "src/app/dashboard/billing/page.tsx",
+    "sha256": "224cc2d07368592068915c8cde3570daa8ef1e51706df60af69a3d648f28a4a5"
+  },
+  {
+    "path": "src/app/dashboard/onboarding/page.tsx",
+    "sha256": "7239d8e2ca8e97ab772a01dc4a8151b1c25793cb151319b60e6bf4b78ba3d983"
+  },
+  {
+    "path": "src/app/dashboard/page.tsx",
+    "sha256": "c88c9daf76b218e1f1512fa6a029a2334da7cc0c77e85bbb130d2cca5d1c3292"
+  },
+  {
+    "path": "src/app/dashboard/qr-kit/page.tsx",
+    "sha256": "40f6abb813f76a8a45801a1c93693d16ab708b8c8727a6531e920dccbf32bd83"
+  },
+  {
+    "path": "src/app/globals.css",
+    "sha256": "13df44ed5aaf8e9a5dacc01ae65ce888a00b8e443da3c556e3f8018f8475a93f"
+  },
+  {
+    "path": "src/app/layout.tsx",
+    "sha256": "96404cd66c27cdb3d3679ca125beb1059cb52b2b8d7134c3bd27b3631daca40c"
+  },
+  {
+    "path": "src/app/manifest.ts",
+    "sha256": "b9d41a4e3319747bff0fd622188a31d2eeb89a4d642a7b0c0f2d035fd656f264"
+  },
+  {
+    "path": "src/app/page.tsx",
+    "sha256": "3073a45f78481e9494f269daf7716ff4c1cb90438027292805a0fb7fe5e756c6"
+  },
+  {
+    "path": "src/app/privacidad/page.tsx",
+    "sha256": "d30afb6e8729c08df6d7b817040aeee9d7764a0b50d9de4eddaab973e63f7af7"
+  },
+  {
+    "path": "src/app/terminos/page.tsx",
+    "sha256": "3f88fc13e2b62f2230547b97424b76bb3f7b3c97dc14526059945e9a65e43113"
+  },
+  {
+    "path": "src/components/admin-ai-budget.tsx",
+    "sha256": "bc7ea7016de58a1f626525b678abecd4d1543f838bbb69f52dc975cf35dd5706"
+  },
+  {
+    "path": "src/components/admin-ai-settings.tsx",
+    "sha256": "8f589ded6f082ba7e2713930ede58d62fc21b76542cdd75eade6b2b2a267e439"
+  },
+  {
+    "path": "src/components/admin-ai-usage.tsx",
+    "sha256": "05f9a0c02f18be39525a076c64fa4a35e9a6ac701d8414d19ed6a95cd6f305f4"
+  },
+  {
+    "path": "src/components/admin-booking-data-policy.tsx",
+    "sha256": "ab78ddacade9191597f63c62755dbebb83ee073ec37bd0221231194bc8147123"
+  },
+  {
+    "path": "src/components/admin-invitations.tsx",
+    "sha256": "e15498b7614fabcebaa9c69e9cd8c26ba2452882e52843f04def6cb72ceb7d1f"
+  },
+  {
+    "path": "src/components/admin-whatsapp.tsx",
+    "sha256": "3410704adc7a23f4781104bebd5ddf802374ea1d91bfd06d194b9e8dea110f28"
+  },
+  {
+    "path": "src/components/agenda-preview.tsx",
+    "sha256": "18a4be3cb99345a718fc59cb7ea3b630c028fc654b2511f6bd0640cc76795c46"
+  },
+  {
+    "path": "src/components/app-shell.tsx",
+    "sha256": "8330a035251180069034b809da7daa559bd98fbcb8576d0786181f93b9982f1f"
+  },
+  {
+    "path": "src/components/appointment-reschedule.tsx",
+    "sha256": "272ba3a697fdaf46c19e91f0f228c773120e659ff75336e3bcf4b8c2e3dcc104"
+  },
+  {
+    "path": "src/components/auth-provider.tsx",
+    "sha256": "370bc65de0f1906868783fcea8c4aa1bf02461331862221b39aa047548d1a229"
+  },
+  {
+    "path": "src/components/booking-card-preview.tsx",
+    "sha256": "650049d9e5a6b1cd0db426c2c3d9ecdd96d6a995a2bffc5b81c4603578a41d84"
+  },
+  {
+    "path": "src/components/booking-proposal.tsx",
+    "sha256": "807a0875e26ffd295dcaf1ce42259dd9c9188a201f9f3823e3840e57c402f0a3"
+  },
+  {
+    "path": "src/components/booking-subject-consent.tsx",
+    "sha256": "673594f8ce83a91a81a4668a85a8bdfa5e45b530db8ec9814afd91cb6b34fdcc"
+  },
+  {
+    "path": "src/components/business-location-editor.tsx",
+    "sha256": "700d13dd78df7c4df596f3b1231aed0fc541b7af987f73da65fb99ad34c46c37"
+  },
+  {
+    "path": "src/components/business-location.tsx",
+    "sha256": "f3ce6f4f47811ba4ce1cef17bd10fb20db9cd86b1fe524de04d86aa1c9709bee"
+  },
+  {
+    "path": "src/components/business-logo-field.tsx",
+    "sha256": "ad9279de4c05595301370a3b2d8e21b2b7e6075c8b716bbf2d3397619681c437"
+  },
+  {
+    "path": "src/components/business-public-profile.tsx",
+    "sha256": "53e27754365467c45f68475c05922cd3304f49c23997a5ae0bd85e3c6aea8b1f"
+  },
+  {
+    "path": "src/components/business-social-fields.tsx",
+    "sha256": "bd61ff86f00ef15b869f209a15b56f8b03675e1da07e0215b9c75569e9962d02"
+  },
+  {
+    "path": "src/components/client-appointment-reminders.tsx",
+    "sha256": "9303d633a1c2471126ea9100c534a055d22ce4c11de9a13fd7dc7113a3623b5a"
+  },
+  {
+    "path": "src/components/client-appointments.tsx",
+    "sha256": "b6d4abbda08bfcc4ec874a24d9fa5d1f59f0feaf26d4de6ff725936e4ed4e63d"
+  },
+  {
+    "path": "src/components/client-policy-controls.tsx",
+    "sha256": "9a5a062419d23f8f94e135ec94a711434121dbf8a055a593653fc824baf83071"
+  },
+  {
+    "path": "src/components/client-waitlist.tsx",
+    "sha256": "bfcf7d12d2c579f09ccb23e3f30efa499bab99da3742a175af9409e2f821656a"
+  },
+  {
+    "path": "src/components/consent-panel.tsx",
+    "sha256": "2b061a764280ddc96061e73ea1fc9f89477657ec6fa7f7f8fb8f948129fcae49"
+  },
+  {
+    "path": "src/components/invitation-redeem.tsx",
+    "sha256": "b713211cfff71e854b443674638d592acaec8b14757c39e77090614591d3b2e9"
+  },
+  {
+    "path": "src/components/marketing-home.css",
+    "sha256": "553e132f0f0fb130b96caf35da48ef41a3fd8dc51305e35b0df17fc80efc17ad"
+  },
+  {
+    "path": "src/components/marketing-home.tsx",
+    "sha256": "f9e4360f2a8b9b5937af52cc3c0cf51d0917820a3981df4a4ec83995f2399087"
+  },
+  {
+    "path": "src/components/marketing-pricing.tsx",
+    "sha256": "6bec0449b920d865331666a798c5a3d15613b8482a3dc51981eeefc087765119"
+  },
+  {
+    "path": "src/components/paid-trial-status.tsx",
+    "sha256": "ed69c27074dfff0f8d95538fe65b3a50d194989c203846f8b3876818a56e9d14"
+  },
+  {
+    "path": "src/components/representation-review.tsx",
+    "sha256": "05a05c5970d5361f40921bbf8633a94ad9430486882318856d31d32954fc23e4"
+  },
+  {
+    "path": "src/components/response-quota.tsx",
+    "sha256": "9c27527db42f58300b1e1f30202a46c4cef32b55868f7212c8ccea69f489cc9a"
+  },
+  {
+    "path": "src/components/sarin-arrival.tsx",
+    "sha256": "186793fd18af34a6016b8403308fee368d8d42583a4182a3c6112c16f692fb8f"
+  },
+  {
+    "path": "src/components/sarin-brand.tsx",
+    "sha256": "9233aabfc10a2742a24f21a60aa7d54d2dfe7d2222bb774e7dbf975f539a5615"
+  },
+  {
+    "path": "src/components/structured-booking.tsx",
+    "sha256": "ae9c867f6956e5dd4ede18464815a4b0925d7f94773dda7858b6711ff3b2394d"
+  },
+  {
+    "path": "src/components/text-suggestions.tsx",
+    "sha256": "d5ca159ea0d44ea9a25da7c23c43169c8053befe63252923fb1df4c53fb11820"
+  },
+  {
+    "path": "src/components/user-avatar.tsx",
+    "sha256": "2b985000358b889b9b5c44ba97c6aee26c9acaa63ea18528a036c9c5e87471e4"
+  },
+  {
+    "path": "src/components/whatsapp-phone-field.tsx",
+    "sha256": "cdd41cbad48532ba8ec383fe4a4a7ac602f79a1d5d7891eedd21a5c77da781bc"
+  },
+  {
+    "path": "src/hooks/use-appointment-reminders.ts",
+    "sha256": "a4d56daf3700e3204ff2a4c3565b7c97c9d7ab62e1780177879b97974e692d32"
+  },
+  {
+    "path": "src/hooks/use-waitlist.ts",
+    "sha256": "ea341af9f6eee7f874762f97a5bebc35a9a0582a49a5963299adc0e494542c36"
+  },
+  {
+    "path": "src/hooks/useAppointmentReschedule.ts",
+    "sha256": "c62315fc81390f63f696b6c259a77f27fae02936223671ab12ffd5f311bfda69"
+  },
+  {
+    "path": "src/hooks/useBookingDataPolicy.ts",
+    "sha256": "b6fb5e2252ab936198ca3b091bd7104fa72147f58589253cbdc474e4e9df3a29"
+  },
+  {
+    "path": "src/hooks/useBookingSubjectConsent.ts",
+    "sha256": "45b63ec585a52dd326e12ec42b59f8df673b112722d6fa26851726ef38068515"
+  },
+  {
+    "path": "src/hooks/useBusiness.ts",
+    "sha256": "ba0af4115b4e815fc4b9f39a1204a3d8c066fd2f6925ace63a2cb930346d979b"
+  },
+  {
+    "path": "src/hooks/useConsent.ts",
+    "sha256": "e7c0e9ad456980fec3a8a256af16075083e557f93596c54e36580c0e38e4351d"
+  },
+  {
+    "path": "src/hooks/useDebouncedChat.ts",
+    "sha256": "20ca01acbcd733e8edb7984ac24caa173551fc71abfdb205de3dafade2aa1fc6"
+  },
+  {
+    "path": "src/hooks/useEngineHealth.ts",
+    "sha256": "e68a07d719a11f16423ca99f496643fc5a8dd4d3c666a2ae195a381b3ade8399"
+  },
+  {
+    "path": "src/hooks/useStructuredBooking.ts",
+    "sha256": "91fdeb71a859e668211b2db319044e873175527866065b97b227794d3c85281c"
+  },
+  {
+    "path": "src/instrumentation.ts",
+    "sha256": "30a616651953056cf5aa9b6fac33eaa10526fc4556258e5d798361d88987b831"
+  },
+  {
+    "path": "src/lib/appointment-reschedule.ts",
+    "sha256": "e10363b80ed4d424b3e48547b52f53cfc39a1d51a3c95760f2ce28c962db021c"
+  },
+  {
+    "path": "src/lib/billing-plans.ts",
+    "sha256": "17f36980ab047c61df77bf79ed5557587817658ee6b072e1194e3ef81f667cf2"
+  },
+  {
+    "path": "src/lib/booking-availability.ts",
+    "sha256": "93d8733c556f1997575bbfa6a61e92ced108a4ae444cbb66ffb8c54de6120d49"
+  },
+  {
+    "path": "src/lib/booking-card.ts",
+    "sha256": "ee898607623c0cc8b3c52e0fedfbc0b90f6f2feac813f70cbd659a0822fb497a"
+  },
+  {
+    "path": "src/lib/booking-subject-legal.ts",
+    "sha256": "35e6dd1321a9d769dddd72a916de5e6ccacbd56e58a56c453797a8b54d1a94a1"
+  },
+  {
+    "path": "src/lib/booking-subject.ts",
+    "sha256": "395c22e7a267e5b61d40f37022d540cabbf1255920d55f9f643b4e615f462ee3"
+  },
+  {
+    "path": "src/lib/business-branding.ts",
+    "sha256": "d70933faf0a592de420b6235d842db856ad15e0029982516a15c6952bf246ed0"
+  },
+  {
+    "path": "src/lib/business-location.ts",
+    "sha256": "34df97be310e3e09fe7c45c587cca1f86ed2750adfb0b8a89da41a447ad7aad2"
+  },
+  {
+    "path": "src/lib/client/api-polling.ts",
+    "sha256": "5150e885e510683f651c6e0a932ee5c3e490bfb021e84015408a321d3e333657"
+  },
+  {
+    "path": "src/lib/client/api.ts",
+    "sha256": "1162e9eebb9fd4c5b82fb8664d32238915fa630aff48fe3912106c6743c365cf"
+  },
+  {
+    "path": "src/lib/client/appointment-calendar.ts",
+    "sha256": "51c6e71a287c05c9b88425ccb465aaaab9491b58d611fa975c4c1be97acfa724"
+  },
+  {
+    "path": "src/lib/client/appointment-image.ts",
+    "sha256": "350568e86c273b19460e4c1768648eacfa45337395b63a33c939d7aaa1ec63bb"
+  },
+  {
+    "path": "src/lib/client/booking-card-assets.ts",
+    "sha256": "4c740c96fdf56e402d7f83a76b6fbae6ec216a59e05d3cf0af2b693edb004c93"
+  },
+  {
+    "path": "src/lib/client/phone-number.ts",
+    "sha256": "988f38d955d106c9742b4fc5728dbbbb9e9a3b049e0b4dedf160af211123eb62"
+  },
+  {
+    "path": "src/lib/client/use-api-poll.ts",
+    "sha256": "0e680bc81117240347eec21ffab798614c0ea59edddfe1cc4b86b9748ab5b9f9"
+  },
+  {
+    "path": "src/lib/client/use-public-commercial-offer.ts",
+    "sha256": "97496f0632f99b1f28cc869ac7de7353a915b403dd1d09e69d58f34c92b2e4a5"
+  },
+  {
+    "path": "src/lib/commercial-offer.ts",
+    "sha256": "927e8332a3988fd17a04d7020f461a4e93d7c5431914bae188ede87c6f00e720"
+  },
+  {
+    "path": "src/lib/firebase/admin.ts",
+    "sha256": "98d95ef5409624c3f44606a01e66b33d5b583bc0a737af4db5d327e51d1a4d02"
+  },
+  {
+    "path": "src/lib/firebase/client.ts",
+    "sha256": "a113679ad9b799d28f69abc38aaffda7367c10a665a6f6300c1f168a91cc7f73"
+  },
+  {
+    "path": "src/lib/firebase/emulator-config.ts",
+    "sha256": "0ae084770e66b1480532288bdbcc2e72b2b21372530d019eee8a39ae4d6850d3"
+  },
+  {
+    "path": "src/lib/firebase/emulator-constants.mjs",
+    "sha256": "8ffe1a3a000acf671a684cdb733bf7714cd93c79269daaef6629ffaa23a97c88"
+  },
+  {
+    "path": "src/lib/firebase/local-auth.ts",
+    "sha256": "3934291d94b3e34f88a80c87152fc15aa906295e5daeb5895901a58ac283997d"
+  },
+  {
+    "path": "src/lib/legal.ts",
+    "sha256": "2a2543b1b38d9eb36d6959f8db9af76d45a3a963e95d54e56ee3fdc40c5d295d"
+  },
+  {
+    "path": "src/lib/marketing-links.ts",
+    "sha256": "c827870fb1ec022c818d964aee891eb9d55afde444f8e30efa0aeae3d6da0e7b"
+  },
+  {
+    "path": "src/lib/paid-trial.ts",
+    "sha256": "3ec1446ee01f96c46dc7707c45eaba12db4852af3d8c7a2f58612a1729664e61"
+  },
+  {
+    "path": "src/lib/sarin/availability.ts",
+    "sha256": "f4d65e1e2a4cb8e52936910387511d7c25ae026e752735ab428d0d32bff676ec"
+  },
+  {
+    "path": "src/lib/sarin/engine.ts",
+    "sha256": "bece2f3b4ac2d6694c398d0deec9993ccebe44cebc2d5fcce486b46b57024893"
+  },
+  {
+    "path": "src/lib/sarin/prompts.ts",
+    "sha256": "d0ee55a745f10c84d34c6a146ed15c7097fceff956e5cdc6a83ab30f39da8bc5"
+  },
+  {
+    "path": "src/lib/sarin/queue.ts",
+    "sha256": "907aec33fad7ed66fac77f7fccbfa5b459db22a787f0acf607d4bf3bf0fa2221"
+  },
+  {
+    "path": "src/lib/sarin/subscription.ts",
+    "sha256": "36023fdd22b0341306056a98a14612a7a01ab5aaca989107efd180a1a81245f6"
+  },
+  {
+    "path": "src/lib/sarin/tools.ts",
+    "sha256": "31eda0e2a508dbcdeff92351016e40654e369d29afcb5272eba2e25814a6b6de"
+  },
+  {
+    "path": "src/lib/server/ai-budget.ts",
+    "sha256": "b2f780ae9d15c234c7c45ceb9efded8d3caca7fb69581735c2051fa19e5dd9c6"
+  },
+  {
+    "path": "src/lib/server/ai-pricing.ts",
+    "sha256": "82c424ae3c947abbd0d23c8e6ad6c1e35bc2cda0444e402830e680e80d0e74c8"
+  },
+  {
+    "path": "src/lib/server/ai-usage.ts",
+    "sha256": "d1a34706a12dd525fb18c997f4b9bfa4209d60380fd8bab8545f82fdc69e6a61"
+  },
+  {
+    "path": "src/lib/server/appointment-reminders.ts",
+    "sha256": "07439277498f5197464c1ab824eaa889b8852b0389af2183e61205e35821509a"
+  },
+  {
+    "path": "src/lib/server/appointment-rescheduling.ts",
+    "sha256": "26afa5aca32a2a05bc5e0f9e1dee56f8d2d3302cb412d0090b8a82ce4366b2e9"
+  },
+  {
+    "path": "src/lib/server/auth.ts",
+    "sha256": "14afe1179e38738a3becf223fed7a8b83e2b37a653ce0b18da4d4602ba9e9f1f"
+  },
+  {
+    "path": "src/lib/server/billing-policy.ts",
+    "sha256": "c897b7ad1aca2ee92b8d0f6cd177e7149ea93f2561ccaa43f5cc441fa8afee7d"
+  },
+  {
+    "path": "src/lib/server/billing.ts",
+    "sha256": "a7c005094c7f5d871f0b280b0be40ce8ab6715baf412c278fff1ca95bf8b6f8a"
+  },
+  {
+    "path": "src/lib/server/booking-action-admission.ts",
+    "sha256": "30a3ef8f13cf1c71dc86912fd9f9210cdb62951c1bd8ad3ab5199b3aafd14672"
+  },
+  {
+    "path": "src/lib/server/booking-data-policy.ts",
+    "sha256": "407665c1d1fe4ab0f5312a02ef9e60437c4ff8abaa86ff6bef8c5695ac252c15"
+  },
+  {
+    "path": "src/lib/server/booking-proposals.ts",
+    "sha256": "7dc4270266408a1212f328e2225f6572275eea708a2427a3bff8eea8aec320fc"
+  },
+  {
+    "path": "src/lib/server/booking-subject-consent.ts",
+    "sha256": "a80caac38ed613eee5c2688105d23af5f35693e0156303733cf3e4c8295f30a9"
+  },
+  {
+    "path": "src/lib/server/booking-url.ts",
+    "sha256": "0644b2677c0e44388d760ac7d016a43f3d179ae5d6dfe152e80f8bfdc1eb74e5"
+  },
+  {
+    "path": "src/lib/server/bookings.ts",
+    "sha256": "594b3e202103a2d63a485c479a2719b0946512badec2de5f447d09fde353c7e2"
+  },
+  {
+    "path": "src/lib/server/business-logos.ts",
+    "sha256": "a9998a5c8021d6d48e03bb6066c7a4d8fbc42f1ce40c3e0009f6f9d1dd1b86db"
+  },
+  {
+    "path": "src/lib/server/businesses.ts",
+    "sha256": "a4c0b17e343add50eb3c7eb149f5e38b030ef066b92ffe563cc7aced9d883d06"
+  },
+  {
+    "path": "src/lib/server/chat-intent.ts",
+    "sha256": "f32289ffd933e6d998f2e777642f5c5fcbca399c4c776113f03e2512399708d2"
+  },
+  {
+    "path": "src/lib/server/chat-replies.ts",
+    "sha256": "6638be169921828023dab38f01772c6e8f833cd8f37a7b8545fcd233224611c5"
+  },
+  {
+    "path": "src/lib/server/chat-state.ts",
+    "sha256": "257b45cc9d56aa9a56fa95419e9298e8ddee6289bcee73a035923ab75fed6f26"
+  },
+  {
+    "path": "src/lib/server/chat.ts",
+    "sha256": "dd250c78c762fef42333226998ec7852f8ec491c65dca705205ba99f95604436"
+  },
+  {
+    "path": "src/lib/server/client-policy.ts",
+    "sha256": "a748682bc39c0e28fafff779f95c7190d375132981d6d22f7528b9b6f2eaafff"
+  },
+  {
+    "path": "src/lib/server/commercial-offer.ts",
+    "sha256": "942ec10180cdee5d347e07ee82116e8e2903a62f1e343ae4488605709f8936dc"
+  },
+  {
+    "path": "src/lib/server/consent.ts",
+    "sha256": "d2f3aea4853dbbd7fb390e159e5b788f37f6277b6d055c136e3ee4fb358718d2"
+  },
+  {
+    "path": "src/lib/server/gemini-test-settings.ts",
+    "sha256": "cd6a316dfd56f759ab38f8fd222859bcc5d0de4b306e4819ad5ff144edd5dab9"
+  },
+  {
+    "path": "src/lib/server/http.ts",
+    "sha256": "4f0fe387dd7bb05c0d55c001a0c492443b96247358800abf1c7d022a752cc374"
+  },
+  {
+    "path": "src/lib/server/inference-rate-limit.ts",
+    "sha256": "e9795d66bbe606e0d5ece263e0864cab0e50695297f6a248ab678eb9668649a7"
+  },
+  {
+    "path": "src/lib/server/inference.ts",
+    "sha256": "35d4d725b495e60c6d7c9c88bcae4e93990a20d0e76ca8401767e783629d11df"
+  },
+  {
+    "path": "src/lib/server/introductory-access.ts",
+    "sha256": "b6bcc06a9de5e511f526be3108e5dd39d439412de801bfbec3550f43835b56bf"
+  },
+  {
+    "path": "src/lib/server/invitation-schemas.ts",
+    "sha256": "ea9787e914a4475461edbf89377377944ffeae8c68bc75077a3dd4c298ae515c"
+  },
+  {
+    "path": "src/lib/server/invitations.ts",
+    "sha256": "49282403befcafe499f669cc9748b070251517921c6966a303046b45514b8c46"
+  },
+  {
+    "path": "src/lib/server/provider-settings.ts",
+    "sha256": "ff9226d2037a7350eb1a9a268f72f36498625428b099f5420c1d03f43abc6c79"
+  },
+  {
+    "path": "src/lib/server/reminder-data-maintenance.ts",
+    "sha256": "3ee9680ab30127bacc70774931e7b1beb93da5793a21fd2c91ab60e3eb85e526"
+  },
+  {
+    "path": "src/lib/server/representation-review.ts",
+    "sha256": "93466697a2db175a861ce85c56d0e20df29b2052b650afc18d50f5c7d5dbbbe6"
+  },
+  {
+    "path": "src/lib/server/response-periods.ts",
+    "sha256": "a26da3cec86d188f820cc8b7ceed7f68dd3cadc8952f4bd7fb92c0470bd14558"
+  },
+  {
+    "path": "src/lib/server/response-quota.ts",
+    "sha256": "923e5bb07ea43b538fa0f56050fa9ec988019a19f0258471c167ac0615c57e61"
+  },
+  {
+    "path": "src/lib/server/schemas.ts",
+    "sha256": "df9c70b109cfcf69a4084a17b59a9f8698e0bf4d2d6c06dfbf8fc4a2127e5fdb"
+  },
+  {
+    "path": "src/lib/server/structured-booking.ts",
+    "sha256": "8caaeb8fbb6c797126a35fe65a099500380a0e782b472084e89bf7133f819694"
+  },
+  {
+    "path": "src/lib/server/waitlist-data-maintenance.ts",
+    "sha256": "303eee0cb100ffc24b00d9d872253960955e361a0eb9a77c8f7a761f89b3dc6f"
+  },
+  {
+    "path": "src/lib/server/waitlist.ts",
+    "sha256": "9dbb9ad50b45d4622a8496a4bf1b7f105aa3c9f4de20a46a334db0618fb6df6e"
+  },
+  {
+    "path": "src/lib/server/whatsapp-config.ts",
+    "sha256": "e99667e085fb941791d337a73f0179739734c8eee9f657ec84c7c48f8708570b"
+  },
+  {
+    "path": "src/lib/server/whatsapp-security.ts",
+    "sha256": "a51ea5d4013da78e4e144c38b544df5a42dbd980a48d4c3d6e3304e20a948f02"
+  },
+  {
+    "path": "src/lib/server/whatsapp-store.ts",
+    "sha256": "967076579ec02bdce80100b2452df28494514580924c9ab7b3fa771c4876e4e7"
+  },
+  {
+    "path": "src/lib/server/whatsapp-worker.ts",
+    "sha256": "095cd3b433887e9088978d503a4af38e5b09d9640fbbf7f1c799b81785704508"
+  },
+  {
+    "path": "src/lib/service-catalog.ts",
+    "sha256": "6239de15fce538d6316e8bffbbb764a90e2e60c92bbdbe89841ad688fd0db08a"
+  },
+  {
+    "path": "src/lib/storage/database.ts",
+    "sha256": "41c57a050e1da5a613d760041cc7ff0c3534dce2e05cd3d2275ce2cd4d819b64"
+  },
+  {
+    "path": "src/lib/storage/types.ts",
+    "sha256": "72be600bec90e6a785a128310db90f9a07781f71239a0f7dfb30a9ccb611d357"
+  },
+  {
+    "path": "src/lib/utils/icsGenerator.ts",
+    "sha256": "5f0fb4db26ffe6eb08bed83f655932a882fbfbb15be74bfabe5c0ac613732f60"
+  },
+  {
+    "path": "src/lib/utils/imageCompression.ts",
+    "sha256": "9458b8b35e61ba34d81bca04478acbc41a57c5d8f4823df36049cbb3fb5c34d4"
+  },
+  {
+    "path": "src/types/ai.ts",
+    "sha256": "b1925f20b074357b3dea65fb147329aa172ceb9964c93e4bfeccfc4e3ffc0b4e"
+  },
+  {
+    "path": "src/types/appointment-reminders.ts",
+    "sha256": "6cc4326492be92e21e85e9c3e1ca72872ccd4094934c6de417aeede06d021fb4"
+  },
+  {
+    "path": "src/types/chat.ts",
+    "sha256": "5d094b96f8696ab92185ee48565f5db378bdd6bd8340fc5a6acf0bf57998499d"
+  },
+  {
+    "path": "src/types/firestore.ts",
+    "sha256": "f04d86a9246afd4a0ed8148e35789e4c325a8103065bd11327d0d28ea9700d66"
+  },
+  {
+    "path": "src/types/invitations.ts",
+    "sha256": "8515d43e83713213bc6652291d439ffd9c192501b3eb1feaeb574ccf59e8d0ce"
+  },
+  {
+    "path": "src/types/waitlist.ts",
+    "sha256": "f3c1c04065fe85bc0ec6a58f36dacaf753ac040c698c4e1de7af3112c0031c81"
+  },
+  {
+    "path": "src/types/whatsapp.ts",
+    "sha256": "c9798aa2f4c49f6ceee4c86321773336d4b2c65d299a3af83a54bacaf2b70545"
+  },
+  {
+    "path": "tailwind.config.ts",
+    "sha256": "18b2d09cda770fcd81bfad40cd247fae17d5e24a53c06ba5e19c1d7af159de99"
+  },
+  {
+    "path": "tasks.md",
+    "sha256": "9f990bff8384bf2692074a16e4610d46bfa1c0c8ec238a69c28509fadd2637d0"
+  },
+  {
+    "path": "tests/admin-abuse-route.test.ts",
+    "sha256": "f97b8c761be593175ce6842720544bbb8e219ae3cb69aec76a82b86198d34b92"
+  },
+  {
+    "path": "tests/admin-ai-budget.test.tsx",
+    "sha256": "2dcac4da4539a3c31b69131e4ef6a35e065067974d19de92cd7210229a43f783"
+  },
+  {
+    "path": "tests/admin-ai-page.test.tsx",
+    "sha256": "c696076ac1ae15d4ed083b5d8546daa898f7741a1a6c12edbcbe64fb670f7f4f"
+  },
+  {
+    "path": "tests/admin-ai-usage.test.tsx",
+    "sha256": "e06a477eba0ca972a38dd36075b4abfd690c7af465ad7fa1fa475b3d857c999d"
+  },
+  {
+    "path": "tests/admin-ai.test.ts",
+    "sha256": "d9698fab8e1a5f8a6a0466770a64da52da3597f9e90ec3daa685dc72494fd315"
+  },
+  {
+    "path": "tests/admin-booking-data-policy.test.tsx",
+    "sha256": "d9b1451ab5b69fa2a4af0b9b1d32af921116a478c5e591a241ef0346945d9f2e"
+  },
+  {
+    "path": "tests/admin-whatsapp-page.test.tsx",
+    "sha256": "42f0372466215ef3ed4da18fb812dbf1e0bdf07a22f2b216a0ddd49ce6ef3766"
+  },
+  {
+    "path": "tests/ai-budget.test.ts",
+    "sha256": "c4a5c7f518e12c4aa0b1a432969df4313b5aec024273ef24a0657991f6fee200"
+  },
+  {
+    "path": "tests/ai-usage.test.ts",
+    "sha256": "2c5126a9845cc5b1e662cee924bc7461d0252c875f777916ce7a6b6842b2366a"
+  },
+  {
+    "path": "tests/api-polling.test.ts",
+    "sha256": "805cc30501e5810dce7410132385af1a6919832733fdc19857e007ad8089916f"
+  },
+  {
+    "path": "tests/appointment-calendar.test.ts",
+    "sha256": "65b3da3b2aaba7c0a61096e995f4fcc2e1e7dba5dc868364f58f60341f3d434d"
+  },
+  {
+    "path": "tests/appointment-reminders-hook.test.tsx",
+    "sha256": "ecd3aaca56b6d00679872560790d8b24cec09f6fdf5f016601e8e13b17360310"
+  },
+  {
+    "path": "tests/appointment-reminders-routes.test.ts",
+    "sha256": "30586dc4643a77848449d9336c4c17280b5969036199e4f9b543c1ebcb3119dc"
+  },
+  {
+    "path": "tests/appointment-reminders.integration.test.ts",
+    "sha256": "86850e30a305de058fa3cfb888c0525db66a9144a5fa6ca20fa720cfa4d194d4"
+  },
+  {
+    "path": "tests/appointment-reminders.test.ts",
+    "sha256": "e3aa57802e3b58a094fffb725f30c942c1b2cda8ca5fc6181cddd69da2035edf"
+  },
+  {
+    "path": "tests/appointment-reschedule-contract.ts",
+    "sha256": "69f6a79e6bcd3f231dde78e8dd1970132503a8aff6714a16810aef9c0d343b18"
+  },
+  {
+    "path": "tests/appointment-reschedule-hook.test.tsx",
+    "sha256": "a2037d20c69ae48f17fec91fd955e86dcadcf2cd2d4d930dc76fdd1060296783"
+  },
+  {
+    "path": "tests/appointment-reschedule-routes.test.ts",
+    "sha256": "e09067f20a442f6d786853e454011405a86bc190c918389145f394a1bda17156"
+  },
+  {
+    "path": "tests/appointment-reschedule-subject.test.ts",
+    "sha256": "fff715deec94187fe957cf7a08893f61fdd906082dea0eb6a15d45a3a093c863"
+  },
+  {
+    "path": "tests/appointment-reschedule-ui.test.tsx",
+    "sha256": "c7310b6f8ebd544f65df24fa52d572c20b38efbebc8a340743e4095c59d8e3a0"
+  },
+  {
+    "path": "tests/appointment-reschedule.integration.test.ts",
+    "sha256": "cf0781c90aa5691dc7ef44d5212777f90dad52bb44f8fbeda8661505e78a56e9"
+  },
+  {
+    "path": "tests/appointment-reschedule.test.ts",
+    "sha256": "1d54eee5f3e36d25253c0f9b5881572262b4dc3078d857dce43d07763c3ce7f9"
+  },
+  {
+    "path": "tests/auth-provider.test.tsx",
+    "sha256": "28ba19f9f1f6109979e1a6daa3b01c894b845693042d98a5534b94960ab8af4f"
+  },
+  {
+    "path": "tests/availability.test.ts",
+    "sha256": "9a60b3b2465b6abd0f302617a680e1c58cf2d9bd54b0f89ea6ab2a95bd62f1be"
+  },
+  {
+    "path": "tests/billing-pages.test.tsx",
+    "sha256": "3661273b16d433375669aed7044f46deea8c1dff825b4a6d9adffa0017fa6825"
+  },
+  {
+    "path": "tests/billing-paid-trial.test.ts",
+    "sha256": "ed2708817630f01a04fcd4657f054d854cfb1e203d3d63cf50347bb8c977cdd6"
+  },
+  {
+    "path": "tests/billing-policy.test.ts",
+    "sha256": "bed13d86df768440342e62a51768b2fecce4dc3f3e965af7203c1ccb37fefd17"
+  },
+  {
+    "path": "tests/billing.test.ts",
+    "sha256": "119d79dc76f14fbc11fbc9a026706bd75b5befdd062ed20a71314e31c79f8b77"
+  },
+  {
+    "path": "tests/booking-action-admission.test.ts",
+    "sha256": "9c864aa8ff45ca7e0cbb0ac03a19b9ade91f83863acd9f3b8b85097fa0fb69e6"
+  },
+  {
+    "path": "tests/booking-card-assets.test.ts",
+    "sha256": "1a58e5c4367b3606b60954a7504878cb4b4f5f2e4aecc2f30d8fe4fcbf4e7f6b"
+  },
+  {
+    "path": "tests/booking-card.test.ts",
+    "sha256": "4424ea9fdc898af614f85f62add467351e8eb4496134698618451e961f048971"
+  },
+  {
+    "path": "tests/booking-data-policy-routes.test.ts",
+    "sha256": "0dc1274f2cc509b4f1883ad44df3a2772f15b3e4d7998041b6d8f1a62346a0f3"
+  },
+  {
+    "path": "tests/booking-data-policy.test.ts",
+    "sha256": "30275cdf4287cfe8f6f66bae87c6ed19fa293cce07aaa900d3b6cc5e10ca603f"
+  },
+  {
+    "path": "tests/booking-proposal.test.tsx",
+    "sha256": "12385ec35e1fa2be32b4e1cc60e6c2e702ccdd23cb59847ff1455682eaedbd23"
+  },
+  {
+    "path": "tests/booking-proposals.test.ts",
+    "sha256": "417ed8f9c65f703acba8685a97793b6feb247b7222cbbe1a640096fb13441d26"
+  },
+  {
+    "path": "tests/booking-subject-consent-route.test.ts",
+    "sha256": "e6e47295bc5e301d3af31631373401db21b5b6f2ed0012b1fadaddf9f00766d4"
+  },
+  {
+    "path": "tests/booking-subject-consent.test.ts",
+    "sha256": "65cc633807a58943b246bf392d37a62dba44532fa7099a50f4c2f6ea8e6cdc54"
+  },
+  {
+    "path": "tests/booking-subject-consent.test.tsx",
+    "sha256": "c4eb9935cd8af7649065877a2fae66aba6db7740081ae291025de1ff33de279e"
+  },
+  {
+    "path": "tests/booking-url.test.ts",
+    "sha256": "54a91a88095d9226212dd0012efeaa6d6306c67906850e035eaf8a9df5ef533c"
+  },
+  {
+    "path": "tests/bookings.test.ts",
+    "sha256": "01efbc56fc42278cb5cd2bb2c9f2c28d28bf8a8eb6a59a946b3422e778cc1eb5"
+  },
+  {
+    "path": "tests/business-ai-budget.integration.test.ts",
+    "sha256": "7bfb2a732e4efb7813da5c1542f786b5ea8a46b6368cd4f2d19cb3b6fa9a8194"
+  },
+  {
+    "path": "tests/business-ai-budget.test.ts",
+    "sha256": "74bd7a44d12c18d2cc60375acda56e5504b5eb541811258758a32e5a202c4e49"
+  },
+  {
+    "path": "tests/business-branding-ui.test.tsx",
+    "sha256": "c7370a2d778f42797d9e3d464225b4f0563dc8407f21d8c72c74d5308c6e729b"
+  },
+  {
+    "path": "tests/business-branding.test.ts",
+    "sha256": "8ee82c7aee647ca7a8c65e315189a7014f3b6b84b820b2f8924b58467bf23492"
+  },
+  {
+    "path": "tests/business-location-client-entry.test.tsx",
+    "sha256": "13e72e8e159e169cca17be037db576d6a17979a78665dd7e2a7a074106c2142c"
+  },
+  {
+    "path": "tests/business-location-onboarding.test.tsx",
+    "sha256": "d64cdead00bcf9a79803f3f4b307c826897256ae6577cb73534502fd627f3deb"
+  },
+  {
+    "path": "tests/business-location-server.test.ts",
+    "sha256": "ff776869b64c1e34081014d83daf0cb11848ca9cd0da86a3cb1f26b95d1d9f55"
+  },
+  {
+    "path": "tests/business-location-ui.test.tsx",
+    "sha256": "2c97e4aaa8d340398e5b8cc8cb36ef0f4e2a9ed40f1a6d0aa5a705029a5d2d30"
+  },
+  {
+    "path": "tests/business-location.test.ts",
+    "sha256": "0f540698b882f2f62d2c57833e24e2ee2dcedac2fc5805cc7b086930ad7c83c0"
+  },
+  {
+    "path": "tests/business-logo-routes.test.ts",
+    "sha256": "8acd2cfef44596c4c2c337f94b5a55e0a7c931f3e3ead191830b9253fc3862b8"
+  },
+  {
+    "path": "tests/business-logos.test.ts",
+    "sha256": "278e45baaeea4ab4def39a66736c5c9b3d87f97f189eb28241cb58ebd194887f"
+  },
+  {
+    "path": "tests/business-public-profile.test.tsx",
+    "sha256": "7da24cdc7242397d4138cd1e6474d4a010db969a814a6bc465a5bea6698d2562"
+  },
+  {
+    "path": "tests/business-read-routes.test.ts",
+    "sha256": "484dbd18a66a022ee5776babd5611878eb84538d587a17e2ca53faadc2ba5eee"
+  },
+  {
+    "path": "tests/businesses.test.ts",
+    "sha256": "117b3d399bb41f487a711d59e197866a46c590f950fd7db5aec0ec0298664527"
+  },
+  {
+    "path": "tests/chat-intent.test.ts",
+    "sha256": "aaf216d11a4285d51531aebeff7838c36eca5f628cb222dcfd62495857d68614"
+  },
+  {
+    "path": "tests/chat-replies.test.ts",
+    "sha256": "d1552bca9954af9c5b6b3ad3bc585beefb6e4cca48a9b86373f446aafd3d8fde"
+  },
+  {
+    "path": "tests/chat-route.test.ts",
+    "sha256": "e1e20e110f534ff69c926ac6880fbec510e0e8a6570c69dafca795ca33f7af93"
+  },
+  {
+    "path": "tests/chat-state.test.ts",
+    "sha256": "6b22def6bced7f04f6df43c2af5dd7b43da512eec7719d6a951d98f2640f9609"
+  },
+  {
+    "path": "tests/chat-surfaces.test.tsx",
+    "sha256": "fc5823c869de8be6c69a957a9c465ca8f10ba8883ad8052235ca3024c37d7ac5"
+  },
+  {
+    "path": "tests/chat.test.ts",
+    "sha256": "772c6966556def65904ba0a71d4128734beb9ec20b624b02ee8ea54ae32c824e"
+  },
+  {
+    "path": "tests/client-api.test.ts",
+    "sha256": "47943fba406545a213cf179adf28ee639b76220b40d3d5787cf29dbcfa6ccf2c"
+  },
+  {
+    "path": "tests/client-appointment-reminders.test.tsx",
+    "sha256": "c972d9349564d5cbcb3ad65b881945218bcc78fc612ed739344df27485307897"
+  },
+  {
+    "path": "tests/client-appointments-calendar.test.tsx",
+    "sha256": "c60d672d2a0eb81fd7e09b9465b666ade9ac66457b3f2009d2cd81a705daebab"
+  },
+  {
+    "path": "tests/client-appointments-rebook.test.tsx",
+    "sha256": "449917929110668497f24fc1ac31236474a3b5e6a8dbb8840a936e7cf44a14d4"
+  },
+  {
+    "path": "tests/client-appointments-reminders.test.tsx",
+    "sha256": "0a7ccab212d1c97ba36af18332e53cf56621624280665ef22df718ea9d0deb6e"
+  },
+  {
+    "path": "tests/client-appointments-reschedule.test.tsx",
+    "sha256": "2d9b762fa228f2fb287f4eefd6b3ac9e9697333dc9dff9a285b2ad84e94c2dc6"
+  },
+  {
+    "path": "tests/client-appointments.test.tsx",
+    "sha256": "afddefbe0e2d3fa97dda347e8ff1fd0a02137dd4e856e87142d6c2c3f3acdab3"
+  },
+  {
+    "path": "tests/client-policy-controls.test.tsx",
+    "sha256": "c52fae02a264d4982b092d3c92b8bd62a84c78f58121bef7fa38cd4825b51ee6"
+  },
+  {
+    "path": "tests/client-policy-route.test.ts",
+    "sha256": "62e3a088c5ae3895e40d49c5f3ef70fac5ad31baa1b29c5194d0a18a1030b138"
+  },
+  {
+    "path": "tests/client-policy.test.ts",
+    "sha256": "4f23913a005993964584142564d7072588eab161cd9983a21ff7f6581b2a974b"
+  },
+  {
+    "path": "tests/client-rebooking-entry.test.tsx",
+    "sha256": "f76cf1c0c2374bb2af8ebf3bba381f84f41b8e240c1138e7716e0c61b2ae2564"
+  },
+  {
+    "path": "tests/client-reschedule-entry.test.tsx",
+    "sha256": "a7341a509baa141c0209916cf0d9b6fa6073a9c272c3f69b4ce9fe466fad0877"
+  },
+  {
+    "path": "tests/cloudflare-credentials.test.ts",
+    "sha256": "07f4ff24ab718b64121bad70b730739c8e29780b798019594d7425b73910417b"
+  },
+  {
+    "path": "tests/cloudflare-data.integration.test.ts",
+    "sha256": "d557461ec9f78e8b0d5e57efc3882e01f9e7260126c910e232823b46203a0c53"
+  },
+  {
+    "path": "tests/cloudflare-database.test.ts",
+    "sha256": "4b1c87693face320c8c382d843b633988243c5beba7a984e2223779908e81eda"
+  },
+  {
+    "path": "tests/cloudflare-google-auth.test.ts",
+    "sha256": "01a21df693e9f4675a20ac65c4826a3394e4c8cb3920d841791c963e34a30096"
+  },
+  {
+    "path": "tests/commercial-offer.test.ts",
+    "sha256": "11de955e2409dd1dba8b4489ba804abdb93b0b48a6848197d2bdbb4db3320ad7"
+  },
+  {
+    "path": "tests/consent-fixtures.ts",
+    "sha256": "6796ee440824f82b2fc416955845b263e3c3afc3775a0e2b4e92b45387eed45c"
+  },
+  {
+    "path": "tests/consent-operations.test.ts",
+    "sha256": "17129f48a72b4a456ddb15037eb48c67e19d674141ecc321695a60eefef76b90"
+  },
+  {
+    "path": "tests/consent-routes.test.ts",
+    "sha256": "a075038b283b4116f1168ceca510200e2d4234b4e284151f493c064e2f8e0c70"
+  },
+  {
+    "path": "tests/consent-ui.test.tsx",
+    "sha256": "14018234b8b91590397285100e3ea50bdb2e2055ddf2f7b4af4d992cb46e2ede"
+  },
+  {
+    "path": "tests/consent.test.ts",
+    "sha256": "f81498c4540eaf7a925a371dbe6c904318e0b45f5b7b6d7aa6e75084f08f25e5"
+  },
+  {
+    "path": "tests/data-migration.test.ts",
+    "sha256": "cf691585a2bfce911a7545c4c91007d1cc50b97082d39746b2c189e3160c68ff"
+  },
+  {
+    "path": "tests/debounced-chat.test.tsx",
+    "sha256": "023d79200201bbea0cd742723cd1fead473add168149e59d7a892b760a47bb9d"
+  },
+  {
+    "path": "tests/deepseek-intent.live.test.ts",
+    "sha256": "4123cc0fc784564f8965f0e62daf73fc6cfcb0f7b04184d0cdb7a0f83fba4b27"
+  },
+  {
+    "path": "tests/doctor.test.ts",
+    "sha256": "c75824dd98ace50ba0d93e459a553b1f00982f921f414a2326c6b0eb84c49ecc"
+  },
+  {
+    "path": "tests/emulator-config.test.ts",
+    "sha256": "d1f6fab9f965f227749be07dd43bfb8a028f37c1e726dc3bc8dc1bac688cb48b"
+  },
+  {
+    "path": "tests/engine-budget.test.ts",
+    "sha256": "f20bfaffbf33acb08e972aaea16b3811eb4228bfd64d9fcadb618e483763f43e"
+  },
+  {
+    "path": "tests/engine-gemini.test.ts",
+    "sha256": "a4ab78d4d0798e73614434fe968067189621a785e090b401e30cce8b472b4a23"
+  },
+  {
+    "path": "tests/engine-health.test.ts",
+    "sha256": "17132e35256625a222333a245c58624947ac832e3250a4f637a9cf4c390270ad"
+  },
+  {
+    "path": "tests/engine-provider-removal.test.ts",
+    "sha256": "47102e6c54b99c4efbc41dc62698b93dc6aea2a50432bdbb4aad7d8139b5d426"
+  },
+  {
+    "path": "tests/engine.test.ts",
+    "sha256": "49dc2f218840b601be40ed20c75d756ca211d08468117067d9a823bd653f024d"
+  },
+  {
+    "path": "tests/firebase-singletons.test.ts",
+    "sha256": "6783cc52fb6475e68d5deb75bf7a941b1e9623633d193bef55defa5c26bf52cc"
+  },
+  {
+    "path": "tests/firestore.integration.test.ts",
+    "sha256": "af285583d2c037b67e229a0f9e614a80ba349f4144bb6bfbcb8b70e75fdb38b5"
+  },
+  {
+    "path": "tests/firestore.rules.test.ts",
+    "sha256": "bce60a1ce681ab3a91b33aed9458e8b4d45811855a73a3698a75700e4057d5be"
+  },
+  {
+    "path": "tests/health-booking-flow.test.ts",
+    "sha256": "06ddc8dc5e06f8ef3564b0937866ed0598357d6a7f90e46dff1e7419865b54de"
+  },
+  {
+    "path": "tests/http-auth.test.ts",
+    "sha256": "30f94c0e5072be6751f6b7db1e0424b4ddb7e70d5765299ccf9d8eb748d841b1"
+  },
+  {
+    "path": "tests/ics.test.ts",
+    "sha256": "12f7df8fc4ec757e5c21454ef6a8a342e3c9cfb8d975580fc30c3ee5d10b713e"
+  },
+  {
+    "path": "tests/inference-rate-limit.test.ts",
+    "sha256": "26cffea6e6c73cfcbc63d921b094c312aaaf1d0597c78a612e5215f31cdf1d8f"
+  },
+  {
+    "path": "tests/invitation-contract.ts",
+    "sha256": "b9424e27c0df1c57312f9afbd3bfcdbd84702488cc951037d06e8db85d9674bc"
+  },
+  {
+    "path": "tests/invitation-routes.test.ts",
+    "sha256": "f725e19c0f7307ae741e8a6405f20358f453b0cd4f65cfbfb03e7fd45b664c9a"
+  },
+  {
+    "path": "tests/invitation-short-codes.test.ts",
+    "sha256": "3a6875db7ce8b9cb42222c2b85a7408eef0057ac8f14791198caeee08b973931"
+  },
+  {
+    "path": "tests/invitation-ui.test.tsx",
+    "sha256": "033d919806d78b15752d9d479887daa7fea85f6ddf96a3717a975c3d26ea6cf4"
+  },
+  {
+    "path": "tests/invitations.test.ts",
+    "sha256": "8cac847cc6f376f607a082d9f67f713dbbae45c0b45a6ce075844534dd37ddf4"
+  },
+  {
+    "path": "tests/local-auth.test.ts",
+    "sha256": "6b5112373366be5b940f7c0189d6fcb5c20e8718b3cd59b15004a6bfcf5dcf1a"
+  },
+  {
+    "path": "tests/local-development.test.ts",
+    "sha256": "5b12b606c26a162dc7a3122956eb7863dba80f065a0f52aed82ee8c4d50d6b51"
+  },
+  {
+    "path": "tests/local-journey.integration.test.ts",
+    "sha256": "ce84f838e91ba3e8d5d018e9b35b766cb7bea51581256deffb6e63d8c0a5d345"
+  },
+  {
+    "path": "tests/local-journey.test.ts",
+    "sha256": "bc6be6eb6e9cd81bdc064f94c88567dbdf47ae547215e3b6db59347e2ef721b6"
+  },
+  {
+    "path": "tests/marketing-home.test.tsx",
+    "sha256": "c639b2f6f348c213e6614fe679b9099706c8c62f8a84c48ad20e919cb6111ec4"
+  },
+  {
+    "path": "tests/marketing-pricing.test.tsx",
+    "sha256": "f5e27f5f48bc2bc2118da6a10e9b50ef6ea3cf85cecbb22d369a7a3b1ad4ce12"
+  },
+  {
+    "path": "tests/memory-firestore.test.ts",
+    "sha256": "457c2ab380360d22e2a32352aeaf5f95b529047c7ef17a22e12cfe320989a926"
+  },
+  {
+    "path": "tests/memoryFirestore.ts",
+    "sha256": "937f21f5076100ee7cabbe636e1427d7476be684b64118e510c127598c40f772"
+  },
+  {
+    "path": "tests/next-availability-d1.integration.test.ts",
+    "sha256": "664e7858ab4fd25800a0413980b86494d29185f95fc4fdbe112f89b7c453aaf7"
+  },
+  {
+    "path": "tests/next-availability-route.test.ts",
+    "sha256": "cfbab128f954c0ce669d157d256dce907dbac11b170619ae807918305eb8774f"
+  },
+  {
+    "path": "tests/next-availability.test.ts",
+    "sha256": "bb580fa96a3a62e43b6798ce2598189ee8350ecd7911a166d2b96f1f47efb6d8"
+  },
+  {
+    "path": "tests/next-available-booking-hook.test.tsx",
+    "sha256": "dab3bb2b65be3dd77f2909f9feb71348f0857125eee4e105e91c4fb2812387d5"
+  },
+  {
+    "path": "tests/next-available-booking-ui.test.tsx",
+    "sha256": "9a7cd411a9f5a09756a494c9baadd52d82e78ae5e48222c66adc50622da79c6a"
+  },
+  {
+    "path": "tests/onboarding-assistance.test.tsx",
+    "sha256": "39a0691f1a1d5c022c52fe2f3f61c4a5146351cee11416a8b3abf2131b20739f"
+  },
+  {
+    "path": "tests/paid-trial.test.ts",
+    "sha256": "d6d13d973b1b258c0b48584fe3997e8184e9dece1ac49831d73d202616fb4bdd"
+  },
+  {
+    "path": "tests/phone-number.test.ts",
+    "sha256": "176c52aa2efbeca2b061b709915f2b94e97dafa838ff99607ea4a3a47410adfb"
+  },
+  {
+    "path": "tests/pilot-abuse.integration.test.ts",
+    "sha256": "bae8a0c2923b1c0edba5968741b4c0d5803d25ff5527c008aa9df2382fcefc1d"
+  },
+  {
+    "path": "tests/public-business-entry.test.tsx",
+    "sha256": "35010fffbbf97b10fe9591e6b876f5eddbab253238fddb64de245568b706cb5a"
+  },
+  {
+    "path": "tests/public-commercial-offer-route.test.ts",
+    "sha256": "c5a915ac90d0e953a4d76ff467d9cb35df78d5fd3307d5c115a27fe96245e113"
+  },
+  {
+    "path": "tests/public-service-booking-entry.test.tsx",
+    "sha256": "840595c7bf01683d5e0ef2a1dd963475f653b80494812089b7d5bdb765c015bf"
+  },
+  {
+    "path": "tests/qr-kit-route.test.ts",
+    "sha256": "60a43cfd8f95f6d5e203d2cbad90fb4e9e3347df2cf4d19adf64d25f83d09d76"
+  },
+  {
+    "path": "tests/qr-kit.test.tsx",
+    "sha256": "0f8c8061f389c1d329b20a7cf9bc0f91df8a31be1ba4c34e0f1e2de4ea5fc92a"
+  },
+  {
+    "path": "tests/queue-vip.test.ts",
+    "sha256": "33a459b3d01c183c3c8bde6e5b2de7885a72ddf4e5ac1c0ac39b572626f38c21"
+  },
+  {
+    "path": "tests/queue.test.ts",
+    "sha256": "a4010edc812f0b797dbe231ce3c49b6a1d66633a7e1341b43a171ed2f94bff5f"
+  },
+  {
+    "path": "tests/reminder-data-maintenance.test.ts",
+    "sha256": "e4ade4b9400c9b73facf5442e3e18d39c5516fe168e3e46891c559b54f5c2ba4"
+  },
+  {
+    "path": "tests/representation-review-route.test.ts",
+    "sha256": "ececdf40d9f03e6df620e61af0ff7c274a0047e4ee3d72afc60fa26c4786e64a"
+  },
+  {
+    "path": "tests/representation-review.test.ts",
+    "sha256": "1a00638fc8168ffaccf1c74e59792ec3c2c95bf750c9fa46137921542b5e7c19"
+  },
+  {
+    "path": "tests/representation-review.test.tsx",
+    "sha256": "16b61c91fe11113355d7268e47b764270b236b8806cf30713e21f283c10e9b55"
+  },
+  {
+    "path": "tests/represented-booking-contract.ts",
+    "sha256": "05a1e3b8f8f783d72feaa0f0ac556f63a0b0c40cbb5be44c363e63b6346d3fc2"
+  },
+  {
+    "path": "tests/represented-booking.integration.test.ts",
+    "sha256": "adc2c2c35e61cd68c75f912516eae51a0d3af446c3fb8b152602a908b7a4d6e8"
+  },
+  {
+    "path": "tests/response-quota.test.ts",
+    "sha256": "8f8bc31fb96a4423a2cfc7a4d9ce2c5aef2df1dca6bcacf27af04e6fd267ab75"
+  },
+  {
+    "path": "tests/retry-after.test.ts",
+    "sha256": "82a1a0314837b2364df75925305a48d3bfa7a6f8a185185d629910165afa4d8f"
+  },
+  {
+    "path": "tests/schemas.test.ts",
+    "sha256": "eacdf52314698ef2ecbb557d0e560acf50e24e8a9f2c5cade7a80609f76c46dc"
+  },
+  {
+    "path": "tests/serve-ollama.test.ts",
+    "sha256": "af3bcc4b7ac8e489b6e1b61751a1bedb0ddbafaa43172eb8007e115b948bd670"
+  },
+  {
+    "path": "tests/server-only.ts",
+    "sha256": "3062f7d22e26c8617df8aed6e06485a74ec317589aead7c1627421874935fc93"
+  },
+  {
+    "path": "tests/service-catalog-prompts.test.ts",
+    "sha256": "7ee698cd0a0159827a0394a7ebb89caf627a0dd7431aa4c2efcf0d8d1206519f"
+  },
+  {
+    "path": "tests/service-information.test.tsx",
+    "sha256": "a42c672a99f8b68ca008519416411698af2baac33a4a342cad8855cdfb97c202"
+  },
+  {
+    "path": "tests/storage-backend.test.ts",
+    "sha256": "243770687089d23ee5c9a08fb2867a8b5c7216e0c652e81930bd734142f7a4a9"
+  },
+  {
+    "path": "tests/structured-booking-lifecycle.test.tsx",
+    "sha256": "eb1d6681289d5d9a2a861a3583b38e83ea8f19db33cddb52de8d7e18ab4087a6"
+  },
+  {
+    "path": "tests/structured-booking-routes.test.ts",
+    "sha256": "9f54fcc5c079ba5ebab88b1b936dc0cbe6b5a7c73448b0fe58ce424d3d6fa826"
+  },
+  {
+    "path": "tests/structured-booking.test.ts",
+    "sha256": "4775b7227acb3021b84531eedb9b864ec3174590c5351cd78944e0d1b2df6335"
+  },
+  {
+    "path": "tests/structured-booking.test.tsx",
+    "sha256": "83c095f1b59c53f2159d9fddfe73aa7504ee3209bfb6a4da9aaba4d2c9089d0b"
+  },
+  {
+    "path": "tests/text-suggestions.test.tsx",
+    "sha256": "39b1621f16e28f2946951ed22c9b52ab3819350cd503362014a79c7b031f8563"
+  },
+  {
+    "path": "tests/use-business.test.tsx",
+    "sha256": "5e4fd06de665c97e6b107bea8c6d7c56472d3d9deff687b732e235b6ac114e5e"
+  },
+  {
+    "path": "tests/user-avatar.test.tsx",
+    "sha256": "f6f9ad88b0bf39308d7d23a552393ec810f286d2981f7d22366cf12051e08af5"
+  },
+  {
+    "path": "tests/waitlist-contract.ts",
+    "sha256": "809037a820cc2ff744ee94fe1366942bd5fc9dc0a4d08178490b147fed90980f"
+  },
+  {
+    "path": "tests/waitlist-d1.test.ts",
+    "sha256": "0edf4639c2fea1716c40b0aaaf212e5bb3dd6649b4d958b5aa30896da602b1f5"
+  },
+  {
+    "path": "tests/waitlist-data-maintenance.test.ts",
+    "sha256": "988099e5eabc16c82671b3b7378baa51683bc120ec4665d231da1c3c4f73a39e"
+  },
+  {
+    "path": "tests/waitlist-lifecycle.test.tsx",
+    "sha256": "f047e306a860c491b3d5e85f63c5ccedbfbee224152cf11e3901064006db6862"
+  },
+  {
+    "path": "tests/waitlist-routes.test.ts",
+    "sha256": "90a72b8b03868902c034035831fa723f29c3c6336fcda8c410eaa11fb783444d"
+  },
+  {
+    "path": "tests/waitlist-ui.test.tsx",
+    "sha256": "3a992e72d359c25ce3adb336ace80e6ebc297c34c5eba022eec2ad68389add94"
+  },
+  {
+    "path": "tests/waitlist.test.ts",
+    "sha256": "2903b01e56ad5d0b9e9106c86d5b8a39a40656d4ac1e3cdcf890e5ab9f84d5d5"
+  },
+  {
+    "path": "tests/whatsapp-config.test.ts",
+    "sha256": "75b24fa4b2e6fa3ab95977233a2e39adc6e7fa936d75752adb12d9b91a713557"
+  },
+  {
+    "path": "tests/whatsapp-fixtures.ts",
+    "sha256": "02e8b27cc665ccb21ef2900104a0890d1cc760909dc3846d22d983994bd1d08f"
+  },
+  {
+    "path": "tests/whatsapp-maintenance.test.ts",
+    "sha256": "208493fd30d555db1f12bcb2fbb7aa06c8ed2736366851d9ef3bdae12a635eea"
+  },
+  {
+    "path": "tests/whatsapp-phone-field.test.tsx",
+    "sha256": "9e60fa2d911d4264b4ec43e7b4780fe489530cfb2f8302271e9c62d0bd143b71"
+  },
+  {
+    "path": "tests/whatsapp-queue.test.ts",
+    "sha256": "bf29e9a142f46a2d9df6711d46622acc5254b8484ea7593d3838de2449a00d10"
+  },
+  {
+    "path": "tests/whatsapp-routes.test.ts",
+    "sha256": "d44b9e4efd348952665029ca3a83c6c71b61d687afabf3116dfb97f2f23412cd"
+  },
+  {
+    "path": "tests/whatsapp-security.test.ts",
+    "sha256": "b006f51826b09496cc8051095075271f74e4490868faff601246386118711791"
+  },
+  {
+    "path": "tsconfig.json",
+    "sha256": "4ce983b681839694dc829d0f9f6bce6d41ebe935786a716b01899e35334b2d29"
+  },
+  {
+    "path": "vitest.config.mts",
+    "sha256": "0863a8617bd761ba2bcb94c3e42fd54596a7349697406e3a5d56db920d29ff66"
+  },
+  {
+    "path": "wrangler.jsonc",
+    "sha256": "fd4bff55103dbb2a4eea9b1f858aceb01f50bf14eecba962179563bb15f7c8bf"
+  }
+]

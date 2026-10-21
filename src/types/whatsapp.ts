@@ -33,3 +33,23 @@ export interface WhatsAppUsage {
   businesses: ({ businessId: string } & WhatsAppUsageCounters)[];
   truncated: boolean;
 }
+
+export type WhatsAppConversationMode = 'bot' | 'human' | 'review';
+export interface AdminWhatsAppConversation {
+  id: string;
+  businessId: string;
+  phoneNumberId: string;
+  mode: WhatsAppConversationMode;
+  revision: number;
+  updatedAt: string;
+  lastInboundAt: string | null;
+  lastHumanAt: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  lastMessage: string | null;
+  contentAvailable: boolean;
+}
+export interface AdminWhatsAppConversations {
+  conversations: AdminWhatsAppConversation[];
+  truncated: boolean;
+}

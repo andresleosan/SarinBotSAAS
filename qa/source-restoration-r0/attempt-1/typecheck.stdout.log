@@ -1,0 +1,4 @@
+src/lib/client/booking-card-assets.ts(90,40): error TS2307: Cannot find module 'pdf-lib' or its corresponding type declarations.
+src/lib/server/admin-copilot.ts(101,128): error TS2322: Type '"sarin_admin_copilot"' is not assignable to type '"sarin_client" | "sarin_onboarding" | "sarin_owner_copilot"'.
+tests/booking-card-assets.test.ts(2,52): error TS2307: Cannot find module 'pdf-lib' or its corresponding type declarations.
+tests/booking-card-assets.test.ts(35,70): error TS7031: Binding element 'value' implicitly has an 'any' type.

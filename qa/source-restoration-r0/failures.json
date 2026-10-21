@@ -1,0 +1,386 @@
+[
+  {
+    "path": "tests/admin-copilot.test.ts",
+    "assertions": 21,
+    "failed": [
+      {
+        "name": "grounded read-only administrative questions uses the configured provider once, returns server-owned sources and meters only the administrator",
+        "messages": [
+          "AssertionError: expected undefined to match object { businessId: null, …(1) }\n    at Proxy.<anonymous> (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/index.uwTEEBsB.js:2066:10)\n    at Proxy.<anonymous> (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/index.uwTEEBsB.js:1958:14)\n    at Proxy.methodWrapper (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/admin-copilot.test.ts:121:30\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/admin-deep-links.test.ts",
+    "assertions": 8,
+    "failed": [
+      {
+        "name": "administrator payment deep links rejects invalid or ambiguous focused payment ids: ?focusPayment=",
+        "messages": [
+          "AssertionError: expected 503 to be 400 // Object.is equality\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/admin-deep-links.test.ts:27:48\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "administrator payment deep links rejects invalid or ambiguous focused payment ids: ?focusPayment=../payment",
+        "messages": [
+          "AssertionError: expected 503 to be 400 // Object.is equality\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/admin-deep-links.test.ts:27:48\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "administrator payment deep links rejects invalid or ambiguous focused payment ids: ?focusPayment=one&focusPayment=two",
+        "messages": [
+          "AssertionError: expected 503 to be 400 // Object.is equality\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/admin-deep-links.test.ts:27:48\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "administrator payment deep links includes a payment outside the first 500 records without exposing its image or mutating data",
+        "messages": [
+          "AssertionError: expected [ { id: 'new-499', …(8) }, …(499) ] to have a length of 501 but got 500\n    at Proxy.<anonymous> (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/index.uwTEEBsB.js:2163:20)\n    at Proxy.<anonymous> (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/index.uwTEEBsB.js:1958:14)\n    at Proxy.methodWrapper (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/admin-deep-links.test.ts:39:27\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "administrator payment deep links returns 404 when the focused payment no longer exists",
+        "messages": [
+          "AssertionError: expected 200 to be 404 // Object.is equality\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/admin-deep-links.test.ts:47:74\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/appointment-reminders.integration.test.ts",
+    "assertions": 8,
+    "failed": [
+      {
+        "name": "two D1 handles preserve one seen timestamp and never mutate the appointment",
+        "messages": [
+          "Error: internal error; reference = ic08cc8bkll1ko50tmo2763d\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reminders.integration.test.ts:49:5"
+        ]
+      },
+      {
+        "name": "rejects an in-flight old enable after another handle disables the preference",
+        "messages": [
+          "Error: internal error; reference = lo5m3p0r0lhgeb88qm5g49op\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reminders.integration.test.ts:49:5"
+        ]
+      },
+      {
+        "name": "revalidates a consent that commits while seen is in flight",
+        "messages": [
+          "Error: internal error; reference = gfq11dfhtoup2fbifdb4k8j4\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reminders.integration.test.ts:49:5"
+        ]
+      },
+      {
+        "name": "revalidates a cancel that commits while seen is in flight",
+        "messages": [
+          "Error: internal error; reference = 4g2vp22jjk96hs6at676g4or\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reminders.integration.test.ts:49:5"
+        ]
+      },
+      {
+        "name": "revalidates a reschedule that commits while seen is in flight",
+        "messages": [
+          "Error: internal error; reference = rlm1rc7o0tq6f7khkn2magln\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reminders.integration.test.ts:49:5"
+        ]
+      },
+      {
+        "name": "repeats only an identical journaled seen commit after response loss",
+        "messages": [
+          "Error: internal error; reference = 3at200ilgs5b8je7l2eb5bm1\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reminders.integration.test.ts:49:5"
+        ]
+      },
+      {
+        "name": "queries only the future window despite 1001 historical visits and measures real local D1 read cost",
+        "messages": [
+          "Error: internal error; reference = hh83qp70ak9ltd42lsp2delv\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reminders.integration.test.ts:49:5"
+        ]
+      },
+      {
+        "name": "index migration preserves existing documents and the global revision",
+        "messages": [
+          "Error: internal error; reference = a27supur1m902hm87lfed45u\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reminders.integration.test.ts:49:5"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/appointment-reschedule.integration.test.ts",
+    "assertions": 8,
+    "failed": [
+      {
+        "name": "real D1 atomically moves one document with deduplicated locks and same-proposal replay",
+        "messages": [
+          "Error: internal error; reference = af5ugk2n4fhv0un5ll5it9b9\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reschedule.integration.test.ts:14:13"
+        ]
+      },
+      {
+        "name": "real D1 updates origin destination and client locks across resource and date",
+        "messages": [
+          "Error: internal error; reference = d5pjitmtkfpss96hifpat82o\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reschedule.integration.test.ts:14:13"
+        ]
+      },
+      {
+        "name": "real D1 serializes two source-revision competitors across separate handles",
+        "messages": [
+          "Error: internal error; reference = bc8p5cnfppsrg0acouu414hs\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reschedule.integration.test.ts:14:13"
+        ]
+      },
+      {
+        "name": "real D1 serializes a reschedule against a destination booking",
+        "messages": [
+          "Error: internal error; reference = ldn92cfrugln9bkd9plj2hbr\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reschedule.integration.test.ts:14:13"
+        ]
+      },
+      {
+        "name": "real D1 serializes a reschedule against a destination manual",
+        "messages": [
+          "Error: internal error; reference = bl54u5tivlbgieh599e10718\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reschedule.integration.test.ts:14:13"
+        ]
+      },
+      {
+        "name": "real D1 serializes cancellation against a reschedule without losing the source",
+        "messages": [
+          "Error: internal error; reference = 2fquk06nebvqqr4mikg9i7os\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reschedule.integration.test.ts:14:13"
+        ]
+      },
+      {
+        "name": "real D1 retains original operation evidence across A to B to A and later cancellation",
+        "messages": [
+          "Error: internal error; reference = n8tke3orr5ss93cpmu59g1io\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reschedule.integration.test.ts:14:13"
+        ]
+      },
+      {
+        "name": "real D1 retries the identical journaled commit after a lost response",
+        "messages": [
+          "Error: internal error; reference = inrnsj6kut74kuutcjd8fk1p\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/appointment-reschedule.integration.test.ts:14:13"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/booking-card-assets.test.ts",
+    "assertions": 0,
+    "failed": [],
+    "message": "Cannot find package 'pdf-lib' imported from C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/booking-card-assets.test.ts"
+  },
+  {
+    "path": "tests/business-ai-budget.integration.test.ts",
+    "assertions": 2,
+    "failed": [
+      {
+        "name": "business budget overrides on real local D1 reserves the final overridden business slot once across independent D1 handles",
+        "messages": [
+          "Error: internal error; reference = 33q1r4ifv5hlodeta43m3jgo\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/business-ai-budget.integration.test.ts:29:15"
+        ]
+      },
+      {
+        "name": "business budget overrides on real local D1 preserves used and uncertain counters when raising A and still enforces the global pool shared with B",
+        "messages": [
+          "Error: internal error; reference = kegjto2rsuq3ie0f4vh226on\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/business-ai-budget.integration.test.ts:29:15"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/cloudflare-data.integration.test.ts",
+    "assertions": 10,
+    "failed": [],
+    "message": ""
+  },
+  {
+    "path": "tests/data-migration.test.ts",
+    "assertions": 21,
+    "failed": [
+      {
+        "name": "Firestore migration artifacts roundtrips large logos through real D1/R2 and a local SQL backup recovery",
+        "messages": [
+          "Error: internal error; reference = 2jkrdi06p72ij9hip5gg29nl\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/data-migration.test.ts:60:21\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "Firestore migration artifacts creates and reopens a private backup directory using only the current operator permissions",
+        "messages": [
+          "Error: MIGRATION_BACKUP_INSIDE_WORKSPACE\n    at fail (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/scripts/lib/data-migration.mjs:11:32)\n    at resolveBackupDirectory (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/scripts/lib/data-migration.mjs:353:28)\n    at privateDirectory (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/scripts/lib/data-migration.mjs:358:18)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/data-migration.test.ts:239:7\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "Firestore migration artifacts imports the generated SQL and image bytes into real local D1/R2 and reads them through the Worker bridge",
+        "messages": [
+          "Error: internal error; reference = 7a1pvd10oq846ban3i5hhu09\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/data-migration.test.ts:272:21\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "Firestore migration artifacts reads machine JSON from the installed Wrangler CLI without suppressing stdout",
+        "messages": [
+          "Error: MIGRATION_BACKUP_INSIDE_WORKSPACE\n    at fail (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/scripts/lib/data-migration.mjs:11:32)\n    at resolveBackupDirectory (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/scripts/lib/data-migration.mjs:353:28)\n    at privateDirectory (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/scripts/lib/data-migration.mjs:358:18)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/data-migration.test.ts:324:7\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/inference-rate-limit.test.ts",
+    "assertions": 20,
+    "failed": [
+      {
+        "name": "client frequency on real local Workerd D1 persists admission across DB handles and serializes the final slot",
+        "messages": [
+          "Error: internal error; reference = bt3v46ukp4q409e6pi4nm9hd\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at Module.createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/inference-rate-limit.test.ts:122:21\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/next-availability-d1.integration.test.ts",
+    "assertions": 1,
+    "failed": [],
+    "message": "internal error; reference = ac8jmb7nqj4cbgul4al4ba7j"
+  },
+  {
+    "path": "tests/pilot-abuse.integration.test.ts",
+    "assertions": 2,
+    "failed": [],
+    "message": ""
+  },
+  {
+    "path": "tests/reminder-data-maintenance.test.ts",
+    "assertions": 10,
+    "failed": [
+      {
+        "name": "real D1 rejects a concurrent inserted receipt before deletion and later removes the exact new export only",
+        "messages": [
+          "Error: internal error; reference = dfrk0pjuukf5ech43h09qf6q\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/reminder-data-maintenance.test.ts:82:19\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "real D1 supports exact appointment export and deletion with owner filter=false, preserving preferences and other receipts",
+        "messages": [
+          "Error: internal error; reference = bn7ipjc98vaolcg8294v1886\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/reminder-data-maintenance.test.ts:111:19\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "real D1 supports exact appointment export and deletion with owner filter=true, preserving preferences and other receipts",
+        "messages": [
+          "Error: internal error; reference = agjaqe1nnqv2bpojn7mkg4hs\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/reminder-data-maintenance.test.ts:111:19\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/represented-booking.integration.test.ts",
+    "assertions": 4,
+    "failed": [
+      {
+        "name": "real D1 confirms adult self child haircut and pediatrics once without IA usage",
+        "messages": [
+          "Error: internal error; reference = k1rva3e0g1h81sk6tcekmvs4\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/represented-booking.integration.test.ts:9:61"
+        ]
+      },
+      {
+        "name": "real D1 rejects changed identity and withdrawal and validates canonical receipts",
+        "messages": [
+          "Error: internal error; reference = omucbftnpb4g89im2qcg4nnk\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/represented-booking.integration.test.ts:9:61"
+        ]
+      },
+      {
+        "name": "real D1 serializes final quota and withdrawal across independent handles",
+        "messages": [
+          "Error: internal error; reference = 7i55oukv1tsjdd2l7s6l7mp3\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/represented-booking.integration.test.ts:9:61"
+        ]
+      },
+      {
+        "name": "real D1 preserves legacy confirmed recovery under changed health policy",
+        "messages": [
+          "Error: internal error; reference = r8a7n4cui200bekv934kl8hj\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/represented-booking.integration.test.ts:9:61"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/waitlist-d1.test.ts",
+    "assertions": 7,
+    "failed": [
+      {
+        "name": "keeps GET cost independent of 1001 old appointments without writing or scanning waitlist history",
+        "messages": [
+          "Error: internal error; reference = brnpvf747640fs22eknqancr\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/waitlist-d1.test.ts:39:114"
+        ]
+      },
+      {
+        "name": "never truncates more than 1000 matching day records into a trustworthy availability result",
+        "messages": [
+          "Error: internal error; reference = v81uoetglqghg6dv7hghr1pm\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/waitlist-d1.test.ts:39:114"
+        ]
+      },
+      {
+        "name": "revalidates availability that changes before the join commit",
+        "messages": [
+          "Error: internal error; reference = ggfdgrt9eo0no3mlib75d822\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/waitlist-d1.test.ts:39:114"
+        ]
+      },
+      {
+        "name": "revalidates consent that changes before the join commit",
+        "messages": [
+          "Error: internal error; reference = j453dkbb9j0rl51kh7bdaatr\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/waitlist-d1.test.ts:39:114"
+        ]
+      },
+      {
+        "name": "serializes competing joins and rejects a delayed cancellation after a replacement",
+        "messages": [
+          "Error: internal error; reference = tu70qne217c7m44dl6sp43jr\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/waitlist-d1.test.ts:39:114"
+        ]
+      },
+      {
+        "name": "retries only the identical journaled join commit after response loss",
+        "messages": [
+          "Error: internal error; reference = ku8oi0ml2flk7rmbj7c68q90\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/waitlist-d1.test.ts:39:114"
+        ]
+      },
+      {
+        "name": "uses a fresh clock when an availability read crosses the requested day end",
+        "messages": [
+          "Error: internal error; reference = opjggbr6m9ldlt7ntb71nger\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/waitlist-d1.test.ts:39:114"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/waitlist-data-maintenance.test.ts",
+    "assertions": 11,
+    "failed": [
+      {
+        "name": "real D1 preserves neighboring data and rejects a concurrent change before deleting the exact new export",
+        "messages": [
+          "Error: internal error; reference = 5g2q5ddktr1alunsf8skk8v7\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at createDataTestRuntime (C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/cloudflare/tests/data-runtime.mjs:28:7)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/waitlist-data-maintenance.test.ts:79:19\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      }
+    ],
+    "message": ""
+  },
+  {
+    "path": "tests/whatsapp-conversation-routes.test.ts",
+    "assertions": 5,
+    "failed": [
+      {
+        "name": "private conversation routes returns a private bounded list and a confirmed revision after takeover",
+        "messages": [
+          "AssertionError: expected { conversations: [], truncated: false } to match object { conversations: [ { …(3) } ], …(1) }\n    at Proxy.<anonymous> (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/index.uwTEEBsB.js:2066:10)\n    at Proxy.<anonymous> (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/index.uwTEEBsB.js:1958:14)\n    at Proxy.methodWrapper (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/whatsapp-conversation-routes.test.ts:33:33\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      },
+      {
+        "name": "private conversation routes accepts app echoes only behind the existing signed webhook boundary",
+        "messages": [
+          "AssertionError: expected { conversations: [], truncated: false } to match object { conversations: [ { …(3) } ] }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/index.uwTEEBsB.js:2066:10)\n    at Proxy.<anonymous> (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/index.uwTEEBsB.js:1958:14)\n    at Proxy.methodWrapper (file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/whatsapp-conversation-routes.test.ts:55:63\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///E:/Proyectos/Sarin%20Bot/node_modules/.pnpm/vitest@5.0.4_@opentelemetry_e44368014a4d10330fea25571fc464e1/node_modules/vitest/dist/chunks/run.Cm2sd7-x.js:2794:20"
+        ]
+      }
+    ],
+    "message": ""
+  }
+]

@@ -1,0 +1,2088 @@
+stderr | tests/billing-pages.test.tsx > billing plan screens > offers three accessible periods with monthly selected and no upload without bank accounts
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > refreshes an obsolete quote, keeps the selected image and bank, and waits for a second explicit submission
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > blocks a repeated upload when refreshing a changed price fails until an explicit refresh succeeds
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > submits only the selected plan and preserves retry identity until that selection changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > locks plan changes during image processing
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > shows the pending receipt's saved period and amount instead of the monthly default
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > labels receipt history by saved period and treats legacy receipts as thirty days
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > edits administrative subscription and pack prices without adding bank accounts
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > shows commercial administration without a personal chat entry point
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > reviews and confirms the duration from the saved receipt
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > does not invent a payment expiry date for a business without an approved payment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > labels complimentary trial status in both owner and administrator screens
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > labels complimentary trial status in both owner and administrator screens
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > labels an approved private draft and its receipt without inventing a subscription expiry
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > shows the current commercial period and a warning without exposing an unavailable WhatsApp purchase
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > does not turn an absent allowance into zero consumption
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > submits a response pack without a subscription plan and changes retry identity when purchase kind changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > keeps an exhausted paid allowance eligible for a pack but prevents purchases for a trial
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > keeps an exhausted paid allowance eligible for a pack but prevents purchases for a trial
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > keeps a pending pack distinct from a renewal in the owner screen and admin approval
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > keeps a pending pack distinct from a renewal in the owner screen and admin approval
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > refreshes usage without treating reserved responses as free or displaying a warning below eighty percent
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > does not sell a pack during preventive access even when old responses remain
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > accepts the first introductory payment before a business is configured
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > keeps an introductory receipt pending without promising preventive access or thirty days
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > shows consumed introductory appointments and requires a plan after ten without a repurchase
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/billing-pages.test.tsx > billing plan screens > approves introductory receipts as ten appointments without extending a subscription
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > offers another day or professional only after a successful empty availability search: {"availability":[]}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > offers another day or professional only after a successful empty availability search: {"availability":[{"resourceId":"r","resourceName":"Recurso","slots":[]},{"resourceId":"other","resourceName":"Otro profesional","slots":[]}]}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > shows request failure without reporting empty availability while loading or after an error
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > initializes a catalog service once without choosing a professional, searching or reserving
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > consumes a removed service seed without selecting it or resetting later user changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > does not transfer the initial service to a changed account
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > does not transfer the initial service to a changed business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > does not transfer the initial service to a changed subject
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > shows selected service metadata as plain text with the customer duration and COP price
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > replaces service details and clears the previous time with optional metadata {}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > replaces service details and clears the previous time with optional metadata {"category":"  ","description":"\n "}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > replaces service details and clears the previous time with optional metadata {"category":42,"description":{"historic":true}}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > replaces service details and clears the previous time with optional metadata {"category":"ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","description":"ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > general self booking stays adult-only when minor bookings are enabled: false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > general self booking stays adult-only when minor bookings are enabled: true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > general self booking uses the existing proposal contact and intake form without a representative
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > starts a fresh case when the explicit subject, business or adult account changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > minor name field appears only after current case authorization and role change resets it
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > health books while inference is offline without mounting a chat
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking.test.tsx > retains the original uncertain request when minor capacity is disabled
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > starts with the self calendar without chat or engine calls when minors=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > starts with the self calendar without chat or engine calls when minors=true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > offers chat explicitly and allows returning to the self calendar
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > locks route and subject changes while chat isWaitingBatch
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > locks route and subject changes while chat isGenerating
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > locks route and subject changes while chat confirming
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > locks route and subject changes while chat confirmationUncertain
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > preserves the calendar controller and locks route changes while confirmation needs recovery
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > selects a represented case explicitly and returns to the self calendar
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > keeps calendar unavailable before consent and never mounts chat for health
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > keeps appointments and cancellation visible while new chat and booking contact require consent
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > never mounts chat while policy is loading or in a restricted booking flow
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > keeps the restricted controller mounted across outer withdrawals and policy errors
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > keeps the original chat recovery mounted after consent changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > keeps the original chat recovery mounted after policy changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > keeps the original chat recovery mounted after health changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > allows a new configuration message after the server reports the earlier turn completed
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > pauses public chat without removing confirmed appointments or offering a subscription to the customer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > keeps owner cancellation available after the tenth appointment and offers a plan
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > pauses new public messages after ten introductory appointments while preserving the confirmed appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > lets the customer retry the saved tenth appointment after a network failure without sending a new message
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > does not display an old agenda read after changing business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/chat-surfaces.test.tsx > chat pause surfaces > does not show an old cancellation error in another business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > sends a burst as one user turn after 2.5 seconds from its last message
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > drops pending batches and late results when consent is withdrawn, preserving visible history
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > waits for the running turn before processing a second burst
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > retries the same request without losing a later burst
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > aborts requests and clears conversation when switching businesses
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > splits oversized bursts and bounds context without limiting later turns
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > pauses new messages after quota exhaustion while preserving the failed request for an explicit retry
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > does not confuse a transport failure with quota exhaustion
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > discards a late reply when UID changes within the same business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > serializes explicit confirmation with chat and ignores confirmation from a previous UID
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > locks an ambiguous confirmation until the same proposal recovers one saved appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > unlocks a definitive first confirmation rejection without blocking a new turn
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > keeps a server failure uncertain even if a later retry returns a definitive rejection
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > clears ambiguous confirmation state when its privacy scope changes {"actorUid":"another-client"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > clears ambiguous confirmation state when its privacy scope changes {"tenantId":"business-2"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > retains only the original confirmation for recovery without new permissions, in-flight=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > retains only the original confirmation for recovery without new permissions, in-flight=true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > cannot begin a confirmation after permissions are withdrawn
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > preserves a retry version and starts a fresh request after state conflict
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/debounced-chat.test.tsx > debounced authenticated chat lifecycle > does not retry an already completed turn and permits a new request
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > health owner can configure manually without mounting AI or free intake
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > applies a proposed configuration only on explicit action and preserves optional intake metadata
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > edits optional public service details locally and includes them only in an explicit save
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > allows the owner to clear service metadata while keeping the service bookable
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > keeps explicit metadata clears in the saved payload after applying an assistant proposal that omits them
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > preserves stored service metadata by ID when an assistant proposal omits it
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > keeps local metadata edits when applying a proposal with reordered services and no metadata
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > keeps existing questions and instructions on load without an automatic save
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > does_not_reset_dirty_form_after_logo_poll and saves socials only explicitly
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > adds chosen examples independently and saves them only with the business form
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > lets the owner combine all six suggestions per field without duplicate lines or automatic saves
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > requires an approved payment before showing configuration or sending onboarding messages
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > requires an approved payment before showing configuration or sending onboarding messages
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > opens an approved private draft with blank editable business details and its first resource
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/onboarding-assistance.test.tsx > onboarding editable examples > asks an exhausted introductory owner to choose a plan instead of buying the trial again
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > shows only the authenticated customer's appointments and sorts upcoming visits by start time
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > shows beneficiary only for its own booking and keeps legacy identity unspecified
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > retains cancelled and past visits in descending history with honest status labels
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > uses the Colombian day for its calendar and filters a selected date without showing another customer's visit
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > requires confirmation, blocks duplicate submissions, and moves the saved cancellation into history
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > lets the customer keep the appointment and preserves it when cancellation is rejected
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > keeps read failures separate from the chat and retries its own appointment subscription
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > never offers cancellation or calendar export once an appointment has started
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > rechecks the start time when confirming after the screen's clock has become stale
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > does not claim a cancellation succeeded if the server returns a different customer's appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > ignores stale subscriptions after a change of authenticated account
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > does not present an unknown persisted status as a confirmed appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > ignores a late cancellation result after switching accounts and businesses
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > does not let an in-flight pre-cancellation read restore a cancelled appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > downloads a PNG reminder without exporting contact details or intake answers
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > prevents duplicate downloads and cancellation while preparing the image
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > discards an image if a fresh read says the appointment was cancelled
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments.test.tsx > the customer's appointments within one business > shows an image error and allows retry without changing the appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > reads only its scope, keeps the preference off and never marks reminders during reads or refreshes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > enables with the observed revision and blocks duplicate mutations in the same event
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > hides immediately on disable, aborts an older read and cannot be reactivated by its late result
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > reconciles an uncertain preference with GET without replaying the old decision
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > keeps a failed reconciliation explicit and retries only the read
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > clears an obsolete lost-preference error only after GET confirms the actual saved state, without replaying PATCH
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > keeps both connection failures understandable in Spanish while preference reconciliation remains unresolved
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > preserves an unrelated seen failure and its exact retry when the automatic GET succeeds
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > keeps a definite preference rejection actionable after GET confirms that it remains disabled
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > shows suspended permissions without reminders and explicitly re-enables with the current revision
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > marks only after an explicit action and preserves a durable original seen timestamp
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > retries a lost seen response using the identical occurrence and never marks a changed occurrence
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > rejects a retained seen action after cancel
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > rejects a retained seen action after reschedule
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > rejects a retained seen action after revision
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > rejects a retained seen action after canonical-read
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > rejects a retained seen action after clock
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > rejects a retained seen action after lock
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > aborts outstanding requests, discards late data and rejects retained writes after account
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > aborts outstanding requests, discards late data and rejects retained writes after business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > aborts outstanding requests, discards late data and rejects retained writes after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > rejects a retained preference handler after the observed revision changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > never turns read errors or foreign responses into a successful empty result
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > keeps unverified old reminders hidden while a failed read is retried
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > uses the server clock at the inclusive 24-hour and exclusive start boundaries
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > removes a reminder exactly at its start without a parent render, poll response or additional request
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > clears the expiry timer while hidden and excludes expired reminders immediately on foreground even if the read is pending
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > stops polling when hidden, resumes on foreground and removes every timer after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reminders-hook.test.tsx > does not offer retry for a stale occurrence conflict
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > starts a fresh calendar case with current catalog data and no historical booking details or automatic mutations
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > consumes each history choice once and does not restore it after manual changes or another case
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks new history entry at the account gate without remounting the current case
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks new history entry at the business gate without remounting the current case
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks new history entry at the ready gate without remounting the current case
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks new history entry at the subscription gate without remounting the current case
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > rejects a removed service against the current catalog even through a retained callback
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > preserves the current case and blocks rebooking while the catalog cannot be refreshed
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > preserves an uncertain structured confirmation and its exact retry while rebooking is blocked
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > preserves the chat operation while waiting and starts the calendar only after unlocking
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > preserves the chat operation while generating and starts the calendar only after unlocking
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > preserves the chat operation while confirming and starts the calendar only after unlocking
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > preserves the chat operation while uncertain and starts the calendar only after unlocking
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > discards the history choice and stale callback after a account identity change
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > discards the history choice and stale callback after a business identity change
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > starts a new health authorization and does not inherit a minor or other prior beneficiary
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > resumes a waitlist with fresh case and one-shot exact hints while leaving the request intact
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > resumes represented waitlist through a new subject authorization with its role and no inherited name
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks a retained waitlist continuation after account gate changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks a retained waitlist continuation after business gate changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks a retained waitlist continuation after ready gate changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks a retained waitlist continuation after subscription gate changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > blocks a retained waitlist continuation after catalog gate changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-rebooking-entry.test.tsx > does not resume an any-professional request when no current service resource remains active
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > downloads only the calendar allowlist, uses the Colombian filename and explains manual updates without a write
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > honors a synchronous workspace mutex rejection before calendar begins
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > honors a synchronous workspace mutex rejection before image begins
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > honors a synchronous workspace mutex rejection before cancel begins
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > offers export only for valid own future confirmed appointments and keeps the PNG action
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > shows generator failure and permits an explicit retry without changing the booking
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > shows download failure and permits an explicit retry without changing the booking
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > blocks duplicate calendar exports, PNG, cancellation and rebooking while calendar preparation is pending
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > blocks a retained calendar action while cancel is pending
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > blocks a retained calendar action while image is pending
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects a retained image handler from another account before it can lock the current calendar action
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects a retained cancel handler from another account before it can lock the current calendar action
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: cancelled_by_client
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: cancelled_by_owner
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: completed
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: no_show
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: removed
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: time
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: end
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: service
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: resource
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: resource-name
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: business-name
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: owner
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: tenant
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: type
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: clock
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards prepared content after the current appointment or metadata changes: read-error
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards an in-flight export after user without replaying it
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards an in-flight export after business without replaying it
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards an in-flight export after round-trip without replaying it
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > discards an in-flight export after unmount without replaying it
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects retained calendar handlers before generation after user
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects retained calendar handlers before generation after business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects retained calendar handlers before generation after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects retained calendar handlers before generation after removed
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects retained calendar handlers before generation after cancelled
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects retained calendar handlers before generation after clock
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects retained calendar handlers before generation after read-error
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > rejects retained calendar handlers before generation after retry
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-calendar.test.tsx > explicit calendar file export from own appointments > allows the current StrictMode handler and rejects its retained action after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > finds the next date only on request and preserves the chosen resource  without picking a time
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > finds the next date only on request and preserves the chosen resource one without picking a time
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > retains the chosen date and exposes the checked range when the window is empty
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects a delayed result from yesterday after Colombia crosses midnight and permits a fresh manual retry
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > clears a previously chosen time when it finds a later date
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > reports request failure separately from an empty calendar and allows retry
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: null
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-01","availability":[{"resourceId":"one","resourceName":"Ana","slots":["09:00","10:00"]}],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-02-30","availability":[{"resourceId":"one","resourceName":"Ana","slots":["09:00","10:00"]}],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-16","availability":[{"resourceId":"one","resourceName":"Ana","slots":["09:00","10:00"]}],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-03","availability":[{"resourceId":"one","resourceName":"Ana","slots":["09:00","10:00"]}],"fromDateKey":"2029-12-31","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-03","availability":[{"resourceId":"one","resourceName":"Ana","slots":["09:00","10:00"]}],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-16"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-03","availability":[{"resourceId":"one","resourceName":"Ana","slots":["09:00","10:00"]}],"fromDateKey":"2030-01-16","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-03","availability":[],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-03","availability":[{"resourceId":"one","resourceName":"Ana","slots":[]}],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-03","availability":[{"resourceId":"one","resourceName":"Ana","slots":["24:00"]}],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":"2030-01-03","availability":[{"resourceId":"one","resourceName":null,"slots":["09:00","10:00"]}],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects an invalid response without changing the date: {"dateKey":null,"availability":[{"resourceId":"one","resourceName":"Ana","slots":["09:00","10:00"]}],"fromDateKey":"2030-01-02","throughDateKey":"2030-01-15"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > rejects a response for a different explicitly chosen professional
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > aborts and discards late results after selection changes: {"serviceId":"other"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > aborts and discards late results after selection changes: {"resourceId":"other"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > aborts and discards late results after selection changes: {"dateKey":"2030-01-08"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > cannot commit or restart an obsolete search after scope/permission changes: {"uid":"demo-other"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > cannot commit or restart an obsolete search after scope/permission changes: {"uid":""}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > cannot commit or restart an obsolete search after scope/permission changes: {"businessId":"demo-other"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > cannot commit or restart an obsolete search after scope/permission changes: {"caseId":"demo-other-request"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > cannot commit or restart an obsolete search after scope/permission changes: {"active":false}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > prevents duplicate searches and gives a newer daily reload ownership over a late result
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > clears a completed search on a daily reload
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > requires a successful empty daily read and current permission before searching
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > retained search and daily handlers cannot modify a frozen proposal or uncertain confirmation
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > a retained first-confirmation callback cannot begin a booking after permission is withdrawn
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > aborts an in-flight search when a proposal freezes the booking
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > a retained selection handler from a different identity cannot abort its replacement search
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-hook.test.tsx > works after StrictMode effect replay and blocks retained handlers after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > uses the current catalog name and emits only its service ID without copying or submitting the old appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > offers only valid own historical appointments whose service still exists
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > omits the action when callback or current service is absent: {}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > omits the action when callback or current service is absent: {}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > omits the action when callback or current service is absent: {"services":[]}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > omits the action when callback or current service is absent: {"services":[{"id":"other-service","name":"Corte actual del catálogo","price":32000,"durationMinutes":45,"bufferMinutes":5,"resourceIds":["new-chair"]}]}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > keeps an unavailable affordance disabled when rebookingEnabled=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > keeps an unavailable affordance disabled when rebookingEnabled=undefined
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > limits rebooking to History even when a historical visit is visible in Calendar
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > keeps current StrictMode actions usable and invalidates retained actions after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > keeps current StrictMode actions usable and invalidates retained actions after remount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > rejects a retained handler after its current context changes: permission
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > rejects a retained handler after its current context changes: catalog
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > rejects a retained handler after its current context changes: callback
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > rejects a retained handler after its current context changes: view
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > rejects a retained handler after its current context changes: user
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > rejects a retained handler after its current context changes: business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > rejects a retained handler after its current context changes: unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > revalidates the current appointment before invoking an old handler: removed
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > revalidates the current appointment before invoking an old handler: changed-service
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > revalidates the current appointment before invoking an old handler: no-longer-history
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > blocks retained actions on read failure and while retrying the appointment read
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > blocks rebooking while an existing appointment action is pending: cancel
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-rebook.test.tsx > rebooking from the own appointment history > blocks rebooking while an existing appointment action is pending: export
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > asks current health and representation choices for a new fixed case before offering schedule fields
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > keeps the fixed case mounted and blocks a retained return while its authorization is being saved
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > shows source versus current proposal and confirms without a new phone, intake input or AI
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > keeps a legacy beneficiary absent and allows only the unrestricted general path without a subject read
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > preserves an uncertain legacy confirmation when current policy becomes restricted
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > routes restricted legacy identity to business contact without inventing a case: {"dataMode":"health","representedMinorsEnabled":false}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > routes restricted legacy identity to business contact without inventing a case: {"dataMode":"general","representedMinorsEnabled":true}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > reports a successful empty daily search honestly and requires a manual next date
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-ui.test.tsx > blocks a proposal after the catalog or current source changes without removing recovery
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > renders the real snapshot and actionable sources without consuming AI
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > makes limited coverage and unavailable quotas visible without inventing a global all-clear
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > submits one read-only question with an id and displays a plain answer and server sources
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > changes the data scope and clears old private conversation before showing another business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > keeps an unsent question after failure and exposes a retryable error
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > shows loading failure without invented zero metrics and can refresh
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > aborts active reads and questions when unmounted
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > prepares a suggested question without sending it automatically
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > discards a response for an old business after the scope changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > does not mount private requests when the administrator gate denies access
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-copilot-ui.test.tsx > private administrative copilot > clears private data and ignores a late answer when the account identity changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > renders server estimates and joins business names without exposing additional identity data
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > distinguishes missing measurement from a measured month without activity
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > does not present pre-counter history or the previous month's numbers as a new month
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > labels incomplete cost data and write confirmation failures without turning unknown cost into zero
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > preserves the last successful reading on refresh failure and retries only the read endpoint
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > does not round a positive sub-cent estimate down to free usage
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > keeps the latest DeepSeek refresh when an earlier request finishes late
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > reads Gemini history without selecting the active AI or accepting a late DeepSeek refresh
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-usage.test.tsx > monthly administrative AI usage > keeps Gemini without measurement separate from existing DeepSeek totals
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > opens a dedicated fixed source, blocks other actions and new booking, and lets the customer return without a write
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > allows an exhausted paid trial schedule change while fresh rebooking stays paused
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > blocks a retained entry after the current account gate closes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > blocks a retained entry after the current consent gate closes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > blocks a retained entry after the current ready gate closes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > blocks a retained entry after the current local-action gate closes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > blocks a retained entry after the current chat gate closes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > invalidates a changed current source and discards the entry across an account change
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > refreshes Mis citas after immutable operation success without installing a historical appointment and explains calendar updates
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-reschedule-entry.test.tsx > keeps the same uncertain operation mounted when the booking policy becomes unavailable
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-page.test.tsx > owner AI controls > changes AI only on explicit save and locks selection while the request is pending
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-page.test.tsx > owner AI controls > separates Gemini tests from the actual client provider without offering a test radio
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-page.test.tsx > owner AI controls > shows a pending test key even when client Gemini is active
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-page.test.tsx > owner AI controls > keeps Gemini disabled until the server verifies paid billing, then saves only an explicit manual choice
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > reads once with the expected identity, without polling, and refreshes explicitly
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-page.test.tsx > owner AI controls > retains the actual active provider after a rejected change without automatic retries
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > latches a join synchronously and saves only the exact selected filters and fresh operation
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > reconciles a lost join response with GET without replaying the mutation or preserving a stale network error
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > clears an ambiguous HTTP 500 save error after GET recovers the committed request
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > clears an ambiguous HTTP 502 save error after GET recovers the committed request
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-page.test.tsx > owner AI controls > prevents selecting an unconfigured provider without asking for credentials
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > clears an ambiguous HTTP 503 save error after GET recovers the committed request
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > clears an ambiguous HTTP 504 save error after GET recovers the committed request
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > keeps an ambiguous save blocked until an explicit successful reconciliation and does not claim an empty list
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-page.test.tsx > owner AI controls > keeps a successful saved selection when refreshing provider status fails
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > retains definite rejection copy after reconciliation and permits a new explicit attempt only when cleared
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a retained join when the current canJoin gate changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a retained join when the current actionsLocked gate changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a retained join when the current mutex gate changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > cancels a suspended request without new-booking permission and reconciles a lost response
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > blocks a retained cancel after the request revision changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-page.test.tsx > owner AI controls > retries a failed status read without writing provider configuration
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > discards late reads and retained actions through account A to B to A
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > does not let an older GET overwrite a committed join
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a malformed or cross-scope DTO rather than exposing a request: {"ownerUid":"another"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a malformed or cross-scope DTO rather than exposing a request: {"businessId":"another"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a malformed or cross-scope DTO rather than exposing a request: {"revision":-1}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a malformed or cross-scope DTO rather than exposing a request: {"request":{"id":"demo-entry","serviceId":"cut","dateKey":"2030-01-01","resourceId":"one","subjectKind":"self","createdAt":1893510000000,"expiresAt":1893560400000,"status":"available","checkedAt":null}}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a malformed or cross-scope DTO rather than exposing a request: {"request":{"id":"demo-entry","serviceId":"cut","dateKey":"2030-02-30","resourceId":"one","subjectKind":"self","createdAt":1893510000000,"expiresAt":1893560400000,"status":"waiting","checkedAt":1893510000000}}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a malformed or cross-scope DTO rather than exposing a request: {"request":{"id":"demo-entry","serviceId":"cut","dateKey":"2030-01-01","resourceId":"one","subjectKind":"represented_minor","createdAt":1893510000000,"expiresAt":1893560400000,"status":"waiting","checkedAt":1893510000000}}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > rejects a malformed or cross-scope DTO rather than exposing a request: {"request":{"id":"demo-entry","serviceId":"cut","dateKey":"2030-01-01","resourceId":"one","subjectKind":"self","createdAt":1893510000000,"expiresAt":1893560400000,"status":"waiting","checkedAt":1893510000000,"privateName":"not allowed"}}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-lifecycle.test.tsx > expires availability at the server-derived boundary without another API request or write
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > presents the business identity and catalog without an account or auth provider
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > pairs each service with its fixed COP price and duration, including a zero price
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > shows each published service description as plain text alongside its price and duration
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > groups categories in first appearance order, merging case and NFC equivalents without reordering services
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > retains the flat catalog for legacy services and empty categories
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > shows Colombia opening hours with split intervals, closed days and unpublished days
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > offers the published telephone and normalized social links
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > continues only when the visitor chooses to reserve
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > continues with the exact service ID from each service button, grouped=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > continues with the exact service ID from each service button, grouped=true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > keeps existing appointments accessible when new bookings are paused
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > starts with no new day or time, uses dedicated daily availability and freezes the source and proposal without sending private source data
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-public-profile.test.tsx > public business profile > handles unpublished catalog and optional identity details without inventing content
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > offers the next-date search only after a successful daily read with no times
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > recovers the identical confirmation despite permission and catalog withdrawal and accepts later current state only beside immutable operation proof
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects malformed or unrelated immutable confirmation evidence: appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects malformed or unrelated immutable confirmation evidence: revision
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects malformed or unrelated immutable confirmation evidence: resource
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects malformed or unrelated immutable confirmation evidence: time
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects malformed or unrelated immutable confirmation evidence: proposal
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects malformed or unrelated immutable confirmation evidence: missing
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > finishes only with immutable proof and a consistent current record for that operation revision
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects a hybrid current record beside otherwise valid operation proof: service
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects a hybrid current record beside otherwise valid operation proof: type
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > rejects a hybrid current record beside otherwise valid operation proof: end-time
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > discards a late availability read after catalog and rejects retained operations
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > announces search loading once and lets the client choose a time on the found date
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > discards a late availability read after permission and rejects retained operations
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > discards a late availability read after selection and rejects retained operations
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > discards a late availability read after account and rejects retained operations
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > discards a late availability read after unmount and rejects retained operations
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/appointment-reschedule-hook.test.tsx > retains an uncertain operation through generic conflicts until durable terminal closure
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > moves focus to the found-date message before the time buttons without stealing it on later renders
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > explains the bounded empty range in Colombian dates and allows manual selection
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > shows an actionable search error without claiming that the calendar is full
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > blocks a retained search click when enabled is withdrawn
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > blocks a retained search click when permission is withdrawn
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > blocks a retained search click when subscription is withdrawn
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/next-available-booking-ui.test.tsx > disables the proposal confirmation and blocks its retained callback when the business subscription is suspended
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > offers joining only for a current successful empty search and sends its case and exact professional filter
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > blocks retained joining after permission changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > blocks retained joining after enabled changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > blocks retained joining after subscription changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > blocks retained joining after pending changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > blocks retained joining after request changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > consumes date and professional hints once and starts a new represented case without prior personal data
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > does not label a failed or reconciling read as an empty waitlist
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > shows removed catalog options legibly and permits leaving a suspended request without booking permission
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > offers an explicit fresh booking only for available status and blocks while another action is locked
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/waitlist-ui.test.tsx > moves focus to the saved request once after a mutation without stealing focus on availability refresh
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-onboarding.test.tsx > owner location publication > starts unpublished with optional fields and saves location only on explicit action
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-onboarding.test.tsx > owner location publication > hydrates the stored location and saves owner edits
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-onboarding.test.tsx > owner location publication > drops the onsite address when changing modality and clears the full location when unpublished
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-onboarding.test.tsx > owner location publication > ignores malformed legacy location rather than fabricating public details
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-onboarding.test.tsx > owner location publication > preserves unsaved location edits when a business poll updates other published fields
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-onboarding.test.tsx > owner location publication > refreshes location from a business poll when the form has no local changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-onboarding.test.tsx > owner location publication > preserves a local edit when an assistant proposal omits location
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-onboarding.test.tsx > owner location publication > preserves a local remove when an assistant proposal omits location
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > carries a public service through sign-in and both prior consent gates without starting a booking
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > consumes the entry choice once and leaves manual changes and new reservations in control
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > discards an unconsumed anonymous choice on account change
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > discards an unconsumed anonymous choice on logout change
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > discards an unconsumed anonymous choice on business change
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > discards the choice when returning to the profile and using the generic reserve action
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > discards an unconsumed choice when the business behind the same link changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > revalidates the public service against the current authenticated catalog
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-service-booking-entry.test.tsx > keeps the health subject authorization before displaying the preselected service
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/invitation-ui.test.tsx > invitation interfaces > keeps a new code in memory after a copy failure and discards it explicitly
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/invitation-ui.test.tsx > invitation interfaces > does not display the cancelled first read during StrictMode effect recovery
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/invitation-ui.test.tsx > invitation interfaces > retains create request identity for retry but changes it when the recipient changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/invitation-ui.test.tsx > invitation interfaces > discards a late secret after the account changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/invitation-ui.test.tsx > invitation interfaces > redeems without bank details, locks in flight and passes confirmed access to its parent
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/invitation-ui.test.tsx > invitation interfaces > labels courtesy response capacity in normal and compact displays
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/invitation-ui.test.tsx > invitation interfaces > labels courtesy response capacity in normal and compact displays
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/invitation-ui.test.tsx > invitation interfaces > refreshes the administrative parent after access changes without undoing successful commands
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > distinguishes unsearched, loading, successful empty and failed availability
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > clears completed and late empty searches when selection changes: {"serviceId":"two"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > clears completed and late empty searches when selection changes: {"resourceId":"other"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > clears completed and late empty searches when selection changes: {"dateKey":"2030-01-02"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > clears successful availability and the initial service when booking identity changes: {"uid":"demo-other-user"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > clears successful availability and the initial service when booking identity changes: {"businessId":"demo-other-business"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > clears successful availability and the initial service when booking identity changes: {"requestId":"demo-other-case"}
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > late availability cannot replace changed service or account
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > lost confirmation retries original proposal and contact after permission withdrawal
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/structured-booking-lifecycle.test.tsx > keeps an uncertain original through generic conflicts until a durable terminal close
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > offers a manual schedule change only for own future confirmed appointments and emits the exact source without writing
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > rejects retained change handlers after source changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > rejects retained change handlers after permission changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > rejects retained change handlers after read changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > rejects retained change handlers after clock changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > rejects retained change handlers after account changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > rejects retained change handlers after unmount changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > locks change, PNG, ICS and cancellation while the workspace owns an operation, including retained handlers
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > hands the action lock to a reschedule workspace before another retained handler can run in the same event
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > blocks a retained change while image is pending and reports the local action lock
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > blocks a retained change while calendar is pending and reports the local action lock
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reschedule.test.tsx > blocks a retained change while cancel is pending and reports the local action lock
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > presents an optional per-business switch without asking for browser notification permission
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > shows only a generic reminder, Colombia date/time and explicit seen controls
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > moves an explicitly seen reminder to a native collapsed group and preserves it after reload
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > moves an explicitly seen reminder to a native collapsed group and preserves it after reload
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > distinguishes loading, read error/retry and a successful empty response
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > retains preference controls while the canonical appointments are unavailable and hides stale reminders
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > offers explicit reactivation and disabling after consent revisions suspend the preference
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > rejects retained view actions after lock changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > rejects retained view actions after cancel changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > rejects retained view actions after reschedule changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > rejects retained view actions after account changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > rejects retained view actions after clock changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointment-reminders.test.tsx > leaves disabling available while booking actions are locked and disables view/seen
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-page.test.tsx > administrative WhatsApp preparation > shows preparation without claiming connectivity or allowing enablement when server configuration is absent
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-page.test.tsx > administrative WhatsApp preparation > saves only a paused identifier binding and does not send secrets or auto-enable
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-page.test.tsx > administrative WhatsApp preparation > retains the server's unverified state after a rejected explicit enable request
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-page.test.tsx > administrative WhatsApp preparation > clears unsaved identifiers when choosing a different business
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-page.test.tsx > administrative WhatsApp preparation > shows recorded deliveries and uncertain outcomes without turning unavailable Meta cost into zero
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-conversations.test.tsx > administrative WhatsApp conversation handoff > shows the confirmed responsibility and customer context
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-conversations.test.tsx > administrative WhatsApp conversation handoff > takes control once with the expected revision and renders only the confirmed change
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-conversations.test.tsx > administrative WhatsApp conversation handoff > refreshes a conflict before letting the operator retry with the current revision
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-conversations.test.tsx > administrative WhatsApp conversation handoff > can return control for new messages or leave a conversation pending review
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-conversations.test.tsx > administrative WhatsApp conversation handoff > shows unavailable content and bounded coverage explicitly
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-conversations.test.tsx > administrative WhatsApp conversation handoff > filters by business without treating hidden conversations as an empty global inbox
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-conversations.test.tsx > administrative WhatsApp conversation handoff > keeps the confirmed mode when a mutation fails and cancels requests on unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-whatsapp-conversations.test.tsx > administrative WhatsApp conversation handoff > distinguishes failed reads from an empty inbox and permits a fresh read
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/auth-provider.test.tsx > authentication provider access state > offers public service information before Google sign-in without requesting a session
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/auth-provider.test.tsx > authentication provider access state > records the explicit pre-Google proof against the resulting account without treating ordinary login as acceptance
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/auth-provider.test.tsx > authentication provider access state > does not claim a preauthorization for a different Google account after an identity switch
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/auth-provider.test.tsx > authentication provider access state > keeps administrator content blocked when server session validation fails
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/auth-provider.test.tsx > authentication provider access state > ignores an old administrator session response after signing out
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/auth-provider.test.tsx > authentication provider access state > revokes administrator UI access immediately when sign-out begins
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/auth-provider.test.tsx > authentication provider access state > rejects direct local account access outside development emulation
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/consent-ui.test.tsx > explicit consent controls > starts with two unchecked decisions, links documents and records explicit choices
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/consent-ui.test.tsx > explicit consent controls > keeps new operations closed after a read error while retaining read-only content
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/consent-ui.test.tsx > explicit consent controls > ignores a pending acceptance when UID changes and immediately masks the prior state
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/consent-ui.test.tsx > explicit consent controls > keeps withdrawal closed during a pending or uncertain POST even when polling returns the previous accepted revision
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/consent-ui.test.tsx > explicit consent controls > obtains signed proof before enabling the Google acceptance action and clears it when unchecked
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-budget.test.tsx > individual budget administration > shows recorded and reserved amounts and saves the selected business with current versions and identity
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-budget.test.tsx > individual budget administration > restores inherited values without erasing usage and requires refresh after an uncertain save
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-ai-budget.test.tsx > individual budget administration > discards a late read after switching businesses and clears the previous identity data
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/marketing-pricing.test.tsx > public live pricing > shows saved prices and refreshes without credentials or a rebuild
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/marketing-pricing.test.tsx > public live pricing > does not advertise a fixed tariff while the first request is pending
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/marketing-pricing.test.tsx > public live pricing > hides a previously loaded tariff on failure and recovers only after a fresh successful read
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/marketing-pricing.test.tsx > public live pricing > rejects malformed offers instead of partially displaying their prices
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/marketing-pricing.test.tsx > public live pricing > does not query a guessed backend when coordinated access has no configured origin
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/marketing-pricing.test.tsx > public live pricing > masks old prices immediately and discards a late response after the endpoint changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/marketing-pricing.test.tsx > public live pricing > waits while hidden and loads current tariffs when the page becomes visible
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reminders.test.tsx > returns from history to the current upcoming card and focuses it without a write
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reminders.test.tsx > hides a stale reminder after canonical cancel without waiting for the reminders poll
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reminders.test.tsx > hides a stale reminder after canonical reschedule without waiting for the reminders poll
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reminders.test.tsx > hides a stale reminder after canonical revision without waiting for the reminders poll
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reminders.test.tsx > hides a stale reminder after canonical corrupt-revision without waiting for the reminders poll
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reminders.test.tsx > uses the parent action mutex even when a retained reminder callback runs before React renders the lock
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-appointments-reminders.test.tsx > keeps private appointment details outside the reminder summary
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-business-entry.test.tsx > shows the real business and services anonymously, even while Google session detection is pending
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-business-entry.test.tsx > requests Google only after choosing to reserve and allows returning to the public profile
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-business-entry.test.tsx > reports a missing business without first asking for Google
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-business-entry.test.tsx > can retry an unavailable public profile without requesting a Google session
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-business-entry.test.tsx > keeps the existing authenticated gate and returns to the profile after sign out
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/public-business-entry.test.tsx > resets the login choice when the business link changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/qr-kit.test.tsx > selected printable kit > kit_uses_selected_template_without_style_selector and exports only server-supplied details
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/qr-kit.test.tsx > selected printable kit > discards_old_account_or_branding_export, including a result completed after the poll changes
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > separates an existing phone without rewriting the persisted value on load
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > keeps the chosen country while empty and composes it with the entered number
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > recognizes a pasted international number without duplicating the prefix
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > keeps unknown international numbers editable without prepending Colombia
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > honors an explicit country selection when two countries share +1
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > keeps an invalid national entry visible under the chosen country
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > preserves leading zeroes when editing a previously stored national number
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > does not leave two plus signs after choosing a country for an unknown number
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/whatsapp-phone-field.test.tsx > WhatsApp country and number field > loads a later business value without emitting an edit
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/booking-proposal.test.tsx > shows the server summary and confirms only with locally collected contact
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/booking-proposal.test.tsx > locks contact fields during recovery and retries the same proposal with the collected contact intact
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/booking-proposal.test.tsx > blocks recovery submission when confirming=true and disabled=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/booking-proposal.test.tsx > blocks recovery submission when confirming=false and disabled=true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/booking-subject-consent.test.tsx > pediatrics requires all applicable explicit unchecked choices
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/booking-subject-consent.test.tsx > withdrawal stays closed across stale refresh and reuses its uncertain request
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/text-suggestions.test.tsx > editable field suggestions > changes nothing on mount and appends only after a non-submit button is pressed
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/text-suggestions.test.tsx > editable field suggestions > recognizes an existing line despite case and whitespace differences
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/text-suggestions.test.tsx > editable field suggestions > keeps the original text and its existing trailing newline
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/text-suggestions.test.tsx > editable field suggestions > does not insert an example beyond the field length limit
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/text-suggestions.test.tsx > editable field suggestions > keeps additional suggestions selectable without duplicating existing lines or accepting unknown values
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/text-suggestions.test.tsx > editable field suggestions > enforces the field length limit for dropdown suggestions too
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-policy-controls.test.tsx > owner client policy controls > saves an explicit default limit with its reason
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-policy-controls.test.tsx > owner client policy controls > discards a response after switching owners
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-policy-controls.test.tsx > owner client policy controls > preserves inherited limits when changing only a client block
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/client-policy-controls.test.tsx > owner client policy controls > cannot overwrite an unknown policy after a failed read
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > renders the existing Google photo without sending a referrer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for undefined
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for null
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for 
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for http://lh3.googleusercontent.com/photo
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for https://googleusercontent.com.attacker.test/photo
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for https://notgoogleusercontent.com/photo
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for https://googleusercontent.com@attacker.test/photo
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for https://user:password@lh3.googleusercontent.com/photo
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for https://lh3.googleusercontent.com:8443/photo
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > uses the initial without an image request for data:image/png;base64,c3ludGhldGlj
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > falls back after a failed image and accepts a later different Google photo
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > receives the signed-in account photo in the shell without changing sign out
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/user-avatar.test.tsx > Google account avatar > keeps administration navigation focused on the commercial workspace
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/use-business.test.tsx > masks the previous owner and ignores late data when changing Google accounts
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/use-business.test.tsx > rejects a different owner in a response and does not poll after sign-out
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/use-business.test.tsx > exposes mutation invalidation and explicit refresh from the existing poller
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-branding-ui.test.tsx > business identity controls > uploads_removes_and_retries with the observed digest, preserving the existing logo on failure
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-branding-ui.test.tsx > business identity controls > ignores an old account upload response
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-branding-ui.test.tsx > business identity controls > edits up to three social links locally without calling the server
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-client-entry.test.tsx > shows the same published location before booking permissions with authenticated=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/business-location-client-entry.test.tsx > shows the same published location before booking permissions with authenticated=true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/admin-booking-data-policy.test.tsx > policy edits preserve current business on stale response and submit a scoped CAS
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | tests/representation-review.test.tsx > needs contact updates review without cancelling the appointment
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/booking-card-assets.test.ts [ tests/booking-card-assets.test.ts ]
+Error: Cannot find package 'pdf-lib' imported from C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/tests/booking-card-assets.test.ts
+ ❯ tests/booking-card-assets.test.ts:2:1
+      1| import { afterEach, beforeEach, describe, expect, it, vi } from 'vites…
+      2| import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
+       | ^
+      3| import { buildBookingCardAssets } from '@/lib/client/booking-card-asse…
+      4| import type { BookingCardDetails } from '@/lib/booking-card';
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/50]⎯
+
+ FAIL  tests/cloudflare-data.integration.test.ts > commercial invariants on Cloudflare data
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/cloudflare-data.integration.test.ts:38:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/50]⎯
+
+ FAIL  tests/next-availability-d1.integration.test.ts [ tests/next-availability-d1.integration.test.ts ]
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/next-availability-d1.integration.test.ts:11:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/50]⎯
+
+ FAIL  tests/pilot-abuse.integration.test.ts > commercial pilot abuse contract on real local D1
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ Module.createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/pilot-abuse.integration.test.ts:22:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/50]⎯
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 46 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/admin-copilot.test.ts > grounded read-only administrative questions > uses the configured provider once, returns server-owned sources and meters only the administrator
+AssertionError: expected undefined to match object { businessId: null, …(1) }
+
+- Expected:
+{
+  "businessId": null,
+  "mode": "sarin_admin_copilot",
+}
+
++ Received:
+undefined
+
+ ❯ tests/admin-copilot.test.ts:121:30
+    119|     expect(added.some(([path]) => path.startsWith('responseQuotaTurns/…
+    120|     const ledger = added.find(([path]) => path.startsWith('aiUsageCall…
+    121|     expect(ledger?.[1].data).toMatchObject({ businessId: null, mode: '…
+       |                              ^
+    122|     expect(JSON.stringify(added)).not.toContain(question().question);
+    123|     expect(JSON.stringify(added)).not.toContain(data.reply);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/50]⎯
+
+ FAIL  tests/admin-deep-links.test.ts > administrator payment deep links > rejects invalid or ambiguous focused payment ids: ?focusPayment=
+ FAIL  tests/admin-deep-links.test.ts > administrator payment deep links > rejects invalid or ambiguous focused payment ids: ?focusPayment=../payment
+ FAIL  tests/admin-deep-links.test.ts > administrator payment deep links > rejects invalid or ambiguous focused payment ids: ?focusPayment=one&focusPayment=two
+AssertionError: expected 503 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 503
+
+ ❯ tests/admin-deep-links.test.ts:27:48
+     25|   it.each(['?focusPayment=', '?focusPayment=../payment', '?focusPaymen…
+     26|     state.db = { collection() { throw new Error('Invalid input reached…
+     27|     expect((await GET(request(query))).status).toBe(400);
+       |                                                ^
+     28|   });
+     29|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/50]⎯
+
+ FAIL  tests/admin-deep-links.test.ts > administrator payment deep links > includes a payment outside the first 500 records without exposing its image or mutating data
+AssertionError: expected [ { id: 'new-499', …(8) }, …(499) ] to have a length of 501 but got 500
+
+- Expected
++ Received
+
+- 501
++ 500
+
+ ❯ tests/admin-deep-links.test.ts:39:27
+     37|     expect(response.headers.get('Cache-Control')).toBe('no-store');
+     38|     const data = await response.json();
+     39|     expect(data.receipts).toHaveLength(501);
+       |                           ^
+     40|     expect(data.receipts.find((item: { id: string }) => item.id === 'o…
+     41|     expect(JSON.stringify(data)).not.toMatch(/private-image-data|priva…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/50]⎯
+
+ FAIL  tests/admin-deep-links.test.ts > administrator payment deep links > returns 404 when the focused payment no longer exists
+AssertionError: expected 200 to be 404 // Object.is equality
+
+- Expected
++ Received
+
+- 404
++ 200
+
+ ❯ tests/admin-deep-links.test.ts:47:74
+     45|
+     46|   it('returns 404 when the focused payment no longer exists', async ()…
+     47|     expect((await GET(request('?focusPayment=deleted-payment'))).statu…
+       |                                                                          ^
+     48|   });
+     49|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/50]⎯
+
+ FAIL  tests/appointment-reminders.integration.test.ts > two D1 handles preserve one seen timestamp and never mutate the appointment
+ FAIL  tests/appointment-reminders.integration.test.ts > rejects an in-flight old enable after another handle disables the preference
+ FAIL  tests/appointment-reminders.integration.test.ts > revalidates a consent that commits while seen is in flight
+ FAIL  tests/appointment-reminders.integration.test.ts > revalidates a cancel that commits while seen is in flight
+ FAIL  tests/appointment-reminders.integration.test.ts > revalidates a reschedule that commits while seen is in flight
+ FAIL  tests/appointment-reminders.integration.test.ts > repeats only an identical journaled seen commit after response loss
+ FAIL  tests/appointment-reminders.integration.test.ts > queries only the future window despite 1001 historical visits and measures real local D1 read cost
+ FAIL  tests/appointment-reminders.integration.test.ts > index migration preserves existing documents and the global revision
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\package.json
+ ❯ tests/appointment-reminders.integration.test.ts:29:42
+     27|   vi.spyOn(Date, 'now').mockReturnValue(now); metrics = []; intercept …
+     28|   const require = createRequire(new URL('../cloudflare/package.json', …
+     29|   const wrangler = createRequire(require.resolve('wrangler/package.jso…
+       |                                          ^
+     30|   const { build } = wrangler('esbuild'), { Miniflare, convertV4Minifla…
+     31|   // Real local D1/R2 only. The test-only wrapper measures statements …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/50]⎯
+
+ FAIL  tests/appointment-reschedule.integration.test.ts > real D1 atomically moves one document with deduplicated locks and same-proposal replay
+ FAIL  tests/appointment-reschedule.integration.test.ts > real D1 updates origin destination and client locks across resource and date
+ FAIL  tests/appointment-reschedule.integration.test.ts > real D1 serializes two source-revision competitors across separate handles
+ FAIL  tests/appointment-reschedule.integration.test.ts > real D1 serializes a reschedule against a destination booking
+ FAIL  tests/appointment-reschedule.integration.test.ts > real D1 serializes a reschedule against a destination manual
+ FAIL  tests/appointment-reschedule.integration.test.ts > real D1 serializes cancellation against a reschedule without losing the source
+ FAIL  tests/appointment-reschedule.integration.test.ts > real D1 retains original operation evidence across A to B to A and later cancellation
+ FAIL  tests/appointment-reschedule.integration.test.ts > real D1 retries the identical journaled commit after a lost response
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/appointment-reschedule.integration.test.ts:14:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/50]⎯
+
+ FAIL  tests/business-ai-budget.integration.test.ts > business budget overrides on real local D1 > reserves the final overridden business slot once across independent D1 handles
+ FAIL  tests/business-ai-budget.integration.test.ts > business budget overrides on real local D1 > preserves used and uncertain counters when raising A and still enforces the global pool shared with B
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/business-ai-budget.integration.test.ts:29:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/50]⎯
+
+ FAIL  tests/data-migration.test.ts > Firestore migration artifacts > roundtrips large logos through real D1/R2 and a local SQL backup recovery
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/data-migration.test.ts:60:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/50]⎯
+
+ FAIL  tests/data-migration.test.ts > Firestore migration artifacts > creates and reopens a private backup directory using only the current operator permissions
+Error: MIGRATION_BACKUP_INSIDE_WORKSPACE
+ ❯ fail scripts/lib/data-migration.mjs:11:32
+      9| export const DOCUMENT_PREFIX = `projects/${PROJECT_ID}/databases/(defa…
+     10| const ROOT = DOCUMENT_PREFIX.slice(0, -1);
+     11| const fail = (code) => { throw new Error(`MIGRATION_${code}`); };
+       |                                ^
+     12| const record = (value) => value !== null && typeof value === 'object' …
+     13| const own = (value, key) => Object.prototype.hasOwnProperty.call(value…
+ ❯ resolveBackupDirectory scripts/lib/data-migration.mjs:353:28
+ ❯ privateDirectory scripts/lib/data-migration.mjs:358:18
+ ❯ tests/data-migration.test.ts:239:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/50]⎯
+
+ FAIL  tests/data-migration.test.ts > Firestore migration artifacts > imports the generated SQL and image bytes into real local D1/R2 and reads them through the Worker bridge
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/data-migration.test.ts:272:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/50]⎯
+
+ FAIL  tests/data-migration.test.ts > Firestore migration artifacts > reads machine JSON from the installed Wrangler CLI without suppressing stdout
+Error: MIGRATION_BACKUP_INSIDE_WORKSPACE
+ ❯ fail scripts/lib/data-migration.mjs:11:32
+      9| export const DOCUMENT_PREFIX = `projects/${PROJECT_ID}/databases/(defa…
+     10| const ROOT = DOCUMENT_PREFIX.slice(0, -1);
+     11| const fail = (code) => { throw new Error(`MIGRATION_${code}`); };
+       |                                ^
+     12| const record = (value) => value !== null && typeof value === 'object' …
+     13| const own = (value, key) => Object.prototype.hasOwnProperty.call(value…
+ ❯ resolveBackupDirectory scripts/lib/data-migration.mjs:353:28
+ ❯ privateDirectory scripts/lib/data-migration.mjs:358:18
+ ❯ tests/data-migration.test.ts:324:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/50]⎯
+
+ FAIL  tests/inference-rate-limit.test.ts > client frequency on real local Workerd D1 > persists admission across DB handles and serializes the final slot
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ Module.createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/inference-rate-limit.test.ts:122:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/50]⎯
+
+ FAIL  tests/reminder-data-maintenance.test.ts > real D1 rejects a concurrent inserted receipt before deletion and later removes the exact new export only
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/reminder-data-maintenance.test.ts:82:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/50]⎯
+
+ FAIL  tests/reminder-data-maintenance.test.ts > real D1 supports exact appointment export and deletion with owner filter=false, preserving preferences and other receipts
+ FAIL  tests/reminder-data-maintenance.test.ts > real D1 supports exact appointment export and deletion with owner filter=true, preserving preferences and other receipts
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/reminder-data-maintenance.test.ts:111:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/50]⎯
+
+ FAIL  tests/represented-booking.integration.test.ts > real D1 confirms adult self child haircut and pediatrics once without IA usage
+ FAIL  tests/represented-booking.integration.test.ts > real D1 rejects changed identity and withdrawal and validates canonical receipts
+ FAIL  tests/represented-booking.integration.test.ts > real D1 serializes final quota and withdrawal across independent handles
+ FAIL  tests/represented-booking.integration.test.ts > real D1 preserves legacy confirmed recovery under changed health policy
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/represented-booking.integration.test.ts:9:67
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/50]⎯
+
+ FAIL  tests/waitlist-d1.test.ts > keeps GET cost independent of 1001 old appointments without writing or scanning waitlist history
+ FAIL  tests/waitlist-d1.test.ts > never truncates more than 1000 matching day records into a trustworthy availability result
+ FAIL  tests/waitlist-d1.test.ts > revalidates availability that changes before the join commit
+ FAIL  tests/waitlist-d1.test.ts > revalidates consent that changes before the join commit
+ FAIL  tests/waitlist-d1.test.ts > serializes competing joins and rejects a delayed cancellation after a replacement
+ FAIL  tests/waitlist-d1.test.ts > retries only the identical journaled join commit after response loss
+ FAIL  tests/waitlist-d1.test.ts > uses a fresh clock when an availability read crosses the requested day end
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\package.json
+ ❯ tests/waitlist-d1.test.ts:23:123
+     21|   clock = waitlistNow; vi.spyOn(Date, 'now').mockImplementation(() => …
+     22|   metrics = []; queryMetrics = []; intercept = null; loseCommit = fals…
+     23|   const require = createRequire(new URL('../cloudflare/package.json', …
+       |                                                                                                                           ^
+     24|   const { build } = wrangler('esbuild'), { Miniflare, convertV4Minifla…
+     25|   const bundle = await build({ stdin: { resolveDir: fileURLToPath(new …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/50]⎯
+
+ FAIL  tests/waitlist-data-maintenance.test.ts > real D1 preserves neighboring data and rejects a concurrent change before deleting the exact new export
+Error: Cannot find module 'wrangler/package.json'
+Require stack:
+- C:\Users\Drean Skate\AppData\Local\SarinBot\whatsapp-adaptation-20261020\source-restoration\cloudflare\tests\data-runtime.mjs
+ ❯ createDataTestRuntime cloudflare/tests/data-runtime.mjs:8:49
+      6| export async function createDataTestRuntime() {
+      7|   const require = createRequire(import.meta.url);
+      8|   const wranglerRequire = createRequire(require.resolve('wrangler/pack…
+       |                                                 ^
+      9|   const { build } = wranglerRequire('esbuild');
+     10|   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('mi…
+ ❯ tests/waitlist-data-maintenance.test.ts:79:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/50]⎯
+
+ FAIL  tests/whatsapp-conversation-routes.test.ts > private conversation routes > returns a private bounded list and a confirmed revision after takeover
+AssertionError: expected { conversations: [], truncated: false } to match object { conversations: [ { …(3) } ], …(1) }
+
+- Expected
++ Received
+
+  {
+-   "conversations": [
+-     {
+-       "id": "aba8e53d85e7afa11302ac91c1fce83c0542a37a282ddfbcd1ffecf18b321929",
+-       "mode": "bot",
+-       "revision": 0,
+-     },
+-   ],
++   "conversations": [],
+    "truncated": false,
+  }
+
+ ❯ tests/whatsapp-conversation-routes.test.ts:33:33
+     31|     const result = await GET(request('GET', 'owner'));
+     32|     expect(result.status).toBe(200); expect(result.headers.get('Cache-…
+     33|     expect(await result.json()).toMatchObject({ conversations: [{ id, …
+       |                                 ^
+     34|     const changed = await PATCH(request('PATCH', 'owner', { conversati…
+     35|     expect(changed.status).toBe(200); expect(changed.headers.get('Cach…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/50]⎯
+
+ FAIL  tests/whatsapp-conversation-routes.test.ts > private conversation routes > accepts app echoes only behind the existing signed webhook boundary
+AssertionError: expected { conversations: [], truncated: false } to match object { conversations: [ { …(3) } ] }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "conversations": [
+-     {
+-       "id": "aba8e53d85e7afa11302ac91c1fce83c0542a37a282ddfbcd1ffecf18b321929",
+-       "mode": "human",
+-       "revision": 1,
+-     },
+-   ],
++   "conversations": [],
+  }
+
+ ❯ tests/whatsapp-conversation-routes.test.ts:55:63
+     53|     const signature = createHmac('sha256', 'synthetic-app-secret').upd…
+     54|     expect((await webhook(new Request('https://example.test/webhook', …
+     55|     expect(await (await GET(request('GET', 'owner'))).json()).toMatchO…
+       |                                                               ^
+     56|     expect(fetch).not.toHaveBeenCalled();
+     57|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/50]⎯
+

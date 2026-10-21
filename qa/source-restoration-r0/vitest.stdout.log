@@ -1,0 +1,333 @@
+
+ RUN  v5.0.4 C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration
+
+ ✓ tests/structured-booking.test.tsx (20 tests) 382ms
+ ↓ tests/local-journey.integration.test.ts (1 test | 1 skipped)
+ ↓ tests/firestore.integration.test.ts (15 tests | 15 skipped)
+ ✓ tests/billing-pages.test.tsx (24 tests) 523ms
+ ✓ tests/debounced-chat.test.tsx (20 tests) 104ms
+ ✓ tests/appointment-reschedule.test.ts (49 tests) 289ms
+ ✓ tests/chat-surfaces.test.tsx (24 tests) 785ms
+ ✓ tests/appointment-reminders-hook.test.tsx (29 tests) 119ms
+ ✓ tests/client-appointments.test.tsx (18 tests) 298ms
+ ✓ tests/onboarding-assistance.test.tsx (14 tests) 1237ms
+ ✓ tests/client-rebooking-entry.test.tsx (24 tests) 754ms
+ ✓ tests/waitlist.test.ts (26 tests) 607ms
+ ✓ tests/client-appointments-calendar.test.tsx (41 tests) 494ms
+ ✓ tests/engine.test.ts (43 tests) 68ms
+ ✓ tests/billing.test.ts (24 tests) 145ms
+ ❯ tests/cloudflare-data.integration.test.ts (10 tests | 10 skipped) 4011ms
+   ❯ commercial invariants on Cloudflare data (10)
+     ↓ reserves the final cloud budget atomically across D1 handles and retains unknown usage
+     ↓ persists only scoped structured selections across D1 handles
+     ↓ serializes client limits across independent D1 handles and keeps policies private
+     ↓ normalizes a business logo through D1/R2 and binds public reads to its current digest
+     ↓ preserves invitation access, quota, suspension and concurrent payment invariants on actual D1
+     ↓ paginates 51 equal-date invitations without duplicates using a string cursor on D1
+     ↓ confirms only one overlapping booking and scopes client reads/cancellation
+     ↓ consumes the tenth trial unit once across different resources and preserves idempotent retries
+     ↓ stores receipt bytes in private R2 and atomically approves the paid trial once
+     ↓ reserves the final AI response once and settles/releases counters without duplication
+ ❯ tests/inference-rate-limit.test.ts (20 tests | 1 failed) 2610ms
+   ✓ persistent client inference rate limits (12)
+     ✓ admits ten new turns in a sliding minute and opens exactly when the oldest expires 19ms
+     ✓ bounds an hour independently of the minute and expires its oldest marks 67ms
+     ✓ bounds a day to 120 marks and prunes expired marks instead of growing state 150ms
+     ✓ readmits a turn without durable completion while rejecting altered payloads under its identifier 2ms
+     ✓ applies globally across businesses for one UID while keeping different UIDs independent 5ms
+     ✓ rejects reuse of one request identifier across another business or channel 2ms
+     ✓ atomically admits only one concurrent claimant for the final minute slot 3ms
+     ✓ does not count recovery of a durable completed turn predating the limiter 2ms
+     ✓ does not count recovery of a durable reserved turn predating the limiter 1ms
+     ✓ counts a released durable turn as a fresh admission when it can infer again 1ms
+     ✓ limits repeated failed attempts under the same released request identifier 5ms
+     ✓ fails closed on corrupt persistent rate state instead of resetting limits 1ms
+   ❯ client frequency on real local Workerd D1 (1)
+     × persists admission across DB handles and serializes the final slot 1997ms
+   ✓ rate limits before commercial response reservation (4)
+     ✓ returns 429 without retaining quota or calling the provider for the eleventh new turn 150ms
+     ✓ bounds provider failures retried with one request ID without retaining commercial capacity 74ms
+     ✓ admits sarin_onboarding before queueing and keeps exact retry delay 65ms
+     ✓ admits sarin_owner_copilot before queueing and keeps exact retry delay 43ms
+   ✓ shared mode and tenant admission (3)
+     ✓ does not corrupt tenant state when two UIDs use the same request identifier 2ms
+     ✓ limits one tenant across thirty UIDs and keeps another tenant independent 13ms
+     ✓ does not let a UID evade limits by changing mode or tenant; onboarding replay keeps legacy null identity 7ms
+ ✓ tests/next-available-booking-hook.test.tsx (36 tests) 232ms
+ ✓ tests/admin-ai.test.ts (35 tests) 144ms
+ ❯ tests/data-migration.test.ts (21 tests | 4 failed) 11418ms
+   ❯ Firestore migration artifacts (21)
+     ✓ preserves both R2 prefixes with identical bytes and reopens old-style hash-named files 71ms
+     × roundtrips large logos through real D1/R2 and a local SQL backup recovery 9903ms
+     ✓ binds blob size, type and digest to the correct collection and rejects restore collisions 40ms
+     ✓ decodes only exactly representable JSON types and rejects unsupported values without printing contents 4ms
+     ✓ exports collection and document pagination recursively through missing ancestors at one read time 10ms
+     ✓ fails on repeated pagination tokens, cross-project names and duplicate conflicting documents 4ms
+     ✓ uses the server snapshot after the last drained write, including a write within the previous second 2ms
+     ✓ extracts canonical proof bytes with a hash reference and verifies every artifact 6ms
+     ✓ extracts legacy inline receipt images without duplicating identical R2 bytes 3ms
+     ✓ rejects every path or JSON shape unavailable through the shared runtime protocol before import 35ms
+     ✓ reports unresolved reservation counts without identities or content 3ms
+     ✓ writes immutable private artifacts outside the workspace and detects altered SQL or restore files 149ms
+     × creates and reopens a private backup directory using only the current operator permissions 12ms
+     ✓ generates executable SQL with literal quoting and rejects a nonempty import target 7ms
+     × imports the generated SQL and image bytes into real local D1/R2 and reads them through the Worker bridge 1136ms
+     ✓ requires dedicated resources and explicit final maintenance, and renews operator tokens only in memory 8ms
+     ✓ locates the Windows Google SDK Python entrypoint under lib rather than bin 1ms
+     × reads machine JSON from the installed Wrangler CLI without suppressing stdout 4ms
+     ✓ preserves original Firestore field types and image bytes when creating a baseline restore 1ms
+     ✓ reconciles D1 updates, new documents, deleted paths and R2 images for a guarded rollback plan 4ms
+     ✓ hashes canonical maps independently of insertion order and rejects silent JSON coercion 1ms
+ ✓ tests/ai-usage.test.ts (16 tests) 229ms
+ ✓ tests/whatsapp-queue.test.ts (13 tests) 138ms
+ ✓ tests/doctor.test.ts (27 tests) 84ms
+ ✓ tests/engine-gemini.test.ts (34 tests) 94ms
+ ✓ tests/client-appointments-rebook.test.tsx (24 tests) 322ms
+ ✓ tests/chat-route.test.ts (18 tests) 291ms
+ ↓ tests/firestore.rules.test.ts (11 tests | 11 skipped)
+ ✓ tests/appointment-reschedule-ui.test.tsx (9 tests) 161ms
+ ✓ tests/local-journey.test.ts (12 tests) 152ms
+ ✓ tests/admin-copilot-ui.test.tsx (11 tests) 237ms
+ ❯ tests/admin-copilot.test.ts (21 tests | 1 failed) 507ms
+   ✓ private administrator snapshot (10)
+     ✓ authorizes GET before reading any data or invoking a provider 11ms
+     ✓ authorizes POST before reading any data or invoking a provider 3ms
+     ✓ derives pending work from real data without inference, sensitive fields or any writes 48ms
+     ✓ reports bounded coverage rather than presenting the first hundred records as global totals 70ms
+     ✓ filters facts and payment queries to the selected business while retaining selector choices 5ms
+     ✓ surfaces unavailable quota without treating it as zero remaining 6ms
+     ✓ rejects invalid or unavailable scope ?businessId=missing 4ms
+     ✓ rejects invalid or unavailable scope ?businessId=alpha&businessId=beta 2ms
+     ✓ rejects invalid or unavailable scope ?unknown=x 3ms
+     ✓ rejects invalid or unavailable scope ?businessId=../alpha 2ms
+   ❯ grounded read-only administrative questions (11)
+     × uses the configured provider once, returns server-owned sources and meters only the administrator 34ms
+     ✓ excludes other businesses from provider context when scoped 6ms
+     ✓ rejects invalid input before any inference: {"requestId":"request-0001","question":"¿Qué pagos tengo pendientes?","tools":["approve_payment"]} 2ms
+     ✓ rejects invalid input before any inference: {"requestId":"request-0001","question":""} 2ms
+     ✓ rejects invalid input before any inference: {"requestId":"request-0001","question":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"} 1ms
+     ✓ rejects invalid input before any inference: {"requestId":"request-0001","question":"¿Qué pagos tengo pendientes?","businessId":"../x"} 1ms
+     ✓ rejects invalid input before any inference: {"requestId":"bad","question":"¿Qué pagos tengo pendientes?"} 1ms
+     ✓ rejects invented sources, model-supplied links and unexpected tool calls without executing changes 28ms
+     ✓ does not infer twice for the same request identifier, including after a provider error 10ms
+     ✓ applies the durable minute limit across repeated calls without charging a tenant 38ms
+     ✓ keeps a daily limit even after minute windows expire 227ms
+ ✓ tests/appointment-reminders.test.ts (22 tests) 175ms
+ ✓ tests/admin-ai-usage.test.tsx (9 tests) 218ms
+ ✓ tests/firebase-singletons.test.ts (16 tests) 297ms
+ ✓ tests/next-availability.test.ts (23 tests) 263ms
+ ✓ tests/appointment-reschedule-subject.test.ts (10 tests) 319ms
+ ✓ tests/client-reschedule-entry.test.tsx (10 tests) 405ms
+ ✓ tests/admin-ai-page.test.tsx (8 tests) 253ms
+ ✓ tests/consent-operations.test.ts (7 tests) 147ms
+ ✓ tests/waitlist-lifecycle.test.tsx (24 tests) 82ms
+ ✓ tests/next-available-booking-ui.test.tsx (9 tests) 170ms
+ ✓ tests/response-quota.test.ts (11 tests) 48ms
+ ✓ tests/business-public-profile.test.tsx (12 tests) 134ms
+ ✓ tests/appointment-reschedule-hook.test.tsx (18 tests) 90ms
+ ✓ tests/consent.test.ts (11 tests) 58ms
+ ✓ tests/billing-paid-trial.test.ts (11 tests) 62ms
+ ✓ tests/waitlist-ui.test.tsx (11 tests) 153ms
+ ❯ tests/appointment-reminders.integration.test.ts (8 tests | 8 failed) 8656ms
+   × two D1 handles preserve one seen timestamp and never mutate the appointment 1609ms
+   × rejects an in-flight old enable after another handle disables the preference 933ms
+   × revalidates a consent that commits while seen is in flight 1154ms
+   × revalidates a cancel that commits while seen is in flight 1065ms
+   × revalidates a reschedule that commits while seen is in flight 965ms
+   × repeats only an identical journaled seen commit after response loss 998ms
+   × queries only the future window despite 1001 historical visits and measures real local D1 read cost 961ms
+   × index migration preserves existing documents and the global revision 969ms
+ ✓ tests/invitations.test.ts (7 tests) 91ms
+ ✓ tests/business-location-onboarding.test.tsx (8 tests) 1256ms
+ ❯ tests/waitlist-d1.test.ts (7 tests | 7 failed) 8195ms
+   × keeps GET cost independent of 1001 old appointments without writing or scanning waitlist history 1813ms
+   × never truncates more than 1000 matching day records into a trustworthy availability result 976ms
+   × revalidates availability that changes before the join commit 969ms
+   × revalidates consent that changes before the join commit 981ms
+   × serializes competing joins and rejects a delayed cancellation after a replacement 993ms
+   × retries only the identical journaled join commit after response loss 1032ms
+   × uses a fresh clock when an availability read crosses the requested day end 1428ms
+ ✓ tests/business-read-routes.test.ts (7 tests) 40ms
+ ✓ tests/ics.test.ts (34 tests) 65ms
+ ✓ tests/booking-proposals.test.ts (7 tests) 112ms
+ ✓ tests/public-service-booking-entry.test.tsx (9 tests) 400ms
+ ❯ tests/reminder-data-maintenance.test.ts (10 tests | 3 failed) 4394ms
+   ✓ private reminder export and guarded deletion procedure (7)
+     ✓ exports one appointment receipt and deletes only that receipt, preserving its owner preference and neighboring data 19ms
+     ✓ exports and deletes every preference and receipt of an account in the specified business 3ms
+     ✓ exports and deletes both private collections of one business without touching its appointments 5ms
+     ✓ refuses all deletion after a changed record since the private export 4ms
+     ✓ refuses all deletion after a added record since the private export 3ms
+     ✓ refuses all deletion after a deleted record since the private export 3ms
+     ✓ rejects a tampered export, identity mismatch and oversized batch before any deletes 27ms
+   × real D1 rejects a concurrent inserted receipt before deletion and later removes the exact new export only 1871ms
+   × real D1 supports exact appointment export and deletion with owner filter=false, preserving preferences and other receipts 1379ms
+   × real D1 supports exact appointment export and deletion with owner filter=true, preserving preferences and other receipts 1076ms
+ ✓ tests/engine-budget.test.ts (6 tests) 199ms
+ ✓ tests/invitation-ui.test.tsx (7 tests) 175ms
+ ✓ tests/structured-booking-lifecycle.test.tsx (10 tests) 91ms
+ ✓ tests/cloudflare-google-auth.test.ts (4 tests) 59ms
+ ✓ tests/invitation-short-codes.test.ts (8 tests) 89ms
+ ✓ tests/client-appointments-reschedule.test.tsx (12 tests) 252ms
+ ✓ tests/cloudflare-database.test.ts (9 tests) 21ms
+ ✓ tests/client-appointment-reminders.test.tsx (12 tests) 123ms
+ ✓ tests/admin-whatsapp-page.test.tsx (5 tests) 166ms
+ ✓ tests/business-location-server.test.ts (17 tests) 45ms
+ ✓ tests/admin-whatsapp-conversations.test.tsx (8 tests) 133ms
+ ❯ tests/waitlist-data-maintenance.test.ts (11 tests | 1 failed) 1703ms
+   ✓ private waitlist export and guarded deletion (10)
+     ✓ fails closed on a canonical account document with missing_owner instead of claiming an empty export 10ms
+     ✓ fails closed on a canonical account document with other_owner instead of claiming an empty export 1ms
+     ✓ fails closed on a canonical account document with other_business instead of claiming an empty export 1ms
+     ✓ exports an account including its empty revision tombstone, then removes only the exact inventory 6ms
+     ✓ exports all requests of a business whose parent is absent without modifying appointments 2ms
+     ✓ refuses the entire deletion after a changed document since export 2ms
+     ✓ refuses the entire deletion after a added document since export 3ms
+     ✓ refuses the entire deletion after a deleted document since export 2ms
+     ✓ rejects scope tampering, appointment filtering and ownership corruption 3ms
+     ✓ refuses oversized deletes without truncating the export 11ms
+   × real D1 preserves neighboring data and rejects a concurrent change before deleting the exact new export 1658ms
+ ✓ tests/local-development.test.ts (13 tests) 23ms
+ ✓ tests/business-ai-budget.test.ts (5 tests) 96ms
+ ✓ tests/consent-ui.test.tsx (5 tests) 81ms
+ ✓ tests/auth-provider.test.tsx (7 tests) 136ms
+ ✓ tests/bookings.test.ts (8 tests) 61ms
+ ✓ tests/engine-health.test.ts (8 tests) 59ms
+ ✓ tests/booking-subject-consent.test.ts (5 tests) 91ms
+ ❯ tests/pilot-abuse.integration.test.ts (2 tests | 2 skipped) 1698ms
+   ❯ commercial pilot abuse contract on real local D1 (2)
+     ↓ keeps five historical appointments and payment trial usage through interpretation, explicit confirmation, replay and cancellation
+     ↓ keeps five historical appointments and invitation trial usage through interpretation, explicit confirmation, replay and cancellation
+ ❯ tests/business-ai-budget.integration.test.ts (2 tests | 2 failed) 2690ms
+   ❯ business budget overrides on real local D1 (2)
+     × reserves the final overridden business slot once across independent D1 handles 1676ms
+     × preserves used and uncertain counters when raising A and still enforces the global pool shared with B 1011ms
+ ✓ tests/cloudflare-credentials.test.ts (19 tests) 283ms
+ ✓ tests/paid-trial.test.ts (11 tests) 18ms
+ ✓ tests/businesses.test.ts (6 tests) 56ms
+ ✓ tests/schemas.test.ts (28 tests) 56ms
+ ↓ tests/deepseek-intent.live.test.ts (1 test | 1 skipped)
+ ✓ tests/admin-ai-budget.test.tsx (3 tests) 126ms
+ ✓ tests/appointment-reschedule-routes.test.ts (4 tests) 83ms
+ ✓ tests/business-location.test.ts (48 tests) 50ms
+ ✓ tests/client-policy.test.ts (4 tests) 80ms
+ ✓ tests/structured-booking.test.ts (7 tests) 392ms
+ ❯ tests/booking-card-assets.test.ts (0 test)
+ ✓ tests/client-appointments-reminders.test.tsx (7 tests) 168ms
+ ✓ tests/marketing-pricing.test.tsx (7 tests) 166ms
+ ✓ tests/ai-budget.test.ts (5 tests) 5095ms
+   ✓ pre-fetch paid inference budget (5)
+     ✓ allows the token volume of 100 legitimate daily responses and 3000 monthly responses with enough monetary funding 4985ms
+ ✓ tests/appointment-reminders-routes.test.ts (4 tests) 76ms
+ ✓ tests/whatsapp-routes.test.ts (7 tests) 86ms
+ ✓ tests/public-business-entry.test.tsx (6 tests) 130ms
+ ✓ tests/emulator-config.test.ts (24 tests) 15ms
+ ✓ tests/qr-kit.test.tsx (2 tests) 97ms
+ ❯ tests/whatsapp-conversation-routes.test.ts (5 tests | 2 failed) 57ms
+   ❯ private conversation routes (5)
+     ✓ authorizes GET before storage or external work 10ms
+     ✓ authorizes PATCH before storage or external work 4ms
+     × returns a private bounded list and a confirmed revision after takeover 26ms
+     ✓ rejects spoofed audit identity, invalid control and oversized requests 9ms
+     × accepts app echoes only behind the existing signed webhook boundary 6ms
+ ✓ tests/health-booking-flow.test.ts (4 tests) 255ms
+ ✓ tests/business-logos.test.ts (4 tests) 231ms
+ ✓ tests/consent-routes.test.ts (5 tests) 46ms
+ ✓ tests/whatsapp-phone-field.test.tsx (9 tests) 355ms
+ ✓ tests/waitlist-routes.test.ts (3 tests) 149ms
+ ✓ tests/api-polling.test.ts (5 tests) 21ms
+ ✓ tests/whatsapp-config.test.ts (12 tests) 63ms
+ ✓ tests/phone-number.test.ts (21 tests) 17ms
+ ✓ tests/booking-proposal.test.tsx (4 tests) 65ms
+ ✓ tests/booking-subject-consent.test.tsx (2 tests) 41ms
+ ✓ tests/text-suggestions.test.tsx (6 tests) 44ms
+ ✓ tests/business-branding.test.ts (4 tests) 20ms
+ ✓ tests/client-policy-controls.test.tsx (4 tests) 71ms
+ ✓ tests/next-availability-route.test.ts (10 tests) 114ms
+ ❯ tests/admin-deep-links.test.ts (8 tests | 5 failed) 63ms
+   ❯ administrator payment deep links (8)
+     ✓ authorizes focused reads before accessing database records 11ms
+     × rejects invalid or ambiguous focused payment ids: ?focusPayment= 12ms
+     × rejects invalid or ambiguous focused payment ids: ?focusPayment=../payment 3ms
+     × rejects invalid or ambiguous focused payment ids: ?focusPayment=one&focusPayment=two 2ms
+     × includes a payment outside the first 500 records without exposing its image or mutating data 22ms
+     × returns 404 when the focused payment no longer exists 3ms
+     ✓ keeps a payment already loaded only once 2ms
+     ✓ preserves the existing authorized receipt image read 7ms
+ ✓ tests/user-avatar.test.tsx (14 tests) 80ms
+ ✓ tests/booking-data-policy.test.ts (4 tests) 41ms
+ ✓ tests/invitation-routes.test.ts (3 tests) 57ms
+ ✓ tests/appointment-calendar.test.ts (8 tests) 37ms
+ ✓ tests/admin-abuse-route.test.ts (2 tests) 80ms
+ ✓ tests/business-branding-ui.test.tsx (3 tests) 38ms
+ ✓ tests/use-business.test.tsx (3 tests) 34ms
+ ✓ tests/business-location-ui.test.tsx (12 tests) 54ms
+ ✓ tests/marketing-home.test.tsx (15 tests) 79ms
+ ✓ tests/whatsapp-security.test.ts (9 tests) 44ms
+ ✓ tests/local-auth.test.ts (10 tests) 11ms
+ ✓ tests/commercial-offer.test.ts (8 tests) 16ms
+ ✓ tests/business-location-client-entry.test.tsx (2 tests) 79ms
+ ❯ tests/next-availability-d1.integration.test.ts (1 test | 1 skipped) 1591ms
+   ↓ searches the bounded date range on real D1 without including other tenants or writing data
+ ✓ tests/booking-card.test.ts (2 tests) 63ms
+ ✓ tests/chat-intent.test.ts (8 tests) 39ms
+ ✓ tests/business-logo-routes.test.ts (2 tests) 75ms
+ ✓ tests/billing-policy.test.ts (15 tests) 10ms
+ ✓ tests/serve-ollama.test.ts (4 tests) 2411ms
+   ✓ Mac Ollama launcher with simulated binaries only (4)
+     ✓ accepts the reviewed defaults and leaves unrelated environment secrets behind 481ms
+     ✓ checks configuration without executing even the fixture Ollama binary 396ms
+     ✓ refuses cloud mode and nonloopback binding 759ms
+     ✓ never evaluates shell substitutions or accepts unknown keys 762ms
+ ✓ tests/queue.test.ts (4 tests) 10ms
+ ✓ tests/booking-data-policy-routes.test.ts (1 test) 44ms
+ ❯ tests/appointment-reschedule.integration.test.ts (8 tests | 8 failed) 8963ms
+   × real D1 atomically moves one document with deduplicated locks and same-proposal replay 1903ms
+   × real D1 updates origin destination and client locks across resource and date 1038ms
+   × real D1 serializes two source-revision competitors across separate handles 928ms
+   × real D1 serializes a reschedule against a destination booking 968ms
+   × real D1 serializes a reschedule against a destination manual 963ms
+   × real D1 serializes cancellation against a reschedule without losing the source 1033ms
+   × real D1 retains original operation evidence across A to B to A and later cancellation 1048ms
+   × real D1 retries the identical journaled commit after a lost response 1079ms
+ ✓ tests/admin-booking-data-policy.test.tsx (1 test) 47ms
+ ✓ tests/booking-action-admission.test.ts (2 tests) 215ms
+ ✓ tests/representation-review.test.ts (1 test) 88ms
+ ✓ tests/client-policy-route.test.ts (2 tests) 30ms
+ ✓ tests/representation-review.test.tsx (1 test) 51ms
+ ✓ tests/availability.test.ts (6 tests) 15ms
+ ✓ tests/qr-kit-route.test.ts (1 test) 99ms
+ ✓ tests/client-api.test.ts (3 tests) 55ms
+ ✓ tests/whatsapp-maintenance.test.ts (2 tests) 28ms
+ ✓ tests/engine-provider-removal.test.ts (4 tests) 17ms
+ ✓ tests/storage-backend.test.ts (3 tests) 269ms
+ ✓ tests/booking-url.test.ts (3 tests) 23ms
+ ✓ tests/chat.test.ts (1 test) 69ms
+ ✓ tests/chat-state.test.ts (2 tests) 19ms
+ ✓ tests/http-auth.test.ts (2 tests) 69ms
+ ✓ tests/memory-firestore.test.ts (2 tests) 10ms
+ ✓ tests/queue-vip.test.ts (1 test) 7ms
+ ✓ tests/public-commercial-offer-route.test.ts (2 tests) 23ms
+ ✓ tests/booking-subject-consent-route.test.ts (1 test) 27ms
+ ✓ tests/representation-review-route.test.ts (1 test) 19ms
+ ✓ tests/structured-booking-routes.test.ts (1 test) 25ms
+ ✓ tests/service-information.test.tsx (2 tests) 38ms
+ ✓ tests/retry-after.test.ts (1 test) 9ms
+ ✓ tests/chat-replies.test.ts (2 tests) 5ms
+ ✓ tests/service-catalog-prompts.test.ts (1 test) 37ms
+ ❯ tests/represented-booking.integration.test.ts (4 tests | 4 failed) 4142ms
+   × real D1 confirms adult self child haircut and pediatrics once without IA usage 1577ms
+   × real D1 rejects changed identity and withdrawal and validates canonical receipts 1037ms
+   × real D1 serializes final quota and withdrawal across independent handles 752ms
+   × real D1 preserves legacy confirmed recovery under changed health policy 774ms
+
+ Test Files  16 failed | 140 passed | 4 skipped (160)
+      Tests  46 failed | 1565 passed | 41 skipped (1652)
+   Start at  22:31:19
+   Duration  59.95s (import 52%, tests 46%, transform 2%, worker 1%)
+
+     Import  373 modules were evaluated 697 times · 99.11s total, 52% of tracked time
+             ~5.65s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+
+JSON report written to C:/Users/Drean/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration/qa/source-restoration-r0/vitest-results.json
