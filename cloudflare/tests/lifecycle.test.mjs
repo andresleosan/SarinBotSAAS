@@ -69,6 +69,10 @@ test('installed SDK dispatches the virtual identity host through its registered 
   assert.equal(dataEndpoint.status, 405);
   assert.equal((await dataEndpoint.json()).code, 'DATA_INVALID');
 
+  const audioEndpoint = await proxy.fetch(new Request('http://sarin-audio.internal/transcribe'));
+  assert.equal(audioEndpoint.status, 405);
+  assert.deepEqual(await audioEndpoint.json(), { ok: false, reason: 'denied' });
+
   const metadata = await (await import('../src/index.ts')).default.fetch(new Request('https://sarinbotsaas.pages.dev/.well-known/openid-configuration'), { SARIN_MAINTENANCE: 'true' });
   assert.equal(metadata.status, 200);
 });

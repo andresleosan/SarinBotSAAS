@@ -4,6 +4,14 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { configureBuild } from '../scripts/configure-build.mjs';
+import { runtimeEnvironment } from '../src/router.ts';
+
+test('audio AI binding and own media key remain outside Node runtime environment', () => {
+  const result = runtimeEnvironment({ FIREBASE_ADMIN_PROJECT_ID: 'synthetic-project', FIREBASE_ADMIN_CLIENT_EMAIL: 'synthetic@example.test', FIREBASE_ADMIN_PRIVATE_KEY: 'synthetic', SUPERADMIN_UID: 'synthetic', SARIN_TUNNEL_URL: 'https://engine.alsdevstudio.com/v1/chat/completions', OLLAMA_MAIN_MODEL: 'synthetic', CF_ACCESS_CLIENT_ID: 'synthetic', CF_ACCESS_CLIENT_SECRET: 'synthetic', AI: { run() {} }, PLATFORM_YCLOUD_API_KEY: 'synthetic-media-key' });
+  assert.equal(result.AI, undefined);
+  assert.equal(result.PLATFORM_YCLOUD_API_KEY, undefined);
+  assert.equal(result.PLATFORM_WHATSAPP_AUDIO_ENABLED, undefined);
+});
 
 test('configuration has one default container and no public route, logs, traces or beta scheduling', () => {
   const config = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
@@ -14,6 +22,10 @@ test('configuration has one default container and no public route, logs, traces 
   assert.equal(config.workers_dev, false);
   assert.equal(config.preview_urls, false);
   assert.equal(config.routes, undefined);
+  assert.deepEqual(config.ai, { binding: 'AI' });
+  assert.equal(config.vars?.PLATFORM_WHATSAPP_AUDIO_ENABLED, undefined);
+  assert.equal(config.vars?.PLATFORM_YCLOUD_API_KEY, undefined);
+  assert.equal(config.vars?.PLATFORM_WHATSAPP_AUDIO_DAILY_BUDGET_MICROS, undefined);
   assert.equal(config.observability.logs.enabled, false);
   assert.equal(config.observability.traces.enabled, false);
   assert.equal(config.containers[0].observability.enabled, false);

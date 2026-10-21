@@ -1,3 +1,4 @@
+import { handlePlatformAudioOutbound } from './platform-whatsapp-audio.ts';
 import { Container, ContainerProxy, getContainer } from '@cloudflare/containers';
 import { handleIdentityOutbound, handlePublicIdentityRequest } from './identity.ts';
 import { handleDataOutbound } from './data.ts';
@@ -38,7 +39,7 @@ export class SarinApp extends Container<CloudflareBindings> {
 
 // Invoke the SDK's inherited setter to populate ContainerProxy's dispatch registry.
 // A subclass static field would shadow that setter in the pinned SDK 0.3.7.
-SarinApp.outboundByHost = { 'sarin-google.internal': handleIdentityOutbound, 'sarin-data.internal': handleDataOutbound };
+SarinApp.outboundByHost = { 'sarin-google.internal': handleIdentityOutbound, 'sarin-data.internal': handleDataOutbound, 'sarin-audio.internal': handlePlatformAudioOutbound };
 
 export default {
   async fetch(request: Request, env: CloudflareBindings): Promise<Response> {

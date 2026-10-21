@@ -1,5 +1,6 @@
 // Manual optional bindings for the restored platform bridge; no runtime defaults.
 interface PlatformWhatsAppBindings {
+  PLATFORM_YCLOUD_API_KEY?: string;
   PLATFORM_WHATSAPP_RECEIVE_ENABLED?: string;
   PLATFORM_WHATSAPP_RETENTION_ENABLED?: string;
   PLATFORM_WHATSAPP_AI_ENABLED?: string;
