@@ -18,6 +18,14 @@ export function useAccountConsent() {
   return value;
 }
 function Links() { return <nav aria-label="Documentos para tu decisión" className="flex flex-wrap gap-x-5 text-sm text-sarin-blue"><a href="/terminos" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4">Términos y condiciones</a><a href="/privacidad" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4">Privacidad y datos</a></nav>; }
+function DecisionDocuments({ documents }: { documents: ConsentDocuments }) {
+  const support = documents.scope === 'platform_support';
+  return <div className="space-y-3">
+    {!support && <Links />}
+    <details><summary className="min-h-11 cursor-pointer text-sm text-sarin-blue">{support ? 'Condiciones del soporte de SarinBot' : 'Condiciones de esta decisión'}</summary><p className="whitespace-pre-wrap text-sm leading-6">{documents.terms}</p></details>
+    <details><summary className="min-h-11 cursor-pointer text-sm text-sarin-blue">{support ? 'Privacidad y datos del soporte de SarinBot' : 'Privacidad y datos de esta decisión'}</summary><p className="whitespace-pre-wrap text-sm leading-6">{documents.privacy}</p></details>
+  </div>;
+}
 function Choices({ documents, onChoices }: { documents: Pick<ConsentDocuments, 'termsAcceptance' | 'dataAuthorization'>; onChoices: (terms: boolean, data: boolean) => void }) {
   const [terms, setTerms] = useState(false), [data, setData] = useState(false);
   return <fieldset className="space-y-3"><legend className="sr-only">Condiciones y autorización, decisiones independientes</legend>
@@ -45,10 +53,10 @@ export function ConsentPanel({ controller, title = 'Privacidad y permisos', bloc
     {controller.error && <p role="alert" className="text-sm text-rose-800">{controller.error}</p>}
     {controller.loading ? <p role="status" className="text-sm text-sarin-muted">Comprobando tus permisos…</p> : <>
       {controller.withdrawalRequested && <div className="space-y-2 text-sm"><p role="status">Las nuevas operaciones están detenidas. Estamos pendientes de confirmar tu retirada de autorización.</p><button className="min-h-11 text-sarin-blue underline disabled:opacity-50" disabled={controller.busy} onClick={() => void controller.decide('revoke')}>Reintentar retirada de autorización</button></div>}
-      {status && <><p className="text-sm leading-6 text-sarin-muted">{status.documents.notice}</p><Links />{!controller.active && <DecisionForm key={`${status.documents.fingerprint}:${status.revision}`} controller={controller} blockedReason={blockedReason} />}</>}
+      {status && <><p className="text-sm leading-6 text-sarin-muted">{status.documents.notice}</p><DecisionDocuments documents={status.documents} />{!controller.active && <DecisionForm key={`${status.documents.scope}:${status.documents.fingerprint}:${status.revision}`} controller={controller} blockedReason={blockedReason} />}</>}
       {!status && <button className={button} onClick={controller.refresh}>Reintentar comprobación</button>}
       {status?.receipt && <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm"><span>Última decisión: {status.receipt.action === 'accept' ? 'aceptación' : 'revocación'} · {new Date(status.receipt.occurredAt).toLocaleString('es-CO')}</span><button className="min-h-11 text-sarin-blue underline" onClick={download}>Descargar mi constancia</button></div>}
-      {controller.active && <><p className="text-xs leading-6 text-sarin-muted">Retirar esta autorización detiene nuevas operaciones de este ámbito. Puedes consultar y cancelar citas existentes y solicitar atención sobre tus datos.</p><button className="min-h-11 text-sm text-sarin-blue underline disabled:opacity-50" disabled={controller.busy} onClick={() => void controller.decide('revoke')}>Retirar autorización</button></>}
+      {controller.active && <><p className="text-xs leading-6 text-sarin-muted">{status?.documents.scope === 'platform_support' ? 'Retirar esta autorización detiene nuevas consultas de soporte de SarinBot por WhatsApp. No revoca por sí sola los permisos de cuenta o de negocios ni borra las constancias legales. Puedes ejercer tus derechos mediante el contacto de ALS Dev Studio.' : 'Retirar esta autorización detiene nuevas operaciones de este ámbito. Puedes consultar y cancelar citas existentes y solicitar atención sobre tus datos.'}</p><button className="min-h-11 text-sm text-sarin-blue underline disabled:opacity-50" disabled={controller.busy} onClick={() => void controller.decide('revoke')}>Retirar autorización</button></>}
     </>}
   </div>;
   return controller.active ? <details className="my-4 rounded-xl border border-sarin-line bg-sarin-paper p-4"><summary className="min-h-11 cursor-pointer text-sm font-medium">{title} · autorización vigente</summary>{contents}</details> : <section aria-label={title} className="my-4 space-y-2 rounded-xl border border-sarin-line bg-sarin-paper p-4 sm:p-5"><h2 className="text-base font-semibold">{title}</h2>{contents}</section>;

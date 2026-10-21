@@ -15,7 +15,7 @@ function canonical(value: unknown): unknown {
 }
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 export const consentStateKey = (uid: string, scope: ConsentScope, businessId: string | null = null) => `consent_state_${hash([uid, scope, businessId])}`;
-const scopeSchema = z.enum(['account', 'business_client']);
+const scopeSchema = z.enum(['account', 'business_client', 'platform_support']);
 const revisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER - 1);
 const fingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export const consentInputSchema = z.object({ scope: scopeSchema, businessId: documentIdSchema.optional(), action: z.enum(['accept', 'revoke']), requestId: requestIdSchema,
@@ -82,7 +82,7 @@ async function verifiedReceipt(current: Awaited<ReturnType<typeof state>>, db: D
 }
 export async function assertConsent(uid: string, scope: ConsentScope, business?: ConsentBusiness, db: Database = getAdminDb(), tx?: Transaction): Promise<void> {
   const current = await state(uid, scope, business, db, tx);
-  if (!current.value?.active || current.value.fingerprint !== current.documents.fingerprint) throw new HttpError(428, scope === 'account' ? 'Revisa y acepta las condiciones y la autorización de tu cuenta antes de nuevas operaciones.' : 'Autoriza el chat y las reservas de este negocio antes de continuar.', 'CONSENT_REQUIRED');
+  if (!current.value?.active || current.value.fingerprint !== current.documents.fingerprint) throw new HttpError(428, scope === 'account' ? 'Revisa y acepta las condiciones y la autorización de tu cuenta antes de nuevas operaciones.' : scope === 'platform_support' ? 'Autoriza el soporte de la plataforma SarinBot antes de continuar.' : 'Autoriza el chat y las reservas de este negocio antes de continuar.', 'CONSENT_REQUIRED');
   await verifiedReceipt(current, db, tx);
 }
 /** Read-only anchor for optional features; a later reauthorization never restores an old opt-in. */
@@ -113,7 +113,7 @@ export async function updateConsent(user: ChatActor, supplied: ConsentInput, db:
     const claimRef = preauthorized ? db.collection('serverSettings').doc(`consent_claim_${hash(preauthorized.nonce)}`) : null;
     const claim = claimRef ? await tx.get(claimRef) : null;
     if (claim?.exists) throw new HttpError(409, 'Esta decisión previa ya fue registrada. Revisa las casillas otra vez.', 'CONSENT_CHANGED');
-    if (accepting && input.scope === 'business_client') await assertConsent(user.uid, 'account', undefined, db, tx);
+    if (accepting && input.scope !== 'account') await assertConsent(user.uid, 'account', undefined, db, tx);
     const profileRef = db.collection('users').doc(user.uid);
     const profile = accepting && input.scope === 'account' ? await tx.get(profileRef) : null;
     const revision = (current.value?.revision ?? 0) + 1, occurredAt = Date.now();

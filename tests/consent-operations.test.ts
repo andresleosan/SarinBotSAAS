@@ -16,6 +16,7 @@ import { submitReceipt } from '@/lib/server/billing';
 import { saveBusinessLogo } from '@/lib/server/business-logos';
 import { updateClientPolicy } from '@/lib/server/client-policy';
 import type { Business } from '@/types/firestore';
+import type { ConsentScope } from '@/lib/legal';
 const now = Date.parse('2030-01-01T12:00:00Z'), owner = { uid: 'owner' }, client = { uid: 'client' };
 const business: Business = { ...privateBusinessDraft(owner, now), id: businessIdForOwner('owner'), name: 'Prueba', phoneWhatsApp: '573001234567', slug: 'prueba', subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: now + 864000000 }, sarinConfig: { onboardingCompleted: true, tone: '', customRules: '', intakeFields: [] }, resources: [{ id: 'one', name: 'Uno', active: true }], services: [{ id: 'cut', name: 'Corte', durationMinutes: 30, bufferMinutes: 0, price: 20000, resourceIds: ['one'] }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] } } };
 const selection = { serviceId: 'cut', resourceId: 'one', dateKey: '2030-01-07', startTimeStr: '09:00' }, contact = { clientPhone: '573001234567', intakeAnswers: {} };
@@ -28,6 +29,17 @@ async function allow(db: Db, user = client, customer = true) {
 describe('consent before new processing', () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); vi.stubEnv('SARIN_CHAT_PROVIDER', 'ollama'); state.complete.mockReset(); state.queue.mockReset().mockImplementation(async job => job()); });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
+  it('does not let platform support acceptance authorize commercial inference, quota or booking mutations', async () => {
+    const { db, rows } = memoryFirestore({ [`businesses/${business.id}`]: { ...business } }); state.db = db; await allow(db, client, false);
+    const scope = 'platform_support' as ConsentScope;
+    const current = await readConsent(client.uid, scope, undefined, db);
+    await updateConsent(client, { scope, action: 'accept', requestId: 'allow-support-only', expectedRevision: 0, fingerprint: current.documents.fingerprint, termsAccepted: true, dataAuthorized: true }, db);
+    const before = structuredClone([...rows]);
+    await expect(runSarinChat({ user: client, body: { mode: 'sarin_client', tenantId: business.id, requestId: 'support-not-chat', messages: [{ role: 'user', content: 'Servicios' }] } })).rejects.toMatchObject({ code: 'CONSENT_REQUIRED' });
+    await expect(createBookingProposal(client, business.id, selection, 'support-not-proposal', db)).rejects.toMatchObject({ code: 'CONSENT_REQUIRED' });
+    await expect(createAppointment(client, business.id, { ...selection, ...contact }, 'support-not-booking', db)).rejects.toMatchObject({ code: 'CONSENT_REQUIRED' });
+    expect(state.complete).not.toHaveBeenCalled(); expect([...rows]).toEqual(before);
+  });
   it('blocks direct chat before inference, admission or quota writes', async () => {
     const { db, rows } = memoryFirestore({ [`businesses/${business.id}`]: { ...business } }); state.db = db;
     await expect(runSarinChat({ user: client, body: { mode: 'sarin_client', tenantId: business.id, requestId: 'no-consent', messages: [{ role: 'user', content: 'Servicios' }] } })).rejects.toMatchObject({ code: 'CONSENT_REQUIRED' });

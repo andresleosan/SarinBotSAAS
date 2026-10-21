@@ -11,7 +11,7 @@ export async function preauthorizationRequest(documents: ConsentDocuments, signa
   return data;
 }
 export function useConsent(uid: string | undefined, scope: ConsentScope, business?: ConsentBusiness) {
-  const key = uid && (scope === 'account' || business) ? JSON.stringify([uid, scope, business?.id, business?.name, business?.phoneWhatsApp]) : null;
+  const key = uid && (scope !== 'business_client' || business) ? JSON.stringify([uid, scope, ...(scope === 'business_client' ? [business!.id, business!.name, business!.phoneWhatsApp] : [])]) : null;
   const identity = useRef({ key });
   if (identity.current.key !== key) identity.current = { key };
   const current = identity.current;
