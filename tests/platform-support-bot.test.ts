@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { AsyncLocalStorage } from 'node:async_hooks';
 const auth = vi.hoisted(() => ({ getUser: vi.fn() }));
 vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => { throw new Error('Default backend forbidden'); }, getAdminAuth: () => auth }));
 import { buildSupportScenario } from './platform-support-fixtures';
@@ -82,18 +83,33 @@ it('enforces strict output keys, source uniqueness, Unicode and public scope', (
   const sources = [{ id: 'sarin.support.v1' }];
   for (const value of [{ reply: '<script>x</script>', sourceIds: ['sarin.support.v1'] }, { reply: 'https://private.invalid', sourceIds: ['sarin.support.v1'] }, { reply: 'x'.repeat(1025), sourceIds: ['sarin.support.v1'] }, { reply: '\ud800', sourceIds: ['sarin.support.v1'] }, { reply: 'Contenido', sourceIds: [] }, { reply: 'Contenido', sourceIds: ['sarin.support.v1', 'sarin.support.v1'] }, { reply: 'Contenido', sourceIds: ['sarin.support.v1'], tool: 'pay' }]) expect(validatePlatformSupportOutput(JSON.stringify(value), sources)).toBeNull();
 });
-it.each(['actor', 'question', 'signal'] as const)('denies altered %s inside the real context without consuming its legitimate engine capability', async changed => {
-  const s = await buildSupportScenario(), { lease } = await s.question(), job = (await s.work.readAuthorized(lease))!;
+it.each(['actor', 'question', 'signal'] as const)('denies altered %s at admissible initial context entry and preserves the original continuation', async changed => {
+  const question = 'Synthetic initial-entry question', signal = new AbortController().signal;
+  const s = await buildSupportScenario(), { lease } = await s.question(question), job = (await s.work.readAuthorized(lease))!;
   if (job.authorityKind !== 'actor') throw new Error('Expected actor');
-  const real = engineModule.completePlatformSupport;
+  const realRun = AsyncLocalStorage.prototype.run;
+  let probes = 0, continuations = 0;
   fetcher.mockResolvedValue(response(JSON.stringify({ reply: 'Soporte público.', sourceIds: ['sarin.support.v1'] })));
-  const intercepted = vi.spyOn(engineModule, 'completePlatformSupport').mockImplementation(async (capability, body, signal, usage) => {
-    const actor = workActor(job), question = JSON.parse(body).messages[1].content;
-    await expect(answerPlatformSupport(changed === 'actor' ? { ...actor, uid: 'other-synthetic-actor' } : actor, changed === 'question' ? 'changed question' : question, changed === 'signal' ? new AbortController().signal : signal)).rejects.toMatchObject({ status: 409 });
-    return real(capability, body, signal, usage);
+  // Observe the dispatcher's actual private store; never construct or mutate authority.
+  vi.spyOn(AsyncLocalStorage.prototype, 'run').mockImplementation(function (this: AsyncLocalStorage<unknown>, store, callback, ...args) {
+    if (store?.db !== s.db || store?.lease?.jobId !== lease.jobId) return realRun.call(this, store, callback, ...args);
+    return realRun.call(this, store, async () => {
+      expect(this.getStore()).toBe(store);
+      expect(store).toMatchObject({ lease, actor: workActor(job), question, entered: false });
+      expect(store.signal).toBe(signal); expect(signal.aborted).toBe(false);
+      probes++;
+      await expect(answerPlatformSupport(changed === 'actor' ? { ...store.actor, uid: 'other-synthetic-actor' } : store.actor, changed === 'question' ? 'changed question' : store.question, changed === 'signal' ? new AbortController().signal : store.signal)).rejects.toMatchObject({ status: 409 });
+      // A later durable-authority rejection would already have consumed this entry.
+      expect(store.entered).toBe(false);
+      expect(fetcher).not.toHaveBeenCalled();
+      expect([...s.rows.values()].filter(r => isBudgetCall(r) && r.stage === 'generation')).toHaveLength(0);
+      expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(0);
+      continuations++;
+      return callback(...args);
+    });
   });
-  await runPlatformSupportWork(lease, s.db, new AbortController().signal);
-  expect(intercepted).toHaveBeenCalledTimes(1); expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(await runPlatformSupportWork(lease, s.db, signal)).toEqual({ reply: 'Soporte público.', sourceIds: ['sarin.support.v1'] });
+  expect(probes).toBe(1); expect(continuations).toBe(1); expect(fetcher).toHaveBeenCalledTimes(1);
   expect([...s.rows.values()].filter(r => isBudgetCall(r) && r.stage === 'generation')).toHaveLength(1);
   expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(1);
 });
