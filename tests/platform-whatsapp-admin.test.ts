@@ -37,6 +37,19 @@ it('generates the private consulted payment answer through the once capability a
   expect(await takePlatformSendPermit(out.outboxId as string, claim.token, s.db, now)).toBeNull();
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it('records the channel length rejection without retaining model text or retrying generation', async () => {
+  const s = await privateScenario(), reply = 'Respuesta sintética extensa. '.repeat(15);
+  const fetcher = vi.fn().mockResolvedValue(response({ reply, sourceIds: ['payment-demo-payment'] })); vi.stubGlobal('fetch', fetcher);
+  await expect(runPlatformSupportWork(s.lease, s.db, new AbortController().signal)).rejects.toThrow();
+  const observations = [...s.rows.entries()].filter(([path]) => path.startsWith('aiUsageCalls/'));
+  expect(observations).toHaveLength(1);
+  expect(observations[0][1]).toMatchObject({ platformOutput: 'admin_channel_length' });
+  expect(JSON.stringify(observations[0][1])).not.toContain(reply);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect([...s.rows.values()].find(r => isBudgetCall(r) && r.stage === 'generation')).toMatchObject({ status: 'settled', actualMicros: 8 });
+  expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(0);
+});
 it.each(['foreign', 'disabled', 'deleted', 'cutoff', 'role'] as const)('denies current %s private identity before a private snapshot', async loss => {
   const s = await privateScenario(), job = (await s.work.readAuthorized(s.lease))!;
   if (job.authorityKind !== 'actor') throw new Error('Expected actor');

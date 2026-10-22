@@ -16,7 +16,7 @@ import { workActor, workPayload } from './platform-whatsapp-work-authority';
 import { currentGenerationPolicy, quotePlatformGeneration, reservePlatformGeneration } from './platform-whatsapp-budget';
 import { reconcilePlatformConnection } from './platform-whatsapp-connection';
 import { readPlatformSupportKnowledge, validatePlatformSupportOutput, PLATFORM_SCOPE_REFUSAL } from './platform-support-knowledge';
-import { recordAiUsage } from './ai-usage';
+import { recordAiUsage, type AiUsageContext } from './ai-usage';
 import { platformWhatsAppConflictError } from './platform-whatsapp-store';
 import { preparePlatformPaymentAction, parsePlatformPaymentSelection } from './admin-payment-actions';
 
@@ -87,18 +87,26 @@ async function generate(actor: PlatformActor, question: string, signal: AbortSig
     if (!permit || permit.question !== question || JSON.stringify(permit.actor) !== JSON.stringify(actor) || permit.maximumOutputTokens !== 4096) throw platformWhatsAppConflictError();
     const capability = Object.freeze({}); capabilities.set(capability, { context, body, generationToken: permit.generationToken });
     let observation: EngineUsageObservation | null = null, answer: AdminCopilotAnswer | { reply: string; sourceIds: string[] } | null = null;
+    let platformOutput: AiUsageContext['platformOutput'] = 'transport_failed';
     try {
       if (kind === 'admin_query') await assertPlatformSuperadmin(actor, db);
       const message = await completePlatformSupport(capability, body, signal, value => { observation = value; });
       if (snapshot) {
+        platformOutput = 'admin_contract';
         const validated = validateAdminCopilotAnswer(message, snapshot, 'deepseek');
-        if (validated.reply.length > 320 || validated.sources.length > 2) throw platformWhatsAppConflictError();
+        if (validated.reply.length > 320) { platformOutput = 'admin_channel_length'; throw platformWhatsAppConflictError(); }
+        if (validated.sources.length > 2) { platformOutput = 'admin_channel_sources'; throw platformWhatsAppConflictError(); }
         answer = validated;
-      } else if (!message.tool_calls?.length && message.content) answer = validatePlatformSupportOutput(message.content, sources);
+      } else {
+        platformOutput = 'public_contract';
+        if (!message.tool_calls?.length && message.content) answer = validatePlatformSupportOutput(message.content, sources);
+      }
+      if (answer) platformOutput = 'accepted';
     } catch { /* Once-started failure is terminal; account observed usage without repair calls. */ }
     finally { capabilities.delete(capability); }
     const observed = observation as EngineUsageObservation | null;
     const known = !!observed?.usage && observed.model !== null && policy.mapping.responseModels.includes(observed.model);
+    if (!known) platformOutput = 'usage_unknown';
     const usage = known ? { ...emptyUsage, usageInputTokens: observed!.usage!.promptTokens, usageOutputTokens: observed!.usage!.completionTokens } : emptyUsage;
     const actualMicros = known ? platformCost([{ units: usage.usageInputTokens!, rate: { numerator: 300, denominator: 1000 } }, { units: usage.usageOutputTokens!, rate: { numerator: 1200, denominator: 1000 } }]) : null;
     let paymentLink: string | null = null;
@@ -107,19 +115,19 @@ async function generate(actor: PlatformActor, question: string, signal: AbortSig
       try {
         const proposal = await preparePlatformPaymentAction(actor, selection);
         paymentLink = 'https://sarinbotsaas.pages.dev/admin/assistant?paymentAction=' + proposal.id;
-      } catch { answer = null; /* Preserve observed generation settlement even when preparation is unavailable. */ }
+      } catch { answer = null; platformOutput = 'payment_preparation'; /* Preserve observed generation settlement even when preparation is unavailable. */ }
     }
     let committed = null;
     let text = answer?.reply ?? '';
     if (paymentLink) text = 'Propuesta preparada. Revisa el importe y confirma individualmente en el panel autenticado: ' + paymentLink + '\nCaduca a los cinco minutos. Abrir el enlace no confirma el pago.';
     if (snapshot && answer && 'sources' in answer) {
       text += '\nFuentes: ' + (answer.sources.map(source => platformAdminSourceUrl(source)).join(', ') || 'sin referencias individuales') + '\nPagos consultados: ' + snapshot.metrics.pendingPayments + '; soporte consultado: ' + menu!.support + '. ' + menu!.health + '\nConsulta vigente al ' + new Date(snapshot.generatedAt).toISOString() + '. Contenido vence ' + new Date(job.bodyExpiresAt).toISOString() + '.';
-      if (!workText(text, 'reply')) answer = null;
+      if (!workText(text, 'reply')) { answer = null; platformOutput = 'channel_envelope'; }
     }
     try {
       committed = await completePlatformGeneration(lease, permit.generationToken, known && answer && !signal.aborted ? { status: 'completed', text, actualMicros: actualMicros!, usage } : { status: known ? 'failed' : 'unknown', actualMicros, usage }, db);
     } finally {
-      if (observed) { try { await recordAiUsage(observed, { businessId: null, mode: 'sarin_platform_support' }, db); } catch { /* Telemetry never grants permission or repeats accounting. */ } }
+      if (observed) { try { await recordAiUsage(observed, { businessId: null, mode: 'sarin_platform_support', platformOutput }, db); } catch { /* Telemetry never grants permission or repeats accounting. */ } }
     }
     if (!committed || !answer) throw platformWhatsAppConflictError();
     return answer;
