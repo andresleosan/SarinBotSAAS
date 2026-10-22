@@ -3,7 +3,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import type { Database } from '@/lib/storage/types';
 import { isPlatformOutbox, workCatalog, WORK_RENEW_MS, type Lease, type PlatformJob } from '../../../shared/platform-whatsapp-work';
 import { getPlatformWhatsAppConfig } from './platform-whatsapp-config';
-import { createPlatformWorkStore, readOutboxPreparation, readAuthorizedOutbox, takePlatformSendPermit } from './platform-whatsapp-work-store';
+import { createPlatformWorkStore, readOutboxDispatchPreparation, readAuthorizedOutbox, takePlatformSendPermit, cancelUnauthorizedPrivateOutput } from './platform-whatsapp-work-store';
 import { transcribePlatformAudio } from './platform-whatsapp-audio';
 import { preparePlatformAudioFallback } from './platform-whatsapp-work-audio';
 import { reconcilePlatformConnection } from './platform-whatsapp-connection';
@@ -36,8 +36,9 @@ function cancelled<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 async function sendOutbox(id: string, db: Database, parentSignal?: AbortSignal): Promise<void> {
-  const store = createPlatformWorkStore(db), initial = await readOutboxPreparation(id, db, Date.now());
-  if (!initial || !['prepared', 'claimed'].includes(initial.outbox.status) || initial.job.processingDeadlineAt === null || initial.job.processingDeadlineAt <= Date.now()) return;
+  const store = createPlatformWorkStore(db), initial = await readOutboxDispatchPreparation(id, db, Date.now());
+  if (!initial) return;
+  if (!['prepared', 'claimed'].includes(initial.outbox.status) || initial.job.processingDeadlineAt === null || initial.job.processingDeadlineAt <= Date.now()) return;
   const controller = new AbortController(), signal = AbortSignal.any([controller.signal, ...parentSignal ? [parentSignal] : []]);
   const key = 'send:' + id; if (state().owned.has(key)) return;
   state().owned.set(key, { controller, job: initial.job, db });
@@ -48,20 +49,20 @@ async function sendOutbox(id: string, db: Database, parentSignal?: AbortSignal):
     const config = getPlatformWhatsAppConfig(); if (!enabled() || !config.scope || !config.sendEnabled) return;
     const client = createPlatformYCloudClient({ scope: config.scope, apiKey: process.env.PLATFORM_YCLOUD_API_KEY ?? '', sendEnabled: config.sendEnabled });
     const claim = initial.outbox.status === 'claimed' && initial.outbox.sendToken ? { token: initial.outbox.sendToken } : await store.claimSend(id);
-    if (!claim) return;
+    if (!claim) { if (initial.job.kind === 'admin_query') await cancelUnauthorizedPrivateOutput(id, db); return; }
     signal.throwIfAborted();
     const permit = await takePlatformSendPermit(id, claim.token, db);
-    if (!permit) return;
+    if (!permit) { if (initial.job.kind === 'admin_query') await cancelUnauthorizedPrivateOutput(id, db); return; }
     signal.throwIfAborted();
     let result: Awaited<ReturnType<typeof client.sendButtons>>;
     try { result = await cancelled(client.sendButtons({ ...permit, signal }), signal); } catch { result = { status: 'unknown' }; }
     await store.finishSend(id, claim.token, result);
-  } finally { clearTimeout(deadline); state().owned.delete(key); }
+  } finally { clearTimeout(deadline); state().owned.delete(key); if (initial.job.kind === 'admin_query') await cancelUnauthorizedPrivateOutput(id, db); }
 }
 export async function processPlatformWhatsAppWork(lease: Lease, callerSignal?: AbortSignal): Promise<void> {
   if (!enabled()) return;
   const db = getAdminDb(), store = createPlatformWorkStore(db);
-  const job = await store.readAuthorized(lease); if (!job || job.processingDeadlineAt === null || ['admin_query', 'operator_notification'].includes(job.kind)) return;
+  const job = await store.readAuthorized(lease); if (!job || job.processingDeadlineAt === null || job.kind === 'operator_notification') return;
   const key = 'job:' + job.jobId; if (state().owned.has(key)) return;
   const controller = new AbortController(), signal = AbortSignal.any([controller.signal, ...callerSignal ? [callerSignal] : []]);
   state().owned.set(key, { controller, job, db, lease });

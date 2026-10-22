@@ -9,6 +9,7 @@ export const WORK_LEASE_MS = 60_000, WORK_RENEW_MS = 20_000, WORK_DEADLINE_MS = 
 export const workCatalog = {
   identification: { text: 'Soy SarinBot, el asistente de soporte de SarinBot. Consulta las condiciones de soporte y tratamiento de datos y vincula tu cuenta en la sección Ayuda de la aplicación. Aceptar abre el menú; no acepta documentos ni vincula tu cuenta.', purpose: 'notice' },
   identification_audio: { text: 'Soy SarinBot, el asistente de soporte de SarinBot. Consulta las condiciones de soporte y tratamiento de datos y vincula tu cuenta en la sección Ayuda de la aplicación. Aceptar abre el menú; no acepta documentos ni vincula tu cuenta. No procesé este audio. Después de vincular tu cuenta y habilitar el soporte, envíalo de nuevo.', purpose: 'notice' },
+  admin_menu: { text: 'Administración privada de consulta: Pagos pendientes / Estado de SarinBot / Soporte recibido. Los conteos corresponden a registros consultados. Las decisiones de pago requieren revisión individual en el panel autenticado.', purpose: 'admin' },
   support_menu: { text: 'Elige Soporte, Planes y suscripción o Atención humana.', purpose: 'support' },
   permission: { text: 'Abre la sección Ayuda de la aplicación para vincular tu cuenta y revisar los permisos de soporte. Después, envía un mensaje nuevo y elige Soporte o Planes y suscripción.', purpose: 'reply' },
   support_ready: { text: 'El soporte de SarinBot está habilitado para esta conversación. Escríbeme tu consulta o envía una nota de voz de hasta dos minutos.', purpose: 'reply' },
@@ -143,7 +144,8 @@ export function isPlatformJob(v: unknown): v is PlatformJob {
   if (!oneOf(v.outputKind, ['none', 'generated', 'catalog', 'audio_fallback']) || (v.outboxId === null) !== (v.outputKind === 'none') || v.generationState === 'unknown' && v.outboxId !== null) return false;
   if (v.authorityKind === 'fixed_notice' && (v.audioState !== 'not_applicable' || v.generationState !== 'not_applicable' || v.kind !== 'control')) return false;
   if (v.sourceKind !== 'audio' && v.audioState !== 'not_applicable') return false;
-  if (v.authorityKind === 'actor' && v.catalogId !== null && !['support_ready', 'plans_ready', 'audio_fallback'].includes(String(v.catalogId))) return false;
+  if (v.authorityKind === 'actor' && v.catalogId !== null && !['support_ready', 'plans_ready', 'admin_menu', 'audio_fallback'].includes(String(v.catalogId))) return false;
+  if (v.catalogId === 'admin_menu' && (v.kind !== 'admin_query' || v.authorityKind !== 'actor')) return false;
   if (v.outputKind === 'generated' && (v.catalogId !== null || v.generationState !== 'completed') || v.outputKind === 'audio_fallback' && (v.catalogId !== 'audio_fallback' || !['failed', 'unknown'].includes(String(v.audioState))) || v.outputKind === 'catalog' && v.catalogId === null) return false;
   if (![v.leaseClaimedAt, v.leaseExpiresAt, v.processingStartedAt, v.processingDeadlineAt].every(x => nullable(x, workTime)) || !nullable(v.leaseToken, workUuid)) return false;
   if (v.processingStartedAt === null ? v.processingDeadlineAt !== null : v.processingDeadlineAt !== Math.min(Number(v.processingStartedAt) + WORK_DEADLINE_MS, Number(v.bodyExpiresAt), v.windowExpiresAt === null ? 0 : Number(v.windowExpiresAt))) return false;

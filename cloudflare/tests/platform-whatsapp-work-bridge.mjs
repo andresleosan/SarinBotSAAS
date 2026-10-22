@@ -6,3 +6,5 @@ const wakePath = '../src/platform-whatsapp-wake.ts';
 export const { preparePlatformAudio, startPlatformAudio, finishPlatformAudio } = await import(stagesPath);
 export const { cleanupPlatformWhatsAppRetention } = await import(retentionPath);
 export const { hasPotentialPlatformWork } = await import(wakePath);
+const audioPath = '../src/platform-whatsapp-audio.ts';
+export const { handlePlatformAudioOutbound } = await import(audioPath);

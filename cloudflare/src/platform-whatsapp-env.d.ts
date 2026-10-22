@@ -1,5 +1,6 @@
 // Manual optional bindings for the restored platform bridge; no runtime defaults.
 interface PlatformWhatsAppBindings {
+  SUPERADMIN_UID?: string;
   PLATFORM_WHATSAPP_PROCESSING_ENABLED?: string;
   PLATFORM_WHATSAPP_TRANSCRIPTION_ENABLED?: string;
   PLATFORM_WHATSAPP_GENERATION_POLICY?: string;

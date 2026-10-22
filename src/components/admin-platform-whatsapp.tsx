@@ -158,6 +158,7 @@ function PlatformWorkspace({ scope }: { scope: string }) {
       <button type="button" className={`${secondaryButtonClass} shrink-0`} disabled={pending || authLost} onClick={() => { setError(null); setNotice(null); poll.refresh(); }}>Actualizar bandeja de SarinBot</button>
     </div>
     <p className="text-xs leading-6 text-sarin-muted">Actualización cada 15 segundos mientras esta página está visible, al recuperar el foco o al pulsar Actualizar. Fechas de Colombia.</p>
+    <p className="text-sm text-sarin-muted">Las consultas privadas por WhatsApp muestran pagos pendientes y soporte consultados. Los comprobantes se revisan individualmente en el panel autenticado; una consulta o nota de voz no aprueba pagos.</p>
     {authLost && <Notice error>La sesión o sus permisos dejaron de ser válidos. Se borró la información privada de esta vista. Vuelve a iniciar sesión para consultar.</Notice>}
     {!authLost && (error || poll.error) && <Notice error>{error || poll.error}{snapshot ? ' Se conserva el último estado confirmado; actualiza para comprobar cambios.' : ''}</Notice>}
     {!authLost && notice && <Notice>{notice}</Notice>}

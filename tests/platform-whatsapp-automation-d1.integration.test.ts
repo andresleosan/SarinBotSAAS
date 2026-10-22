@@ -31,15 +31,56 @@ import type { DataCommand, DataReadResult, DataCommitResult } from '../shared/da
 let runtime: Awaited<ReturnType<typeof createDataTestRuntime>>, db: Database, second: Database;
 const commands: DataCommand[] = [], fetcher = vi.fn();
 const transport: DataTransport = async command => { commands.push(structuredClone(command)); const r = await runtime.fetch(command), value = await r.json() as DataReadResult | DataCommitResult; if (!r.ok) throw new StorageError(r.status, (value as unknown as { code: string }).code); return value; };
-const global = globalThis as typeof globalThis & { __platformWorkDriver?: { draining: boolean; timer: ReturnType<typeof setTimeout> | null } };
+type TestDriver = { draining: boolean; timer: ReturnType<typeof setTimeout> | null; owned: Map<string, { controller: AbortController }> };
+const global = globalThis as typeof globalThis & { __platformWorkDriver?: TestDriver };
+const idleSignals = new WeakMap<TestDriver, Promise<void>>();
+let runtimeClosed = false;
+/** Observe the real drain finally on this exact instance; never manufacture idle state. */
+function driverIdle(driver = global.__platformWorkDriver): Promise<void> {
+  if (!driver?.draining) return Promise.resolve();
+  const existing = idleSignals.get(driver); if (existing) return existing;
+  const descriptor = Object.getOwnPropertyDescriptor(driver, 'draining');
+  if (!descriptor || !('value' in descriptor) || !descriptor.configurable) throw new Error('Unexpected driver state descriptor');
+  let value = descriptor.value as boolean;
+  const idle = new Promise<void>(resolve => {
+    Object.defineProperty(driver, 'draining', { configurable: descriptor.configurable, enumerable: descriptor.enumerable,
+      get: () => value,
+      set(next: boolean) {
+        value = next;
+        if (!next) { Object.defineProperty(driver, 'draining', { ...descriptor, value }); idleSignals.delete(driver); resolve(); }
+      },
+    });
+  });
+  idleSignals.set(driver, idle); return idle;
+}
 beforeAll(async () => { runtime = await createDataTestRuntime(); }, 30000);
-afterAll(async () => { await runtime?.dispose(); });
+afterAll(async () => { if (!runtimeClosed) await runtime?.dispose(); });
 beforeEach(async () => {
+  if (runtimeClosed) { runtime = await createDataTestRuntime(); runtimeClosed = false; }
   vi.spyOn(Date, 'now').mockReturnValue(now); state.getUser.mockReset().mockImplementation(async uid => ({ uid, disabled: false }));
   await runtime.db.exec('DELETE FROM app_documents; DELETE FROM app_commits;'); db = createCloudflareDatabase(transport); second = createCloudflareDatabase(transport); state.db = db; commands.length = 0;
   fetcher.mockReset(); vi.stubGlobal('fetch', fetcher); vi.stubEnv('DEEPSEEK_API_KEY', 'synthetic-key'); vi.stubEnv('PLATFORM_YCLOUD_API_KEY', 'synthetic-key'); vi.stubEnv('PILOT_AI_BUDGET_ENFORCED', 'true');
 });
-afterEach(async () => { vi.stubEnv('PLATFORM_WHATSAPP_PROCESSING_ENABLED', 'false'); await vi.waitFor(() => expect(global.__platformWorkDriver?.draining ?? false).toBe(false)); if (global.__platformWorkDriver?.timer) clearTimeout(global.__platformWorkDriver.timer); delete global.__platformWorkDriver; state.db = null; vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(async () => {
+  vi.stubEnv('PLATFORM_WHATSAPP_PROCESSING_ENABLED', 'false');
+  const driver = global.__platformWorkDriver;
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([driverIdle(driver), new Promise<never>((_, reject) => { watchdog = setTimeout(() => reject(new Error('Real driver remained active during cleanup')), 1000); })]);
+  } catch (error) {
+    // Only this test's owned work/runtime is closed. Do not restore globals under a live drain.
+    for (const owned of driver?.owned.values() ?? []) owned.controller.abort();
+    await runtime.dispose(); runtimeClosed = true;
+    await driverIdle(driver);
+    throw error;
+  } finally {
+    clearTimeout(watchdog);
+    if (driver?.draining) throw new Error('Refusing to restore state while the real driver is active');
+    if (driver?.timer) clearTimeout(driver.timer);
+    delete global.__platformWorkDriver; state.db = null;
+    vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals();
+  }
+});
 async function scenario() {
   const s = await buildSupportScenario(), q = await s.question();
   await db.runTransaction(async tx => { await tx.get(db.collection('serverSettings').doc('platform_whatsapp')); for (const [path, row] of s.rows) { const [root, id] = path.split('/'); tx.set(db.collection(root).doc(id), row); } });
@@ -256,7 +297,8 @@ it.each((['prepared', 'claimed'] as const).flatMap(status => (['expired', 'stale
   expect.soft(await hasDuePlatformWork(second, now)).toBe(true);
   expect.soft(await hasPotentialPlatformWork(env, now)).toBe(true);
   fetcher.mockClear(); startPlatformWhatsAppWorker();
-  await vi.waitFor(() => expect(global.__platformWorkDriver?.draining).toBe(false), { timeout: 15000 });
+  await driverIdle();
+  expect(global.__platformWorkDriver?.draining).toBe(false);
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(JSON.parse(fetcher.mock.calls[0][1].body).externalId).toBe(liveId);
   expect((await db.collection('platformWhatsAppOutbox').doc(liveId).get()).data()).toMatchObject({ status: 'accepted', outboxId: liveId, expiresAt: live.expiresAt });

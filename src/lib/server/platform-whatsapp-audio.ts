@@ -20,6 +20,7 @@ export async function transcribePlatformAudio(lease: Lease, signal: AbortSignal)
     if (!policy.enabled.audio || policy.limits.audio <= 0 || policy.tariff.audio.numerator <= 0) return { ok: false, reason: 'denied' };
     await operation.wait(reservePlatformCost(job.jobId, 'audio', maximumPlatformCost(policy, 'audio'), db));
     operation.check();
+    if (!await operation.wait(createPlatformWorkStore(db).readAuthorized(lease))) return { ok: false, reason: 'denied' };
     const transport = fetch(AUDIO_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lease), redirect: 'manual', signal: operation.controller.signal });
     void transport.then(response => { if (operation.controller.signal.aborted) discardAudioBody(response.body); }, () => {});
     const response = await operation.wait(transport);

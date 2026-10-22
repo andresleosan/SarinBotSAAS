@@ -56,7 +56,7 @@ export function stageReply(job: PlatformJob, outbox: PlatformOutbox, tx: Transac
   stageWork(tx, db, 'platformWhatsAppOutbox/' + outbox.outboxId, outbox);
   stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, { ...job, status: 'reply_saved', nextAttemptAt: job.processingDeadlineAt, outboxId: outbox.outboxId, outputKind: outbox.outputKind });
 }
-export async function readOutboxPreparation(id: string, db: Database, now: number) {
+async function inspectOutboxPreparation(id: string, db: Database, now: number) {
   const outbox = await db.runTransaction(tx => readWork(tx, db, 'platformWhatsAppOutbox/' + id));
   if (outbox?.recordType !== 'outbox') return null;
   const job = await db.runTransaction(tx => readWork(tx, db, 'platformWhatsAppJobs/' + outbox.jobId));
@@ -64,7 +64,18 @@ export async function readOutboxPreparation(id: string, db: Database, now: numbe
   if (!outboxMatchesJob(outbox, job)) throw platformWhatsAppUnavailableError();
   const payload = workPayload(outbox, now);
   if (payload && outbox.outputFingerprint !== outboxFingerprint(job, payload.text!, outbox.menuPurpose, outbox.menuActions)) throw platformWhatsAppUnavailableError();
-  const prepared = await prepareWorkIdentity(job, db, now); return prepared ? { job, outbox, prepared } : null;
+  const prepared = await prepareWorkIdentity(job, db, now); return { job, outbox, prepared };
+}
+export async function readOutboxPreparation(id: string, db: Database, now: number) {
+  const facts = await inspectOutboxPreparation(id, db, now);
+  return facts?.prepared ? { ...facts, prepared: facts.prepared } : null;
+}
+/** Recovery cancellation is restricted to the actual private job already read. */
+export async function readOutboxDispatchPreparation(id: string, db: Database, now: number) {
+  const facts = await inspectOutboxPreparation(id, db, now);
+  if (facts?.prepared) return { ...facts, prepared: facts.prepared };
+  if (facts?.job.kind === 'admin_query') await cancelUnauthorizedPrivateOutput(id, db, now);
+  return null;
 }
 export async function readAuthorizedOutbox(id: string, db: Database, now = Date.now()) {
   const p = await readOutboxPreparation(id, db, now); if (!p) return null;
@@ -246,5 +257,27 @@ export async function recordPlatformDeliveryStatus(event: Extract<import('./yclo
     const next = event.status !== 'failed' && order.indexOf(event.status) > order.indexOf(status) ? event.status : status;
     if (next === status && failed === (out.deliveryFailed ?? false)) return;
     stageWork(tx, db, 'platformWhatsAppOutbox/' + out.outboxId, { ...out, deliveryStatus: next, deliveryFailed: failed, deliveryObservedAt: Math.max(out.deliveryObservedAt ?? 0, now) });
+  });
+}
+/** Negative-only recovery guard. Never retries an effect or releases an uncertain generation cost. */
+export async function cancelUnauthorizedPrivateOutput(outboxId: string, db: Database, now = Date.now()): Promise<void> {
+  const initial = await db.runTransaction(async tx => {
+    const outbox = await readWork(tx, db, 'platformWhatsAppOutbox/' + outboxId);
+    const job = outbox?.recordType === 'outbox' ? await readWork(tx, db, 'platformWhatsAppJobs/' + outbox.jobId) : null;
+    return outbox?.recordType === 'outbox' && job?.recordType === 'job' && job.kind === 'admin_query' && outboxMatchesJob(outbox, job) ? { job, outbox } : null;
+  });
+  if (!initial || !['prepared', 'claimed'].includes(initial.outbox.status)) return;
+  const prepared = await prepareWorkIdentity(initial.job, db, now);
+  await db.runTransaction(async tx => {
+    const [job, outbox] = await Promise.all([readWork(tx, db, 'platformWhatsAppJobs/' + initial.job.jobId), readWork(tx, db, 'platformWhatsAppOutbox/' + outboxId)]);
+    if (job?.recordType !== 'job' || job.kind !== 'admin_query' || job.epoch !== initial.job.epoch || outbox?.recordType !== 'outbox' || !outboxMatchesJob(outbox, job) || !['prepared', 'claimed'].includes(outbox.status)) return;
+    if (prepared && await readWorkAuthority(job, prepared, tx, db, now)) return;
+    const head = await readWork(tx, db, 'platformWhatsAppJobs/head_' + job.conversationId);
+    const advance = head?.recordType === 'control_head' && head.headJobId === job.jobId && head.controlEpoch === job.controlEpoch && head.controlRevision === job.controlRevision ? await prepareHeadAdvance(head, job, tx, db, now) : null;
+    const cost = outbox.sendReservationId ? await readPlatformSettlement(outbox.sendReservationId, tx, db) : null;
+    if (cost?.call.status === 'reserved') stagePlatformSettlement(cost, 0, emptyUsage, null, tx, db, now);
+    stageWork(tx, db, 'platformWhatsAppOutbox/' + outboxId, { ...outbox, status: 'cancelled', sendFinishedAt: now });
+    stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, { ...job, status: 'cancelled', nextAttemptAt: null });
+    advance?.();
   });
 }

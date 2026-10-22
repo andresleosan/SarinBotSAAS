@@ -159,7 +159,7 @@ export function isPlatformWhatsAppEventRecord(value: unknown): value is Platform
     && isDigest(value.conversationId) && ['incoming_text', 'human_echo', 'incoming_audio', 'incoming_choice'].includes(value.kind as string)
     && (!timed || (isNullableInteger(value.customerSentAt) && (value.customerSentAt === null || (value.customerSentAt as number) <= value.receivedAt)))
     && (!newer || (value.ingressDisposition === 'control_only' || consumed ? value.state === 'body_erased' && value.content === null : value.kind === 'incoming_audio' && value.ingressDisposition === 'descriptor_retained'))
-    && (!consumed || uuid(value.consumedOutboxId) && ['accept', 'human', 'stop', 'support', 'plans'].includes(String(value.consumedAction)) && uuid(value.resultControlEpoch) && isInteger(value.resultControlRevision) && (value.resultJobId === null || typeof value.resultJobId === 'string' && /^job_[a-f0-9]{64}(?![\s\S])/.test(value.resultJobId)))
+    && (!consumed || uuid(value.consumedOutboxId) && ['accept', 'human', 'stop', 'support', 'plans', 'payments', 'status', 'inbox'].includes(String(value.consumedAction)) && uuid(value.resultControlEpoch) && isInteger(value.resultControlRevision) && (value.resultJobId === null || typeof value.resultJobId === 'string' && /^job_[a-f0-9]{64}(?![\s\S])/.test(value.resultJobId)))
     && isInteger(value.occurredAt) && isDigest(value.canonicalIdentity) && isDigest(value.fingerprint)
     && value.bodyExpiresAt === Math.min(value.occurredAt, value.receivedAt) + PLATFORM_BODY_TTL;
 }

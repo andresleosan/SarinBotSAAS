@@ -15,7 +15,7 @@ export function currentWorkProjection(job: PlatformJob, facts: { head: unknown; 
     && s.kind === (job.sourceKind === 'text' ? 'incoming_text' : job.sourceKind === 'audio' ? 'incoming_audio' : 'incoming_choice')
     && job.bodyExpiresAt > now && job.expiresAt > now && job.windowExpiresAt !== null && job.windowExpiresAt > now && job.sourceReceivedAt <= now && job.createdAt <= now
     && (job.conversationRevision === null ? c === undefined || c === null : isPlatformWhatsAppConversationRecord(c) && workScopeEqual(job, c) && c.revision === job.conversationRevision && c.expiresAt > now)
-    && (job.authorityKind === 'fixed_notice' ? h.entryState === 'initial' : h.entryState === 'bot' && isPlatformWhatsAppConversationRecord(c) && c.mode === 'bot') && !['admin_query', 'operator_notification'].includes(job.kind);
+    && (job.authorityKind === 'fixed_notice' ? h.entryState === 'initial' : h.entryState === 'bot' && isPlatformWhatsAppConversationRecord(c) && c.mode === 'bot') && job.kind !== 'operator_notification';
 }
 export function currentWorkLink(job: PlatformJob, facts: { link: unknown; phone: unknown; owner: unknown; marker: unknown; expectedUidIndex: string; scopeDigest: string; keyFingerprint: string }, now: number): boolean {
   const { link: l, phone: p, owner: o, marker: m } = facts;
@@ -52,6 +52,7 @@ export async function potentialPlatformWork(read: (path: string) => Promise<unkn
   const scope = { wabaId: env.PLATFORM_WHATSAPP_WABA_ID, phoneE164: env.PLATFORM_WHATSAPP_PHONE_E164, phoneNumberId: env.PLATFORM_WHATSAPP_PHONE_NUMBER_ID };
   const policy = parsePlatformWorkPolicy(env as WorkPolicyEnvironment); if (!policy) return false;
   const check = async (job: PlatformJob, advance = false): Promise<boolean> => {
+    if (job.kind === 'admin_query' && (job.authorityKind !== 'actor' || typeof env.SUPERADMIN_UID !== 'string' || !env.SUPERADMIN_UID || env.SUPERADMIN_UID !== job.uid)) return false;
     if (job.wabaId !== scope.wabaId || job.phoneE164 !== scope.phoneE164 || job.phoneNumberId !== scope.phoneNumberId || job.bodyState !== 'body_present' || job.processingDeadlineAt !== null && now >= job.processingDeadlineAt) return false;
     const head = await read('platformWhatsAppJobs/head_' + job.conversationId);
     const facts = { head: advance && isControlHead(head) && head.status === 'advance' ? { ...head, status: 'active' } : head, source: await read('platformWhatsAppEvents/' + job.sourceEventId), conversation: await read('platformWhatsAppConversations/' + job.conversationId), connection: await read('serverSettings/platform_whatsapp') };

@@ -59,3 +59,6 @@ export interface PlatformWhatsAppConversationList {
 }
 export interface PlatformWhatsAppConversationControlResponse { conversation: PlatformWhatsAppConversationView }
 export interface PlatformWhatsAppIngressResult { outcome: 'stored' | 'duplicate' | 'conflict'; conversationId: string }
+
+/** Counts describe validated consulted records, never totals or unread messages. */
+export interface PlatformAdminMenu { payments: number; health: string; support: number }

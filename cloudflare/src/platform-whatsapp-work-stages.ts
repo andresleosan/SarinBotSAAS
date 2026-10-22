@@ -56,7 +56,7 @@ async function readJob(lease: Lease, tx: Reader): Promise<PlatformJob | null> {
   return j && isPlatformJob(j) && j.epoch === lease.epoch ? j : null;
 }
 async function authorized(job: PlatformJob, lease: Lease, env: Env, tx: Reader, now: number): Promise<boolean> {
-  if (job.authorityKind !== 'actor' || job.kind !== 'customer_reply' || job.sourceKind !== 'audio' || job.status !== 'leased' || job.leaseToken !== lease.token || job.leaseExpiresAt === null || job.leaseExpiresAt <= now || job.processingDeadlineAt === null || job.processingDeadlineAt <= now) return false;
+  if (job.authorityKind !== 'actor' || !['customer_reply', 'admin_query'].includes(job.kind) || job.kind === 'admin_query' && (!env.SUPERADMIN_UID || env.SUPERADMIN_UID !== job.uid) || job.sourceKind !== 'audio' || job.status !== 'leased' || job.leaseToken !== lease.token || job.leaseExpiresAt === null || job.leaseExpiresAt <= now || job.processingDeadlineAt === null || job.processingDeadlineAt <= now) return false;
   const [head, source, conversation, connection, link] = await Promise.all([tx.get('platformWhatsAppJobs/head_' + job.conversationId), tx.get('platformWhatsAppEvents/' + job.sourceEventId), tx.get('platformWhatsAppConversations/' + job.conversationId), tx.get('serverSettings/platform_whatsapp'), tx.get('platformWhatsAppLinks/link_' + job.linkId)]);
   if (head !== undefined && !isWorkRecordAtPath('platformWhatsAppJobs/head_' + job.conversationId, head)
     || source !== undefined && !isPlatformWhatsAppEventRecord(source)

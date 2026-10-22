@@ -1,0 +1,43 @@
+﻿import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+const auth = vi.hoisted(() => ({ getUser: vi.fn() }));
+vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => { throw new Error('Default backend forbidden'); }, getAdminAuth: () => auth }));
+import { buildSupportScenario } from './platform-support-fixtures';
+import { now } from './platform-whatsapp-test-fixtures';
+import { admitAdminCopilot } from '@/lib/server/admin-copilot-rate';
+import { runPlatformSupportWork } from '@/lib/server/platform-support-bot';
+import { completeChat } from '@/lib/sarin/engine';
+import { isBudgetCall, isPlatformOutbox } from '../shared/platform-whatsapp-work';
+beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(now); auth.getUser.mockReset().mockImplementation(async uid => ({ uid, disabled: false })); vi.stubEnv('SUPERADMIN_UID', 'demo-link-user'); vi.stubEnv('DEEPSEEK_API_KEY', 'synthetic-key'); vi.stubEnv('PILOT_AI_BUDGET_ENFORCED', 'true'); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+const answer = (extra = {}) => Response.json({ model: 'synthetic-wire-model-v1', choices: [{ message: { content: JSON.stringify({ reply: 'No hay pagos pendientes entre los registros consultados.', sourceIds: [] }) } }], usage: { prompt_tokens: 11, prompt_cache_hit_tokens: 1, prompt_cache_miss_tokens: 10, completion_tokens: 3, total_tokens: 14 }, ...extra });
+it('keeps web ten/minute and sixty/day admission separate from one private platform generation', async () => {
+  const s = await buildSupportScenario(), { lease } = await s.question('consulta privada');
+  for (let n = 0; n < 60; n++) await admitAdminCopilot('demo-link-user', { requestId: 'web-request-' + n, question: 'Consulta' }, s.db, now - 360000 + Math.floor(n / 10) * 60001);
+  await expect(admitAdminCopilot('demo-link-user', { requestId: 'web-request-60', question: 'Consulta' }, s.db, now)).rejects.toMatchObject({ status: 429 });
+  for (let n = 0; n < 10; n++) await admitAdminCopilot('other-web-admin', { requestId: 'minute-request-' + n, question: 'Consulta' }, s.db, now);
+  await expect(admitAdminCopilot('other-web-admin', { requestId: 'minute-request-10', question: 'Consulta' }, s.db, now)).rejects.toMatchObject({ status: 429 });
+  const before = structuredClone([...s.rows.entries()].filter(([path]) => path.includes('admin_copilot_rate_')));
+  const fetcher = vi.fn().mockResolvedValue(answer()); vi.stubGlobal('fetch', fetcher);
+  const offset = s.seen.length; await runPlatformSupportWork(lease, s.db, new AbortController().signal);
+  expect([...s.rows.entries()].filter(([path]) => path.includes('admin_copilot_rate_'))).toEqual(before);
+  expect(JSON.stringify(s.seen.slice(offset).filter(c => c.action === 'commit'))).not.toMatch(/responseQuota|aiBudget|admin_copilot_rate_|paymentReceipts/);
+  const calls = [...s.rows.values()].filter(isBudgetCall).filter(c => c.stage === 'generation'); expect(calls).toHaveLength(1);
+  const telemetry = [...s.rows.entries()].filter(([path]) => path.startsWith('aiUsageCalls/')); expect(telemetry).toHaveLength(1); expect(telemetry[0][0]).toBe('aiUsageCalls/' + calls[0].effectToken);
+  await expect(completeChat([{ role: 'user', content: 'commercial' }], undefined, { provider: 'deepseek' })).rejects.toMatchObject({ code: 'AI_BUDGET_UNAVAILABLE' });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it.each(['mapping', 'budget'] as const)('default closed private %s refuses before paid generation', async gate => {
+  const s = await buildSupportScenario(), { lease } = await s.question('consulta privada');
+  vi.stubEnv(gate === 'mapping' ? 'PLATFORM_WHATSAPP_GENERATION_POLICY' : 'PLATFORM_WHATSAPP_GENERATION_DAILY_BUDGET_MICROS', gate === 'mapping' ? '' : '0');
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  await expect(runPlatformSupportWork(lease, s.db, new AbortController().signal)).rejects.toThrow();
+  expect(fetcher).not.toHaveBeenCalled(); expect([...s.rows.values()].filter(isBudgetCall).filter(c => c.stage === 'generation')).toHaveLength(0);
+});
+it.each([{ model: 'unknown-model' }, { usage: undefined }])('private unknown usage/model retains the original hold and never persists an answer: %j', async change => {
+  const s = await buildSupportScenario(), { lease } = await s.question('consulta privada');
+  const fetcher = vi.fn().mockResolvedValue(answer(change)); vi.stubGlobal('fetch', fetcher);
+  await expect(runPlatformSupportWork(lease, s.db, new AbortController().signal)).rejects.toThrow();
+  expect([...s.rows.values()].filter(isBudgetCall).find(c => c.stage === 'generation')).toMatchObject({ status: 'uncertain', actualMicros: null });
+  expect([...s.rows.values()].filter(isPlatformOutbox).filter(c => c.outputKind === 'generated')).toHaveLength(0);
+  await expect(runPlatformSupportWork(lease, s.db, new AbortController().signal)).rejects.toThrow(); expect(fetcher).toHaveBeenCalledTimes(1);
+});
