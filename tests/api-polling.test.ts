@@ -94,3 +94,24 @@ describe('bounded visible API polling', () => {
     polling.stop();
   });
 });
+
+it('allows the support five-second interval', async () => {
+  vi.useFakeTimers();
+  const load = vi.fn(async () => 'read');
+  const poll = startApiPolling(load, () => {}, () => {}, { intervalMs: 5_000 });
+  await vi.advanceTimersByTimeAsync(5_000);
+  expect(load).toHaveBeenCalledTimes(2);
+  poll.stop(); vi.useRealTimers();
+});
+
+it('coalesces focus refreshes until an aborted load actually settles', async () => {
+  const events = new EventTarget(); vi.stubGlobal('window', events);
+  const pending: Array<(value: string) => void> = [];
+  const load = vi.fn(() => new Promise<string>(resolve => pending.push(resolve)));
+  const poll = startApiPolling(load, () => {}, () => {});
+  events.dispatchEvent(new Event('focus')); events.dispatchEvent(new Event('focus'));
+  expect(load).toHaveBeenCalledTimes(1);
+  pending[0]('old'); await Promise.resolve(); await Promise.resolve();
+  expect(load).toHaveBeenCalledTimes(2);
+  poll.stop(); pending[1]?.('done'); vi.unstubAllGlobals();
+});

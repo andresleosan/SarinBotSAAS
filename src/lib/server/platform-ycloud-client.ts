@@ -25,6 +25,19 @@ export function createPlatformYCloudClient(config: { scope: PlatformWhatsAppScop
   const headers = { 'X-API-Key': config.apiKey, 'Content-Type': 'application/json', Accept: 'application/json' };
   const request = (path: string, signal: AbortSignal, body?: string) => fetch('https://api.ycloud.com/v2' + path, { method: body === undefined ? 'GET' : 'POST', headers, signal, cache: 'no-store', redirect: 'error', ...(body === undefined ? {} : { body }) });
   return {
+    async sendText(input: { to: string; text: string; externalId: string; signal: AbortSignal }): Promise<DeliveryResult> {
+      if (input.signal.aborted || !config.sendEnabled || !PLATFORM_PHONE_PATTERN.test(input.to) || input.to === scope.phoneE164 || !workText(input.text, 'reply') || !workUuid(input.externalId)) return { status: 'cancelled' };
+      const body = JSON.stringify({ from: scope.phoneE164, to: input.to, type: 'text', externalId: input.externalId, text: { body: input.text, preview_url: false } });
+      const signal = AbortSignal.any([input.signal, AbortSignal.timeout(15000)]);
+      try {
+        signal.throwIfAborted();
+        const response = await request('/whatsapp/messages/sendDirectly', signal, body), value = await json(response, signal);
+        if (!response.ok || !workText(value.id, 'provider') || ['wabaId', 'from', 'to', 'externalId'].some(k => value[k] !== undefined && value[k] !== ({ wabaId: scope.wabaId, from: scope.phoneE164, to: input.to, externalId: input.externalId } as Record<string, string>)[k])) return { status: 'unknown' };
+        if (value.status === 'failed') return { status: 'rejected' };
+        if (value.status !== undefined && !['accepted', 'sent', 'delivered', 'read'].includes(String(value.status))) return { status: 'unknown' };
+        return { status: 'accepted', providerId: value.id };
+      } catch { return { status: 'unknown' }; }
+    },
     async readAccountConnection(): Promise<{ connected: boolean; observedAt: number }> {
       const observedAt = Date.now(), signal = AbortSignal.timeout(10000);
       const accountResponse = await request('/whatsapp/businessAccounts/' + encodeURIComponent(scope.wabaId), signal);

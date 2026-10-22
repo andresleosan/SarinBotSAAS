@@ -1,4 +1,5 @@
 import { cleanupAdminPaymentRetention } from './admin-payment-retention.ts';
+import { cleanupPlatformSupportRetention } from './platform-support-retention.ts';
 import { hasPotentialPlatformWork } from './platform-whatsapp-wake.ts';
 import { handlePlatformAudioOutbound } from './platform-whatsapp-audio.ts';
 import { Container, ContainerProxy, getContainer } from '@cloudflare/containers';
@@ -55,6 +56,10 @@ export default {
     if (flags.SARIN_MAINTENANCE !== 'true') {
       const result = await cleanupAdminPaymentRetention(env);
       if (result.morePending || result.clearedBodies || result.deletedMetadata) console.info({ event: 'admin_payment_retention', ...result });
+      if (flags.PLATFORM_WHATSAPP_RETENTION_ENABLED !== 'true') {
+        const support = await cleanupPlatformSupportRetention(env);
+        if (support.morePending || support.clearedBodies || support.deletedMetadata) console.info({ event: 'platform_support_retention', ...support });
+      }
     }
     if (flags.PLATFORM_WHATSAPP_RETENTION_ENABLED === 'true' && flags.SARIN_MAINTENANCE !== 'true') {
       const result = await cleanupPlatformWhatsAppRetention(env);

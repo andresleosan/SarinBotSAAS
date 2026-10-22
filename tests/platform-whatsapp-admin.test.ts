@@ -66,6 +66,15 @@ afterEach(() => vi.unstubAllGlobals());
 import { getSarinQueueStats, runInSarinQueue } from '@/lib/sarin/queue';
 import { readPlatformAdminMenu, platformAdminSourceUrl, readPlatformAdminContext } from '@/lib/server/platform-whatsapp-admin';
 import { seedConsents } from './platform-whatsapp-link-fixtures';
+import { createSupportConversation } from '@/lib/server/platform-support';
+import { randomUUID } from 'node:crypto';
+it('adds consulted live web threads to the WA support count with explicit bounded coverage', async () => {
+  const s = await privateScenario(); vi.stubEnv('PLATFORM_SUPPORT_KEY', Buffer.alloc(32, 43).toString('base64'));
+  await seedConsents(s.db, 'demo-web'); await createSupportConversation('demo-web', randomUUID(), s.db);
+  const job = (await s.work.readAuthorized(s.lease))!; if (job.authorityKind !== 'actor') throw new Error('Expected actor');
+  const result = await readPlatformAdminContext(workActor(job), s.db);
+  expect(result.menu.support).toBe(2); expect(result.menu.health).toContain('web');
+});
 import { AsyncLocalStorage } from 'node:async_hooks';
 it('gives foreign/client calls 403 without a bound context or private read', async () => {
   const s = await privateScenario(), job = (await s.work.readAuthorized(s.lease))!;

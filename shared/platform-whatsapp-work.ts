@@ -30,7 +30,10 @@ export interface ControlHead extends PlatformWhatsAppIdentity {
   headJobId: string | null; tailJobId: string | null; currentMenuOutboxId: string | null;
   status: 'idle' | 'active' | 'advance' | 'repair_needed'; nextAttemptAt: number | null; receivedAt: number; expiresAt: number;
 }
+export type SupportNotificationBinding = { conversationId: string; messageId: string; configRevision: number; outboxId: string; bodyExpiresAt: number; expiresAt: number };
+export function supportNotificationText(binding: SupportNotificationBinding): string { if (!workUuid(binding.conversationId)) throw new Error('Invalid support reference'); return 'Tienes una nueva consulta de soporte en SarinBot. Revísala en tu panel.\nhttps://sarinbotsaas.pages.dev/admin/assistant?support=' + binding.conversationId; }
 interface SourceBinding extends PlatformWhatsAppIdentity {
+  supportNotification?: SupportNotificationBinding;
   jobId: string; epoch: string; sourceEventId: string; conversationId: string; controlEpoch: string; controlRevision: number;
   connectionRevision: number; conversationRevision: number | null; sourceOccurredAt: number; sourceReceivedAt: number;
   customerSentAt: number | null; windowExpiresAt: number | null; bodyExpiresAt: number; expiresAt: number; createdAt: number;
@@ -41,10 +44,10 @@ export type PlatformJob = SourceBinding & WorkAuthority & WorkStages & {
   recordType: 'job'; sourceKind: 'text' | 'audio' | 'menu'; kind: 'control' | 'customer_reply' | 'admin_query' | 'operator_notification';
   status: 'waiting' | 'ready' | 'leased' | 'reply_saved' | 'completed' | 'cancelled' | 'unknown';
   nextJobId: string | null; nextAttemptAt: number | null; leaseToken: string | null; leaseClaimedAt: number | null; leaseExpiresAt: number | null;
-  processingStartedAt: number | null; processingDeadlineAt: number | null; outboxId: string | null; outputKind: 'none' | 'generated' | 'catalog' | 'audio_fallback';
+  processingStartedAt: number | null; processingDeadlineAt: number | null; outboxId: string | null; outputKind: 'none' | 'generated' | 'catalog' | 'audio_fallback' | 'operator_notification';
 };
 export type PlatformOutbox = SourceBinding & WorkAuthority & {
-  recordType: 'outbox'; outboxId: string; outputFingerprint: string; outputKind: 'generated' | 'catalog' | 'audio_fallback';
+  recordType: 'outbox'; outboxId: string; outputFingerprint: string; outputKind: 'generated' | 'catalog' | 'audio_fallback' | 'operator_notification';
   menuPurpose: 'notice' | 'support' | 'admin' | 'reply'; menuVersion: 1; menuActions: string[];
   consumedByEventId: string | null; consumedAt: number | null;
   status: 'prepared' | 'claimed' | 'started' | 'accepted' | 'rejected' | 'unknown' | 'cancelled';
@@ -113,9 +116,10 @@ function source(v: R): boolean {
   return workId(v.jobId, 'job') && workUuid(v.epoch) && workId(v.sourceEventId, 'event') && workDigest(v.conversationId) && workUuid(v.controlEpoch)
     && workInteger(v.controlRevision) && workInteger(v.connectionRevision) && nullable(v.conversationRevision, workInteger)
     && ['sourceOccurredAt', 'sourceReceivedAt', 'bodyExpiresAt', 'expiresAt', 'createdAt'].every(k => workTime(v[k]))
-    && Number(v.createdAt) >= Number(v.sourceReceivedAt) && v.bodyExpiresAt === Math.min(Number(v.sourceOccurredAt), Number(v.sourceReceivedAt)) + PLATFORM_BODY_TTL
-    && v.expiresAt === Number(v.sourceReceivedAt) + PLATFORM_METADATA_TTL && nullable(v.customerSentAt, workTime)
+    && Number(v.createdAt) >= Number(v.sourceReceivedAt) && v.bodyExpiresAt === Math.min(Math.min(Number(v.sourceOccurredAt), Number(v.sourceReceivedAt)) + PLATFORM_BODY_TTL, workObject(v.supportNotification) ? Number(v.supportNotification.bodyExpiresAt) : Infinity)
+    && v.expiresAt === Math.min(Number(v.sourceReceivedAt) + PLATFORM_METADATA_TTL, workObject(v.supportNotification) ? Number(v.supportNotification.expiresAt) : Infinity) && nullable(v.customerSentAt, workTime)
     && (v.customerSentAt === null ? v.windowExpiresAt === null : Number(v.customerSentAt) <= Number(v.sourceReceivedAt) && workTime(v.windowExpiresAt) && v.windowExpiresAt === Number(v.customerSentAt) + PLATFORM_BODY_TTL)
+    && (!Object.hasOwn(v, 'supportNotification') || workObject(v.supportNotification) && workExact(v.supportNotification, ['conversationId', 'messageId', 'configRevision', 'outboxId', 'bodyExpiresAt', 'expiresAt']) && workUuid(v.supportNotification.conversationId) && workDigest(v.supportNotification.messageId) && workInteger(v.supportNotification.configRevision) && v.supportNotification.configRevision > 0 && workUuid(v.supportNotification.outboxId) && workTime(v.supportNotification.bodyExpiresAt) && workTime(v.supportNotification.expiresAt) && v.authorityKind === 'actor' && v.catalogId === null)
     && workDigest(v.requestFingerprint) && (v.bodyState === 'body_present' ? isPlatformWhatsAppCiphertext(v.content) : v.bodyState === 'body_erased' && v.content === null)
     && (v.catalogId === null ? v.catalogVersion === null : typeof v.catalogId === 'string' && Object.hasOwn(workCatalog, v.catalogId) && v.catalogVersion === 1) && authority(v);
 }
@@ -139,9 +143,10 @@ export function isControlHead(v: unknown): v is ControlHead {
     && (v.status === 'idle' ? v.headJobId === null && v.tailJobId === null && v.nextAttemptAt === null : v.status === 'active' ? v.headJobId !== null && v.tailJobId !== null && v.nextAttemptAt === null : v.status === 'advance' ? v.headJobId !== null && v.tailJobId !== null && workTime(v.nextAttemptAt) : v.status === 'repair_needed' && v.nextAttemptAt === null);
 }
 export function isPlatformJob(v: unknown): v is PlatformJob {
-  if (!identity(v) || !workExact(v, [...sourceKeys, ...authorityKeys(v), ...stageKeys, 'recordType', 'sourceKind', 'kind', 'status', 'nextJobId', 'nextAttemptAt', 'leaseToken', 'leaseClaimedAt', 'leaseExpiresAt', 'processingStartedAt', 'processingDeadlineAt', 'outboxId', 'outputKind']) || v.recordType !== 'job' || !source(v) || !stage(v, 'audio') || !stage(v, 'generation')) return false;
+  if (!identity(v) || !workExact(v, [...sourceKeys, ...Object.hasOwn(v, 'supportNotification') ? ['supportNotification'] : [], ...authorityKeys(v), ...stageKeys, 'recordType', 'sourceKind', 'kind', 'status', 'nextJobId', 'nextAttemptAt', 'leaseToken', 'leaseClaimedAt', 'leaseExpiresAt', 'processingStartedAt', 'processingDeadlineAt', 'outboxId', 'outputKind']) || v.recordType !== 'job' || !source(v) || !stage(v, 'audio') || !stage(v, 'generation')) return false;
   if (!oneOf(v.sourceKind, ['text', 'audio', 'menu']) || !oneOf(v.kind, ['control', 'customer_reply', 'admin_query', 'operator_notification']) || !oneOf(v.status, ['waiting', 'ready', 'leased', 'reply_saved', 'completed', 'cancelled', 'unknown']) || !nullable(v.nextJobId, x => workId(x, 'job')) || v.nextJobId === v.jobId || !nullable(v.nextAttemptAt, workTime) || !nullable(v.outboxId, workUuid)) return false;
-  if (!oneOf(v.outputKind, ['none', 'generated', 'catalog', 'audio_fallback']) || (v.outboxId === null) !== (v.outputKind === 'none') || v.generationState === 'unknown' && v.outboxId !== null) return false;
+  if (!oneOf(v.outputKind, ['none', 'generated', 'catalog', 'audio_fallback', 'operator_notification']) || (v.outboxId === null) !== (v.outputKind === 'none') || v.generationState === 'unknown' && v.outboxId !== null) return false;
+  if ((v.kind === 'operator_notification') !== Object.hasOwn(v, 'supportNotification') || v.kind === 'operator_notification' && (v.audioState !== 'not_applicable' || v.generationState !== 'not_applicable' || v.outputKind !== 'none' && v.outputKind !== 'operator_notification')) return false;
   if (v.authorityKind === 'fixed_notice' && (v.audioState !== 'not_applicable' || v.generationState !== 'not_applicable' || v.kind !== 'control')) return false;
   if (v.sourceKind !== 'audio' && v.audioState !== 'not_applicable') return false;
   if (v.authorityKind === 'actor' && v.catalogId !== null && !['support_ready', 'plans_ready', 'admin_menu', 'audio_fallback'].includes(String(v.catalogId))) return false;
@@ -153,11 +158,12 @@ export function isPlatformJob(v: unknown): v is PlatformJob {
   return v.status === 'leased' ? v.leaseToken !== null && v.nextAttemptAt === v.leaseExpiresAt : v.status === 'reply_saved' ? v.outboxId !== null && workTime(v.nextAttemptAt) : ['cancelled', 'completed', 'unknown', 'waiting'].includes(String(v.status)) ? v.nextAttemptAt === null : v.leaseToken === null && workTime(v.nextAttemptAt);
 }
 export function isPlatformOutbox(v: unknown): v is PlatformOutbox {
-  if (!identity(v) || !workExact(v, [...sourceKeys, ...authorityKeys(v), 'recordType', 'outboxId', 'outputFingerprint', 'outputKind', 'menuPurpose', 'menuVersion', 'menuActions', 'consumedByEventId', 'consumedAt', 'status', 'sendToken', 'sendClaimedAt', 'sendStartedAt', 'sendFinishedAt', 'providerId', 'sendReservationId', ...Object.hasOwn(v, 'deliveryStatus') ? ['deliveryStatus', 'deliveryFailed', 'deliveryObservedAt'] : []]) || v.recordType !== 'outbox' || !source(v) || !workUuid(v.outboxId) || !workDigest(v.outputFingerprint)) return false;
+  if (!identity(v) || !workExact(v, [...sourceKeys, ...Object.hasOwn(v, 'supportNotification') ? ['supportNotification'] : [], ...authorityKeys(v), 'recordType', 'outboxId', 'outputFingerprint', 'outputKind', 'menuPurpose', 'menuVersion', 'menuActions', 'consumedByEventId', 'consumedAt', 'status', 'sendToken', 'sendClaimedAt', 'sendStartedAt', 'sendFinishedAt', 'providerId', 'sendReservationId', ...Object.hasOwn(v, 'deliveryStatus') ? ['deliveryStatus', 'deliveryFailed', 'deliveryObservedAt'] : []]) || v.recordType !== 'outbox' || !source(v) || !workUuid(v.outboxId) || !workDigest(v.outputFingerprint)) return false;
   if (Object.hasOwn(v, 'deliveryStatus') && (!oneOf(v.deliveryStatus, ['unobserved', 'accepted', 'sent', 'delivered', 'read']) || typeof v.deliveryFailed !== 'boolean' || !nullable(v.deliveryObservedAt, workTime) || v.deliveryStatus === 'unobserved' && !v.deliveryFailed && v.deliveryObservedAt !== null || (v.deliveryStatus !== 'unobserved' || v.deliveryFailed) && v.deliveryObservedAt === null)) return false;
-  if (!oneOf(v.outputKind, ['generated', 'catalog', 'audio_fallback']) || (v.outputKind === 'generated') !== (v.catalogId === null) || v.outputKind === 'audio_fallback' && v.catalogId !== 'audio_fallback' || !oneOf(v.menuPurpose, ['notice', 'support', 'admin', 'reply']) || v.menuVersion !== 1) return false;
+  if (!oneOf(v.outputKind, ['generated', 'catalog', 'audio_fallback', 'operator_notification']) || (['generated', 'operator_notification'].includes(String(v.outputKind))) !== (v.catalogId === null) || v.outputKind === 'audio_fallback' && v.catalogId !== 'audio_fallback' || !oneOf(v.menuPurpose, ['notice', 'support', 'admin', 'reply']) || v.menuVersion !== 1) return false;
   if (v.catalogId !== null && v.menuPurpose !== workCatalog[v.catalogId as CatalogId].purpose) return false;
-  const actions = createPlatformMenu(v.outboxId, v.menuPurpose as PlatformOutbox['menuPurpose']).map(b => parsePlatformMenuChoice(b.id)!.action);
+  if ((v.outputKind === 'operator_notification') !== Object.hasOwn(v, 'supportNotification')) return false;
+  const actions = v.outputKind === 'operator_notification' ? [] : createPlatformMenu(v.outboxId, v.menuPurpose as PlatformOutbox['menuPurpose']).map(b => parsePlatformMenuChoice(b.id)!.action);
   if (JSON.stringify(v.menuActions) !== JSON.stringify(actions) || !nullable(v.consumedByEventId, x => workId(x, 'event')) || !nullable(v.consumedAt, workTime) || (v.consumedAt === null) !== (v.consumedByEventId === null) || v.consumedAt !== null && v.status !== 'accepted') return false;
   if (!nullable(v.sendToken, workUuid) || !nullable(v.sendReservationId, x => workId(x, 'call')) || !['sendClaimedAt', 'sendStartedAt', 'sendFinishedAt'].every(k => nullable(v[k], workTime)) || !nullable(v.providerId, x => workText(x, 'provider'))) return false;
   if (v.status === 'prepared') return ['sendToken', 'sendReservationId', 'sendClaimedAt', 'sendStartedAt', 'sendFinishedAt', 'providerId'].every(k => v[k] === null);
@@ -169,7 +175,7 @@ export function isPlatformOutbox(v: unknown): v is PlatformOutbox {
 }
 export function outboxMatchesJob(o: PlatformOutbox, j: PlatformJob): boolean {
   const fields = [...identityKeys, 'jobId', 'epoch', 'sourceEventId', 'conversationId', 'controlEpoch', 'controlRevision', 'connectionRevision', 'conversationRevision', 'sourceOccurredAt', 'sourceReceivedAt', 'customerSentAt', 'windowExpiresAt', 'bodyExpiresAt', 'expiresAt', 'requestFingerprint', 'outputKind', 'catalogId', 'catalogVersion', ...authorityKeys(j as unknown as R)];
-  return j.outboxId === o.outboxId && fields.every(k => (o as unknown as R)[k] === (j as unknown as R)[k]);
+  return JSON.stringify(j.supportNotification) === JSON.stringify(o.supportNotification) && j.outboxId === o.outboxId && fields.every(k => (o as unknown as R)[k] === (j as unknown as R)[k]);
 }
 export function validUsage(v: Usage, stage: CostStage): boolean {
   return workObject(v) && workExact(v, usageKeys) && usageKeys.every(k => nullable(v[k as keyof Usage], workInteger)) && (stage === 'audio' ? v.usageInputTokens === null && v.usageOutputTokens === null && v.usageMessages === null && (v.usageAudioMilliseconds === null || v.usageAudioMilliseconds <= 120_000)

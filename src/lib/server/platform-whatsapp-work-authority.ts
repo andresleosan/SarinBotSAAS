@@ -1,4 +1,5 @@
 import 'server-only';
+import { readSupportNotificationAuthority, supportNotificationSourcePhone } from './platform-support-notifications';
 import { isSuperadmin } from './auth';
 import type { Database, Transaction } from '@/lib/storage/types';
 import type { PlatformActor } from '../../../shared/platform-whatsapp-authorization';
@@ -39,7 +40,7 @@ export function workPayload(record: PlatformJob | PlatformOutbox, now: number): 
   return v as { customerPhone: string; question?: string | null; text?: string };
 }
 export async function prepareWorkIdentity(job: PlatformJob, db: Database, now: number) {
-  if (job.kind === 'admin_query' && (job.authorityKind !== 'actor' || !isSuperadmin(job.uid))) return null;
+  if (['admin_query', 'operator_notification'].includes(job.kind) && (job.authorityKind !== 'actor' || !isSuperadmin(job.uid))) return null;
   const payload = workPayload(job, now);
   if (!payload) return null;
   const identity = job.authorityKind === 'actor' ? await preparePlatformWhatsAppAudioRetentionIdentity(payload.customerPhone, job, db, now) : null;
@@ -57,8 +58,8 @@ export async function readWorkAuthority(job: PlatformJob, prepared: PreparedWork
   if (h && h.recordType !== 'control_head' || source !== undefined && !isPlatformWhatsAppEventRecord(source) || conversation !== undefined && !isPlatformWhatsAppConversationRecord(conversation)) throw platformWhatsAppUnavailableError();
   if (!currentWorkProjection(job, { head: h, source, conversation, connection }, now)) return null;
   if (h?.recordType !== 'control_head' || !isPlatformWhatsAppEventRecord(source) || h.expiresAt <= now || h.receivedAt > now || h.status !== 'active' || h.headJobId !== job.jobId || h.controlEpoch !== job.controlEpoch || h.controlRevision !== job.controlRevision || h.connectionRevision !== job.connectionRevision || h.attachedConversationRevision !== job.conversationRevision || h.entryState === 'human_paused'
-    || job.kind === 'admin_query' && (job.authorityKind !== 'actor' || !isSuperadmin(job.uid)) || job.kind === 'operator_notification' || !freshWorkConnection(connection, now) || connection.connectionRevision !== job.connectionRevision
-    || source.conversationId !== job.conversationId || source.fingerprint !== job.requestFingerprint || source.connectionRevision !== job.connectionRevision || source.occurredAt !== job.sourceOccurredAt || source.receivedAt !== job.sourceReceivedAt || source.bodyExpiresAt !== job.bodyExpiresAt || source.expiresAt !== job.expiresAt || !samePlatformWhatsAppScope(source, job) || !samePlatformWhatsAppScope(h, job)
+    || ['admin_query', 'operator_notification'].includes(job.kind) && (job.authorityKind !== 'actor' || !isSuperadmin(job.uid)) || !freshWorkConnection(connection, now) || connection.connectionRevision !== job.connectionRevision
+    || source.conversationId !== job.conversationId || source.fingerprint !== job.requestFingerprint || source.connectionRevision !== job.connectionRevision || source.occurredAt !== job.sourceOccurredAt || source.receivedAt !== job.sourceReceivedAt || Math.min(source.bodyExpiresAt, job.supportNotification?.bodyExpiresAt ?? Infinity) !== job.bodyExpiresAt || Math.min(source.expiresAt, job.supportNotification?.expiresAt ?? Infinity) !== job.expiresAt || !samePlatformWhatsAppScope(source, job) || !samePlatformWhatsAppScope(h, job)
     || !('customerSentAt' in source) || source.customerSentAt !== job.customerSentAt || job.customerSentAt === null || job.windowExpiresAt === null || job.windowExpiresAt <= now || job.bodyExpiresAt <= now || job.expiresAt <= now || job.sourceReceivedAt > now || job.createdAt > now || !workPayload(job, now)) return null;
   if (job.conversationRevision === null ? conversation !== undefined : !isPlatformWhatsAppConversationRecord(conversation) || !samePlatformWhatsAppScope(conversation, job) || conversation.expiresAt <= now || conversation.revision !== job.conversationRevision) return null;
   if (job.authorityKind === 'actor') {
@@ -66,5 +67,6 @@ export async function readWorkAuthority(job: PlatformJob, prepared: PreparedWork
     const identity = await readPlatformWhatsAppAudioRetentionIdentityInTransaction(prepared.identity, prepared.payload.customerPhone, job, tx, db, now);
     if (!identity || !sameWorkAuthority(job, actorAuthority(identity))) return null;
   } else if (h.entryState !== 'initial') return null;
+  if (job.kind === 'operator_notification' && (!await readSupportNotificationAuthority(job, tx, db, now) || supportNotificationSourcePhone(source, 'platformWhatsAppEvents/' + job.sourceEventId, now) !== prepared.payload.customerPhone)) return null;
   return { head: h, source, conversation, connection };
 }

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Database, Transaction } from '@/lib/storage/types';
 import { isPlatformWhatsAppConversationRecord } from '../../../shared/platform-whatsapp-records';
 import { createPlatformMenu, parsePlatformMenuChoice } from '../../../shared/platform-whatsapp-menu';
-import { WORK_DEADLINE_MS, WORK_LEASE_MS, workCatalog, workText, emptyUsage, outboxMatchesJob, type ControlHead, type CostStage, type DeliveryResult, type Lease, type PlatformJob, type PlatformOutbox, type Usage, type GenerationQuote } from '../../../shared/platform-whatsapp-work';
+import { WORK_DEADLINE_MS, WORK_LEASE_MS, workCatalog, supportNotificationText, workText, emptyUsage, outboxMatchesJob, type ControlHead, type CostStage, type DeliveryResult, type Lease, type PlatformJob, type PlatformOutbox, type Usage, type GenerationQuote } from '../../../shared/platform-whatsapp-work';
 import { maximumPlatformCost } from '../../../shared/platform-whatsapp-policy';
 import { getPlatformWhatsAppConfig } from './platform-whatsapp-config';
 import { encryptPlatformWhatsAppContent, platformWhatsAppDigest } from './platform-whatsapp-crypto';
@@ -42,15 +42,15 @@ export async function preparedLease(lease: Lease, db: Database, now: number) {
   const prepared = await prepareWorkIdentity(job, db, now); return prepared ? { job, prepared } : null;
 }
 function outboxFingerprint(job: PlatformJob, text: string, purpose: PlatformOutbox['menuPurpose'], actions: string[]) {
-  return platformWhatsAppDigest('work-output', [JSON.stringify([job.wabaId, job.phoneE164, job.phoneNumberId, job.jobId, job.epoch, job.outputKind === 'none' ? job.catalogId === 'audio_fallback' ? 'audio_fallback' : job.catalogId ? 'catalog' : 'generated' : job.outputKind, job.catalogId, job.catalogVersion, purpose, 1, actions, text])], getPlatformWhatsAppConfig().contentKey);
+  return platformWhatsAppDigest('work-output', [JSON.stringify([job.wabaId, job.phoneE164, job.phoneNumberId, job.jobId, job.epoch, job.outputKind === 'none' ? job.kind === 'operator_notification' ? 'operator_notification' : job.catalogId === 'audio_fallback' ? 'audio_fallback' : job.catalogId ? 'catalog' : 'generated' : job.outputKind, job.catalogId, job.catalogVersion, purpose, 1, actions, text])], getPlatformWhatsAppConfig().contentKey);
 }
 export function prepareOutbox(job: PlatformJob, customerPhone: string, text: string, id: string, now: number): PlatformOutbox {
   if (!workText(text, 'reply')) throw platformWhatsAppConflictError();
-  const purpose = job.catalogId ? workCatalog[job.catalogId].purpose : 'reply', actions = createPlatformMenu(id, purpose).map(b => parsePlatformMenuChoice(b.id)!.action);
+  const purpose = job.catalogId ? workCatalog[job.catalogId].purpose : 'reply', actions = job.kind === 'operator_notification' ? [] : createPlatformMenu(id, purpose).map(b => parsePlatformMenuChoice(b.id)!.action);
   const { recordType: _rt, sourceKind: _sk, kind: _k, status: _s, nextJobId: _next, nextAttemptAt: _at, leaseToken: _lt, leaseClaimedAt: _lc, leaseExpiresAt: _le, processingStartedAt: _ps, processingDeadlineAt: _pd,
     audioState: _as, audioToken: _at2, audioLeaseToken: _alt, audioReservationId: _ar, audioStartedAt: _ast, audioFinishedAt: _af,
     generationState: _gs, generationToken: _gt, generationLeaseToken: _glt, generationReservationId: _gr, generationStartedAt: _gst, generationFinishedAt: _gf, outboxId: _oid, outputKind: _ok, ...common } = job;
-  return { ...common, createdAt: now, recordType: 'outbox', outboxId: id, outputFingerprint: outboxFingerprint(job, text, purpose, actions), outputKind: job.catalogId === 'audio_fallback' ? 'audio_fallback' : job.catalogId ? 'catalog' : 'generated', menuPurpose: purpose, menuVersion: 1, menuActions: actions, consumedByEventId: null, consumedAt: null, status: 'prepared', sendToken: null, sendClaimedAt: null, sendStartedAt: null, sendFinishedAt: null, providerId: null, sendReservationId: null, deliveryStatus: 'unobserved', deliveryFailed: false, deliveryObservedAt: null, bodyState: 'body_present', content: encryptPlatformWhatsAppContent({ customerPhone, text }, 'platformWhatsAppOutbox/' + id, getPlatformWhatsAppConfig().contentKey) };
+  return { ...common, createdAt: now, recordType: 'outbox', outboxId: id, outputFingerprint: outboxFingerprint(job, text, purpose, actions), outputKind: job.kind === 'operator_notification' ? 'operator_notification' : job.catalogId === 'audio_fallback' ? 'audio_fallback' : job.catalogId ? 'catalog' : 'generated', menuPurpose: purpose, menuVersion: 1, menuActions: actions, consumedByEventId: null, consumedAt: null, status: 'prepared', sendToken: null, sendClaimedAt: null, sendStartedAt: null, sendFinishedAt: null, providerId: null, sendReservationId: null, deliveryStatus: 'unobserved', deliveryFailed: false, deliveryObservedAt: null, bodyState: 'body_present', content: encryptPlatformWhatsAppContent({ customerPhone, text }, 'platformWhatsAppOutbox/' + id, getPlatformWhatsAppConfig().contentKey) };
 }
 export function stageReply(job: PlatformJob, outbox: PlatformOutbox, tx: Transaction, db: Database) {
   stageWork(tx, db, 'platformWhatsAppOutbox/' + outbox.outboxId, outbox);
@@ -74,7 +74,7 @@ export async function readOutboxPreparation(id: string, db: Database, now: numbe
 export async function readOutboxDispatchPreparation(id: string, db: Database, now: number) {
   const facts = await inspectOutboxPreparation(id, db, now);
   if (facts?.prepared) return { ...facts, prepared: facts.prepared };
-  if (facts?.job.kind === 'admin_query') await cancelUnauthorizedPrivateOutput(id, db, now);
+  if (facts && ['admin_query', 'operator_notification'].includes(facts.job.kind)) await cancelUnauthorizedPrivateOutput(id, db, now);
   return null;
 }
 export async function readAuthorizedOutbox(id: string, db: Database, now = Date.now()) {
@@ -113,7 +113,7 @@ export function createPlatformWorkStore(db: Database, clock: () => number = Date
             if (!authority || now >= deadline || consumed) {
               await terminateClaim(job, head?.recordType === 'control_head' ? head : null, consumed, tx, db, now); return null;
             }
-            const stage = job.catalogId ? 'send' : job.sourceKind === 'audio' && job.audioState !== 'completed' ? 'audio' : 'generation';
+            const stage = job.catalogId || job.kind === 'operator_notification' ? 'send' : job.sourceKind === 'audio' && job.audioState !== 'completed' ? 'audio' : 'generation';
             if (!await claimBudgetOpen(job, stage, tx, db, now)) { await terminateClaim(job, authority.head, consumed, tx, db, now); return null; }
             const updated: PlatformJob = { ...job, status: 'leased', processingStartedAt: job.processingStartedAt ?? now, processingDeadlineAt: deadline, leaseToken: token, leaseClaimedAt: now, leaseExpiresAt: Math.min(now + WORK_LEASE_MS, deadline), nextAttemptAt: Math.min(now + WORK_LEASE_MS, deadline) };
             stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, updated); return { jobId: job.jobId, epoch: job.epoch, token };
@@ -138,12 +138,12 @@ export function createPlatformWorkStore(db: Database, clock: () => number = Date
     },
     async saveReply(lease: Lease, text: string): Promise<{ outboxId: string }> {
       const now = clock(), p = await preparedLease(lease, db, now); if (!p || !workText(text, 'reply')) throw platformWhatsAppConflictError();
-      const id = p.job.outboxId ?? randomUUID(), outbox = prepareOutbox(p.job, p.prepared.payload.customerPhone, text, id, now);
+      const id = p.job.outboxId ?? p.job.supportNotification?.outboxId ?? randomUUID(), outbox = prepareOutbox(p.job, p.prepared.payload.customerPhone, text, id, now);
       return db.runTransaction(async tx => {
         const j = await readWork(tx, db, 'platformWhatsAppJobs/' + lease.jobId);
         if (j?.recordType !== 'job' || !liveLease(j, lease, now) || !await readWorkAuthority(j, p.prepared, tx, db, now)) throw platformWhatsAppConflictError();
         if (j.outboxId) { const saved = await readWork(tx, db, 'platformWhatsAppOutbox/' + j.outboxId); if (saved?.recordType !== 'outbox' || saved.outputFingerprint !== outboxFingerprint(j, text, saved.menuPurpose, saved.menuActions)) throw platformWhatsAppConflictError(); return { outboxId: j.outboxId }; }
-        if (!j.catalogId || text !== workCatalog[j.catalogId].text || j.generationState !== 'not_applicable' || j.catalogId !== p.job.catalogId || j.epoch !== p.job.epoch) throw platformWhatsAppConflictError();
+        if ((j.kind === 'operator_notification' ? !j.supportNotification || text !== supportNotificationText(j.supportNotification) : !j.catalogId || text !== workCatalog[j.catalogId].text) || j.generationState !== 'not_applicable' || j.catalogId !== p.job.catalogId || j.epoch !== p.job.epoch) throw platformWhatsAppConflictError();
         stageReply(j, outbox, tx, db); return { outboxId: id };
       });
     },
@@ -175,7 +175,7 @@ export function createPlatformWorkStore(db: Database, clock: () => number = Date
         const authority = p ? await readWorkAuthority(j, p.prepared, tx, db, now) : null;
         const costs = await readPlatformSettlement(o.sendReservationId, tx, db), head = authority?.head ?? await readWork(tx, db, 'platformWhatsAppJobs/head_' + j.conversationId);
         const current = !!authority && o.status !== 'cancelled' && j.status === 'reply_saved' && j.processingDeadlineAt !== null && now < j.processingDeadlineAt;
-        const acceptedHead = current && result.status === 'accepted' ? { ...authority!.head, currentMenuOutboxId: outboxId } : head;
+        const acceptedHead = current && result.status === 'accepted' && j.kind !== 'operator_notification' ? { ...authority!.head, currentMenuOutboxId: outboxId } : head;
         const advance = acceptedHead?.recordType === 'control_head' && acceptedHead.headJobId === j.jobId && acceptedHead.controlEpoch === j.controlEpoch && acceptedHead.controlRevision === j.controlRevision ? await prepareHeadAdvance(acceptedHead, j, tx, db, now) : null;
         const aliasPath = result.status === 'accepted' ? providerAliasPath(o, result.providerId) : null;
         const alias = aliasPath ? await readWork(tx, db, aliasPath) : null;
@@ -209,7 +209,7 @@ export async function takePlatformSendPermit(outboxId: string, token: string, db
     if (!facts.call || facts.call.reservationId !== o.sendReservationId || facts.call.status !== 'reserved') return null;
     if (!stagePlatformCostStart(facts, token, tx, db, now)) return null;
     stageWork(tx, db, 'platformWhatsAppOutbox/' + outboxId, { ...o, status: 'started', sendStartedAt: now });
-    return { to: payload.customerPhone, text: payload.text!, buttons: createPlatformMenu(outboxId, o.menuPurpose), externalId: outboxId };
+    return { to: payload.customerPhone, text: payload.text!, buttons: j.kind === 'operator_notification' ? [] : createPlatformMenu(outboxId, o.menuPurpose), externalId: outboxId };
   });
 }
 export async function takePlatformGenerationPermit(lease: Lease, db: Database, now = Date.now(), quote?: GenerationQuote) {
@@ -264,13 +264,13 @@ export async function cancelUnauthorizedPrivateOutput(outboxId: string, db: Data
   const initial = await db.runTransaction(async tx => {
     const outbox = await readWork(tx, db, 'platformWhatsAppOutbox/' + outboxId);
     const job = outbox?.recordType === 'outbox' ? await readWork(tx, db, 'platformWhatsAppJobs/' + outbox.jobId) : null;
-    return outbox?.recordType === 'outbox' && job?.recordType === 'job' && job.kind === 'admin_query' && outboxMatchesJob(outbox, job) ? { job, outbox } : null;
+    return outbox?.recordType === 'outbox' && job?.recordType === 'job' && ['admin_query', 'operator_notification'].includes(job.kind) && outboxMatchesJob(outbox, job) ? { job, outbox } : null;
   });
   if (!initial || !['prepared', 'claimed'].includes(initial.outbox.status)) return;
   const prepared = await prepareWorkIdentity(initial.job, db, now);
   await db.runTransaction(async tx => {
     const [job, outbox] = await Promise.all([readWork(tx, db, 'platformWhatsAppJobs/' + initial.job.jobId), readWork(tx, db, 'platformWhatsAppOutbox/' + outboxId)]);
-    if (job?.recordType !== 'job' || job.kind !== 'admin_query' || job.epoch !== initial.job.epoch || outbox?.recordType !== 'outbox' || !outboxMatchesJob(outbox, job) || !['prepared', 'claimed'].includes(outbox.status)) return;
+    if (job?.recordType !== 'job' || !['admin_query', 'operator_notification'].includes(job.kind) || job.epoch !== initial.job.epoch || outbox?.recordType !== 'outbox' || !outboxMatchesJob(outbox, job) || !['prepared', 'claimed'].includes(outbox.status)) return;
     if (prepared && await readWorkAuthority(job, prepared, tx, db, now)) return;
     const head = await readWork(tx, db, 'platformWhatsAppJobs/head_' + job.conversationId);
     const advance = head?.recordType === 'control_head' && head.headJobId === job.jobId && head.controlEpoch === job.controlEpoch && head.controlRevision === job.controlRevision ? await prepareHeadAdvance(head, job, tx, db, now) : null;

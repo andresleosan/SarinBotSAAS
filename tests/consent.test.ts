@@ -177,7 +177,7 @@ describe('independent platform support consent', () => {
   });
   it('offers a separate platform decision without a business or profile', async () => {
     const { db, rows } = setup();
-    await expect(readConsent(user.uid, support, undefined, db)).resolves.toMatchObject({ active: false, revision: 0, receipt: null, documents: { version: '2026-10-18.2', scope: 'platform_support', business: null } });
+    await expect(readConsent(user.uid, support, undefined, db)).resolves.toMatchObject({ active: false, revision: 0, receipt: null, documents: { version: '2026-10-21.1', scope: 'platform_support', business: null } });
     expect([...rows.keys()]).toEqual(['businesses/shop']);
   });
   it.each(['missing', 'revoked', 'obsolete'] as const)('blocks support acceptance with %s account consent before writes', async state => {

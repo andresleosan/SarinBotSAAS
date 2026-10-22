@@ -1,4 +1,5 @@
 import { isAdminPaymentRecord } from '../../shared/admin-payment-actions.ts';
+import { isSupportRecord, isSupportRecipient } from '../../shared/platform-support-records.ts';
 import type { DataCommand, DataRead, DataReadResult, DataCommitResult, DataRecord } from '../../shared/data-protocol.ts';
 import { isDataJson, isDataPath } from '../../shared/data-protocol.ts';
 import { SINGLETON_NAME } from './router.ts';
@@ -9,7 +10,7 @@ const MAX_READ = 1000;
 const REPLAY_MS = 24 * 60 * 60 * 1000;
 const encoder = new TextEncoder();
 const fields: Record<string, 'string' | 'number' | 'boolean'> = {
-  jobId: 'string', outboxId: 'string', conversationId: 'string',
+  jobId: 'string', outboxId: 'string', conversationId: 'string', recordType: 'string', sequence: 'number',
   ownerUid: 'string', 'client.uid': 'string', dateKey: 'string', resourceId: 'string', status: 'string', type: 'string', tenantId: 'string', businessId: 'string', phoneNumberId: 'string', state: 'string', bodyState: 'string', id: 'string', appointmentId: 'string',
   createdAt: 'number', updatedAt: 'number', submittedAt: 'number', startsAt: 'number', startAt: 'number', nextAttemptAt: 'number', bodyExpiresAt: 'number', expiresAt: 'number', enabled: 'boolean',
 };
@@ -73,7 +74,7 @@ function validateCommand(command: unknown): asserts command is DataCommand {
   for (const write of command.writes) {
     if (!object(write)) throw invalid();
     path(write.path, true);
-    if (write.op === 'delete') { keys(write, ['op', 'path']); if (write.path === 'adminPaymentActions/key_marker') throw invalid(); continue; }
+    if (write.op === 'delete') { keys(write, ['op', 'path']); if (['adminPaymentActions/key_marker', 'platformSupportConversations/key_marker'].includes(write.path)) throw invalid(); continue; }
     if (typeof write.op !== 'string' || !['set', 'create'].includes(write.op)) throw invalid();
     keys(write, write.op === 'set' ? ['op', 'path', 'data', 'merge'] : ['op', 'path', 'data']);
     if (!object(write.data) || !isDataJson(write.data) || (write.merge !== undefined && typeof write.merge !== 'boolean')) throw invalid();
@@ -84,6 +85,8 @@ function validateCommand(command: unknown): asserts command is DataCommand {
       logo(write.data.logoDataUrl);
     }
     if (write.path.startsWith('adminPaymentActions/') && (write.merge || !isAdminPaymentRecord(write.path, write.data))) throw invalid();
+    if (/^platformSupport(?:Conversations|Messages)\//.test(write.path) && (write.merge || !isSupportRecord(write.path, write.data))) throw invalid();
+    if (write.path === 'platformSettings/platform_support_recipient' && (write.merge || !isSupportRecipient(write.data))) throw invalid();
   }
 }
 function validate(command: unknown): asserts command is DataCommand {

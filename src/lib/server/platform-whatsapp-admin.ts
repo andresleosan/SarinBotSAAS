@@ -12,6 +12,7 @@ import { prepareWorkIdentity, readWorkAuthority, workActor } from './platform-wh
 import { readAdminCopilotSnapshot } from './admin-copilot';
 import { listPlatformWhatsAppConversations } from './platform-whatsapp-conversations';
 import { answerBoundPlatformAdmin, platformAdminDatabase } from './platform-support-bot';
+import { listSupportConversations } from './platform-support';
 
 const denied = () => new HttpError(403, 'La administracion privada no esta autorizada.', 'PLATFORM_ADMIN_DENIED');
 /** Current Firebase is prepared outside the supplied database transaction; D1 rechecks exact durable facts. */
@@ -48,8 +49,12 @@ export async function readPlatformAdminContext(actor: PlatformActor, db: Databas
   await assertPlatformSuperadmin(actor, db);
   const inbox = await listPlatformWhatsAppConversations(db);
   await assertPlatformSuperadmin(actor, db);
-  return { snapshot, menu: { payments: snapshot.metrics.pendingPayments, support: inbox.conversations.filter(c => c.contentAvailable).length,
-    health: `Registros consultados; pagos ${snapshot.coverage.paymentsTruncated ? 'truncados' : 'sin truncamiento observado'}; negocios ${snapshot.coverage.businessesTruncated ? 'truncados' : 'sin truncamiento observado'}; cupos no disponibles: ${snapshot.coverage.allowancesUnavailable}; soporte ${inbox.truncated ? 'truncado o no disponible' : 'sin truncamiento observado'}. Conexion observada recientemente; no acredita salud del motor. Solo bandeja WhatsApp vigente.` } };
+  let web = 0, webCoverage = 'no disponible';
+  try { const page = await listSupportConversations({ uid: actor.uid, role: 'admin' }, null, db); web = page.conversations.length; webCoverage = page.hasMore ? 'truncada a una página' : 'sin truncamiento observado'; }
+  catch (e) { if (!(e instanceof HttpError) || e.status !== 503) throw e; }
+  await assertPlatformSuperadmin(actor, db);
+  return { snapshot, menu: { payments: snapshot.metrics.pendingPayments, support: inbox.conversations.filter(c => c.contentAvailable).length + web,
+    health: `Registros consultados; pagos ${snapshot.coverage.paymentsTruncated ? 'truncados' : 'sin truncamiento observado'}; negocios ${snapshot.coverage.businessesTruncated ? 'truncados' : 'sin truncamiento observado'}; cupos no disponibles: ${snapshot.coverage.allowancesUnavailable}; soporte WhatsApp ${inbox.truncated ? 'truncado o no disponible' : 'sin truncamiento observado'}; consultas web vigentes ${web}, cobertura ${webCoverage}. Conexion observada recientemente; no acredita salud del motor. Conteos consultados, no totales ni no leídos.` } };
 }
 
 /** Approved application origin; only server-owned protected source paths. */

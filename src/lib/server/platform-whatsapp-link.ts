@@ -358,6 +358,25 @@ export interface AudioRetentionIdentity {
   support: ConsentAnchor;
   conversationId: string;
 }
+/** Web configuration selects only the caller's own link; no recipient phone is returned. */
+async function ownRecipientLink(uid: string, tx: Transaction, db: Database, now: number): Promise<AudioRetentionIdentity | null> {
+  const config = configuration(); if (!config || await readMarkerState(tx, db, config) !== 'matching') return null;
+  const owner = await ownerLookup(tx, db, uid), facts = await readOwner(tx, db, owner, now);
+  if (!owner || owner.uidIndex !== config.digest('link-uid-v1', [uid]) || !samePlatformWhatsAppScope(owner, config.scope) || !facts.current) return null;
+  const consent = await anchors(tx, db, uid), link = facts.current;
+  if (!sameAnchors(link, consent)) return null;
+  return { uid, confirmedAuthTime: link.confirmedAuthTime, linkId: owner.currentLinkId!, linkRevision: link.revision, conversationId: link.conversationId, ...consent };
+}
+export async function preparePlatformSupportRecipientLink(user: DecodedIdToken, db: Database, now: number): Promise<AudioRetentionIdentity | null> {
+  await webUser(user, now, false);
+  const prepared = await db.runTransaction(tx => ownRecipientLink(user.uid, tx, db, now));
+  if (prepared) checkCutoff(await currentUser(user.uid), authTime(prepared.confirmedAuthTime, now, false));
+  return prepared;
+}
+export async function readPlatformSupportRecipientLink(prepared: AudioRetentionIdentity, tx: Transaction, db: Database, now: number): Promise<AudioRetentionIdentity | null> {
+  const current = await ownRecipientLink(prepared.uid, tx, db, now);
+  return current && JSON.stringify(current) === JSON.stringify(prepared) ? current : null;
+}
 async function audioRetentionFacts(customerPhone: string, scope: PlatformWhatsAppScope, tx: Transaction, db: Database, config: Config, now: number): Promise<AudioRetentionIdentity | null> {
   if (!samePlatformWhatsAppScope(config.scope, scope) || !PLATFORM_PHONE_PATTERN.test(customerPhone) || customerPhone === scope.phoneE164) return null;
   const marker = await readMarkerState(tx, db, config);

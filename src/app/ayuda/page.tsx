@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { SarinBrand } from "@/components/sarin-brand";
 import { sarinContact, sarinWhatsAppUrl } from "@/lib/sarin-contact";
@@ -55,7 +55,7 @@ export default function HelpPage() {
             <p className="mt-2">La atención automatizada por WhatsApp todavía no está activa ni disponible para contratar. Que un negocio muestre un teléfono o un enlace de contacto no significa que tenga un bot conectado a WhatsApp.</p>
           </section>
           <section aria-labelledby="soporte">
-            <h2 id="soporte" className="text-lg font-semibold">Soporte y consultas sobre datos</h2>
+            <h2 id="soporte" className="text-lg font-semibold">Soporte y consultas sobre datos</h2><p><Link href="/soporte" className={linkClass}>Abrir soporte privado de SarinBot</Link></p>
             <p className="mt-2">Contacta a Andrés Santiago · SarinBot en:</p>
             <p><a href={sarinWhatsAppUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className={`inline-flex min-h-11 max-w-full items-center py-2 ${linkClass}`}>WhatsApp de SarinBot: {sarinContact.displayPhone}</a></p>
             <a href="mailto:alsdevstudio@alsdevstudio.com" className={`inline-block min-h-11 break-all py-2 ${linkClass}`}>alsdevstudio@alsdevstudio.com</a>

@@ -1,7 +1,7 @@
 import 'server-only';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { Database } from '@/lib/storage/types';
-import { isPlatformOutbox, workCatalog, WORK_RENEW_MS, type Lease, type PlatformJob } from '../../../shared/platform-whatsapp-work';
+import { isPlatformOutbox, workCatalog, supportNotificationText, WORK_RENEW_MS, type Lease, type PlatformJob } from '../../../shared/platform-whatsapp-work';
 import { getPlatformWhatsAppConfig } from './platform-whatsapp-config';
 import { createPlatformWorkStore, readOutboxDispatchPreparation, readAuthorizedOutbox, takePlatformSendPermit, cancelUnauthorizedPrivateOutput } from './platform-whatsapp-work-store';
 import { transcribePlatformAudio } from './platform-whatsapp-audio';
@@ -49,20 +49,20 @@ async function sendOutbox(id: string, db: Database, parentSignal?: AbortSignal):
     const config = getPlatformWhatsAppConfig(); if (!enabled() || !config.scope || !config.sendEnabled) return;
     const client = createPlatformYCloudClient({ scope: config.scope, apiKey: process.env.PLATFORM_YCLOUD_API_KEY ?? '', sendEnabled: config.sendEnabled });
     const claim = initial.outbox.status === 'claimed' && initial.outbox.sendToken ? { token: initial.outbox.sendToken } : await store.claimSend(id);
-    if (!claim) { if (initial.job.kind === 'admin_query') await cancelUnauthorizedPrivateOutput(id, db); return; }
+    if (!claim) { if (['admin_query', 'operator_notification'].includes(initial.job.kind)) await cancelUnauthorizedPrivateOutput(id, db); return; }
     signal.throwIfAborted();
     const permit = await takePlatformSendPermit(id, claim.token, db);
-    if (!permit) { if (initial.job.kind === 'admin_query') await cancelUnauthorizedPrivateOutput(id, db); return; }
+    if (!permit) { if (['admin_query', 'operator_notification'].includes(initial.job.kind)) await cancelUnauthorizedPrivateOutput(id, db); return; }
     signal.throwIfAborted();
     let result: Awaited<ReturnType<typeof client.sendButtons>>;
-    try { result = await cancelled(client.sendButtons({ ...permit, signal }), signal); } catch { result = { status: 'unknown' }; }
+    try { result = await cancelled(initial.job.kind === 'operator_notification' ? client.sendText({ ...permit, signal }) : client.sendButtons({ ...permit, signal }), signal); } catch { result = { status: 'unknown' }; }
     await store.finishSend(id, claim.token, result);
-  } finally { clearTimeout(deadline); state().owned.delete(key); if (initial.job.kind === 'admin_query') await cancelUnauthorizedPrivateOutput(id, db); }
+  } finally { clearTimeout(deadline); state().owned.delete(key); if (['admin_query', 'operator_notification'].includes(initial.job.kind)) await cancelUnauthorizedPrivateOutput(id, db); }
 }
 export async function processPlatformWhatsAppWork(lease: Lease, callerSignal?: AbortSignal): Promise<void> {
   if (!enabled()) return;
   const db = getAdminDb(), store = createPlatformWorkStore(db);
-  const job = await store.readAuthorized(lease); if (!job || job.processingDeadlineAt === null || job.kind === 'operator_notification') return;
+  const job = await store.readAuthorized(lease); if (!job || job.processingDeadlineAt === null) return;
   const key = 'job:' + job.jobId; if (state().owned.has(key)) return;
   const controller = new AbortController(), signal = AbortSignal.any([controller.signal, ...callerSignal ? [callerSignal] : []]);
   state().owned.set(key, { controller, job, db, lease });
@@ -72,7 +72,8 @@ export async function processPlatformWhatsAppWork(lease: Lease, callerSignal?: A
   try {
     let outboxId: string | null = job.outboxId;
     signal.throwIfAborted();
-    if (job.catalogId) outboxId = (await store.saveReply(lease, workCatalog[job.catalogId].text)).outboxId;
+    if (job.kind === 'operator_notification' && job.supportNotification) outboxId = (await store.saveReply(lease, supportNotificationText(job.supportNotification))).outboxId;
+    else if (job.catalogId) outboxId = (await store.saveReply(lease, workCatalog[job.catalogId].text)).outboxId;
     else {
       if (job.sourceKind === 'audio' && job.audioState !== 'completed') {
         if (process.env.PLATFORM_WHATSAPP_TRANSCRIPTION_ENABLED !== 'true') return;
