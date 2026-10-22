@@ -42,5 +42,12 @@ test('actual local Workerd WebCrypto decrypts Node ciphertext and matches the sc
   const value={text:'Consulta ñ 😀',nested:{n:1}},parts=['111111','+12025550000','222222','+12025550100'];
   const invoke=p=>mf.dispatchFetch('http://synthetic-crypto.test/',{method:'POST',body:JSON.stringify({envelope:encrypt(value),path,key,parts,...p})});
   const response=await invoke({});assert.equal(response.status,200);assert.deepEqual(await response.json(),{value,digest:await platformWorkerDigest('conversation',parts,key)});
+  const exactLimitValue={text:'x'.repeat(250000-Buffer.byteLength(JSON.stringify({text:''}),'utf8'))};
+  assert.equal(Buffer.byteLength(JSON.stringify(exactLimitValue),'utf8'),250000);
+  const exactLimitResponse=await invoke({envelope:encrypt(exactLimitValue)});
+  assert.equal(exactLimitResponse.status,200);assert.deepEqual(await exactLimitResponse.json(),{value:exactLimitValue,digest:await platformWorkerDigest('conversation',parts,key)});
+  const overLimitValue={text:'x'.repeat(250001-Buffer.byteLength(JSON.stringify({text:''}),'utf8'))};
+  assert.equal(Buffer.byteLength(JSON.stringify(overLimitValue),'utf8'),250001);
+  assert.equal((await invoke({envelope:encrypt(overLimitValue)})).status,400);
   assert.equal((await invoke({path:path+'wrong'})).status,400);assert.equal((await invoke({key:Buffer.alloc(32,12).toString('base64')})).status,400);
 });
