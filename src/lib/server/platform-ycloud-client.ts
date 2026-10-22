@@ -53,7 +53,9 @@ export function createPlatformYCloudClient(config: { scope: PlatformWhatsAppScop
       // A proven negative fences the revision even when optional removal metadata is incomplete.
       if (accountRemoved || phoneDisconnected) return { connected: false, observedAt };
       if (['removedTime', 'removedReason', 'removedInitiatedBy'].some(k => account[k] !== undefined || phone[k] !== undefined)) throw unavailable();
-      if (phone.status !== 'CONNECTED' || phone.updateEvent !== undefined && phone.updateEvent !== 'ACCOUNT_RECONNECTED' || account.accountReviewStatus !== 'APPROVED' || account.banState !== 'REINSTATE' || account.paymentMethodAttached !== true || !Array.isArray(account.restrictions) || account.restrictions.length) throw unavailable();
+      // Authenticated GET responses omit optional event metadata on the current API.
+      if (phone.status !== 'CONNECTED' || phone.updateEvent !== undefined && phone.updateEvent !== 'ACCOUNT_RECONNECTED' || account.accountReviewStatus !== 'APPROVED' || account.paymentMethodAttached !== true) throw unavailable();
+      if (account.banState !== undefined && account.banState !== 'REINSTATE' || account.restrictions !== undefined && (!Array.isArray(account.restrictions) || account.restrictions.length)) throw unavailable();
       return { connected: true, observedAt };
     },
     async sendButtons(input: { to: string; text: string; buttons: Array<{ id: string; title: string }>; externalId: string; signal: AbortSignal }): Promise<DeliveryResult> {

@@ -14,6 +14,10 @@ it('observes exactly two fixed own-scope resources and uses local start time', a
   expect(fetcher.mock.calls.map(c => c[0])).toEqual(['https://api.ycloud.com/v2/whatsapp/businessAccounts/' + identity.wabaId, 'https://api.ycloud.com/v2/whatsapp/phoneNumbers/' + identity.wabaId + '/' + encodeURIComponent(identity.phoneE164)]);
   expect(fetcher.mock.calls.every(c => c[1].redirect === 'error' && c[1].headers['X-API-Key'] === 'synthetic-key')).toBe(true);
 });
+it('accepts current authenticated GET readiness when optional event-only fields are absent', async () => {
+  fetcher.mockResolvedValueOnce(Response.json({ id: identity.wabaId, accountReviewStatus: 'APPROVED', paymentMethodAttached: true })).mockResolvedValueOnce(Response.json(phone));
+  expect(await client().readAccountConnection()).toEqual({ connected: true, observedAt: now });
+});
 it.each([{ status: 'DISCONNECTED' }, { updateEvent: 'ACCOUNT_OFFBOARDED' }])('distinguishes proven disconnect %j', async change => {
   fetcher.mockResolvedValueOnce(Response.json(account)).mockResolvedValueOnce(Response.json({ ...phone, ...change }));
   expect(await client().readAccountConnection()).toEqual({ connected: false, observedAt: now });
@@ -35,7 +39,7 @@ it.each([{ id: 'foreign' }, { status: 'UNKNOWN' }, { updateEvent: 'UNKNOWN' }, {
   fetcher.mockResolvedValueOnce(Response.json(account)).mockResolvedValueOnce(Response.json({ ...phone, ...change }));
   await expect(client().readAccountConnection()).rejects.toMatchObject({ code: 'PLATFORM_PROVIDER_UNKNOWN' });
 });
-it.each([{ paymentMethodAttached: false }, { restrictions: undefined }, { banState: 'UNKNOWN' }, { accountReviewStatus: 'PENDING' }])('closes positive readiness for %j', async change => {
+it.each([{ paymentMethodAttached: false }, { restrictions: null }, { restrictions: ['restricted'] }, { banState: 'UNKNOWN' }, { accountReviewStatus: 'PENDING' }])('closes positive readiness for %j', async change => {
   fetcher.mockResolvedValueOnce(Response.json({ ...account, ...change })).mockResolvedValueOnce(Response.json(phone));
   await expect(client().readAccountConnection()).rejects.toMatchObject({ code: 'PLATFORM_PROVIDER_UNKNOWN' });
 });
