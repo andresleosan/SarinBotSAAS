@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sarinWhatsAppUrl } from '../src/lib/sarin-contact.ts';
 
 const output = fileURLToPath(new URL('../landing/out/', import.meta.url));
 const html = await readFile(join(output, 'index.html'), 'utf8');
@@ -28,7 +29,7 @@ for (const link of anchors) {
     assert.ok(entry || ['/ayuda', '/privacidad'].includes(url.pathname), 'Only approved application entry and information routes may be linked.');
     if (entry) applicationLinks.push(url.pathname);
   } else {
-    assert.equal(url.href, 'https://www.alsdevstudio.com/', 'An unapproved external destination was exported.');
+    assert.ok(url.href === 'https://www.alsdevstudio.com/' || url.href === sarinWhatsAppUrl, 'An unapproved external destination was exported.');
   }
 }
 if (applicationLinks.length) {
