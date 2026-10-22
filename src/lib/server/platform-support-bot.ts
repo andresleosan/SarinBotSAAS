@@ -94,7 +94,9 @@ async function generate(actor: PlatformActor, question: string, signal: AbortSig
       if (snapshot) {
         platformOutput = 'admin_contract';
         const validated = validateAdminCopilotAnswer(message, snapshot, 'deepseek');
-        if (validated.reply.length > 320) { platformOutput = 'admin_channel_length'; throw platformWhatsAppConflictError(); }
+        // Reserve transport capacity against the final text below, including trusted references.
+        // The prompt's brevity target must not reject a valid reply that fits that envelope.
+        if (!workText(validated.reply, 'reply')) { platformOutput = 'admin_channel_length'; throw platformWhatsAppConflictError(); }
         if (validated.sources.length > 2) { platformOutput = 'admin_channel_sources'; throw platformWhatsAppConflictError(); }
         answer = validated;
       } else {

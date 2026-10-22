@@ -39,7 +39,7 @@ it('generates the private consulted payment answer through the once capability a
 });
 
 it('records the channel length rejection without retaining model text or retrying generation', async () => {
-  const s = await privateScenario(), reply = 'Respuesta sintética extensa. '.repeat(15);
+  const s = await privateScenario(), reply = 'x'.repeat(1025);
   const fetcher = vi.fn().mockResolvedValue(response({ reply, sourceIds: ['payment-demo-payment'] })); vi.stubGlobal('fetch', fetcher);
   await expect(runPlatformSupportWork(s.lease, s.db, new AbortController().signal)).rejects.toThrow();
   const observations = [...s.rows.entries()].filter(([path]) => path.startsWith('aiUsageCalls/'));
@@ -49,6 +49,30 @@ it('records the channel length rejection without retaining model text or retryin
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect([...s.rows.values()].find(r => isBudgetCall(r) && r.stage === 'generation')).toMatchObject({ status: 'settled', actualMicros: 8 });
   expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(0);
+});
+
+it('delivers a verified reply above 320 characters when the complete WhatsApp envelope fits', async () => {
+  const s = await privateScenario(), reply = 'Consulta sintética con información verificada. '.repeat(9);
+  expect(reply.length).toBeGreaterThan(320);
+  const fetcher = vi.fn().mockResolvedValue(response({ reply, sourceIds: ['payment-demo-payment'] })); vi.stubGlobal('fetch', fetcher);
+  await runPlatformSupportWork(s.lease, s.db, new AbortController().signal);
+  const out = [...s.rows.values()].find(r => isPlatformOutbox(r) && r.outputKind === 'generated')!;
+  const text = workPayload(out as never, now)!.text!;
+  expect(text).toContain(reply.trim());
+  expect(text).toContain('https://sarinbotsaas.pages.dev/admin?focusPayment=demo-payment');
+  expect(text.length).toBeLessThanOrEqual(1024);
+  expect(Buffer.byteLength(text, 'utf8')).toBeLessThanOrEqual(4096);
+  expect([...s.rows.values()].find(r => isBudgetCall(r) && r.stage === 'generation')).toMatchObject({ status: 'settled', actualMicros: 8 });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it('rejects an oversized complete WhatsApp envelope even when the model reply alone fits', async () => {
+  const s = await privateScenario(), reply = 'x'.repeat(1000);
+  const fetcher = vi.fn().mockResolvedValue(response({ reply, sourceIds: ['payment-demo-payment'] })); vi.stubGlobal('fetch', fetcher);
+  await expect(runPlatformSupportWork(s.lease, s.db, new AbortController().signal)).rejects.toThrow();
+  expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(0);
+  expect([...s.rows.entries()].find(([path]) => path.startsWith('aiUsageCalls/'))![1]).toMatchObject({ platformOutput: 'channel_envelope' });
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it.each(['foreign', 'disabled', 'deleted', 'cutoff', 'role'] as const)('denies current %s private identity before a private snapshot', async loss => {
   const s = await privateScenario(), job = (await s.work.readAuthorized(s.lease))!;
@@ -130,7 +154,7 @@ it.each([
   { reply: 'Pago', sourceIds: ['payment-foreign'] },
   { reply: 'Pago', sourceIds: [], tool: 'reviewPayment' },
   { reply: 'Pago', sourceIds: [], action: 'approve' },
-  { reply: 'x'.repeat(321), sourceIds: [] },
+  { reply: 'x'.repeat(1025), sourceIds: [] },
 ])('rejects forged private response and accounts usage once: %j', async value => {
   const s = await privateScenario(), fetcher = vi.fn().mockResolvedValue(response(value)); vi.stubGlobal('fetch', fetcher);
   await expect(runPlatformSupportWork(s.lease, s.db, new AbortController().signal)).rejects.toThrow();
