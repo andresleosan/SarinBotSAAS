@@ -65,8 +65,8 @@ export async function prepareSupportRecipientIdentity(db: Database, at: number) 
     const link = (await tx.get(db.collection('platformWhatsAppLinks').doc('link_' + config.linkId))).data();
     if (link !== undefined && !isPlatformWhatsAppLinkRecord(link)) throw supportUnavailable();
     if (!isPlatformWhatsAppLinkRecord(link) || link.status !== 'active' || link.revision !== config.linkRevision || link.validUntil <= at) return null;
-    // One bounded exact-scope source lookup, never an address book or reconstructed HMAC phone.
-    const rows = await tx.get(db.collection('platformWhatsAppEvents').where('recordType', '==', 'event').where('conversationId', '==', link.conversationId).where('state', '==', 'body_present').orderBy('bodyExpiresAt', 'desc').limit(1));
+    // Select original text evidence within the query: newer retained audio is not notice authority.
+    const rows = await tx.get(db.collection('platformWhatsAppEvents').where('recordType', '==', 'event').where('kind', '==', 'incoming_text').where('conversationId', '==', link.conversationId).where('state', '==', 'body_present').orderBy('bodyExpiresAt', 'desc').limit(1));
     const row = rows.docs[0]; if (!row) return null; const source = row.data(), path = 'platformWhatsAppEvents/' + row.id;
     if (!isPlatformWhatsAppEventRecord(source) || !/^event_[a-f0-9]{64}$/.test(row.id) || source.conversationId !== link.conversationId) throw supportUnavailable();
     const phone = supportNotificationSourcePhone(source, path, at); return phone ? { source, path, phone } : null;

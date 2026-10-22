@@ -20,6 +20,7 @@ import { preparePlatformAudio } from '../cloudflare/tests/platform-whatsapp-work
 import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config';
 import { createPlatformWorkStore, takePlatformSendPermit } from '@/lib/server/platform-whatsapp-work-store';
 import { supportNotificationText } from '../shared/platform-whatsapp-work';
+import { ingestPlatformWhatsAppEvent } from '@/lib/server/platform-whatsapp-ingress';
 let runtime: Awaited<ReturnType<typeof createDataTestRuntime>>, db: Database, second: Database;
 const transport: DataTransport = async command => { const response = await runtime.fetch(command), value = await response.json(); if (!response.ok) throw new StorageError(response.status, value.code); return value; };
 beforeAll(async () => { runtime = await createDataTestRuntime(); }, 30000);
@@ -33,8 +34,26 @@ async function configured() {
   vi.stubEnv('SUPERADMIN_UID', 'demo-link-user'); const s = await buildSupportScenario(); await seed(s.rows);
   const link = (await readPlatformWhatsAppLinkStatus(token(), db)).current!;
   await configurePlatformSupportRecipient(token(), { linkId: link.linkId, expectedRevision: 0, requestId: randomUUID() }, db);
-  return { thread: await createSupportConversation(actor.uid, randomUUID(), db), work: createPlatformWorkStore(db) };
+  return { thread: await createSupportConversation(actor.uid, randomUUID(), db), work: createPlatformWorkStore(db), event: s.event };
 }
+it.each(['open', 'closed'] as const)('newer retained audio cannot shadow or renew the original text window (%s) on real D1', async window => {
+  const s = await configured(), later = now + (window === 'open' ? 1000 : 86_400_000);
+  vi.spyOn(Date, 'now').mockReturnValue(later);
+  const connection = db.collection('serverSettings').doc('platform_whatsapp');
+  await connection.set({ ...(await connection.get()).data()!, observedAt: later, updatedAt: later });
+  const { text: _text, ...base } = s.event();
+  await ingestPlatformWhatsAppEvent({ ...base, kind: 'incoming_audio', occurredAt: later, customerSentAt: later, audio: { id: '123456789', link: 'https://api.ycloud.com/v2/whatsapp/media/download/123456789', sha256: Buffer.alloc(32, 7).toString('base64'), mimeType: 'audio/ogg; codecs=opus' } }, getPlatformWhatsAppConfig(), db, later);
+  const audio = (await db.collection('platformWhatsAppEvents').get()).docs.find(d => d.data().kind === 'incoming_audio')!.data();
+  expect(audio).toMatchObject({ state: 'body_present', ingressDisposition: 'descriptor_retained', receivedAt: later });
+  const message = await appendSupportMessage(actor, s.thread.id, { requestId: randomUUID(), expectedRevision: 0, text: 'private web question' }, db);
+  expect((await readSupportMessages(actor, s.thread.id, null, db)).notificationStates).toEqual([{ messageId: message.id, state: window === 'open' ? 'pending' : 'blocked' }]);
+  const notice = (await db.collection('platformWhatsAppJobs').get()).docs.find(d => d.data().kind === 'operator_notification')?.data();
+  if (window === 'closed') expect(notice).toBeUndefined();
+  else {
+    expect(notice).toMatchObject({ sourceKind: 'text', sourceReceivedAt: now, customerSentAt: now, windowExpiresAt: now + 86_400_000, bodyExpiresAt: now + 86_400_000 });
+    expect((await db.collection('platformWhatsAppEvents').doc(notice!.sourceEventId).get()).data()).toMatchObject({ kind: 'incoming_text', state: 'body_present' });
+  }
+});
 it.each(['valid-old', 'malformed'] as const)('real Node and Worker classify %s support documents without historical rewrite', async mode => {
   const s = await buildWorkAudioScenario(); await seed(s.rows);
   const key = consentStateKey('demo-link-user', 'platform_support'), current = (await db.collection('serverSettings').doc(key).get()).data()!, receipt = (await db.collection('serverSettings').doc(current.receiptId).get()).data()!;

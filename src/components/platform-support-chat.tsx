@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { ConsentPanel, useAccountConsent } from '@/components/consent-panel';
 import { useConsent, type ConsentController } from '@/hooks/useConsent';
@@ -69,10 +69,26 @@ function permission(controller: ConsentController, uid: string, kind: 'account' 
   if (!controller.active || controller.loading || controller.error || controller.withdrawalRequested || !status || !receipt || receipt.uid !== uid || receipt.scope !== kind || receipt.action !== 'accept' || !receipt.termsAccepted || !receipt.dataAuthorized || receipt.revision !== status.revision || receipt.documents.fingerprint !== status.documents.fingerprint || receipt.documents.version !== version || status.documents.version !== version) return null;
   return [status.revision, status.documents.fingerprint, receipt.requestId, receipt.occurredAt, receipt.documents.version];
 }
-type Context = { scope: string; uid: string; admin: boolean; current: () => boolean; fail: () => void };
+type Context = { scope: string; uid: string; admin: boolean; current: () => boolean; capture: () => () => boolean; fail: () => void };
+// Each effect setup owns a generation. A later setup cannot revive its promises.
+function useLifetime() {
+  const lifetime = useRef({ active: true, generation: 0 });
+  useLayoutEffect(() => {
+    const generation = ++lifetime.current.generation; lifetime.current.active = true;
+    return () => { if (lifetime.current.generation === generation) lifetime.current.active = false; };
+  }, []);
+  return {
+    current: () => lifetime.current.active,
+    capture: () => { const generation = lifetime.current.generation; return () => lifetime.current.active && lifetime.current.generation === generation; },
+  };
+}
+function captureContext(context: Context): Context {
+  const current = context.capture(); return { ...context, current, capture: () => current };
+}
 function endpoint(admin: boolean) { return admin ? '/api/admin/platform-support' : '/api/platform-support'; }
 function check(context: Context, signal?: AbortSignal) { if (!context.current() || signal?.aborted) throw new Error('Lectura obsoleta.'); }
 async function read<T>(context: Context, path: string, signal: AbortSignal): Promise<T> {
+  context = captureContext(context);
   const result = await apiFetch<T>(path, { signal }, context.uid, () => context.current() && !signal.aborted);
   check(context, signal); return result;
 }
@@ -83,6 +99,7 @@ function useExpiry(action: () => void, deadlines: number[]) {
 }
 
 export function PlatformSupportChat({ admin = false, initialThread = null }: { admin?: boolean; initialThread?: string | null }) {
+  const lifetime = useLifetime();
   const auth = useAuth(), account = useAccountConsent(), support = useConsent(auth.user?.uid, 'platform_support');
   const [visibility, setVisibility] = useState({ active: typeof document === 'undefined' || document.visibilityState !== 'hidden', epoch: 0 });
   const visibilityRef = useRef(visibility); visibilityRef.current = visibility;
@@ -94,11 +111,12 @@ export function PlatformSupportChat({ admin = false, initialThread = null }: { a
     const reset = (active: boolean) => { const next = { active, epoch: visibilityRef.current.epoch + 1 }; visibilityRef.current = next; setVisibility(next); };
     const blur = () => reset(false), focus = () => reset(document.visibilityState !== 'hidden'), change = () => reset(document.visibilityState !== 'hidden');
     window.addEventListener('blur', blur); window.addEventListener('focus', focus); document.addEventListener('visibilitychange', change);
-    return () => { identity.current = null; window.removeEventListener('blur', blur); window.removeEventListener('focus', focus); document.removeEventListener('visibilitychange', change); };
+    return () => { window.removeEventListener('blur', blur); window.removeEventListener('focus', focus); document.removeEventListener('visibilitychange', change); };
   }, []);
   const active = scope && visibility.active && failed !== scope;
   const activeRef = useRef(Boolean(active)); activeRef.current = Boolean(active);
-  const context: Context | null = active ? { scope, uid: uid!, admin, current: () => activeRef.current && identity.current === scope && visibilityRef.current.active && visibilityRef.current.epoch === visibility.epoch && auth.isCurrentSession(uid!, auth.authEpoch), fail: () => { if (identity.current === scope) { identity.current = null; setFailed(scope); } } } : null;
+  const current = () => lifetime.current() && activeRef.current && identity.current === scope && visibilityRef.current.active && visibilityRef.current.epoch === visibility.epoch && auth.isCurrentSession(uid!, auth.authEpoch);
+  const context: Context | null = active ? { scope, uid: uid!, admin, current, capture: () => { const owns = lifetime.capture(); return () => owns() && current(); }, fail: () => { if (current()) { identity.current = null; setFailed(scope); } } } : null;
   return <div className="min-w-0 space-y-4 break-words">
     <p className="text-sm leading-6">Conversaciones privadas con el equipo de SarinBot. El texto permanece disponible hasta 24 horas; los controles del hilo, hasta 30 días. El texto web no se envía automáticamente a IA. No adjuntes comprobantes ni datos sensibles aquí.</p>
     <ConsentPanel controller={account} title="Permisos de cuenta" />
@@ -122,20 +140,21 @@ function SupportWorkspace({ context, initialThread }: { context: Context; initia
   useEffect(() => () => { createAbort.current?.abort(); createId.current = null; memory.current = { items: [], cursor: null, catchingUp: false }; }, []);
   const base = endpoint(context.admin);
   const poll = useApiPoll(context.scope, async signal => {
+    const captured = captureContext(context);
     let value = memory.current;
     const cursors = new Set(sweepCursors.current);
     try {
       for (let page = 0; page < 3; page++) {
         const cursor = value.cursor; if (cursor) { if (cursors.has(cursor)) throw invalid(); cursors.add(cursor); }
         const start = mono();
-        const result = await read<SupportConversationPage>(context, base + '/conversations' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''), signal);
-        check(context, signal);
+        const result = await read<SupportConversationPage>(captured, base + '/conversations' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''), signal);
+        check(captured, signal);
         if (result.hasMore && (!result.cursor || cursors.has(result.cursor))) throw invalid();
         value = mergeSupportList(value, result, start);
         if (!value.catchingUp) { cursors.clear(); break; }
       }
-      check(context, signal); memory.current = value; sweepCursors.current = cursors; return value;
-    } catch (cause) { if (context.current() && !signal.aborted) { memory.current = { items: [], cursor: null, catchingUp: false }; context.fail(); } throw cause; }
+      check(captured, signal); memory.current = value; sweepCursors.current = cursors; return value;
+    } catch (cause) { if (captured.current() && !signal.aborted) { memory.current = { items: [], cursor: null, catchingUp: false }; context.fail(); } throw cause; }
   }, { intervalMs: 5_000 });
   const live = poll.value?.items.filter(item => Date.now() < item.expiresAt && mono() < item.deadline) ?? [];
   useExpiry(() => {
@@ -149,15 +168,16 @@ function SupportWorkspace({ context, initialThread }: { context: Context; initia
   async function createConversation() {
     if (!context.current() || context.admin || createAbort.current || creation.review) return;
     const abort = createAbort.current = new AbortController();
+    const captured = captureContext(context);
     const requestId = createId.current ??= crypto.randomUUID();
     setCreation({ busy: true, uncertain: false, review: false, notice: '' });
     try {
-      const value = await apiFetch<{ id: string; revision: number }>(base + '/conversations', { method: 'POST', signal: abort.signal, body: JSON.stringify({ requestId }) }, context.uid, () => context.current() && !abort.signal.aborted);
-      check(context, abort.signal);
+      const value = await apiFetch<{ id: string; revision: number }>(base + '/conversations', { method: 'POST', signal: abort.signal, body: JSON.stringify({ requestId }) }, context.uid, () => captured.current() && !abort.signal.aborted);
+      check(captured, abort.signal);
       if (!uuid.test(value?.id) || !integer(value.revision)) throw invalid();
       createId.current = null; setSelected(value.id); setCreation({ busy: false, uncertain: false, review: false, notice: 'Conversación creada en la web.' }); poll.refresh();
     } catch (cause) {
-      if (!context.current() || abort.signal.aborted) return;
+      if (!captured.current() || abort.signal.aborted) return;
       if (cause instanceof ApiError && [401, 403, 428].includes(cause.status)) { context.fail(); return; }
       const conflict = cause instanceof ApiError && cause.status === 409;
       if (conflict) createId.current = null;
@@ -175,49 +195,73 @@ function SupportWorkspace({ context, initialThread }: { context: Context; initia
     <p className="text-sm text-sarin-muted">{poll.value?.catchingUp ? 'Poniendo la lista al día; cobertura parcial, continuaremos en cinco segundos.' : 'Hilos consultados en la última lectura. El recorrido vuelve a empezar al terminar.'} Orden por identificador; no indica mensajes sin leer ni actividad reciente.</p>
     {poll.value && !live.length && <p>No hay conversaciones vigentes en esta lectura.</p>}
     <ul aria-label="Conversaciones de soporte" className="space-y-2">{live.map(item => <li key={item.id}><button type="button" aria-pressed={selected === item.id} className={`${button} w-full break-all text-left`} onClick={() => { if (Date.now() < item.expiresAt && mono() < item.deadline) setSelected(item.id); }}>Conversación {item.id} · {new Date(item.createdAt).toLocaleDateString('es-CO')}</button></li>)}</ul>
-    {selected && <SupportThread key={context.scope + selected} context={{ ...context, current: () => context.current() && selection.current === selected }} thread={selected} />}
+    {selected && <SupportThread key={context.scope + selected} context={{ ...context, current: () => context.current() && selection.current === selected, capture: () => { const current = context.capture(); return () => current() && selection.current === selected; } }} thread={selected} />}
   </div>;
 }
 
 function SupportThread({ context, thread }: { context: Context; thread: string }) {
+  const lifetime = useLifetime();
   const memory = useRef(emptySupportMessages());
   const sweepCursors = useRef(new Set<string>());
+  const refreshSweep = useRef({ cursor: null as string | null, cursors: new Set<string>(), partial: false });
   const [draft, setDraft] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false);
   const [unseen, setUnseen] = useState(0), [clock, tick] = useState(0), [review, setReview] = useState(false);
   const textarea = useRef<HTMLTextAreaElement | null>(null), end = useRef<HTMLDivElement | null>(null);
   const operation = useRef<{ requestId: string; expectedRevision: number; digest: string } | null>(null);
-  const abortWrite = useRef<AbortController | null>(null), alive = useRef(true), generation = useRef(0);
-  const requestCurrent = () => alive.current && context.current();
+  const abortWrite = useRef<AbortController | null>(null), generation = useRef(0);
+  const focusAfterCommit = useRef<(() => boolean) | null>(null);
+  const requestCurrent = () => lifetime.current() && context.current();
+  const captureCurrent = () => { const own = lifetime.capture(), parent = context.capture(); return () => own() && parent(); };
   const path = endpoint(context.admin) + '/conversations/' + thread + '/messages';
-  useEffect(() => () => { alive.current = false; generation.current++; abortWrite.current?.abort(); operation.current = null; memory.current = emptySupportMessages(); }, []);
+  useEffect(() => () => { generation.current++; abortWrite.current?.abort(); abortWrite.current = null; operation.current = null; focusAfterCommit.current = null; memory.current = emptySupportMessages(); sweepCursors.current.clear(); refreshSweep.current = { cursor: null, cursors: new Set(), partial: false }; }, []);
   const poll = useApiPoll(context.scope + thread, async signal => {
     let value = expireSupportMessages(memory.current);
-    const cursors = new Set(sweepCursors.current), version = generation.current;
-    const valid = () => requestCurrent() && !signal.aborted && generation.current === version;
+    const cursors = new Set(sweepCursors.current), version = generation.current, owns = captureCurrent();
+    const refresh = { ...refreshSweep.current, cursors: new Set(refreshSweep.current.cursors) };
+    const valid = () => owns() && !signal.aborted && generation.current === version;
     try {
       const before = value.items.length;
-      for (let page = 0; page < 3; page++) {
+      // Reserve one page for new messages and two for a finite reread of existing facts.
+      {
         const cursor = value.cursor; if (cursor) { if (cursors.has(cursor)) throw invalid(); cursors.add(cursor); }
         const start = mono();
         const result = await apiFetch<SupportPage>(path + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''), { signal }, context.uid, valid);
         if (!valid()) throw invalid();
         if (result.hasMore && (!result.cursor || cursors.has(result.cursor))) throw invalid();
         value = mergeSupportPage(value, result, start);
-        if (!value.catchingUp) { cursors.clear(); break; }
+        if (!value.catchingUp) cursors.clear();
+      }
+      for (let page = 0; value.items.length && page < 2; page++) {
+        const cursor = refresh.cursor;
+        if (cursor) { if (refresh.cursors.has(cursor)) throw invalid(); refresh.cursors.add(cursor); }
+        const start = mono();
+        const result = await apiFetch<SupportPage>(path + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''), { signal }, context.uid, valid);
+        if (!valid()) throw invalid();
+        if (result.hasMore && (!result.cursor || refresh.cursors.has(result.cursor))) throw invalid();
+        const incremental = { cursor: value.cursor, catchingUp: value.catchingUp, revision: value.revision };
+        value = mergeSupportPage(value, result, start);
+        value = { ...value, ...incremental, revision: Math.max(incremental.revision, result.revision) };
+        refresh.cursor = result.hasMore ? result.cursor : null; refresh.partial = result.hasMore;
+        if (!result.hasMore) { refresh.cursors.clear(); break; }
       }
       if (!valid()) throw invalid();
       value = expireSupportMessages(value);
-      memory.current = value; sweepCursors.current = cursors;
+      memory.current = value; sweepCursors.current = cursors; refreshSweep.current = refresh;
       setUnseen(count => count + Math.max(0, value.items.length - before));
       return value;
     } catch (cause) { if (valid()) { memory.current = emptySupportMessages(); operation.current = null; setDraft(''); setNotice(''); context.fail(); } throw cause; }
   }, { intervalMs: 5_000 });
   const value = expireSupportMessages(poll.value ?? emptySupportMessages());
+  useEffect(() => {
+    if (busy || review || !focusAfterCommit.current) return;
+    const current = focusAfterCommit.current; focusAfterCommit.current = null;
+    if (current()) textarea.current?.focus();
+  }, [busy, review, notice]);
   useExpiry(() => { const expired = expireSupportMessages(memory.current); if (expired.items.some((item, index) => item.text !== memory.current.items[index]?.text)) { memory.current = expired; poll.setValue(current => current && expireSupportMessages(current), { invalidate: false }); } tick(clock + 1); }, value.items.filter(item => item.text !== null).map(item => item.deadline));
   async function send() {
     if (!requestCurrent() || abortWrite.current || busy || review || !poll.value || !draft.trim() || [...draft].length > 4096 || value.catchingUp) return;
-    const abort = abortWrite.current = new AbortController(), version = ++generation.current;
-    const current = () => requestCurrent() && !abort.signal.aborted && generation.current === version;
+    const abort = abortWrite.current = new AbortController(), version = ++generation.current, owns = captureCurrent();
+    const current = () => owns() && !abort.signal.aborted && generation.current === version;
     const text = draft;
     setBusy(true); setNotice('');
     poll.setValue(previous => previous);
@@ -230,10 +274,10 @@ function SupportThread({ context, thread }: { context: Context; thread: string }
       const result = await apiFetch<{ id: string; sequence: number; revision: number }>(path, { method: 'POST', signal: abort.signal, body: JSON.stringify({ requestId: op.requestId, expectedRevision: op.expectedRevision, text }) }, context.uid, current);
       if (!current()) return;
       if (!result || typeof result.id !== 'string' || !integer(result.sequence) || !integer(result.revision)) throw invalid();
-      operation.current = null; setDraft(''); setNotice('Mensaje confirmado en la web. El aviso de WhatsApp se consulta por separado.'); poll.refresh(); textarea.current?.focus();
+      operation.current = null; setDraft(''); setNotice('Mensaje confirmado en la web. El aviso de WhatsApp se consulta por separado.'); focusAfterCommit.current = current; poll.refresh();
     } catch (cause) {
       if (!current()) return;
-      memory.current = emptySupportMessages(); sweepCursors.current.clear(); poll.setValue(null); setDraft(''); setUnseen(0);
+      memory.current = emptySupportMessages(); sweepCursors.current.clear(); refreshSweep.current = { cursor: null, cursors: new Set(), partial: false }; focusAfterCommit.current = null; poll.setValue(null); setDraft(''); setUnseen(0);
       if (cause instanceof ApiError && [401, 403, 428].includes(cause.status)) { operation.current = null; context.fail(); return; }
       if (cause instanceof ApiError && cause.status === 409) { operation.current = null; setReview(true); setNotice('La conversación cambió. Actualiza y revisa la nueva lectura antes de escribir y enviar una nueva operación.'); }
       else { setNotice('Resultado incierto. Se borró el texto de esta vista. Consulta la conversación y, si necesitas reintentar, vuelve a escribir exactamente el mismo mensaje; se conservará su identificador de solicitud.'); }
@@ -245,6 +289,7 @@ function SupportThread({ context, thread }: { context: Context; thread: string }
     <h3 className="break-all font-semibold">Conversación {thread}</h3>
     {poll.loading && <p role="status">Consultando mensajes…</p>}
     {value.catchingUp && <p role="status">Poniendo los mensajes al día. Se leen hasta 300 por ciclo de cinco segundos.</p>}
+    {refreshSweep.current.partial && <p role="status">Actualizando los avisos de mensajes anteriores; el recorrido continúa en cinco segundos.</p>}
     {poll.value && !value.items.length && <p>Esta conversación todavía no tiene mensajes en la lectura actual.</p>}
     <p aria-live="polite" aria-atomic="true" className="text-sm">{unseen > 0 ? `${unseen} mensajes nuevos consultados.` : ''}</p>
     {unseen > 0 && <button type="button" className={button} onClick={() => { end.current?.focus(); end.current?.scrollIntoView({ block: 'nearest' }); setUnseen(0); }}>Ir a los mensajes nuevos</button>}
@@ -260,19 +305,22 @@ function SupportThread({ context, thread }: { context: Context; thread: string }
 }
 
 function SupportRecipient({ context }: { context: Context }) {
+  const lifetime = useLifetime();
   const [selected, setSelected] = useState(false), [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
-  const abort = useRef<AbortController | null>(null), alive = useRef(true);
+  const abort = useRef<AbortController | null>(null);
   const operation = useRef<{ linkId: string; expectedRevision: number; requestId: string } | null>(null);
-  const current = () => alive.current && context.current();
-  useEffect(() => () => { alive.current = false; abort.current?.abort(); operation.current = null; }, []);
+  const current = () => lifetime.current() && context.current();
+  const captureCurrent = () => { const own = lifetime.capture(), parent = context.capture(); return () => own() && parent(); };
+  useEffect(() => () => { abort.current?.abort(); abort.current = null; operation.current = null; }, []);
   const poll = useApiPoll(context.scope + ':recipient', async signal => {
+    const own = captureCurrent(), captured = { ...context, current: own, capture: () => own };
     try {
-      const config = await read<SupportRecipientView>(context, '/api/admin/platform-support/notifications', signal);
+      const config = await read<SupportRecipientView>(captured, '/api/admin/platform-support/notifications', signal);
       if (typeof config?.configured !== 'boolean' || !integer(config.revision) || !(config.expiresAt === null || integer(config.expiresAt))) throw invalid();
-      const link = await read<PlatformWhatsAppLinkStatus>(context, '/api/platform-whatsapp/link', signal);
+      const link = await read<PlatformWhatsAppLinkStatus>(captured, '/api/platform-whatsapp/link', signal);
       if (!link || !(link.current === null || uuid.test(link.current.linkId) && integer(link.current.revision) && integer(link.current.expiresAt) && /^••••[0-9]{4}$/.test(link.current.maskedPhone))) throw invalid();
       return { config, link: link.current };
-    } catch (cause) { if (current() && !signal.aborted) context.fail(); throw cause; }
+    } catch (cause) { if (own() && !signal.aborted) context.fail(); throw cause; }
   }, { intervalMs: 5_000 });
   const data = poll.value, link = data?.link && Date.now() < data.link.expiresAt ? data.link : null;
   const linkKey = link ? JSON.stringify([link.linkId, link.revision, link.expiresAt]) : null;
@@ -283,7 +331,7 @@ function SupportRecipient({ context }: { context: Context }) {
   async function configure() {
     if (!current() || !selected || !link || !data || abort.current) return;
     if (operation.current && operation.current.linkId !== link.linkId) { operation.current = null; setNotice('La vinculación cambió. Revísala y vuelve a seleccionarla.'); setSelected(false); return; }
-    const controller = abort.current = new AbortController(), own = () => current() && !controller.signal.aborted && latestLink.current === linkKey && Date.now() < link.expiresAt;
+    const controller = abort.current = new AbortController(), captured = captureCurrent(), own = () => captured() && !controller.signal.aborted && latestLink.current === linkKey && Date.now() < link.expiresAt;
     const op = operation.current ??= { linkId: link.linkId, expectedRevision: data.config.revision, requestId: crypto.randomUUID() };
     setBusy(true);
     try {
@@ -297,7 +345,7 @@ function SupportRecipient({ context }: { context: Context }) {
       if (cause instanceof ApiError && cause.status === 409) { operation.current = null; setSelected(false); poll.setValue(null); setNotice('La configuración cambió. Revisa la lectura actual y selecciona de nuevo antes de guardar.'); }
       else setNotice('Resultado incierto. Puedes reintentar explícitamente la misma selección.');
       poll.refresh();
-    } finally { if (abort.current === controller) abort.current = null; if (current()) setBusy(false); }
+    } finally { if (abort.current === controller) abort.current = null; if (captured() && !controller.signal.aborted) setBusy(false); }
   }
   if (!current()) return null;
   return <details className="space-y-3 rounded-lg border border-sarin-line p-3"><summary className="min-h-11 cursor-pointer">Avisos opcionales de WhatsApp al operador</summary>

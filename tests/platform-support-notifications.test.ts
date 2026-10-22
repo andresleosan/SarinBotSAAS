@@ -12,7 +12,7 @@ import { createSupportConversation, appendSupportMessage, readSupportMessages } 
 import { workPayload } from '@/lib/server/platform-whatsapp-work-authority';
 import { ingestPlatformWhatsAppEvent } from '@/lib/server/platform-whatsapp-ingress';
 import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config';
-import { createPlatformWorkStore, takePlatformSendPermit } from '@/lib/server/platform-whatsapp-work-store';
+import { createPlatformWorkStore, takePlatformSendPermit, recordPlatformDeliveryStatus, cancelUnauthorizedPrivateOutput } from '@/lib/server/platform-whatsapp-work-store';
 import { supportNotificationText } from '../shared/platform-whatsapp-work';
 import { processPlatformWhatsAppWork } from '@/lib/server/platform-whatsapp-worker';
 beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(now); firebase.getUser.mockReset().mockImplementation(async uid => ({ uid, disabled: false })); vi.stubEnv('SUPERADMIN_UID', 'demo-link-user'); vi.stubEnv('PLATFORM_SUPPORT_KEY', Buffer.alloc(32, 43).toString('base64')); });
@@ -46,6 +46,28 @@ async function scenario() {
   await configurePlatformSupportRecipient(token(), { linkId: link.linkId, expectedRevision: 0, requestId: randomUUID() }, s.db);
   return { ...s, thread: await createSupportConversation('demo-web', randomUUID(), s.db), actor: { uid: 'demo-web', role: 'customer' as const } };
 }
+it.each(['delivered', 'cancelled'] as const)('rereads the same existing message to observe real notice transition to %s without an append', async terminal => {
+  const s = await scenario();
+  const message = await appendSupportMessage(s.actor, s.thread.id, { requestId: randomUUID(), expectedRevision: 0, text: 'same message' }, s.db);
+  const reread = async () => {
+    const page = await readSupportMessages(s.actor, s.thread.id, null, s.db);
+    expect(page.messages.map(m => m.id)).toEqual([message.id]); expect(page.revision).toBe(1);
+    return page.notificationStates;
+  };
+  expect(await reread()).toEqual([{ messageId: message.id, state: 'pending' }]);
+  const lease = (await s.work.claimNext())!, job = (await s.work.readAuthorized(lease))!, out = await s.work.saveReply(lease, supportNotificationText(job.supportNotification!));
+  if (terminal === 'delivered') {
+    const claim = (await s.work.claimSend(out.outboxId))!;
+    await takePlatformSendPermit(out.outboxId, claim.token, s.db);
+    await s.work.finishSend(out.outboxId, claim.token, { status: 'accepted', providerId: 'synthetic-fix1-provider' });
+    expect(await reread()).toEqual([{ messageId: message.id, state: 'accepted' }]);
+    await recordPlatformDeliveryStatus({ provider: 'ycloud', eventId: 'synthetic-fix1-delivery', occurredAt: now, messageId: 'synthetic-fix1-provider', whatsappMessageId: null, kind: 'message_status', sourceEventType: 'whatsapp.message.updated', status: 'delivered', suppliedScope: { wabaId: getPlatformWhatsAppConfig().scope!.wabaId, externalId: out.outboxId } }, s.db, now);
+  } else {
+    await seedConsents(s.db, 'demo-link-user', 2, false);
+    await cancelUnauthorizedPrivateOutput(out.outboxId, s.db, now);
+  }
+  expect(await reread()).toEqual([{ messageId: message.id, state: terminal }]);
+});
 it.each(['source-erased', 'window-closed', 'budget-zero', 'role-lost', 'disabled'] as const)('stores terminal blocked for %s and never revives old messages after a new inbound', async mode => {
   const s = await scenario();
   if (mode === 'source-erased') for (const [path, row] of s.rows) if (row.recordType === 'event' && row.kind === 'incoming_text') s.seed(path, { ...row, state: 'body_erased', content: null });

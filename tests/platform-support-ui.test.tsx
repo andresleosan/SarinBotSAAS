@@ -30,9 +30,9 @@ let requests: Array<{ path: string; init: RequestInit }>, handler: (path: string
 const focus = vi.fn(), scroll = vi.fn();
 const response = (data: unknown, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => data });
 async function settle() { for (let n = 0; n < 30; n++) await Promise.resolve(); await new Promise<void>(resolve => setImmediate(resolve)); for (let n = 0; n < 30; n++) await Promise.resolve(); }
-async function mount(props: { admin?: boolean; initialThread?: string | null } = {}) {
+async function mount(props: { admin?: boolean; initialThread?: string | null } = {}, strict = false) {
   let tree!: ReactTestRenderer;
-  await act(async () => { tree = create(<PlatformSupportChat {...props} />, { createNodeMock: () => ({ focus, scrollIntoView: scroll }) }); await settle(); });
+  await act(async () => { tree = create(strict ? <React.StrictMode><PlatformSupportChat {...props} /></React.StrictMode> : <PlatformSupportChat {...props} />, { createNodeMock: () => ({ focus, scrollIntoView: scroll }) }); await settle(); });
   trees.push(tree); return tree;
 }
 const output = (tree: ReactTestRenderer) => JSON.stringify(tree.toJSON());
@@ -49,7 +49,7 @@ beforeEach(() => {
   fixture.firebase.currentUser = { uid: 'alice', getIdToken: async () => 'synthetic-token' };
   fixture.auth = { user: fixture.firebase.currentUser, loading: false, signingOut: false, authEpoch: 1, isSuperadmin: false, isCurrentSession: (uid: string, epoch: number) => uid === fixture.firebase.currentUser?.uid && epoch === fixture.auth.authEpoch };
   fixture.account = consent('account'); fixture.support = consent('platform_support');
-  trees = []; requests = []; focus.mockClear(); scroll.mockClear();
+  trees = []; requests = []; focus.mockReset(); scroll.mockClear();
   handler = path => path.endsWith('/messages') || path.includes('/messages?') ? response(page()) : path.endsWith('/notifications') ? response({ configured: false, revision: 0, expiresAt: null }) : path.endsWith('/link') ? response({ available: true, current: { linkId: id(7), revision: 1, expiresAt: now + 60_000, maskedPhone: '••••1234' }, pending: null, revokeGeneration: id(8) }) : response({ conversations: [conversation(1)], cursor: null, hasMore: false, observedAt: Date.now() });
   vi.stubGlobal('fetch', async (path: string, init: RequestInit) => { requests.push({ path, init }); return handler(path, init); });
 });
@@ -90,6 +90,90 @@ describe('private support entry and page merging', () => {
 });
 
 describe('authenticated incremental support UI', () => {
+  it('refreshes existing notification facts without another message or visibility reset', async () => {
+    let state: SupportPage['notificationStates'][number]['state'] = 'pending';
+    handler = path => path.includes('/messages') ? response(path.includes('?cursor=') ? page([], 'follow') : { ...page(), notificationStates: [{ messageId: 'message-1', state }] }) : response({ conversations: [], cursor: null, hasMore: false, observedAt: Date.now() });
+    const tree = await mount({ initialThread: id(1) });
+    expect(output(tree)).toContain('Pendiente');
+    for (const [next, label] of [['accepted', 'Aceptado por el proveedor'], ['delivered', 'Entregado'], ['cancelled', 'Cancelado']] as const) {
+      state = next; await advance(5000); expect(output(tree)).toContain(label);
+      expect(tree.root.findByProps({ 'aria-label': 'Mensajes consultados' }).findAllByType('li')).toHaveLength(1);
+    }
+  });
+  it('keeps reads, explicit sends and own recipient configuration usable after StrictMode replay', async () => {
+    fixture.auth.isSuperadmin = true; const original = handler;
+    handler = (path, init) => init.method === 'POST' ? response({ id: 'sent', sequence: 2, revision: 2 }) : init.method === 'PATCH' ? response({ revision: 1 }) : original(path, init);
+    const tree = await mount({ admin: true, initialThread: id(1) }, true);
+    expect(output(tree)).toContain('contenido privado sintético');
+    await draft(tree, 'strict send'); await click(tree, 'Enviar mensaje');
+    expect(output(tree)).toContain('Mensaje confirmado en la web');
+    await act(async () => tree.root.findByType('input').props.onChange({ target: { checked: true } }));
+    await click(tree, 'Guardar mi vinculación como destinatario');
+    expect(output(tree)).toContain('Destinatario guardado');
+  });
+  it('focuses the confirmed composer only after its enabled commit', async () => {
+    const pending = deferred<unknown>(), original = handler;
+    handler = (path, init) => init.method === 'POST' ? pending.promise : original(path, init);
+    const tree = await mount({ initialThread: id(1) }); const enabledFocus = vi.fn();
+    focus.mockImplementation(() => { if (!tree.root.findByType('textarea').props.disabled) enabledFocus(); });
+    await draft(tree, 'focus after confirmed'); await click(tree, 'Enviar mensaje');
+    expect(tree.root.findByType('textarea').props.disabled).toBe(true);
+    await act(async () => { pending.resolve(response({ id: 'sent', sequence: 2, revision: 2 })); await settle(); });
+    expect(enabledFocus).toHaveBeenCalledTimes(1);
+    await advance(5000); expect(enabledFocus).toHaveBeenCalledTimes(1);
+  });
+  it('does not revive token requests owned by the first StrictMode effect setup', async () => {
+    const token = deferred<string>(); let tokens = 0;
+    fixture.auth.isSuperadmin = true;
+    fixture.firebase.currentUser.getIdToken = () => ++tokens <= 3 ? token.promise : Promise.resolve('current-synthetic-token');
+    const tree = await mount({ admin: true, initialThread: id(1) }, true);
+    expect(output(tree)).toContain('contenido privado sintético'); expect(tokens).toBeGreaterThan(3);
+    const before = requests.length;
+    await act(async () => { token.resolve('stale-synthetic-token'); await settle(); });
+    expect(requests).toHaveLength(before); expect(output(tree)).toContain('contenido privado sintético');
+  });
+  it.each(['token', 'response', 'json'])('ignores an older StrictMode session after delayed %s completion', async stage => {
+    fixture.auth.isSuperadmin = true;
+    const tree = await mount({ admin: true, initialThread: id(1) }, true);
+    const pending = deferred<any>(), original = handler;
+    if (stage === 'token') fixture.firebase.currentUser.getIdToken = () => pending.promise;
+    else handler = () => stage === 'response' ? pending.promise : { ...response(null), json: () => pending.promise };
+    await advance(5000);
+    fixture.auth.authEpoch++; fixture.firebase.currentUser.getIdToken = async () => 'new-synthetic-token'; handler = original;
+    await act(async () => { tree.update(<React.StrictMode><PlatformSupportChat admin initialThread={id(1)} /></React.StrictMode>); await settle(); });
+    expect(output(tree)).toContain('contenido privado sintético'); const before = requests.length;
+    await act(async () => { pending.resolve(stage === 'token' ? 'late-token' : stage === 'response' ? response(page([message(1, 'stale-body')])) : page([message(1, 'stale-body')])); await settle(); });
+    expect(output(tree)).not.toContain('stale-body'); expect(output(tree)).toContain('contenido privado sintético');
+    expect(requests).toHaveLength(before);
+  });
+  it.each(['message', 'recipient'])('suppresses an old %s write and finally while the current StrictMode session is busy', async kind => {
+    fixture.auth.isSuperadmin = true;
+    const oldWrite = deferred<unknown>(), newWrite = deferred<unknown>(), original = handler; let writes = 0;
+    handler = (path, init) => init.method === (kind === 'message' ? 'POST' : 'PATCH') ? (++writes === 1 ? oldWrite.promise : newWrite.promise) : original(path, init);
+    const tree = await mount({ admin: true, initialThread: id(1) }, true);
+    const send = async () => {
+      if (kind === 'message') { await draft(tree, 'current draft'); await click(tree, 'Enviar mensaje'); }
+      else { await act(async () => tree.root.findByType('input').props.onChange({ target: { checked: true } })); await click(tree, 'Guardar mi vinculación como destinatario'); }
+    };
+    await send(); fixture.auth.authEpoch++;
+    await act(async () => { tree.update(<React.StrictMode><PlatformSupportChat admin initialThread={id(1)} /></React.StrictMode>); await settle(); });
+    await send(); expect(writes).toBe(2);
+    await act(async () => { oldWrite.resolve(response(kind === 'message' ? { id: 'old', sequence: 2, revision: 2 } : { revision: 1 })); await settle(); });
+    expect(output(tree)).not.toContain(kind === 'message' ? 'Mensaje confirmado' : 'Destinatario guardado'); expect(focus).not.toHaveBeenCalled();
+    if (kind === 'message') { expect(tree.root.findByType('textarea').props.disabled).toBe(true); expect(tree.root.findByType('textarea').props.value).toBe('current draft'); }
+    else expect(named(tree, 'Reintentar la misma selección').props.disabled).toBe(true);
+    await act(async () => { newWrite.resolve(response(kind === 'message' ? { id: 'new', sequence: 2, revision: 2 } : { revision: 1 })); await settle(); });
+    expect(output(tree)).toContain(kind === 'message' ? 'Mensaje confirmado' : 'Destinatario guardado');
+    expect(focus).toHaveBeenCalledTimes(kind === 'message' ? 1 : 0);
+  });
+  it('refreshes facts without extending the original plaintext deadline or resurrecting expired stubs', async () => {
+    let state: SupportPage['notificationStates'][number]['state'] = 'pending';
+    handler = path => path.includes('/messages') ? response(path.includes('?cursor=') ? page([], 'follow') : { ...page([message(1, 'refresh ttl secret', 6000)]), observedAt: now, notificationStates: [{ messageId: 'message-1', state }] }) : response({ conversations: [], cursor: null, hasMore: false, observedAt: Date.now() });
+    const tree = await mount({ initialThread: id(1) }); state = 'accepted'; await advance(5000);
+    expect(output(tree)).toContain('refresh ttl secret'); expect(output(tree)).toContain('Aceptado por el proveedor');
+    vi.setSystemTime(now - 100_000); await advance(1000); expect(output(tree)).not.toContain('refresh ttl secret');
+    state = 'delivered'; await advance(4000); expect(output(tree)).toContain('Entregado'); expect(output(tree)).not.toContain('refresh ttl secret');
+  });
   it('reads selected messages without writes, separates WhatsApp state and preserves Enter newline', async () => {
     const tree = await mount({ initialThread: id(1) });
     expect(output(tree)).toContain('contenido privado sintético'); expect(output(tree)).toContain('Bloqueado:');
@@ -144,15 +228,22 @@ describe('authenticated incremental support UI', () => {
     handler = () => new Promise(() => {}); await advance(1000);
     expect(output(tree)).not.toContain('secret ttl'); expect(output(tree)).toContain('Texto vencido');
   });
-  it('drains at most 300 messages per cycle and continues with the retained cursor after five seconds', async () => {
-    let reads = 0;
+  it('reserves one incremental page and two refresh pages with independent progress beyond 300 rows', async () => {
+    const cursors: number[] = []; let delivered = false;
     handler = path => {
       if (!path.includes('/messages')) return response({ conversations: [], cursor: null, hasMore: false, observedAt: now });
-      const start = reads++ * 100; return response(page(Array.from({ length: 100 }, (_, n) => message(start + n + 1)), 'page' + reads, reads < 4));
+      const start = Number(new URL(path, 'https://synthetic.invalid').searchParams.get('cursor') ?? 0); cursors.push(start);
+      const messages = Array.from({ length: Math.min(100, 400 - start) }, (_, n) => message(start + n + 1));
+      return response({ ...page(messages, String(start + messages.length), start + messages.length < 400), notificationStates: messages.map(item => ({ messageId: item.id, state: delivered ? 'delivered' : 'pending' })) });
     };
-    const tree = await mount({ initialThread: id(1) }); expect(reads).toBe(3); expect(output(tree)).toContain('Poniendo los mensajes');
-    await advance(5000); expect(reads).toBe(4); expect(requests.filter(item => item.path.includes('/messages'))[3].path).toContain('cursor=page3');
+    const tree = await mount({ initialThread: id(1) }); expect(cursors).toEqual([0, 0, 100]); expect(output(tree)).toContain('Poniendo los mensajes');
+    await advance(5000); expect(cursors.slice(3)).toEqual([100, 200, 300]);
     expect(tree.root.findByProps({ 'aria-label': 'Mensajes consultados' }).findAllByType('li')).toHaveLength(400);
+    expect(output(tree)).toContain('Poniendo los mensajes'); // A terminal refresh cannot advance the incremental cursor.
+    delivered = true; await advance(5000); expect(cursors.slice(6)).toEqual([200, 0, 100]);
+    await advance(5000); expect(cursors.slice(9)).toEqual([300, 200, 300]);
+    expect(output(tree)).not.toContain('Poniendo los mensajes');
+    expect(tree.root.findByProps({ 'aria-label': 'Mensajes consultados' }).findAllByType('li').every(item => JSON.stringify(item.children.map(child => typeof child === 'string' ? child : child.props.children)).includes('Entregado'))).toBe(true);
   });
   it('retains a finite list cursor across cycles, restarts only at terminal and discovers lower/higher IDs next sweep', async () => {
     let reads = 0;
@@ -231,16 +322,20 @@ it('rejects a repeated cursor across separate bounded list cycles', async () => 
 
 it('rejects a repeated message cursor across separate bounded cycles', async () => {
   let reads = 0;
-  handler = path => path.includes('/messages') ? response(page([message(++reads)], ['a', 'b', 'c', 'a'][reads - 1], true)) : response({ conversations: [], cursor: null, hasMore: false, observedAt: now });
+  handler = path => {
+    if (!path.includes('/messages')) return response({ conversations: [], cursor: null, hasMore: false, observedAt: now });
+    reads++; const cursor = new URL(path, 'https://synthetic.invalid').searchParams.get('cursor');
+    return response(page([message()], cursor === 'a' ? 'b' : cursor === 'b' ? 'c' : 'a', true));
+  };
   const tree = await mount({ initialThread: id(1) }); expect(reads).toBe(3);
-  await advance(5000); expect(reads).toBe(4); expect(output(tree)).toContain('No se pudo comprobar el soporte');
+  await advance(5000); expect(reads).toBe(6); expect(output(tree)).toContain('No se pudo comprobar el soporte');
 });
 
 it('keeps the five-second read schedule when a local message expiry erases plaintext', async () => {
   let reads = 0;
   handler = path => path.includes('/messages') ? (reads++, response(page([message(1, reads === 1 ? 'expires first' : null, 1000)]))) : response({ conversations: [], cursor: null, hasMore: false, observedAt: now });
   await mount({ initialThread: id(1) });
-  await advance(5000); expect(reads).toBe(2);
+  await advance(5000); expect(reads).toBe(4);
 });
 
 it('erases expired list metadata and cannot resurrect it when the wall clock moves back', async () => {
