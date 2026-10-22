@@ -50,7 +50,11 @@ describe('platform domain on the real local Worker D1 fixture', () => {
     }
     expect(isDataPath('platformWhatsAppOther/demo', true)).toBe(false);
     expect(isDataPath('platformWhatsAppEvents/../demo', true)).toBe(false);
-    await expect(db.collection('platformWhatsAppEvents').where('recordType', '==', 'event').get()).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await db.collection('platformWhatsAppEvents').doc('demo').set({ recordType: 'event', kind: 'incoming_text', updatedAt: 2, phoneNumberId: scope.phoneNumberId });
+    expect((await db.collection('platformWhatsAppEvents').where('recordType', '==', 'event').where('kind', '==', 'incoming_text').limit(1).get()).docs.map(doc => doc.id)).toEqual(['demo']);
+    await expect(db.collection('platformWhatsAppEvents').where('privateSender', '==', 'synthetic').get()).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(db.collection('platformWhatsAppEvents').where('recordType', '==', 1).get()).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(db.collection('platformWhatsAppEvents').where('kind', '==', 1).get()).rejects.toMatchObject({ code: 'DATA_INVALID' });
     await expect(db.collection('platformWhatsAppEvents').where('updatedAt', '==', '2').get()).rejects.toMatchObject({ code: 'DATA_INVALID' });
   });
   it('filters and orders updatedAt numerically with a strict explicit bound', async () => {

@@ -155,7 +155,7 @@ function SupportWorkspace({ context, initialThread }: { context: Context; initia
       }
       check(captured, signal); memory.current = value; sweepCursors.current = cursors; return value;
     } catch (cause) { if (captured.current() && !signal.aborted) { memory.current = { items: [], cursor: null, catchingUp: false }; context.fail(); } throw cause; }
-  }, { intervalMs: 5_000 });
+  }, { intervalMs: 5_000, abortOnBlur: true, waitForPending: true, clearOnError: true });
   const live = poll.value?.items.filter(item => Date.now() < item.expiresAt && mono() < item.deadline) ?? [];
   useExpiry(() => {
     const retained = memory.current.items.filter(item => Date.now() < item.expiresAt && mono() < item.deadline);
@@ -250,7 +250,7 @@ function SupportThread({ context, thread }: { context: Context; thread: string }
       setUnseen(count => count + Math.max(0, value.items.length - before));
       return value;
     } catch (cause) { if (valid()) { memory.current = emptySupportMessages(); operation.current = null; setDraft(''); setNotice(''); context.fail(); } throw cause; }
-  }, { intervalMs: 5_000 });
+  }, { intervalMs: 5_000, abortOnBlur: true, waitForPending: true, clearOnError: true });
   const value = expireSupportMessages(poll.value ?? emptySupportMessages());
   useEffect(() => {
     if (busy || review || !focusAfterCommit.current) return;
@@ -321,7 +321,7 @@ function SupportRecipient({ context }: { context: Context }) {
       if (!link || !(link.current === null || uuid.test(link.current.linkId) && integer(link.current.revision) && integer(link.current.expiresAt) && /^••••[0-9]{4}$/.test(link.current.maskedPhone))) throw invalid();
       return { config, link: link.current };
     } catch (cause) { if (own() && !signal.aborted) context.fail(); throw cause; }
-  }, { intervalMs: 5_000 });
+  }, { intervalMs: 5_000, abortOnBlur: true, waitForPending: true, clearOnError: true });
   const data = poll.value, link = data?.link && Date.now() < data.link.expiresAt ? data.link : null;
   const linkKey = link ? JSON.stringify([link.linkId, link.revision, link.expiresAt]) : null;
   const latestLink = useRef(linkKey); latestLink.current = linkKey;

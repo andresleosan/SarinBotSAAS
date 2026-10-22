@@ -14,6 +14,9 @@ vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: 
 vi.mock('@/components/admin-copilot', () => ({ AdminCopilot: () => createElement('div', null, 'Copilot fixture') }));
 vi.mock('@/components/admin-platform-whatsapp', () => ({ AdminPlatformWhatsApp: () => createElement('div', null, 'Reception fixture') }));
 vi.mock('@/components/admin-whatsapp-conversations', () => ({ AdminWhatsAppConversations: () => createElement('div', null, 'Tenant conversations fixture') }));
+// Preserve the actual page/AuthGate/owner-link flow while isolating unrelated sibling workspaces.
+vi.mock('@/components/admin-payment-confirmation', () => ({ AdminPaymentConfirmation: () => null }));
+vi.mock('@/components/admin-platform-support', () => ({ AdminPlatformSupport: () => null }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let h: ReturnType<typeof createLinkHarness>;
 beforeEach(() => { firebase.user = null; firebase.listener = null; h = createLinkHarness(firebase); vi.mocked(reauthenticateWithPopup).mockReset().mockImplementation(async () => ({ user: h.user } as never)); vi.mocked(signOut).mockReset().mockImplementation(async () => { firebase.user = null; await firebase.listener?.(null); }); });

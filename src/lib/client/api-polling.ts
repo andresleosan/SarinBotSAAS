@@ -1,10 +1,11 @@
 ﻿"use client";
 
-export type ApiPollingOptions = { intervalMs?: number };
-/** One actual load at a time, including an abort that has not settled yet. */
+export type ApiPollingOptions = { intervalMs?: number; abortOnBlur?: boolean; waitForPending?: boolean };
+/** Active reads do not overlap. Strict consumers also wait for aborted reads to settle. */
 export function startApiPolling<T>(load: (signal: AbortSignal) => Promise<T>, onValue: (value: T) => void, onError: (error: unknown) => void, options: ApiPollingOptions = {}) {
   const interval = options.intervalMs === 5_000 ? 5_000 : 15_000;
-  let stopped = false, generation = 0, running = false, queued = false;
+  let stopped = false, generation = 0, queued = false;
+  let running: AbortController | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let controller: AbortController | undefined;
   const page = typeof document === 'undefined' ? undefined : document;
@@ -18,9 +19,8 @@ export function startApiPolling<T>(load: (signal: AbortSignal) => Promise<T>, on
   }
   function run() {
     if (stopped || !visible()) return;
-    if (running) { queued = true; return; }
-    running = true;
-    const current = generation, request = controller = new AbortController();
+    if (running && (options.waitForPending || !running.signal.aborted)) { queued = true; return; }
+    const current = generation, request = running = controller = new AbortController();
     void (async () => {
       try {
         const value = await load(request.signal);
@@ -28,10 +28,13 @@ export function startApiPolling<T>(load: (signal: AbortSignal) => Promise<T>, on
       } catch (error) {
         if (!stopped && current === generation && !request.signal.aborted) onError(error);
       } finally {
-        running = false;
-        if (!stopped && visible()) {
-          if (queued) { queued = false; run(); }
-          else if (current === generation) timer = setTimeout(refresh, interval);
+        // An invalidated default read may finish after its replacement. It owns no timer or queue.
+        if (running === request) {
+          running = undefined;
+          if (!stopped && visible()) {
+            if (queued) { queued = false; run(); }
+            else if (current === generation) timer = setTimeout(refresh, interval);
+          }
         }
       }
     })();
@@ -42,7 +45,7 @@ export function startApiPolling<T>(load: (signal: AbortSignal) => Promise<T>, on
   const blur = () => { focused = false; interrupt(); };
   page?.addEventListener?.('visibilitychange', visibility);
   browser?.addEventListener?.('focus', focus);
-  browser?.addEventListener?.('blur', blur);
+  if (options.abortOnBlur) browser?.addEventListener?.('blur', blur);
   refresh();
   return {
     refresh,
@@ -51,7 +54,7 @@ export function startApiPolling<T>(load: (signal: AbortSignal) => Promise<T>, on
       stopped = true; interrupt();
       page?.removeEventListener?.('visibilitychange', visibility);
       browser?.removeEventListener?.('focus', focus);
-      browser?.removeEventListener?.('blur', blur);
+      if (options.abortOnBlur) browser?.removeEventListener?.('blur', blur);
     },
   };
 }

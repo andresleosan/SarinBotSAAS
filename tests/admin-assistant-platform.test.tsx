@@ -14,6 +14,9 @@ vi.mock('@/components/app-shell', () => ({ AppShell: ({ admin, children }: { adm
 vi.mock('@/components/admin-copilot', () => ({ AdminCopilot: ({ onBusinessesChange }: { onBusinessesChange: (businesses: AdminCopilotBusiness[]) => void }) => createElement('button', { onClick: () => onBusinessesChange([{ id: 'synthetic-business', name: 'Synthetic' } as AdminCopilotBusiness]) }, 'Copilot') }));
 vi.mock('@/components/admin-platform-whatsapp', () => ({ AdminPlatformWhatsApp: ({ scope }: { scope: string | null }) => createElement('section', { 'data-platform': scope ?? 'signed-out' }, 'Platform') }));
 vi.mock('@/components/platform-whatsapp-link', () => ({ PlatformWhatsAppLink: () => createElement('div', { 'data-owner-link': true }, 'Owner link') }));
+// These sibling workspaces have their own integration suites; keep this page test on placement and UID state.
+vi.mock('@/components/admin-payment-confirmation', () => ({ AdminPaymentConfirmation: () => null }));
+vi.mock('@/components/admin-platform-support', () => ({ AdminPlatformSupport: () => null }));
 vi.mock('@/components/admin-whatsapp-conversations', () => ({ AdminWhatsAppConversations: ({ businesses }: { businesses: AdminCopilotBusiness[] }) => createElement('section', { 'data-businesses': businesses.map(value => value.id).join(',') }, 'Commercial') }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let renderer: ReactTestRenderer | undefined;
@@ -30,8 +33,10 @@ it('keeps admin boundaries, platform placement and exact SarinBot page copy', as
   expect(serialized.indexOf('Platform')).toBeLessThan(serialized.indexOf('Owner link'));
   expect(serialized.indexOf('Owner link')).toBeLessThan(serialized.indexOf('Commercial'));
   expect(serialized).toContain('Consulta con SarinBot, revisa los pendientes y decide quién atiende cada conversación.');
-  expect(renderer!.root.findByType('a').props.href).toBe('/admin');
-  expect(renderer!.root.findByType('a').children).toEqual(['Volver al control de SarinBot']);
+  const backLinks = renderer!.root.findAllByType('a').filter(node => node.children.join('') === 'Volver al control de SarinBot');
+  expect(backLinks).toHaveLength(1);
+  expect(backLinks[0].props.href).toBe('/admin');
+  expect(renderer!.root.findByProps({ href: '#soporte-web' }).children).toEqual(['Ir al soporte web privado']);
 });
 it('passes business state only to ordinary conversations and remounts it on UID/sign-out changes', async () => {
   await act(async () => { renderer = create(createElement(AdminAssistantPage)); });

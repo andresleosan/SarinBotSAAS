@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startApiPolling } from '@/lib/client/api-polling';
+import { createElement, act } from 'react';
+import { create } from 'react-test-renderer';
+import { useApiPoll } from '@/lib/client/use-api-poll';
+
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 describe('bounded visible API polling', () => {
   let page: EventTarget & { visibilityState: string };
@@ -93,6 +98,52 @@ describe('bounded visible API polling', () => {
     expect(load).toHaveBeenCalledTimes(2);
     polling.stop();
   });
+
+  it.each([false, true])('makes blur interruption explicit independently of the five-second interval: %s', async abortOnBlur => {
+    let finish!: (value: string) => void;
+    const load = vi.fn((signal: AbortSignal) => new Promise<string>(resolve => { finish = resolve; }));
+    const value = vi.fn(), poll = startApiPolling(load, value, vi.fn(), { intervalMs: 5_000, abortOnBlur });
+    windowEvents.dispatchEvent(new Event('blur'));
+    expect(load.mock.calls[0][0].aborted).toBe(abortOnBlur);
+    finish('completed'); await vi.advanceTimersByTimeAsync(0);
+    expect(value).toHaveBeenCalledTimes(abortOnBlur ? 0 : 1);
+    poll.stop();
+  });
+
+  it.each([false, true])('makes waiting for an aborted request explicit and ignores an old finally: %s', async waitForPending => {
+    const pending: Array<{ signal: AbortSignal; finish: (value: string) => void }> = [];
+    const load = vi.fn((signal: AbortSignal) => new Promise<string>(finish => pending.push({ signal, finish })));
+    const value = vi.fn(), poll = startApiPolling(load, value, vi.fn(), { waitForPending });
+    page.visibilityState = 'hidden'; page.dispatchEvent(new Event('visibilitychange'));
+    expect(pending[0].signal.aborted).toBe(true);
+    page.visibilityState = 'visible'; page.dispatchEvent(new Event('visibilitychange'));
+    expect(load).toHaveBeenCalledTimes(waitForPending ? 1 : 2);
+    if (waitForPending) { pending[0].finish('old'); await vi.advanceTimersByTimeAsync(0); }
+    else {
+      pending[0].finish('old'); await vi.advanceTimersByTimeAsync(15_000);
+      expect(load).toHaveBeenCalledTimes(2); expect(value).not.toHaveBeenCalled();
+    }
+    pending[1].finish('current'); await vi.advanceTimersByTimeAsync(0);
+    expect(value).toHaveBeenCalledExactlyOnceWith('current');
+    await vi.advanceTimersByTimeAsync(14_999); expect(load).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1); expect(load).toHaveBeenCalledTimes(3);
+    poll.stop(); pending[2].finish('stopped'); await vi.advanceTimersByTimeAsync(0);
+  });
+
+  it.each([false, true])('preserves a confirmed same-scope value unless clearOnError is explicit: %s', async clearOnError => {
+    const load = vi.fn().mockResolvedValueOnce('confirmed').mockRejectedValueOnce(Error('read failure')).mockResolvedValueOnce('recovered');
+    let state!: ReturnType<typeof useApiPoll<string>>;
+    function Consumer() { state = useApiPoll('same-scope', load, { clearOnError }); return createElement('span', null, state.value); }
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(createElement(Consumer)); });
+    try {
+      expect(state.value).toBe('confirmed');
+      await act(async () => state.refresh());
+      expect(state.value).toBe(clearOnError ? null : 'confirmed'); expect(state.error).toBe('read failure');
+      await act(async () => state.refresh());
+      expect(state.value).toBe('recovered'); expect(state.error).toBeNull();
+    } finally { await act(async () => tree.unmount()); }
+  });
 });
 
 it('allows the support five-second interval', async () => {
@@ -108,7 +159,7 @@ it('coalesces focus refreshes until an aborted load actually settles', async () 
   const events = new EventTarget(); vi.stubGlobal('window', events);
   const pending: Array<(value: string) => void> = [];
   const load = vi.fn(() => new Promise<string>(resolve => pending.push(resolve)));
-  const poll = startApiPolling(load, () => {}, () => {});
+  const poll = startApiPolling(load, () => {}, () => {}, { waitForPending: true });
   events.dispatchEvent(new Event('focus')); events.dispatchEvent(new Event('focus'));
   expect(load).toHaveBeenCalledTimes(1);
   pending[0]('old'); await Promise.resolve(); await Promise.resolve();
