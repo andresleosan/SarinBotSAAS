@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HelpPage from '@/app/ayuda/page';
 import { PlatformSupportChat, emptySupportMessages, mergeSupportPage, expireSupportMessages, mergeSupportList } from '@/components/platform-support-chat';
@@ -28,8 +29,17 @@ const deferred = <T,>() => { let resolve!: (value: T) => void; const promise = n
 let trees: ReactTestRenderer[], documentEvents: EventTarget & { visibilityState: string }, windowEvents: EventTarget;
 let requests: Array<{ path: string; init: RequestInit }>, handler: (path: string, init: RequestInit) => unknown | Promise<unknown>;
 const focus = vi.fn(), scroll = vi.fn();
+const nativeDigest = crypto.subtle.digest.bind(crypto.subtle);
 const response = (data: unknown, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => data });
-async function settle() { for (let n = 0; n < 30; n++) await Promise.resolve(); await new Promise<void>(resolve => setImmediate(resolve)); for (let n = 0; n < 30; n++) await Promise.resolve(); }
+async function settle() {
+  for (let n = 0; n < 30; n++) await Promise.resolve();
+  // WebCrypto runs outside the microtask queue and can outlast setImmediate in CI.
+  if (vi.isMockFunction(crypto.subtle.digest)) {
+    await Promise.all(vi.mocked(crypto.subtle.digest).mock.results.filter(result => result.type === 'return').map(result => result.value));
+  }
+  await new Promise<void>(resolve => setImmediate(resolve));
+  for (let n = 0; n < 30; n++) await Promise.resolve();
+}
 async function mount(props: { admin?: boolean; initialThread?: string | null } = {}, strict = false) {
   let tree!: ReactTestRenderer;
   await act(async () => { tree = create(strict ? <React.StrictMode><PlatformSupportChat {...props} /></React.StrictMode> : <PlatformSupportChat {...props} />, { createNodeMock: () => ({ focus, scrollIntoView: scroll }) }); await settle(); });
@@ -43,6 +53,7 @@ async function draft(tree: ReactTestRenderer, text: string) { await act(async ()
 async function advance(ms: number) { await act(async () => { await vi.advanceTimersByTimeAsync(ms); await settle(); }); }
 
 beforeEach(() => {
+  vi.spyOn(crypto.subtle, 'digest');
   vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'performance'] }); vi.setSystemTime(now);
   documentEvents = Object.assign(new EventTarget(), { visibilityState: 'visible' }); windowEvents = new EventTarget();
   vi.stubGlobal('document', documentEvents); vi.stubGlobal('window', windowEvents);
@@ -53,7 +64,7 @@ beforeEach(() => {
   handler = path => path.endsWith('/messages') || path.includes('/messages?') ? response(page()) : path.endsWith('/notifications') ? response({ configured: false, revision: 0, expiresAt: null }) : path.endsWith('/link') ? response({ available: true, current: { linkId: id(7), revision: 1, expiresAt: now + 60_000, maskedPhone: '••••1234' }, pending: null, revokeGeneration: id(8) }) : response({ conversations: [conversation(1)], cursor: null, hasMore: false, observedAt: Date.now() });
   vi.stubGlobal('fetch', async (path: string, init: RequestInit) => { requests.push({ path, init }); return handler(path, init); });
 });
-afterEach(async () => { await act(async () => { trees.forEach(tree => tree.unmount()); await settle(); }); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => { trees.forEach(tree => tree.unmount()); await settle(); }); vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('private support entry and page merging', () => {
   it('offers private support from help', async () => {
@@ -90,6 +101,19 @@ describe('private support entry and page merging', () => {
 });
 
 describe('authenticated incremental support UI', () => {
+  it('waits for the real message digest before asserting an explicit send', async () => {
+    vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (...args) => {
+      await delay(25);
+      return nativeDigest(...args);
+    });
+    const original = handler;
+    handler = (path, init) => init.method === 'POST' ? response({ id: 'sent', sequence: 2, revision: 2 }) : original(path, init);
+    const tree = await mount({ initialThread: id(1) });
+    await draft(tree, 'synthetic delayed digest');
+    await click(tree, 'Enviar mensaje');
+    expect(requests.filter(item => item.init.method === 'POST')).toHaveLength(1);
+    expect(output(tree)).toContain('Mensaje confirmado en la web');
+  });
   it('refreshes existing notification facts without another message or visibility reset', async () => {
     let state: SupportPage['notificationStates'][number]['state'] = 'pending';
     handler = path => path.includes('/messages') ? response(path.includes('?cursor=') ? page([], 'follow') : { ...page(), notificationStates: [{ messageId: 'message-1', state }] }) : response({ conversations: [], cursor: null, hasMore: false, observedAt: Date.now() });
