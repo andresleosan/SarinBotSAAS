@@ -17,6 +17,7 @@ import { platformPaymentPreparationContext } from './platform-support-bot';
 import { prepareWorkIdentity, readWorkAuthority, workActor, workPayload } from './platform-whatsapp-work-authority';
 import { readWork } from './platform-whatsapp-work-records';
 import { createPlatformWorkStore } from './platform-whatsapp-work-store';
+import type { StoredResponsePeriod } from './response-periods';
 
 export const paymentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}(?![\s\S])/).refine(v => !['__proto__', 'constructor', 'prototype'].includes(v));
 export const paymentUuidSchema = z.string().regex(PAYMENT_UUID);
@@ -111,9 +112,28 @@ export function paymentContextFingerprint(context: Context, actorUid: string, ac
     [sub.currentPeriodEndsAt > now, (sub.graceEndsAt ?? 0) > now, q.current ? q.current.endsAt > now : null], whatsapp ?? null]);
 }
 function validateEffect(context: Context, db: Database, action: 'approve' | 'reject', reason: string | undefined, now: number) {
-  // Same policy as the manual helper, with a write sink for a preparation preview.
-  const sink: Transaction = { get: (() => { throw new Error('Payment effect attempted a late read'); }) as Transaction['get'], set() {}, create() {}, delete() {} };
-  applyPaymentReviewContext(sink, db, context, action, reason, now);
+  // The same billing effect supplies both validation and preview, without real writes.
+  const periods: StoredResponsePeriod[] = [];
+  const capture: Transaction['set'] = (target, data) => {
+    if (target.path.startsWith(context.quota.scopeReference.path + '/periods/')) periods.push(data as StoredResponsePeriod);
+  };
+  const sink: Transaction = { get: (() => { throw new Error('Payment effect attempted a late read'); }) as Transaction['get'], set: capture, create: capture, delete() { throw new Error('Unexpected payment deletion'); } };
+  const result = applyPaymentReviewContext(sink, db, context, action, reason, now);
+  return { ...result, period: periods.at(-1) };
+}
+function describeEffect(context: Context, db: Database, action: 'approve' | 'reject', reason: string | undefined, now: number): string {
+  const preview = validateEffect(context, db, action, reason, now), subscription = preview.business.subscription;
+  if (action === 'reject') {
+    const previous = context.business.subscription;
+    const removedGrace = previous.graceEndsAt !== undefined && subscription.graceEndsAt === undefined;
+    const changed = JSON.stringify(previous) !== JSON.stringify(subscription);
+    return `Rechazar el comprobante. ${removedGrace ? 'Retirar la gracia.' : changed ? 'Actualizar el estado de la suscripción; no hay gracia que retirar.' : 'Solo cambia el comprobante; se conserva la suscripción y su gracia.'} Estado resultante: ${subscription.status}.`;
+  }
+  const period = preview.period;
+  if (!period) throw conflict();
+  if (context.receipt.kind === 'response_pack') return `Añadir ${period.extraResponses - context.quota.current!.extraResponses} respuestas al período ${period.id} (${period.planId ?? period.source}), conservando su vigencia y consumo.`;
+  if (context.receipt.kind === 'paid_trial') return `Activar la prueba pagada de ${subscription.paidTrial!.appointmentLimit} citas y ${period.includedResponses} respuestas incluidas, una sola vez.`;
+  return `Activar ${(period.endsAt - period.startsAt) / 86400000} días con ${period.includedResponses} respuestas incluidas desde la confirmación o desde el fin pagado existente, lo que ocurra después.`;
 }
 type Guard = (tx: Transaction, now: number) => Promise<void>;
 /** Internal deterministic preparation; private dispatcher supplies an exact durable guard. */
@@ -138,7 +158,8 @@ async function prepare(uid: string, input: PreparePaymentInput, db: Database, gu
     await guard(tx, Date.now());
     const writeTime = Date.now();
     assertRole(uid);
-    if (writeTime >= record.validUntil || keys().marker !== key.marker || paymentContextFingerprint(context, uid, input.action, reasonDigest, writeTime) !== contextFingerprint || context.quota.next && context.quota.next.startsAt <= writeTime) throw conflict();
+    if (keys().marker !== key.marker) throw unavailable();
+    if (writeTime >= record.validUntil || paymentContextFingerprint(context, uid, input.action, reasonDigest, writeTime) !== contextFingerprint || context.quota.next && context.quota.next.startsAt <= writeTime) throw conflict();
     if (!marker) tx.create(reference(db, 'key_marker'), { version: 1, recordType: 'key_marker', keyDigest: key.marker });
     tx.create(reference(db, id), record);
     tx.set(reference(db, 'request_' + requestDigest), { version: 1, recordType: 'request', requestDigest, inputDigest, proposalId: id, createdAt: now, expiresAt: now + PAYMENT_RETENTION_MS });
@@ -196,13 +217,14 @@ export async function confirmPaymentAction(actor: DecodedIdToken, id: string, in
     if (paymentContextFingerprint(context, actor.uid, record.action, record.reasonDigest, now) !== record.contextFingerprint) throw conflict();
     const effectTime = Date.now();
     authTime(actor, true, effectTime);
-    if (effectTime >= record.validUntil || keys().marker !== key.marker || paymentContextFingerprint(context, actor.uid, record.action, record.reasonDigest, effectTime) !== record.contextFingerprint || context.quota.next && context.quota.next.startsAt <= effectTime) throw conflict();
+    if (keys().marker !== key.marker) throw unavailable();
+    if (effectTime >= record.validUntil || paymentContextFingerprint(context, actor.uid, record.action, record.reasonDigest, effectTime) !== record.contextFingerprint || context.quota.next && context.quota.next.startsAt <= effectTime) throw conflict();
     const result = applyPaymentReviewContext(tx, database, context, record.action, reason, effectTime);
     tx.set(reference(database, id), { ...record, state: 'executed', reason: null, executedAt: effectTime, effectId: result.receipt.id, confirmDigest: keyed(key, 'confirm', [command.requestId, command.expectedRevision, true]) });
     return result;
   });
 }
-const safeRecords = (receipt: PaymentReceipt, business: Business) => ({ business: { id: business.id, name: business.name.trim() }, payment: { id: receipt.id, amountCOP: receipt.amountCOP, planId: receipt.planId ?? 'monthly', kind: receipt.kind ?? 'subscription', status: receipt.status } });
+const safeRecords = (receipt: PaymentReceipt, business: Business) => ({ business: { id: business.id, name: business.name.trim() }, payment: { id: receipt.id, amountCOP: receipt.amountCOP, planId: receipt.kind === 'paid_trial' || receipt.kind === 'response_pack' ? null : receipt.planId ?? 'monthly', kind: receipt.kind ?? 'subscription', status: receipt.status } });
 export function paymentActionResult(result: { receipt: PaymentReceipt; business: Business }): PaymentActionResult { return { ...safeRecords(result.receipt, result.business), effectId: result.receipt.id, reviewedAt: result.receipt.reviewedAt! }; }
 export async function readPaymentAction(actor: DecodedIdToken, id: string, db?: Database): Promise<PaymentActionView> {
   await assertPaymentActor(actor); paymentUuidSchema.parse(id);
@@ -216,7 +238,14 @@ export async function readPaymentAction(actor: DecodedIdToken, id: string, db?: 
     const business = receipt && (await tx.get(database.collection('businesses').doc(receipt.tenantId))).data() as Business | undefined;
     if (!receipt || !business || receipt.id !== record.paymentId || business.id !== receipt.tenantId || business.ownerUid !== receipt.ownerUid) throw conflict();
     const p = publicProposal(record), reason = p.state === 'pending' ? decrypt(record, key) : undefined;
+    let effect = record.state === 'executed' ? `Comprobante ya ${receipt.status === 'approved' ? 'aprobado' : 'rechazado'}; esta propuesta no aplicará otro efecto.` : 'La propuesta ya no está disponible para confirmar.';
+    if (p.state === 'pending') {
+      const now = Date.now(), context = await readPaymentReviewContext(tx, database, record.paymentId, now);
+      if (paymentContextFingerprint(context, actor.uid, record.action, record.reasonDigest, now) !== record.contextFingerprint) throw conflict();
+      effect = describeEffect(context, database, record.action, reason, now);
+      if (Date.now() >= record.validUntil) throw conflict();
+    }
     authTime(actor, false);
-    return { proposal: { id: p.id, paymentId: p.paymentId, action: p.action, revision: p.revision, expiresAt: p.expiresAt, state: p.state }, ...safeRecords(receipt, business), effect: record.action === 'reject' ? 'Rechazar el comprobante y retirar la gracia correspondiente; se conserva la vigencia pagada existente.' : receipt.kind === 'response_pack' ? `Añadir ${RESPONSE_PACK.responses} respuestas al período vigente indicado en el comprobante.` : receipt.kind === 'paid_trial' ? `Activar la prueba pagada de ${PAID_TRIAL_APPOINTMENT_LIMIT} citas, una sola vez.` : `Activar ${receipt.periodDays ?? 30} días desde la confirmación o desde el fin pagado existente, lo que ocurra después.`, ...(reason !== undefined ? { rejectionReason: reason } : {}) };
+    return { proposal: { id: p.id, paymentId: p.paymentId, action: p.action, revision: p.revision, expiresAt: p.expiresAt, state: p.state }, ...safeRecords(receipt, business), effect, ...(reason !== undefined ? { rejectionReason: reason } : {}) };
   });
 }

@@ -239,3 +239,31 @@ describe("real HTTP client session fences", () => {
     expect(signal.aborted).toBe(true); expect(text(root())).not.toContain("PRIVATE OLD JSON"); expect(text(root())).not.toContain("Decisión registrada");
   });
 });
+
+describe("payment product labels", () => {
+  it.each([
+    { kind: "paid_trial", label: "Prueba pagada" },
+    { kind: "response_pack", label: "Paquete de respuestas" },
+  ])("reviews and records $kind as its actual product without inventing a subscription plan", async ({ kind, label }) => {
+    view.payment = { ...view.payment, kind, planId: null };
+    view.effect = "Efecto autorizado por el servidor para este producto.";
+    await mount();
+    const details = root().findAllByType("dd").map(text);
+    expect(details).toContain(label);
+    expect(details.join(" ")).not.toMatch(/monthly|null|undefined|paid_trial|response_pack/);
+    expect(confirms()).toHaveLength(0);
+    state.api.mockResolvedValueOnce(result());
+    await click("Confirmar aprobación");
+    const outcome = root().findAllByProps({ role: "status" }).map(text).find(value => value.includes("Decisión registrada"));
+    expect(outcome).toContain(label);
+    expect(outcome).not.toMatch(/monthly|null|undefined|paid_trial|response_pack/);
+  });
+
+  it("preserves the server's monthly plan for a legacy subscription in review and result", async () => {
+    await mount();
+    expect(root().findAllByType("dd").map(text).join(" ")).toContain("monthly");
+    state.api.mockResolvedValueOnce(result());
+    await click("Confirmar aprobación");
+    expect(root().findAllByProps({ role: "status" }).map(text).join(" ")).toContain("monthly");
+  });
+});

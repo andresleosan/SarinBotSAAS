@@ -4,13 +4,13 @@ export type PaymentProposal = { id: string; actorUid: string; paymentId: string;
 export type PaymentActionView = {
   proposal: Pick<PaymentProposal, 'id' | 'paymentId' | 'action' | 'revision' | 'expiresAt' | 'state'>;
   business: { id: string; name: string };
-  payment: { id: string; amountCOP: number; planId: string; kind: string; status: 'pending' | 'approved' | 'rejected' };
+  payment: { id: string; amountCOP: number; planId: string | null; kind: string; status: 'pending' | 'approved' | 'rejected' };
   effect: string;
   rejectionReason?: string;
 };
 export type PaymentActionResult = {
   business: { id: string; name: string };
-  payment: { id: string; amountCOP: number; planId: string; kind: string; status: 'pending' | 'approved' | 'rejected' };
+  payment: { id: string; amountCOP: number; planId: string | null; kind: string; status: 'pending' | 'approved' | 'rejected' };
   effectId: string;
   reviewedAt: number;
 };

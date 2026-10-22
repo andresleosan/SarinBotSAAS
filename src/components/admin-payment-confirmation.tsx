@@ -12,6 +12,11 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const secondary = "min-h-11 rounded-[10px] border border-sarin-line px-3 py-2 text-sm font-medium text-sarin-blue disabled:opacity-50 focus-visible:outline focus-visible:outline-2";
 const money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const date = (value: number) => new Date(value).toLocaleString("es-CO", { timeZone: "America/Bogota" });
+function paymentProduct(payment: PaymentActionView["payment"]): string {
+  if (payment.kind === "paid_trial") return "Prueba pagada";
+  if (payment.kind === "response_pack") return "Paquete de respuestas";
+  return payment.planId ? `Suscripción · ${payment.planId}` : "Suscripción";
+}
 type Props = { payments: AdminCopilotSource[]; proposalId?: string | null };
 type Review = { view: PaymentActionView; requestId: string; deadline: number };
 type Phase = "review" | "uncertain" | "reauth";
@@ -170,13 +175,13 @@ function PaymentConfirmationSession({ payments, proposalId }: Props) {
     {error && <p ref={alert} tabIndex={-1} role="alert" className="break-words text-sm leading-6">{error}</p>}
     {review && <div className="min-w-0 space-y-3 rounded-xl border border-sarin-line p-4 [overflow-wrap:anywhere]">
       <h3 ref={heading} tabIndex={-1} className="font-semibold">Revisa antes de {review.view.proposal.action === "approve" ? "aprobar" : "rechazar"}</h3>
-      <dl className="space-y-2 text-sm"><div><dt>Negocio</dt><dd className="font-semibold">{review.view.business.name}</dd></div><div><dt>Importe registrado</dt><dd>{money.format(review.view.payment.amountCOP)}</dd></div><div><dt>Plan y tipo</dt><dd>{review.view.payment.planId} · {review.view.payment.kind}</dd></div><div><dt>Efecto de la decisión</dt><dd>{review.view.effect}</dd></div><div><dt>Estado del pago</dt><dd>{review.view.payment.status}</dd></div><div><dt>Vencimiento de la propuesta (Colombia)</dt><dd>{date(review.view.proposal.expiresAt)}</dd></div>{review.view.rejectionReason && <div><dt>Motivo del rechazo</dt><dd className="whitespace-pre-wrap">{review.view.rejectionReason}</dd></div>}</dl>
+      <dl className="space-y-2 text-sm"><div><dt>Negocio</dt><dd className="font-semibold">{review.view.business.name}</dd></div><div><dt>Importe registrado</dt><dd>{money.format(review.view.payment.amountCOP)}</dd></div><div><dt>Producto</dt><dd>{paymentProduct(review.view.payment)}</dd></div><div><dt>Efecto de la decisión</dt><dd>{review.view.effect}</dd></div><div><dt>Estado del pago</dt><dd>{review.view.payment.status}</dd></div><div><dt>Vencimiento de la propuesta (Colombia)</dt><dd>{date(review.view.proposal.expiresAt)}</dd></div>{review.view.rejectionReason && <div><dt>Motivo del rechazo</dt><dd className="whitespace-pre-wrap">{review.view.rejectionReason}</dd></div>}</dl>
       <a href={`/admin?focusPayment=${encodeURIComponent(review.view.payment.id)}#payment-${encodeURIComponent(review.view.payment.id)}`} className="inline-flex min-h-11 items-center text-sm text-sarin-blue underline">Abrir comprobante en el panel protegido</a>
       {isExpired && <p role="status">La propuesta venció. Prepara una nueva revisión explícita.</p>}
       {review.view.proposal.state !== "pending" && <p role="status">Propuesta {review.view.proposal.state}. Esta lectura no aplica otra decisión.</p>}
       <div className="flex flex-wrap gap-3"><button type="button" className={buttonClass} disabled={busy || blocked.current || isExpired || phase === "reauth" || review.view.proposal.state !== "pending"} onClick={() => void confirm()}>{phase === "uncertain" ? "Reintentar la misma confirmación" : review.view.proposal.action === "approve" ? "Confirmar aprobación de este pago" : "Confirmar rechazo de este pago"}</button><button type="button" className={secondary} disabled={busy || blocked.current || phase === "reauth"} onClick={() => void read(review.view.proposal.id)}>Consultar estado de la propuesta</button></div>
     </div>}
     {phase === "reauth" && <button type="button" className={secondary} disabled={busy} onClick={() => void reauthenticate()}>Verificar mi identidad con Google</button>}
-    {result && <p role="status" className="break-words">Decisión registrada: {result.payment.status} · {result.business.name} · {money.format(result.payment.amountCOP)} · {date(result.reviewedAt)}.</p>}
+    {result && <p role="status" className="break-words">Decisión registrada: {result.payment.status} · {result.business.name} · {paymentProduct(result.payment)} · {money.format(result.payment.amountCOP)} · {date(result.reviewedAt)}.</p>}
   </section>;
 }

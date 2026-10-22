@@ -223,3 +223,93 @@ it('returns only closed receipt metadata and rejects a mismatched document ident
   const mismatch = memoryFirestore({ 'paymentReceipts/other-document': receipt }).db as unknown as Database;
   await expect(mismatch.runTransaction(tx => readPaymentReviewReceipt(tx, mismatch, receipt.id))).rejects.toMatchObject({ status: 409 });
 });
+it.each([undefined, 7000])('describes the actual subscription response allowance %s without preview writes', async allowance => {
+  const { db, rows } = memoryFirestore(paymentFixture());
+  if (allowance !== undefined) await db.collection('paymentReceipts').doc('demo-payment').set({ ...rows.get('paymentReceipts/demo-payment')!.data, responseAllowance: allowance });
+  const p = await preparePaymentAction(actor, prepareInput, db), before = JSON.stringify([...rows]);
+  const view = await readPaymentAction(actor, p.id, db);
+  expect(JSON.stringify([...rows])).toBe(before);
+  const result = await confirmPaymentAction(actor, p.id, command, db);
+  const applied = rows.get('responseQuotaScopes/business_demo-business/periods/payment_demo-payment')!.data;
+  expect(applied.includedResponses).toBe(allowance ?? 3000);
+  expect(view.effect).toContain(`${applied.includedResponses} respuestas incluidas`);
+  expect(view.effect).toContain('30 días');
+  expect(view.payment.planId).toBe('monthly'); expect(paymentActionResult(result).payment.planId).toBe('monthly');
+  const replayBefore = JSON.stringify([...rows]), replay = await readPaymentAction(actor, p.id, db);
+  expect(JSON.stringify([...rows])).toBe(replayBefore);
+  expect(replay.effect).toContain('ya aprobado'); expect(replay.effect).not.toContain('Activar');
+});
+it('describes trial response and appointment capacities from the actual effect without claiming monthly', async () => {
+  const { db, rows } = memoryFirestore(paymentFixture());
+  await db.collection('paymentReceipts').doc('demo-payment').set({ ...rows.get('paymentReceipts/demo-payment')!.data, kind: 'paid_trial', amountCOP: 5000, appointmentAllowance: 10 });
+  const p = await preparePaymentAction(actor, prepareInput, db), before = JSON.stringify([...rows]), view = await readPaymentAction(actor, p.id, db);
+  expect(JSON.stringify([...rows])).toBe(before);
+  const result = await confirmPaymentAction(actor, p.id, command, db);
+  const applied = rows.get('responseQuotaScopes/business_demo-business/periods/trial_demo-payment')!.data;
+  expect(view.effect).toContain(`${applied.includedResponses} respuestas incluidas`);
+  expect(view.effect).toContain(`${result.business.subscription.paidTrial!.appointmentLimit} citas`);
+  expect(view.payment.planId).toBeNull(); expect(paymentActionResult(result).payment.planId).toBeNull();
+});
+it('describes the actual weekly pack destination and added capacity without claiming monthly', async () => {
+  const { db, rows } = memoryFirestore(paymentFixture());
+  const business = rows.get('businesses/demo-business')!.data;
+  await db.collection('businesses').doc('demo-business').set({ ...business, subscription: { ...(business.subscription as object), status: 'active', currentPeriodEndsAt: now + 100000 } });
+  const scope = db.collection('responseQuotaScopes').doc('business_demo-business'); await scope.set({ initializedAt: now });
+  await scope.collection('periods').doc('weekly-target').set({ ...period('weekly-target', now - 1000), planId: 'weekly' });
+  await db.collection('paymentReceipts').doc('demo-payment').set({ ...rows.get('paymentReceipts/demo-payment')!.data, kind: 'response_pack', responseAllowance: 1000, quotaPeriodId: 'weekly-target' });
+  const p = await preparePaymentAction(actor, prepareInput, db), before = JSON.stringify([...rows]), view = await readPaymentAction(actor, p.id, db);
+  expect(JSON.stringify([...rows])).toBe(before);
+  const result = await confirmPaymentAction(actor, p.id, command, db);
+  const applied = (await scope.collection('periods').doc('weekly-target').get()).data()!;
+  expect(view.effect).toContain(`${Number(applied.extraResponses) - 1} respuestas`);
+  expect(view.effect).toContain('weekly-target'); expect(view.effect).toContain('weekly');
+  expect(view.payment.planId).toBeNull(); expect(paymentActionResult(result).payment.planId).toBeNull();
+});
+it.each([
+  ['response_pack', 'demo-payment', 'active', now + 100000, 'active', false],
+  ['subscription', 'other-payment', 'active', now + 100000, 'active', false],
+  ['subscription', 'demo-payment', 'active', now + 100000, 'active', true],
+  ['subscription', 'demo-payment', 'active', now - 1, 'past_due', true],
+  ['subscription', 'demo-payment', 'pending_payment', 0, 'pending_payment', true],
+  ['subscription', 'demo-payment', 'suspended', now - 1, 'suspended', true],
+  ['paid_trial', 'demo-payment', 'trial', 0, 'trial', true],
+] as const)('describes rejection %s/%s/%s and its actual grace/status effect', async (kind, lastPaymentId, status, currentPeriodEndsAt, expectedStatus, removed) => {
+  const { db, rows } = memoryFirestore(paymentFixture());
+  const business = rows.get('businesses/demo-business')!.data;
+  const subscription = { status, lastPaymentId, currentPeriodEndsAt, trialEndsAt: 0, graceEndsAt: now + 50000, ...(status === 'trial' ? { paidTrial: { source: 'payment', paymentId: 'old-trial', activatedAt: 1, appointmentLimit: 10, appointmentsUsed: 0 } } : {}) };
+  await db.collection('businesses').doc('demo-business').set({ ...business, subscription });
+  await db.collection('paymentReceipts').doc('demo-payment').set({ ...rows.get('paymentReceipts/demo-payment')!.data, kind });
+  const p = await preparePaymentAction(actor, { ...prepareInput, action: 'reject', rejectionReason: 'No corresponde' }, db);
+  const before = JSON.stringify([...rows]), view = await readPaymentAction(actor, p.id, db);
+  expect(JSON.stringify([...rows])).toBe(before);
+  const result = await confirmPaymentAction(actor, p.id, command, db);
+  expect(result.business.subscription.status).toBe(expectedStatus);
+  expect(result.business.subscription.graceEndsAt).toBe(removed ? undefined : subscription.graceEndsAt);
+  expect(view.effect).toContain(`Estado resultante: ${expectedStatus}`);
+  expect(view.effect.toLowerCase()).toContain(removed ? 'retirar la gracia' : 'solo cambia el comprobante');
+  if (!removed) expect(result.business.subscription).toEqual(subscription);
+});
+it.each(['paid_trial', 'response_pack'] as const)('does not invent a subscription plan in the %s result', kind => {
+  const fixture = paymentFixture();
+  const result = paymentActionResult({ receipt: { ...fixture['paymentReceipts/demo-payment'], kind, status: 'approved', reviewedAt: now }, business: fixture['businesses/demo-business'] } as Parameters<typeof paymentActionResult>[0]);
+  expect(result.payment.planId).toBeNull();
+});
+it.each(['prepare', 'confirm'] as const)('classifies valid key replacement during %s reads as unavailable without writes', async operation => {
+  const { db, rows } = memoryFirestore(paymentFixture());
+  const p = operation === 'confirm' ? await preparePaymentAction(actor, prepareInput, db) : null;
+  const before = JSON.stringify([...rows]);
+  const delayed: Database = { collection: db.collection.bind(db), runTransaction: handler => db.runTransaction(raw => {
+    const tx = raw as unknown as Transaction;
+    return handler({ ...tx, get: (async (ref: { path?: string }) => { const value = await tx.get(ref as never); if (ref.path === 'responseQuotaScopes/business_demo-business') vi.stubEnv('ADMIN_PAYMENT_ACTION_KEY', Buffer.alloc(32, 9).toString('base64')); return value; }) as unknown as Transaction['get'] });
+  }) };
+  await expect(operation === 'prepare' ? preparePaymentAction(actor, prepareInput, delayed) : confirmPaymentAction(actor, p!.id, command, delayed)).rejects.toMatchObject({ status: 503, code: 'ADMIN_PAYMENT_UNAVAILABLE' });
+  expect(JSON.stringify([...rows])).toBe(before);
+});
+it('does not preview a changed capacity under the old proposal', async () => {
+  const { db, rows } = memoryFirestore(paymentFixture());
+  const p = await preparePaymentAction(actor, prepareInput, db);
+  await db.collection('paymentReceipts').doc('demo-payment').set({ ...rows.get('paymentReceipts/demo-payment')!.data, responseAllowance: 9000 });
+  const before = JSON.stringify([...rows]);
+  await expect(readPaymentAction(actor, p.id, db)).rejects.toMatchObject({ status: 409 });
+  expect(JSON.stringify([...rows])).toBe(before);
+});
