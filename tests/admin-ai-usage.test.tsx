@@ -4,6 +4,7 @@ vi.mock('@/components/admin-ai-budget', () => ({ AdminAiBudget: () => null }));
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AdminPage from "@/app/admin/page";
+vi.mock('@/components/admin-platform-budget', () => ({ AdminPlatformBudget: () => null }));
 vi.mock("@/components/admin-whatsapp", () => ({ AdminWhatsApp: () => null }));
 import type { AdminAiUsage, AiUsageTotals } from "@/types/ai";
 

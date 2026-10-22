@@ -165,7 +165,7 @@ function PlatformWorkspace({ scope }: { scope: string }) {
     {!authLost && poll.loading && !snapshot && <p role="status" className="text-sm text-sarin-muted">Consultando WhatsApp de SarinBot…</p>}
     {status && <div className="min-w-0 space-y-4 rounded-xl bg-sarin-canvas p-4">
       <h3 className="font-semibold">{titles[status.presentationState]}</h3>
-      <p className="text-sm leading-6">IA deshabilitada · Envío deshabilitado. Una bandeja vacía no confirma la conexión.</p>
+      <p className="text-sm leading-6">IA {status.aiEnabled ? 'habilitada' : 'deshabilitada'} · Envío {status.sendEnabled ? 'habilitado' : 'deshabilitado'}. Una bandeja vacía no confirma la conexión.</p>
       <dl className="space-y-2 break-words text-sm leading-6">
         <div><dt className="font-medium">Última recepción firmada</dt><dd>{date(status.lastSignedInboundAt)} · Colombia</dd></div>
         <div><dt className="font-medium">Última respuesta del titular registrada</dt><dd>{date(status.lastHumanEchoAt)} · Colombia</dd></div>

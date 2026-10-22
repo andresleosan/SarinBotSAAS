@@ -23,6 +23,7 @@ import { useEngineHealth } from "@/hooks/useEngineHealth";
 import { AdminAiSettings } from "@/components/admin-ai-settings";
 import { AdminAiUsage } from "@/components/admin-ai-usage";
 import { AdminAiBudget } from "@/components/admin-ai-budget";
+import { AdminPlatformBudget } from "@/components/admin-platform-budget";
 import { AdminBookingDataPolicy } from '@/components/admin-booking-data-policy';
 import { AdminWhatsApp } from "@/components/admin-whatsapp";
 import { AdminInvitations } from "@/components/admin-invitations";
@@ -267,6 +268,7 @@ function Console() {
       </section>
       <AdminAiSettings onSaved={() => void engine.refresh()} />
       <AdminAiBudget businesses={data.businesses} />
+      <AdminPlatformBudget />
       <AdminBookingDataPolicy businesses={data.businesses} />
       <AdminAiUsage businesses={data.businesses} />
       <AdminWhatsApp businesses={data.businesses} />

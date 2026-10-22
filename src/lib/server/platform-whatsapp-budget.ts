@@ -9,6 +9,7 @@ import { platformWhatsAppDigest } from './platform-whatsapp-crypto';
 import { getPlatformWhatsAppConfig } from './platform-whatsapp-config';
 import { HttpError } from './http';
 import { platformSettlementPeriod } from '../../../shared/platform-whatsapp-accounting';
+import { readAdminBudgetReservation, stageAdminBudgetReservation, readAdminBudgetSettlement, stageAdminBudgetSettlement } from './platform-whatsapp-admin-budget';
 const closed = () => new HttpError(503, 'El presupuesto de plataforma no está habilitado.', 'PLATFORM_WORK_CLOSED');
 
 export function currentPlatformWorkPolicy(): { policy: WorkPolicy; fingerprint: string } {
@@ -39,7 +40,7 @@ export function budgetIds(job: PlatformJob, stage: CostStage, now: number) {
   const scope = [job.wabaId, job.phoneE164, job.phoneNumberId], dayStart = Math.floor(now / PLATFORM_BODY_TTL) * PLATFORM_BODY_TTL;
   return { reservationId: 'call_' + workHash('cost', scope, job.jobId, job.epoch, stage), circuitId: 'circuit_' + workHash('stage-circuit', scope, stage), periodId: 'day_' + workHash('day', scope, stage, dayStart), dayStart };
 }
-type BudgetFacts = { call: BudgetCall | null; period: BudgetPeriod; circuit: BudgetCircuit; policy: WorkPolicy; fingerprint: string };
+type BudgetFacts = { call: BudgetCall | null; period: BudgetPeriod; circuit: BudgetCircuit; policy: WorkPolicy; fingerprint: string; administrative: Awaited<ReturnType<typeof readAdminBudgetReservation>> };
 /** Read-only preparation. Callers stage only after all of their own reads. */
 export async function readPlatformReservation(job: PlatformJob, stage: CostStage, maximumMicros: number, tx: Transaction, db: Database, now: number, quote?: GenerationQuote, precheck = false): Promise<BudgetFacts> {
   assertPlatformWhatsAppNow(now);
@@ -56,10 +57,14 @@ export async function readPlatformReservation(job: PlatformJob, stage: CostStage
   if (day && (day.recordType !== 'budget_period' || !samePlatformWhatsAppScope(day, job) || day.stage !== stage || day.dayStart !== ids.dayStart)) throw platformWhatsAppUnavailableError();
   const period: BudgetPeriod = day as BudgetPeriod ?? { ...platformWhatsAppIdentity(job), recordType: 'budget_period', periodId: ids.periodId, stage, dayStart: ids.dayStart, dayEnd: ids.dayStart + PLATFORM_BODY_TTL, usedMicros: 0, heldMicros: 0, overrunMicros: 0, ...emptyUsage, expiresAt: ids.dayStart + PLATFORM_METADATA_TTL };
   if (!call && checkedAdd(period.usedMicros, period.heldMicros, maximumMicros) > policy.limits[stage]) throw closed();
-  return { call: call as BudgetCall | null, period, circuit, policy, fingerprint };
+  const administrative = await readAdminBudgetReservation(ids.reservationId, stage, maximumMicros, tx, db, now);
+  // An old unstarted reservation has no administrative hold; do not grant it a paid permit.
+  if (call && administrative && !administrative.existing) throw closed();
+  return { call: call as BudgetCall | null, period, circuit, policy, fingerprint, administrative };
 }
 export function stagePlatformReservation(job: PlatformJob, stage: CostStage, maximumMicros: number, facts: BudgetFacts, tx: Transaction, db: Database, now: number, quote?: GenerationQuote): BudgetCall {
   if (facts.call) return facts.call;
+  stageAdminBudgetReservation(facts.administrative, tx, db);
   const ids = budgetIds(job, stage, now);
   const call: BudgetCall = { ...(quote ? { quote } : {}), ...platformWhatsAppIdentity(job), recordType: 'budget_call', ...ids, jobId: job.jobId, epoch: job.epoch, stage, requestFingerprint: job.requestFingerprint, maximumMicros, actualMicros: null, tariffVersion: facts.policy.tariff.version, policyFingerprint: facts.fingerprint, createdAt: now, expiresAt: job.expiresAt, status: 'reserved', effectToken: null, startedAt: null, finishedAt: null, ...emptyUsage };
   // dayStart is an aggregate coordinate, never an extra field on a call.
@@ -99,7 +104,8 @@ export async function readPlatformSettlement(id: string, tx: Transaction, db: Da
   if (job?.recordType !== 'job' || !samePlatformWhatsAppScope(call, job) || call.epoch !== job.epoch || call.requestFingerprint !== job.requestFingerprint || call.expiresAt !== job.expiresAt || call.createdAt < job.createdAt || call.createdAt >= job.expiresAt) throw platformWhatsAppUnavailableError();
   const original = budgetIds(job, call.stage, call.createdAt);
   if (call.reservationId !== original.reservationId || call.periodId !== original.periodId || call.circuitId !== original.circuitId || period.dayStart !== original.dayStart || call.createdAt >= period.dayEnd) throw platformWhatsAppUnavailableError();
-  return { call, period, circuit };
+  const administrative = await readAdminBudgetSettlement(id, tx, db);
+  return { call, period, circuit, administrative };
 }
 export function stagePlatformSettlement(facts: Awaited<ReturnType<typeof readPlatformSettlement>>, actual: number | null, usage: Usage, token: string | null, tx: Transaction, db: Database, now: number): boolean {
   const { call, period, circuit } = facts;
@@ -111,6 +117,7 @@ export function stagePlatformSettlement(facts: Awaited<ReturnType<typeof readPla
   if (call.status === 'reserved') {
     if (actual !== 0 || Object.values(usage).some(v => v !== null) || period.heldMicros < call.maximumMicros) throw platformWhatsAppConflictError();
     stageWork(tx, db, 'platformWhatsAppBudgetCalls/' + call.reservationId, { ...call, status: 'released', actualMicros: 0, finishedAt: now });
+    stageAdminBudgetSettlement(facts.administrative, 0, tx, db);
     stageWork(tx, db, 'platformWhatsAppBudgetPeriods/' + period.periodId, { ...period, heldMicros: period.heldMicros - call.maximumMicros });
     return true;
   }
@@ -125,6 +132,7 @@ export function stagePlatformSettlement(facts: Awaited<ReturnType<typeof readPla
     return false;
   }
   stageWork(tx, db, 'platformWhatsAppBudgetCalls/' + call.reservationId, { ...call, status: 'settled', actualMicros: actual, finishedAt: now, ...usage });
+  stageAdminBudgetSettlement(facts.administrative, actual, tx, db);
   stageWork(tx, db, 'platformWhatsAppBudgetPeriods/' + period.periodId, updated);
   if (actual > call.maximumMicros) stageWork(tx, db, 'platformWhatsAppBudgetPeriods/' + circuit.circuitId, { ...circuit, status: 'blocked', reason: 'overrun', trippedAt: circuit.trippedAt ?? now });
   return true;

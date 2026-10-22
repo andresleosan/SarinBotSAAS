@@ -3,6 +3,7 @@ vi.mock('@/components/admin-invitations', () => ({ AdminInvitations: () => null 
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AdminPage from "@/app/admin/page";
+vi.mock('@/components/admin-platform-budget', () => ({ AdminPlatformBudget: () => null }));
 import type { AdminWhatsAppSettings } from "@/types/whatsapp";
 
 const state = vi.hoisted(() => ({ api: vi.fn() }));

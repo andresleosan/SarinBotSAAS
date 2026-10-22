@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock('@/components/admin-invitations', () => ({ AdminInvitations: () => null }));
 vi.mock('@/components/admin-ai-budget', () => ({ AdminAiBudget: () => null }));
 import AdminPage from "@/app/admin/page";
+vi.mock('@/components/admin-platform-budget', () => ({ AdminPlatformBudget: () => null }));
 import type { AdminAiSettings } from "@/types/ai";
 
 const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn() }));

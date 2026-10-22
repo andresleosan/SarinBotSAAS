@@ -2,6 +2,7 @@ import { act, createElement, type ReactNode } from 'react';
 import { create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AdminPage from '@/app/admin/page';
+vi.mock('@/components/admin-platform-budget', () => ({ AdminPlatformBudget: () => null }));
 
 const state = vi.hoisted(() => ({ api: vi.fn() }));
 vi.mock('@/lib/client/api', () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));

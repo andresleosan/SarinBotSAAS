@@ -68,11 +68,12 @@ it.each(['delivered', 'cancelled'] as const)('rereads the same existing message 
   }
   expect(await reread()).toEqual([{ messageId: message.id, state: terminal }]);
 });
-it.each(['source-erased', 'window-closed', 'budget-zero', 'role-lost', 'disabled'] as const)('stores terminal blocked for %s and never revives old messages after a new inbound', async mode => {
+it.each(['source-erased', 'window-closed', 'budget-zero', 'admin-budget-missing', 'role-lost', 'disabled'] as const)('stores terminal blocked for %s and never revives old messages after a new inbound', async mode => {
   const s = await scenario();
   if (mode === 'source-erased') for (const [path, row] of s.rows) if (row.recordType === 'event' && row.kind === 'incoming_text') s.seed(path, { ...row, state: 'body_erased', content: null });
   if (mode === 'window-closed') vi.spyOn(Date, 'now').mockReturnValue(now + 86_400_000);
   if (mode === 'budget-zero') vi.stubEnv('PLATFORM_WHATSAPP_SEND_DAILY_BUDGET_MICROS', '0');
+  if (mode === 'admin-budget-missing') vi.stubEnv('PLATFORM_WHATSAPP_ADMIN_BUDGET_REQUIRED', 'true');
   if (mode === 'role-lost') vi.stubEnv('SUPERADMIN_UID', 'other');
   if (mode === 'disabled') firebase.getUser.mockImplementation(async uid => ({ uid, disabled: uid === 'demo-link-user' }));
   const input = { requestId: randomUUID(), expectedRevision: 0, text: 'never requeue' }, message = await appendSupportMessage(s.actor, s.thread.id, input, s.db);

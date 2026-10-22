@@ -27,6 +27,13 @@ describe('original actor authority and supplied transaction cancellation', () =>
   });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
   const event = (patch = {}) => incoming({ eventId: 'demo-work-' + ++seq, messageId: 'demo-work-' + seq, whatsappMessageId: null, customerSentAt: now, ...patch });
+  it('persists signed incoming text while administrative budgeting suppresses automation', async () => {
+    vi.stubEnv('PLATFORM_WHATSAPP_ADMIN_BUDGET_REQUIRED', 'true');
+    const before = [...s.rows.values()].filter(r => r.recordType === 'event').length;
+    await ingest(event({ text: 'Synthetic request with closed budget' }), getPlatformWhatsAppConfig(), s.db, now);
+    expect([...s.rows.values()].filter(r => r.recordType === 'event')).toHaveLength(before + 1);
+    expect([...s.rows.values()].filter(isPlatformJob)).toHaveLength(0);
+  });
   async function deliver() {
     const lease = (await work.claimNext())!, job = (await work.readAuthorized(lease))!;
     expect(job).not.toBeNull(); const out = await work.saveReply(lease, workCatalog[job.catalogId!].text), claim = (await work.claimSend(out.outboxId))!;
