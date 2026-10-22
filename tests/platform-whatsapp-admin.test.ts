@@ -16,11 +16,11 @@ import { assertPlatformSuperadmin, answerPlatformAdmin } from '@/lib/server/plat
 import { isPlatformOutbox, isBudgetCall } from '../shared/platform-whatsapp-work';
 import { takePlatformSendPermit } from '@/lib/server/platform-whatsapp-work-store';
 const response = (value = { reply: 'Hay un comprobante pendiente consultado.', sourceIds: ['payment-demo-payment'] }, extra = {}) => Response.json({ model: 'synthetic-wire-model-v1', choices: [{ message: { content: JSON.stringify(value) } }], usage: { prompt_tokens: 11, prompt_cache_hit_tokens: 1, prompt_cache_miss_tokens: 10, completion_tokens: 3, total_tokens: 14 }, ...extra });
-async function privateScenario() {
+async function privateScenario(question = 'lista los pagos') {
   vi.stubEnv('SUPERADMIN_UID', 'demo-link-user'); vi.stubEnv('DEEPSEEK_API_KEY', 'synthetic-key'); vi.stubEnv('PILOT_AI_BUDGET_ENFORCED', 'true');
   const s = await buildSupportScenario();
   s.seed('paymentReceipts/demo-payment', { tenantId: 'demo-business', tenantName: 'Demo business', status: 'pending', submittedAt: now, amountCOP: 1000, imageUrl: 'https://private.invalid/image' });
-  const { lease } = await s.question('lista los pagos');
+  const { lease } = await s.question(question);
   return { ...s, lease };
 }
 it('generates the private consulted payment answer through the once capability and encrypted outbox', async () => {
@@ -84,7 +84,7 @@ it('rechecks authority after waiting in the existing critical queue before snaps
   expect(await running).toHaveProperty('status', 409);
   expect(JSON.stringify(s.seen.slice(before))).not.toMatch(/paymentReceipts|businesses/);
 });
-it.each(['requestId', 'question', 'businessId', 'signal', 'actor'] as const)('rejects altered private context %s without consuming the valid entry', async changed => {
+it.each(['requestId', 'question', 'businessId', 'signal', 'actor', 'leadingSpace', 'trailingSpace', 'trailingNewline', 'oversized', 'illFormed', 'requestIdNewline'] as const)('rejects altered private context %s without consuming the valid entry', async changed => {
   const s = await privateScenario(), fetcher = vi.fn().mockResolvedValue(response()); vi.stubGlobal('fetch', fetcher);
   const realRun = AsyncLocalStorage.prototype.run;
   let probes = 0;
@@ -93,8 +93,8 @@ it.each(['requestId', 'question', 'businessId', 'signal', 'actor'] as const)('re
     return realRun.call(this, context, async () => {
       probes++;
       await expect(answerPlatformAdmin(changed === 'actor' ? { ...context.actor, linkRevision: context.actor.linkRevision + 1 } : context.actor, {
-        requestId: changed === 'requestId' ? 'forged-request' : context.requestId,
-        question: changed === 'question' ? 'forged question' : context.question,
+        requestId: changed === 'requestId' ? 'forged-request' : changed === 'requestIdNewline' ? context.requestId + '\n' : context.requestId,
+        question: changed === 'question' ? 'forged question' : changed === 'leadingSpace' ? ' ' + context.question : changed === 'trailingSpace' ? context.question + ' ' : changed === 'trailingNewline' ? context.question + '\n' : changed === 'oversized' ? 'x'.repeat(4097) : changed === 'illFormed' ? '\ud800' : context.question,
         ...(changed === 'businessId' ? { businessId: 'foreign' } : {}),
       }, changed === 'signal' ? new AbortController().signal : context.signal)).rejects.toThrow();
       expect(context.entered).toBe(false); return callback(...args);
@@ -189,4 +189,38 @@ it('rejects a foreign actor before even selecting the default database', async (
   const s = await privateScenario(), job = (await s.work.readAuthorized(s.lease))!;
   if (job.authorityKind !== 'actor') throw new Error('Expected actor');
   await expect(assertPlatformSuperadmin({ ...workActor(job), uid: 'other' })).rejects.toMatchObject({ status: 403 });
+});
+
+import { quotePlatformGeneration } from '@/lib/server/platform-whatsapp-budget';
+it.each([
+  ['leading whitespace', ' lista los pagos'], ['trailing whitespace', 'lista los pagos '], ['trailing newline', 'lista los pagos\n'],
+  ['over web limit', 'x'.repeat(2001)], ['4096 code points', 'x'.repeat(4096)], ['4096 supplementary code points / 16384 bytes', '\u{1f600}'.repeat(4096)],
+])('preserves the exact private source question through once dispatch: %s', async (_label, question) => {
+  const s = await privateScenario(question), fetcher = vi.fn().mockResolvedValue(response()); vi.stubGlobal('fetch', fetcher);
+  const sourceJob = (await s.work.readAuthorized(s.lease))!;
+  expect(workPayload(sourceJob, now)?.question).toBe(question);
+  await runPlatformSupportWork(s.lease, s.db, new AbortController().signal);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const body = fetcher.mock.calls[0][1].body;
+  expect(JSON.parse(JSON.parse(body).messages[1].content).question).toBe(question);
+  const generation = [...s.rows.values()].filter(r => isBudgetCall(r) && r.stage === 'generation');
+  expect(generation).toHaveLength(1);
+  expect(generation[0]).toMatchObject({ status: 'settled', actualMicros: 8, quote: quotePlatformGeneration(body) });
+  expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(1);
+  expect([...s.rows.keys()].filter(path => path.startsWith('aiUsageCalls/'))).toEqual(['aiUsageCalls/' + generation[0].effectToken]);
+  await expect(runPlatformSupportWork(s.lease, s.db, new AbortController().signal)).rejects.toThrow();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it.each([
+  ['oversize ASCII', 'x'.repeat(4097)], ['oversize supplementary', '\u{1f600}'.repeat(4097)],
+  ['unpaired high surrogate', '\ud800'], ['unpaired low surrogate', '\udc00'], ['NUL', 'a\0b'], ['blank', ' \n '],
+])('does not admit invalid private source text: %s', async (_label, question) => {
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  vi.stubEnv('SUPERADMIN_UID', 'demo-link-user');
+  const s = await buildSupportScenario();
+  if ([...question].length > 4096) await expect(s.question(question)).rejects.toMatchObject({ status: 400 });
+  else expect((await s.question(question)).lease).toBeNull();
+  expect([...s.rows.values()].filter(r => isBudgetCall(r) && r.stage === 'generation')).toHaveLength(0);
+  expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(0);
+  expect(fetcher).not.toHaveBeenCalled();
 });

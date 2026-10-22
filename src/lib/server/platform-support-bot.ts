@@ -1,6 +1,7 @@
 import 'server-only';
+import { z } from 'zod';
 import type { AdminCopilotAnswer } from '@/types/admin-copilot';
-import { adminCopilotQuestionSchema, adminCopilotInstructions, reducedAdminCopilotSnapshot, validateAdminCopilotAnswer } from './admin-copilot';
+import { adminCopilotInstructions, reducedAdminCopilotSnapshot, validateAdminCopilotAnswer } from './admin-copilot';
 import { assertPlatformSuperadmin, answerPlatformAdmin, readPlatformAdminContext, platformAdminSourceUrl } from './platform-whatsapp-admin';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getAdminDb } from '@/lib/firebase/admin';
@@ -17,6 +18,10 @@ import { reconcilePlatformConnection } from './platform-whatsapp-connection';
 import { readPlatformSupportKnowledge, validatePlatformSupportOutput, PLATFORM_SCOPE_REFUSAL } from './platform-support-knowledge';
 import { recordAiUsage } from './ai-usage';
 import { platformWhatsAppConflictError } from './platform-whatsapp-store';
+
+// Channel text stays byte-for-byte bound to the durable source, including outer whitespace.
+const platformAdminQuestionSchema = z.object({ requestId: z.string().regex(/^[A-Za-z0-9_-]{8,128}(?![\s\S])/),
+  question: z.string().refine(value => workText(value, 'question')), businessId: z.never().optional() }).strict();
 
 type Context = { lease: Lease; db: Database; actor: PlatformActor; question: string; signal: AbortSignal; entered: boolean; kind: 'customer_reply' | 'admin_query'; requestId: string };
 const execution = new AsyncLocalStorage<Context>();
@@ -44,7 +49,7 @@ export function platformAdminDatabase(actor: PlatformActor): Database {
   return context.db;
 }
 export async function answerBoundPlatformAdmin(actor: PlatformActor, input: { requestId: string; question: string; businessId?: string }, signal: AbortSignal): Promise<AdminCopilotAnswer> {
-  const parsed = adminCopilotQuestionSchema.parse(input), context = execution.getStore();
+  const parsed = platformAdminQuestionSchema.parse(input), context = execution.getStore();
   if (!context || context.kind !== 'admin_query' || context.requestId !== parsed.requestId || parsed.businessId !== undefined) throw platformWhatsAppConflictError();
   return generate(actor, parsed.question, signal, 'admin_query') as Promise<AdminCopilotAnswer>;
 }
