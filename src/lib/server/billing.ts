@@ -1,6 +1,6 @@
 import 'server-only';
 import { assertConsent } from './consent';
-import type { Database as Firestore } from '@/lib/storage/types';
+import type { Database as Firestore, Query, Transaction } from '@/lib/storage/types';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Business, PaymentReceipt, PlatformSettings } from '@/types/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
@@ -14,7 +14,7 @@ import { approveSubscription, grantReceiptGrace } from './billing-policy';
 import type { z } from 'zod';
 import { receiptSchema, settingsSchema } from './schemas';
 import { initializeResponsePeriods, readResponsePeriodState, responsePeriodReference } from './response-periods';
-import { getWhatsAppBusinessStatus } from './whatsapp-config';
+import { getWhatsAppBusinessStatus, readWhatsAppPaymentContext } from './whatsapp-config';
 import { activateIntroductoryTrial } from './introductory-access';
 
 function defaultSettings(): PlatformSettings {
@@ -128,54 +128,78 @@ function receiptPeriodDays(receipt: PaymentReceipt): number {
   return receipt.periodDays;
 }
 
-export async function reviewPayment(paymentId: string, action: 'approve' | 'reject', reason?: string, db: Firestore = getAdminDb()): Promise<{ receipt: PaymentReceipt; business: Business }> {
+/** Query reads do not hydrate historical receipt blobs in D1. Never fetch paymentImages here. */
+export async function readPaymentReviewReceipt(transaction: Transaction, db: Firestore, paymentId: string): Promise<PaymentReceipt | null> {
+  const fields = ['id', 'tenantId', 'tenantName', 'ownerUid', 'ownerEmail', 'amountCOP', 'kind', 'appointmentAllowance', 'responseAllowance', 'quotaPeriodId', 'planId', 'periodDays', 'bankSelected', 'status', 'rejectionReason', 'submittedAt', 'reviewedAt'] as const;
+  const query = db.collection('paymentReceipts').where('id', '==', paymentId).limit(2) as Query & { select?: (...fields: string[]) => Query };
+  // Native Firestore projection also avoids materializing historical inline image fields.
+  const metadata = query.select ? query.select(...fields) : query;
+  const result = await transaction.get(metadata);
+  if (result.empty) return null;
+  if (result.size !== 1 || result.docs[0].id !== paymentId) throw new HttpError(409, 'La identidad del comprobante cambió.');
+  const receipt = result.docs[0].data() as PaymentReceipt;
+  return Object.fromEntries(fields.filter(field => receipt[field] !== undefined).map(field => [field, receipt[field]])) as unknown as PaymentReceipt;
+}
+export async function readPaymentReviewContext(transaction: Transaction, db: Firestore, paymentId: string, now: number, manualAction?: 'approve' | 'reject') {
   const reference = db.collection('paymentReceipts').doc(paymentId);
-  return db.runTransaction(async (transaction) => {
-    const document = await transaction.get(reference);
-    if (!document.exists) throw new HttpError(404, 'El comprobante no existe.');
-    const receipt = document.data() as PaymentReceipt;
-    const businessReference = db.collection('businesses').doc(receipt.tenantId);
-    const businessDocument = await transaction.get(businessReference);
-    if (!businessDocument.exists) throw new HttpError(404, 'El negocio no existe.');
-    const business = businessDocument.data() as Business;
-    const status = action === 'approve' ? 'approved' : 'rejected';
-    if (receipt.status === status) return { receipt, business };
-    if (receipt.status !== 'pending') throw new HttpError(409, 'Este comprobante ya fue revisado con otra decisión.');
-    const now = Date.now();
-    const reviewed: PaymentReceipt = { ...receipt, status, reviewedAt: now, ...(action === 'reject' && reason ? { rejectionReason: reason } : {}) };
-    let subscription = business.subscription;
-    if (receipt.kind !== undefined && receipt.kind !== 'subscription' && receipt.kind !== 'response_pack' && receipt.kind !== 'paid_trial') throw new HttpError(409, 'El tipo de comprobante no es válido.');
-    const quota = action === 'approve' ? await readResponsePeriodState(business, db, transaction, now) : undefined;
-    if (action === 'approve' && receipt.kind === 'paid_trial') {
-      if (!canPurchasePaidTrial(subscription) || receipt.amountCOP !== PAID_TRIAL_PRICE_COP || receipt.appointmentAllowance !== PAID_TRIAL_APPOINTMENT_LIMIT || receipt.planId !== undefined || receipt.periodDays !== undefined || receipt.responseAllowance !== undefined || receipt.quotaPeriodId !== undefined) throw new HttpError(409, 'Los datos de la prueba pagada no son válidos.', 'PAID_TRIAL_UNAVAILABLE');
-      subscription = activateIntroductoryTrial(subscription, { source: 'payment', paymentId: receipt.id }, now);
-      initializeResponsePeriods(transaction, db, { ...quota!, current: null });
-      const periodId = `trial_${receipt.id}`;
-      transaction.create(responsePeriodReference(db, quota!.scopeId, periodId), { id: periodId, source: 'trial', planId: null, startsAt: now, endsAt: PAID_TRIAL_PERIOD_END, includedResponses: PAID_TRIAL_INCLUDED_RESPONSES, extraResponses: 0, usedResponses: 0, reservedResponses: 0 });
-    } else if (action === 'approve' && receipt.kind === 'response_pack') {
-      if (receipt.responseAllowance !== RESPONSE_PACK.responses || receipt.planId !== undefined || receipt.periodDays !== undefined || !quota?.current || receipt.quotaPeriodId !== quota.current.id || quota.current.source === 'trial' || quota.current.endsAt <= now || subscription.status !== 'active') throw new HttpError(409, 'La vigencia de esta ampliación ya no está disponible. Revisa el comprobante.', 'RESPONSE_PACK_EXPIRED');
-      initializeResponsePeriods(transaction, db, { ...quota, current: null });
-      transaction.set(responsePeriodReference(db, quota.scopeId, quota.current.id), { ...quota.current, extraResponses: quota.current.extraResponses + receipt.responseAllowance });
-    } else if (action === 'approve') {
-      if (receipt.planId === 'whatsapp' && !(await getWhatsAppBusinessStatus(business.id)).ready) throw new HttpError(409, 'WhatsApp requiere una conexión verificada antes de aprobar.', 'WHATSAPP_NOT_READY');
-      const periodDays = receiptPeriodDays(receipt);
-      const plan = getBillingPlan(receipt.planId);
-      const includedResponses = receipt.responseAllowance ?? plan.includedResponses;
-      if (!Number.isSafeInteger(includedResponses) || includedResponses < 1 || includedResponses > 1_000_000) throw new HttpError(409, 'La capacidad del comprobante no es válida.');
-      const startsAt = Math.max(now, subscription.currentPeriodEndsAt);
-      subscription = approveSubscription(subscription, receipt.id, now, periodDays);
-      initializeResponsePeriods(transaction, db, quota!);
-      const periodId = `payment_${receipt.id}`;
-      transaction.create(responsePeriodReference(db, quota!.scopeId, periodId), { id: periodId, source: 'subscription', planId: plan.id, startsAt, endsAt: subscription.currentPeriodEndsAt, includedResponses, extraResponses: 0, usedResponses: 0, reservedResponses: 0 });
-    } else if (receipt.kind !== 'response_pack' && subscription.lastPaymentId === receipt.id) {
-      const { graceEndsAt: _graceEndsAt, ...withoutGrace } = subscription;
-      const stillPaid = subscription.status === 'active' && subscription.currentPeriodEndsAt > now;
-      subscription = { ...withoutGrace, status: subscription.status === 'suspended' ? 'suspended' : stillPaid ? 'active' : subscription.currentPeriodEndsAt > 0 ? 'past_due' : subscription.paidTrial ? 'trial' : 'pending_payment' };
-    }
-    const updatedBusiness: Business = { ...business, subscription };
-    transaction.set(reference, reviewed);
-    transaction.set(businessReference, updatedBusiness);
-    if (business.slug) transaction.set(db.collection('publicBusinesses').doc(business.slug), publicBusiness(updatedBusiness));
-    return { receipt: reviewed, business: updatedBusiness };
-  });
+  const metadataOnly = manualAction === undefined;
+  const receipt = metadataOnly ? await readPaymentReviewReceipt(transaction, db, paymentId) : (await transaction.get(reference)).data() as PaymentReceipt | undefined;
+  if (!receipt) throw new HttpError(404, 'El comprobante no existe.');
+  const businessReference = db.collection('businesses').doc(receipt.tenantId);
+  const businessDocument = await transaction.get(businessReference);
+  if (!businessDocument.exists) throw new HttpError(404, 'El negocio no existe.');
+  const business = businessDocument.data() as Business;
+  // The manual endpoint's terminal replay/rejection never depended on quota or readiness.
+  const needsContext = manualAction === undefined || manualAction === 'approve' && receipt.status === 'pending';
+  const scopeId = `business_${business.id}`;
+  const quota = needsContext ? await readResponsePeriodState(business, db, transaction, now) : { scopeId, scopeReference: db.collection('responseQuotaScopes').doc(scopeId), initialize: false, current: null, next: null };
+  const whatsapp = needsContext && receipt.planId === 'whatsapp' ? await (manualAction === undefined ? readWhatsAppPaymentContext : getWhatsAppBusinessStatus)(business.id, db, transaction) : null;
+  return { reference, receipt, businessReference, business, quota, whatsapp, metadataOnly };
+}
+export function applyPaymentReviewContext(transaction: Transaction, db: Firestore, context: Awaited<ReturnType<typeof readPaymentReviewContext>>, action: 'approve' | 'reject', reason: string | undefined, now: number): { receipt: PaymentReceipt; business: Business } {
+  const { reference, receipt, businessReference, business, quota, whatsapp } = context;
+  const status = action === 'approve' ? 'approved' : 'rejected';
+  if (receipt.status === status) return { receipt, business };
+  if (receipt.status !== 'pending') throw new HttpError(409, 'Este comprobante ya fue revisado con otra decisión.');
+  const reviewed: PaymentReceipt = { ...receipt, status, reviewedAt: now, ...(action === 'reject' && reason ? { rejectionReason: reason } : {}) };
+  let subscription = business.subscription;
+  if (receipt.kind !== undefined && receipt.kind !== 'subscription' && receipt.kind !== 'response_pack' && receipt.kind !== 'paid_trial') throw new HttpError(409, 'El tipo de comprobante no es válido.');
+  if (action === 'approve' && receipt.kind === 'paid_trial') {
+    if (!canPurchasePaidTrial(subscription) || receipt.amountCOP !== PAID_TRIAL_PRICE_COP || receipt.appointmentAllowance !== PAID_TRIAL_APPOINTMENT_LIMIT || receipt.planId !== undefined || receipt.periodDays !== undefined || receipt.responseAllowance !== undefined || receipt.quotaPeriodId !== undefined) throw new HttpError(409, 'Los datos de la prueba pagada no son válidos.', 'PAID_TRIAL_UNAVAILABLE');
+    subscription = activateIntroductoryTrial(subscription, { source: 'payment', paymentId: receipt.id }, now);
+    initializeResponsePeriods(transaction, db, { ...quota!, current: null }, now);
+    const periodId = `trial_${receipt.id}`;
+    transaction.create(responsePeriodReference(db, quota!.scopeId, periodId), { id: periodId, source: 'trial', planId: null, startsAt: now, endsAt: PAID_TRIAL_PERIOD_END, includedResponses: PAID_TRIAL_INCLUDED_RESPONSES, extraResponses: 0, usedResponses: 0, reservedResponses: 0 });
+  } else if (action === 'approve' && receipt.kind === 'response_pack') {
+    if (receipt.responseAllowance !== RESPONSE_PACK.responses || receipt.planId !== undefined || receipt.periodDays !== undefined || !quota?.current || receipt.quotaPeriodId !== quota.current.id || quota.current.source === 'trial' || quota.current.endsAt <= now || subscription.status !== 'active') throw new HttpError(409, 'La vigencia de esta ampliación ya no está disponible. Revisa el comprobante.', 'RESPONSE_PACK_EXPIRED');
+    initializeResponsePeriods(transaction, db, { ...quota, current: null }, now);
+    transaction.set(responsePeriodReference(db, quota.scopeId, quota.current.id), { ...quota.current, extraResponses: quota.current.extraResponses + receipt.responseAllowance });
+  } else if (action === 'approve') {
+    if (receipt.planId === 'whatsapp' && !whatsapp?.ready) throw new HttpError(409, 'WhatsApp requiere una conexión verificada antes de aprobar.', 'WHATSAPP_NOT_READY');
+    const periodDays = receiptPeriodDays(receipt);
+    const plan = getBillingPlan(receipt.planId);
+    const includedResponses = receipt.responseAllowance ?? plan.includedResponses;
+    if (!Number.isSafeInteger(includedResponses) || includedResponses < 1 || includedResponses > 1_000_000) throw new HttpError(409, 'La capacidad del comprobante no es válida.');
+    const startsAt = Math.max(now, subscription.currentPeriodEndsAt);
+    subscription = approveSubscription(subscription, receipt.id, now, periodDays);
+    initializeResponsePeriods(transaction, db, quota!, now);
+    const periodId = `payment_${receipt.id}`;
+    transaction.create(responsePeriodReference(db, quota!.scopeId, periodId), { id: periodId, source: 'subscription', planId: plan.id, startsAt, endsAt: subscription.currentPeriodEndsAt, includedResponses, extraResponses: 0, usedResponses: 0, reservedResponses: 0 });
+  } else if (receipt.kind !== 'response_pack' && subscription.lastPaymentId === receipt.id) {
+    const { graceEndsAt: _graceEndsAt, ...withoutGrace } = subscription;
+    const stillPaid = subscription.status === 'active' && subscription.currentPeriodEndsAt > now;
+    subscription = { ...withoutGrace, status: subscription.status === 'suspended' ? 'suspended' : stillPaid ? 'active' : subscription.currentPeriodEndsAt > 0 ? 'past_due' : subscription.paidTrial ? 'trial' : 'pending_payment' };
+  }
+  const updatedBusiness: Business = { ...business, subscription };
+  transaction.set(reference, reviewed, context.metadataOnly ? { merge: true } : undefined);
+  transaction.set(businessReference, updatedBusiness);
+  if (business.slug) transaction.set(db.collection('publicBusinesses').doc(business.slug), publicBusiness(updatedBusiness));
+  return { receipt: reviewed, business: updatedBusiness };
+}
+export async function reviewPaymentInTransaction(transaction: Transaction, db: Firestore, paymentId: string, action: 'approve' | 'reject', reason: string | undefined, now: number): Promise<{ receipt: PaymentReceipt; business: Business }> {
+  const context = await readPaymentReviewContext(transaction, db, paymentId, now, action);
+  return applyPaymentReviewContext(transaction, db, context, action, reason, now);
+}
+export async function reviewPayment(paymentId: string, action: 'approve' | 'reject', reason?: string, db: Firestore = getAdminDb()): Promise<{ receipt: PaymentReceipt; business: Business }> {
+  return db.runTransaction(transaction => reviewPaymentInTransaction(transaction, db, paymentId, action, reason, Date.now()));
 }

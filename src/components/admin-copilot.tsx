@@ -17,7 +17,7 @@ function SourceLink({ source }: { source: AdminCopilotSource }) {
   return <a href={source.href} className="inline-flex min-h-11 max-w-full items-center gap-1.5 break-words text-sm font-medium text-sarin-blue underline decoration-sarin-line underline-offset-4 hover:decoration-sarin-blue"><span className="min-w-0 break-words">{source.label}</span><ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0" /></a>;
 }
 
-export function AdminCopilot({ onBusinessesChange }: { onBusinessesChange?: (businesses: AdminCopilotBusiness[]) => void }) {
+export function AdminCopilot({ onBusinessesChange, onPaymentsChange }: { onBusinessesChange?: (businesses: AdminCopilotBusiness[]) => void; onPaymentsChange?: (payments: AdminCopilotSource[]) => void }) {
   const [data, setData] = useState<AdminCopilotSnapshot | null>(null);
   const [businessId, setBusinessId] = useState("");
   const [question, setQuestion] = useState("");
@@ -32,6 +32,8 @@ export function AdminCopilot({ onBusinessesChange }: { onBusinessesChange?: (bus
   const composer = useRef<HTMLTextAreaElement | null>(null);
   const notifyBusinesses = useRef(onBusinessesChange);
   notifyBusinesses.current = onBusinessesChange;
+  const notifyPayments = useRef(onPaymentsChange);
+  notifyPayments.current = onPaymentsChange;
 
   const refresh = useCallback(async () => {
     readController.current?.abort();
@@ -44,6 +46,7 @@ export function AdminCopilot({ onBusinessesChange }: { onBusinessesChange?: (bus
       if (!mounted.current || controller.signal.aborted) return;
       setData(response);
       notifyBusinesses.current?.(response.businesses);
+      notifyPayments.current?.(response.sources.filter(source => source.kind === "payment"));
     } catch (cause) {
       if (mounted.current && !controller.signal.aborted) setLoadError(errorMessage(cause));
     } finally {
@@ -68,6 +71,7 @@ export function AdminCopilot({ onBusinessesChange }: { onBusinessesChange?: (bus
     setExchanges([]);
     setQuestion("");
     setQuestionError(null);
+    notifyPayments.current?.([]);
     setBusinessId(value);
   }
 
@@ -89,6 +93,7 @@ export function AdminCopilot({ onBusinessesChange }: { onBusinessesChange?: (bus
       setExchanges(previous => [...previous.slice(-9), { id: requestId, question: trimmed, answer }]);
       setData(answer.snapshot);
       notifyBusinesses.current?.(answer.snapshot.businesses);
+      notifyPayments.current?.(answer.snapshot.sources.filter(source => source.kind === "payment"));
       setQuestion("");
     } catch (cause) {
       if (mounted.current && !controller.signal.aborted) setQuestionError(errorMessage(cause));

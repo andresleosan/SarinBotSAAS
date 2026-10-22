@@ -1,3 +1,4 @@
+import { isAdminPaymentRecord } from '../../shared/admin-payment-actions.ts';
 import type { DataCommand, DataRead, DataReadResult, DataCommitResult, DataRecord } from '../../shared/data-protocol.ts';
 import { isDataJson, isDataPath } from '../../shared/data-protocol.ts';
 import { SINGLETON_NAME } from './router.ts';
@@ -62,6 +63,7 @@ function validateCommand(command: unknown): asserts command is DataCommand {
       keys(order, ['field', 'direction']);
       if (typeof order.field !== 'string' || !Object.hasOwn(fields, order.field) || typeof order.direction !== 'string' || !['asc', 'desc'].includes(order.direction)) throw invalid();
     }
+    if (read.path === 'adminPaymentActions' && (!read.order.some(item => object(item) && ['expiresAt', 'bodyExpiresAt'].includes(String(item.field))) || read.filters.some(item => object(item) && !['expiresAt', 'bodyExpiresAt', 'state'].includes(String(item.field))))) throw invalid();
     return;
   }
   if (command.action !== 'commit') throw invalid();
@@ -71,7 +73,7 @@ function validateCommand(command: unknown): asserts command is DataCommand {
   for (const write of command.writes) {
     if (!object(write)) throw invalid();
     path(write.path, true);
-    if (write.op === 'delete') { keys(write, ['op', 'path']); continue; }
+    if (write.op === 'delete') { keys(write, ['op', 'path']); if (write.path === 'adminPaymentActions/key_marker') throw invalid(); continue; }
     if (typeof write.op !== 'string' || !['set', 'create'].includes(write.op)) throw invalid();
     keys(write, write.op === 'set' ? ['op', 'path', 'data', 'merge'] : ['op', 'path', 'data']);
     if (!object(write.data) || !isDataJson(write.data) || (write.merge !== undefined && typeof write.merge !== 'boolean')) throw invalid();
@@ -81,6 +83,7 @@ function validateCommand(command: unknown): asserts command is DataCommand {
       if (typeof write.data.businessId !== 'string' || !/^[A-Za-z0-9_-]{1,60}$/.test(write.data.businessId) || typeof write.data.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(write.data.sha256) || write.path !== `businessLogos/${write.data.businessId}_${write.data.sha256}` || typeof write.data.ownerUid !== 'string' || !write.data.ownerUid || write.data.ownerUid.length > 256 || !Number.isSafeInteger(write.data.createdAt) || Number(write.data.createdAt) < 0) throw invalid();
       logo(write.data.logoDataUrl);
     }
+    if (write.path.startsWith('adminPaymentActions/') && (write.merge || !isAdminPaymentRecord(write.path, write.data))) throw invalid();
   }
 }
 function validate(command: unknown): asserts command is DataCommand {

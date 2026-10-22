@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import type { Database as Firestore } from '@/lib/storage/types';
+import type { Database as Firestore, Transaction, DocumentReference } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import type { AdminWhatsAppSettings, WhatsAppBindingStatus } from '@/types/whatsapp';
 import { documentIdSchema } from './schemas';
@@ -44,17 +44,26 @@ export function bindingReady(binding: WhatsAppBinding, config = readWhatsAppConf
   return config.enabled && config.configured && binding.enabled && binding.verifiedAt !== null
     && config.credentials[binding.phoneNumberId]?.wabaId === binding.wabaId;
 }
-export async function getWhatsAppBusinessStatus(businessId: string, db: Firestore = getAdminDb()): Promise<{ ready: boolean }> {
+export async function readWhatsAppPaymentContext(businessId: string, db: Firestore, transaction?: Transaction) {
   documentIdSchema.parse(businessId);
-  if (!readWhatsAppConfig().enabled) return { ready: false };
-  const index = await db.collection('whatsappBusinesses').doc(businessId).get();
-  if (!index.exists) return { ready: false };
+  const config = readWhatsAppConfig();
+  const read = (reference: DocumentReference) => transaction ? transaction.get(reference) : reference.get();
+  const index = await read(db.collection('whatsappBusinesses').doc(businessId));
+  const policy = [config.enabled, config.configured, config.graphApiVersion];
+  if (!index.exists) return { ready: false, context: [policy, null, null] };
   const phoneId = metaIdSchema.safeParse(index.data()?.phoneNumberId);
   if (!phoneId.success) throw new HttpError(503, 'La configuración privada de WhatsApp no es válida.');
-  const snapshot = await db.collection('whatsappNumbers').doc(phoneId.data).get();
-  if (!snapshot.exists) return { ready: false };
+  const snapshot = await read(db.collection('whatsappNumbers').doc(phoneId.data));
+  if (!snapshot.exists) return { ready: false, context: [policy, phoneId.data, null] };
   const binding = parseWhatsAppBinding(snapshot.data());
-  return { ready: binding.businessId === businessId && bindingReady(binding) };
+  const ready = binding.businessId === businessId && bindingReady(binding, config);
+  return { ready, context: [policy, phoneId.data, [binding.businessId, binding.phoneNumberId, binding.wabaId, binding.enabled, binding.verifiedAt, binding.updatedAt], ready] };
+}
+export async function getWhatsAppBusinessStatus(businessId: string, db: Firestore = getAdminDb(), transaction?: Transaction): Promise<{ ready: boolean }> {
+  documentIdSchema.parse(businessId);
+  if (!readWhatsAppConfig().enabled) return { ready: false };
+  const { ready } = await readWhatsAppPaymentContext(businessId, db, transaction);
+  return { ready };
 }
 export const getBusinessWhatsAppStatus = getWhatsAppBusinessStatus;
 

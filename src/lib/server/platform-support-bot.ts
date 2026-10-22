@@ -18,6 +18,7 @@ import { reconcilePlatformConnection } from './platform-whatsapp-connection';
 import { readPlatformSupportKnowledge, validatePlatformSupportOutput, PLATFORM_SCOPE_REFUSAL } from './platform-support-knowledge';
 import { recordAiUsage } from './ai-usage';
 import { platformWhatsAppConflictError } from './platform-whatsapp-store';
+import { preparePlatformPaymentAction, parsePlatformPaymentSelection } from './admin-payment-actions';
 
 // Channel text stays byte-for-byte bound to the durable source, including outer whitespace.
 const platformAdminQuestionSchema = z.object({ requestId: z.string().regex(/^[A-Za-z0-9_-]{8,128}(?![\s\S])/),
@@ -47,6 +48,12 @@ export function platformAdminDatabase(actor: PlatformActor): Database {
   if (!context) return getAdminDb();
   if (context.kind !== 'admin_query' || JSON.stringify(context.actor) !== JSON.stringify(actor)) throw platformWhatsAppConflictError();
   return context.db;
+}
+/** No caller can mint a private preparation context; selectors must match the actual source text. */
+export function platformPaymentPreparationContext(actor: PlatformActor, selection: { paymentId: string; action: 'approve' | 'reject'; rejectionReason?: string }) {
+  const context = execution.getStore();
+  if (!context || context.kind !== 'admin_query' || !context.entered || context.signal.aborted || JSON.stringify(context.actor) !== JSON.stringify(actor) || JSON.stringify(parsePlatformPaymentSelection(context.question)) !== JSON.stringify(selection)) throw platformWhatsAppConflictError();
+  return { db: context.db, lease: context.lease, requestId: context.requestId, question: context.question, signal: context.signal };
 }
 export async function answerBoundPlatformAdmin(actor: PlatformActor, input: { requestId: string; question: string; businessId?: string }, signal: AbortSignal): Promise<AdminCopilotAnswer> {
   const parsed = platformAdminQuestionSchema.parse(input), context = execution.getStore();
@@ -94,8 +101,17 @@ async function generate(actor: PlatformActor, question: string, signal: AbortSig
     const known = !!observed?.usage && observed.model !== null && policy.mapping.responseModels.includes(observed.model);
     const usage = known ? { ...emptyUsage, usageInputTokens: observed!.usage!.promptTokens, usageOutputTokens: observed!.usage!.completionTokens } : emptyUsage;
     const actualMicros = known ? platformCost([{ units: usage.usageInputTokens!, rate: { numerator: 300, denominator: 1000 } }, { units: usage.usageOutputTokens!, rate: { numerator: 1200, denominator: 1000 } }]) : null;
+    let paymentLink: string | null = null;
+    const selection = kind === 'admin_query' ? parsePlatformPaymentSelection(question) : null;
+    if (known && answer && selection) {
+      try {
+        const proposal = await preparePlatformPaymentAction(actor, selection);
+        paymentLink = 'https://sarinbotsaas.pages.dev/admin/assistant?paymentAction=' + proposal.id;
+      } catch { answer = null; /* Preserve observed generation settlement even when preparation is unavailable. */ }
+    }
     let committed = null;
     let text = answer?.reply ?? '';
+    if (paymentLink) text = 'Propuesta preparada. Revisa el importe y confirma individualmente en el panel autenticado: ' + paymentLink + '\nCaduca a los cinco minutos. Abrir el enlace no confirma el pago.';
     if (snapshot && answer && 'sources' in answer) {
       text += '\nFuentes: ' + (answer.sources.map(source => platformAdminSourceUrl(source)).join(', ') || 'sin referencias individuales') + '\nPagos consultados: ' + snapshot.metrics.pendingPayments + '; soporte consultado: ' + menu!.support + '. ' + menu!.health + '\nConsulta vigente al ' + new Date(snapshot.generatedAt).toISOString() + '. Contenido vence ' + new Date(job.bodyExpiresAt).toISOString() + '.';
       if (!workText(text, 'reply')) answer = null;

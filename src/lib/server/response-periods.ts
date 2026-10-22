@@ -42,8 +42,8 @@ export async function readResponsePeriodState(business: Business, db: Firestore,
     next: next.empty ? null : parseResponsePeriod(next.docs[0].data()) };
 }
 
-export function initializeResponsePeriods(transaction: Transaction, db: Firestore, state: Awaited<ReturnType<typeof readResponsePeriodState>>) {
+export function initializeResponsePeriods(transaction: Transaction, db: Firestore, state: Awaited<ReturnType<typeof readResponsePeriodState>>, now = Date.now()) {
   if (!state.initialize) return;
-  transaction.create(state.scopeReference, { initializedAt: Date.now() });
+  transaction.create(state.scopeReference, { initializedAt: now });
   if (state.current) transaction.create(responsePeriodReference(db, state.scopeId, state.current.id), state.current);
 }
