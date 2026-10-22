@@ -34,9 +34,12 @@ export function createPlatformYCloudClient(config: { scope: PlatformWhatsAppScop
       if (!phoneResponse.ok) { await phoneResponse.body?.cancel(); throw unavailable(); }
       const phone = await json(phoneResponse, signal);
       if (account.id !== scope.wabaId || phone.id !== scope.phoneNumberId || phone.wabaId !== scope.wabaId || phone.phoneNumber !== scope.phoneE164) throw unavailable();
-      if (['PARTNER_REMOVED', 'PARTNER_APP_UNINSTALLED'].includes(String(account.updateEvent)) || typeof account.removedTime === 'string' && Number.isFinite(Date.parse(account.removedTime))) return { connected: false, observedAt };
+      const accountRemoved = ['PARTNER_REMOVED', 'PARTNER_APP_UNINSTALLED'].includes(String(account.updateEvent))
+        || typeof account.removedTime === 'string' && Number.isFinite(Date.parse(account.removedTime));
+      const phoneDisconnected = phone.status === 'DISCONNECTED' || phone.updateEvent === 'ACCOUNT_OFFBOARDED';
+      // A proven negative fences the revision even when optional removal metadata is incomplete.
+      if (accountRemoved || phoneDisconnected) return { connected: false, observedAt };
       if (['removedTime', 'removedReason', 'removedInitiatedBy'].some(k => account[k] !== undefined || phone[k] !== undefined)) throw unavailable();
-      if (phone.status === 'DISCONNECTED' || phone.updateEvent === 'ACCOUNT_OFFBOARDED') return { connected: false, observedAt };
       if (phone.status !== 'CONNECTED' || phone.updateEvent !== undefined && phone.updateEvent !== 'ACCOUNT_RECONNECTED' || account.accountReviewStatus !== 'APPROVED' || account.banState !== 'REINSTATE' || account.paymentMethodAttached !== true || !Array.isArray(account.restrictions) || account.restrictions.length) throw unavailable();
       return { connected: true, observedAt };
     },

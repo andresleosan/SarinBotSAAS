@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => { throw new Error('Default backend forbidden'); } }));
+vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => { throw new Error('Default backend forbidden'); }, getAdminAuth: () => ({ getUser: async (uid: string) => ({ uid, disabled: false }) }) }));
+import { buildSupportScenario } from './platform-support-fixtures';
 import { reconcilePlatformConnection } from '@/lib/server/platform-whatsapp-connection';
 import { configure, connection, connectionPath, identity, memoryStore, now } from './platform-whatsapp-test-fixtures';
 const fetcher = vi.fn();
@@ -26,4 +27,17 @@ it('unknown lookup invalidates stale evidence and known disconnect fences before
   expect(s.rows.get(connectionPath)).toMatchObject({ providerConnection: 'disconnected', paused: true, connectionRevision: 1 });
   fetcher.mockResolvedValueOnce(account()).mockResolvedValueOnce(phone()); await reconcilePlatformConnection(s.db);
   expect(s.rows.get(connectionPath)).toMatchObject({ providerConnection: 'connected', paused: true, pausedReason: 'manual', connectionRevision: 1 });
+});
+it.each([{ status: 'DISCONNECTED' }, { updateEvent: 'ACCOUNT_OFFBOARDED' }])('permanently fences existing work after exact negative plus optional removal metadata %j', async negative => {
+  const s = await buildSupportScenario(), { lease } = await s.question();
+  s.seed(connectionPath, { ...s.rows.get(connectionPath), observedAt: now - 300000 });
+  fetcher.mockResolvedValueOnce(Response.json({ id: identity.wabaId, removedReason: 'ACCOUNT_DISCONNECTED', removedInitiatedBy: 'WHATSAPP_BUSINESS_APP' }))
+    .mockResolvedValueOnce(Response.json({ id: identity.phoneNumberId, wabaId: identity.wabaId, phoneNumber: identity.phoneE164, ...negative }));
+  await reconcilePlatformConnection(s.db);
+  expect(s.rows.get(connectionPath)).toMatchObject({ connectionRevision: 1, providerConnection: 'disconnected', paused: true, pausedReason: 'disconnected' });
+  expect(await s.work.readAuthorized(lease)).toBeNull();
+  fetcher.mockResolvedValueOnce(account()).mockResolvedValueOnce(phone());
+  await reconcilePlatformConnection(s.db);
+  expect(s.rows.get(connectionPath)).toMatchObject({ connectionRevision: 1, providerConnection: 'connected', paused: true, pausedReason: 'manual' });
+  expect(await s.work.readAuthorized(lease)).toBeNull();
 });

@@ -7,6 +7,7 @@ import { ingestPlatformWhatsAppEvent } from '@/lib/server/platform-whatsapp-ingr
 import { createPlatformWorkStore, takePlatformSendPermit } from '@/lib/server/platform-whatsapp-work-store';
 import { parsePlatformWorkPolicy } from '../shared/platform-whatsapp-policy';
 import { workCatalog } from '../shared/platform-whatsapp-work';
+import { encryptPlatformWhatsAppContent, decryptPlatformWhatsAppContent } from '@/lib/server/platform-whatsapp-crypto';
 beforeEach(() => { configure(); configureWork(); vi.spyOn(Date, 'now').mockReturnValue(now); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 it('denies new send claim when global service tariff evidence is absent', async () => {
@@ -26,6 +27,14 @@ it('binds exact destination to encrypted original outbox and fences policy chang
   const circuit = workCircuit(); s.seed('platformWhatsAppBudgetPeriods/' + circuit.circuitId, circuit);
   const event = incoming({ customerSentAt: now }); await ingestPlatformWhatsAppEvent(event, getPlatformWhatsAppConfig(), s.db, now);
   const store = createPlatformWorkStore(s.db), lease = (await store.claimNext())!, out = await store.saveReply(lease, workCatalog.identification.text), claimed = (await store.claimSend(out.outboxId))!;
+  const path = 'platformWhatsAppOutbox/' + out.outboxId, originalOutbox = structuredClone(s.rows.get(path))!;
+  const key = getPlatformWhatsAppConfig().contentKey;
+  const payload = decryptPlatformWhatsAppContent(originalOutbox.content, path, key) as { customerPhone: string; text: string };
+  s.seed(path, { ...originalOutbox, content: encryptPlatformWhatsAppContent({ ...payload, customerPhone: '+12025550999' }, path, key) });
+  await expect(takePlatformSendPermit(out.outboxId, claimed.token, s.db, now)).rejects.toThrow();
+  expect(s.rows.get(path)).toMatchObject({ status: 'claimed', sendStartedAt: null });
+  expect(s.rows.get('platformWhatsAppBudgetCalls/' + originalOutbox.sendReservationId)).toMatchObject({ status: 'reserved', effectToken: null, startedAt: null });
+  s.seed(path, originalOutbox);
   const original = process.env.PLATFORM_WHATSAPP_TARIFF_POLICY!;
   const changed = JSON.parse(original); changed.version = changed.sendEvidence.version = 'synthetic-v2'; vi.stubEnv('PLATFORM_WHATSAPP_TARIFF_POLICY', JSON.stringify(changed));
   await expect(takePlatformSendPermit(out.outboxId, claimed.token, s.db, now)).rejects.toThrow();

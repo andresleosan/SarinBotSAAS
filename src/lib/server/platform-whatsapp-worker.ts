@@ -9,7 +9,8 @@ import { preparePlatformAudioFallback } from './platform-whatsapp-work-audio';
 import { reconcilePlatformConnection } from './platform-whatsapp-connection';
 import { createPlatformYCloudClient } from './platform-ycloud-client';
 import { runPlatformSupportWork } from './platform-support-bot';
-import { hasDuePlatformWork, dueWork } from './platform-whatsapp-work-queue';
+import { hasDuePlatformWork, dueWork, platformWorkCandidates } from './platform-whatsapp-work-queue';
+import { boundedPlatformCandidates } from '../../../shared/platform-whatsapp-work-authorization';
 
 type Owned = { controller: AbortController; job: PlatformJob; db: Database; lease?: Lease };
 type Driver = { draining: boolean; pending: boolean; timer: ReturnType<typeof setTimeout> | null; owned: Map<string, Owned> };
@@ -96,19 +97,24 @@ async function drain(): Promise<void> {
   try {
     const db = getAdminDb(), store = createPlatformWorkStore(db);
     await recognizePlatformWorkCancellation();
-    // Persisted unsent work is handled first; started/unknown rows are never selected.
-    for (const status of ['prepared', 'claimed']) {
-      const page = await db.collection('platformWhatsAppOutbox').where('status', '==', status).limit(25).get();
-      for (const doc of page.docs) { const out = doc.data(); if (!isPlatformOutbox(out) || out.outboxId !== doc.id) continue; try { await sendOutbox(out.outboxId, db); } catch { /* No recovery of an ambiguous started effect. */ } }
-    }
     if (await hasDuePlatformWork(db, Date.now())) await reconcilePlatformConnection(db);
     let previous = '';
     for (let pass = 0; pass < 100; pass++) {
+      // Return to unsent recovery after each bounded claim/cleanup page. Never select started/unknown.
+      for (const status of ['prepared', 'claimed']) {
+        for await (const row of boundedPlatformCandidates((root, state, after) => platformWorkCandidates(db, root, state, after), 'platformWhatsAppOutbox', status)) {
+          const out = row.data;
+          if (!isPlatformOutbox(out) || row.path !== 'platformWhatsAppOutbox/' + out.outboxId) continue;
+          try { await sendOutbox(out.outboxId, db); } catch { /* No recovery of an ambiguous started effect. */ }
+        }
+      }
+      const pages = await Promise.all(['advance', 'leased', 'reply_saved', 'ready'].map(status => dueWork(db, status, Date.now()).get()));
+      const selected = pages.flatMap(page => page.docs.map(doc => { const row = doc.data(); return [doc.id, row.status, row.nextAttemptAt, row.headJobId ?? null]; }));
+      const signature = JSON.stringify(selected);
+      if (!selected.length || signature === previous) break;
+      previous = signature;
       const lease = await store.claimNext();
       if (lease) { try { await processPlatformWhatsAppWork(lease); } catch { /* Durable stages retain uncertainty. */ } previous = ''; continue; }
-      const page = await dueWork(db, 'ready', Date.now()).get(), signature = page.docs.map(d => d.id).join(',');
-      if (!signature || signature === previous) break;
-      previous = signature;
     }
     if (await hasDuePlatformWork(db, Date.now())) {
       if (!driver.timer) { driver.timer = setTimeout(() => { driver.timer = null; kickPlatformWhatsAppWorker(); }, 30000); driver.timer.unref(); }

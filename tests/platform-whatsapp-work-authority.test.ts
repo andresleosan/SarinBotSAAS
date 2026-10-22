@@ -59,7 +59,9 @@ describe('original actor authority and supplied transaction cancellation', () =>
   });
   it('consumes a generation permit only once and requires its exact lease token', async () => {
     await enter(); const lease = await question(); await reservePlatformGeneration((await work.readAuthorized(lease))!, quotePlatformGeneration('synthetic-request'), s.db);
-    expect(await takePlatformGenerationPermit({ ...lease, token: '00000000-0000-4000-8000-000000000099' }, s.db, now)).toBeNull();
+    expect(await takePlatformGenerationPermit({ ...lease, token: '00000000-0000-4000-8000-000000000099' }, s.db, now, quotePlatformGeneration('synthetic-request'))).toBeNull();
+    const call = [...s.rows.values()].find(row => row.recordType === 'budget_call' && row.jobId === lease.jobId && row.stage === 'generation');
+    expect(call).toMatchObject({ status: 'reserved', effectToken: null, startedAt: null, quote: quotePlatformGeneration('synthetic-request') });
     expect(await takePlatformGenerationPermit(lease, s.db, now, quotePlatformGeneration('synthetic-request'))).toMatchObject({ question: 'Synthetic support question' });
     expect(await takePlatformGenerationPermit(lease, s.db, now, quotePlatformGeneration('synthetic-request'))).toBeNull();
   });

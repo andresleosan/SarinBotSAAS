@@ -89,6 +89,21 @@ test('CAS catches query phantoms and only one simultaneous stale writer commits'
   assert.equal((await executeDataCommand(query('businesses/shop/appointments'), env)).documents.length, 1);
   assert.equal((await env.SARIN_DB.prepare('SELECT COUNT(*) AS n FROM app_commits').first()).n, 1);
 });
+test('platform continuation cursor fields are typed strings with strict bounded ordering', async context => {
+  const env = await fixture(context);
+  for (const field of ['outboxId', 'jobId', 'conversationId']) {
+    const root = field === 'outboxId' ? 'platformWhatsAppOutbox' : 'platformWhatsAppJobs';
+    const revision = (await executeDataCommand(read('users/missing'), env)).revision;
+    await executeDataCommand(commit(revision, [
+      set(root + '/first_' + field, { [field]: 'a', status: 'prepared' }),
+      set(root + '/last_' + field, { [field]: 'z', status: 'prepared' }),
+      set(root + '/wrong_' + field, { [field]: 1, status: 'prepared' }),
+    ]), env);
+    const result = await executeDataCommand(query(root, [{ field: 'status', op: '==', value: 'prepared' }, { field, op: '>', value: 'a' }], [{ field, direction: 'asc' }], 25), env);
+    assert.deepEqual(result.documents.map(row => row.path), [root + '/last_' + field]);
+    await assert.rejects(executeDataCommand(query(root, [{ field, op: '>', value: 1 }], [], 25), env), isError('DATA_INVALID'));
+  }
+});
 
 test('an existing create rolls back every write, journal entry and revision increment', async context => {
   const env = await fixture(context);

@@ -18,6 +18,19 @@ it.each([{ status: 'DISCONNECTED' }, { updateEvent: 'ACCOUNT_OFFBOARDED' }])('di
   fetcher.mockResolvedValueOnce(Response.json(account)).mockResolvedValueOnce(Response.json({ ...phone, ...change }));
   expect(await client().readAccountConnection()).toEqual({ connected: false, observedAt: now });
 });
+it.each([
+  { account: { removedReason: 'ACCOUNT_DISCONNECTED' }, phone: { status: 'DISCONNECTED' } },
+  { account: { removedInitiatedBy: 'WHATSAPP_BUSINESS_APP' }, phone: { updateEvent: 'ACCOUNT_OFFBOARDED' } },
+  { account: {}, phone: { status: 'DISCONNECTED', removedReason: 'UNKNOWN_OPTIONAL_METADATA' } },
+])('preserves exact negative facts despite optional removal metadata without timestamp %#', async change => {
+  fetcher.mockResolvedValueOnce(Response.json({ ...account, ...change.account })).mockResolvedValueOnce(Response.json({ ...phone, ...change.phone }));
+  expect(await client().readAccountConnection()).toEqual({ connected: false, observedAt: now });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('keeps removal metadata without a known negative fact indeterminate', async () => {
+  fetcher.mockResolvedValueOnce(Response.json({ ...account, removedReason: 'ACCOUNT_DISCONNECTED' })).mockResolvedValueOnce(Response.json(phone));
+  await expect(client().readAccountConnection()).rejects.toMatchObject({ code: 'PLATFORM_PROVIDER_UNKNOWN' });
+});
 it.each([{ id: 'foreign' }, { status: 'UNKNOWN' }, { updateEvent: 'UNKNOWN' }, { phoneNumber: undefined }])('rejects indeterminate phone %j', async change => {
   fetcher.mockResolvedValueOnce(Response.json(account)).mockResolvedValueOnce(Response.json({ ...phone, ...change }));
   await expect(client().readAccountConnection()).rejects.toMatchObject({ code: 'PLATFORM_PROVIDER_UNKNOWN' });

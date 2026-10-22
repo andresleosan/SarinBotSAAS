@@ -2,5 +2,7 @@
 // The actual Worker implementation is separately checked with cloudflare/tsconfig.json.
 const stagesPath = '../src/platform-whatsapp-work-stages.ts';
 const retentionPath = '../src/platform-whatsapp-retention.ts';
+const wakePath = '../src/platform-whatsapp-wake.ts';
 export const { preparePlatformAudio, startPlatformAudio, finishPlatformAudio } = await import(stagesPath);
 export const { cleanupPlatformWhatsAppRetention } = await import(retentionPath);
+export const { hasPotentialPlatformWork } = await import(wakePath);

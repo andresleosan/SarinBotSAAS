@@ -12,6 +12,7 @@ import { runPlatformSupportWork } from '@/lib/server/platform-support-bot';
 import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config';
 import { ingestPlatformWhatsAppEvent } from '@/lib/server/platform-whatsapp-ingress';
 import { isPlatformOutbox } from '../shared/platform-whatsapp-work';
+import { runInSarinQueue, getSarinQueueStats } from '@/lib/sarin/queue';
 const fetcher = vi.fn();
 type State = { draining: boolean; pending: boolean; timer: ReturnType<typeof setTimeout> | null; owned: Map<string, { controller: AbortController }> };
 const global = globalThis as typeof globalThis & { __platformWorkDriver?: State };
@@ -87,4 +88,27 @@ it('activity-only 30s recovery timer drains prepared work and disappears when em
   vi.stubEnv('PLATFORM_YCLOUD_API_KEY', 'synthetic-provider-key'); vi.mocked(Date.now).mockReturnValue(now + 30000); await vi.advanceTimersByTimeAsync(30000);
   for (let i = 0; i < 100 && global.__platformWorkDriver?.draining; i++) await vi.advanceTimersByTimeAsync(0);
   expect(fetcher).toHaveBeenCalledTimes(2); expect(global.__platformWorkDriver?.timer).toBeNull(); vi.useRealTimers();
+});
+it('queue wait cannot cross the immutable deadline even while the sole renewal keeps the lease alive', async () => {
+  const s = await buildSupportScenario(), { lease } = await s.question(); runtime.db = s.db;
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  const blockers = Array.from({ length: getSarinQueueStats().maxSlots }, () => runInSarinQueue(() => gate));
+  vi.stubEnv('PLATFORM_WHATSAPP_PROCESSING_ENABLED', 'true');
+  const processing = processPlatformWhatsAppWork(lease).catch(error => error);
+  try {
+    for (let i = 0; i < 100 && getSarinQueueStats().normalQueued !== 1; i++) await vi.advanceTimersByTimeAsync(0);
+    expect(getSarinQueueStats().normalQueued).toBe(1);
+    for (let at = 20000; at <= 100000; at += 20000) { vi.mocked(Date.now).mockReturnValue(now + at); await vi.advanceTimersByTimeAsync(20000); }
+    vi.mocked(Date.now).mockReturnValue(now + 119999); await vi.advanceTimersByTimeAsync(19999);
+    expect(getSarinQueueStats().normalQueued).toBe(1);
+    expect(s.rows.get('platformWhatsAppJobs/' + lease.jobId)).toMatchObject({ processingDeadlineAt: now + 120000, leaseExpiresAt: now + 120000, generationToken: null });
+    vi.mocked(Date.now).mockReturnValue(now + 120000); await vi.advanceTimersByTimeAsync(1); await processing;
+    expect(getSarinQueueStats().normalQueued).toBe(0); expect(fetcher).not.toHaveBeenCalled();
+    expect([...s.rows.values()].filter(row => row.recordType === 'budget_call' && row.jobId === lease.jobId)).toHaveLength(0);
+  } finally { release(); await Promise.all(blockers); await processing; }
+  startPlatformWhatsAppWorker();
+  for (let i = 0; i < 100 && global.__platformWorkDriver?.draining; i++) await vi.advanceTimersByTimeAsync(0);
+  expect(s.rows.get('platformWhatsAppJobs/' + lease.jobId)).toMatchObject({ status: 'cancelled', outboxId: null });
+  expect(global.__platformWorkDriver?.timer).toBeNull(); vi.useRealTimers();
 });

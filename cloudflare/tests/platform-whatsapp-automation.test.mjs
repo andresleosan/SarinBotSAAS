@@ -25,11 +25,16 @@ test('Worker wake requires strict source/head/window/scope and permits refreshin
   const head = { ...scope, recordType: 'control_head', conversationId: digest, controlEpoch: epoch, controlRevision: 0, connectionRevision: 7, entryState: 'initial', botAuthorityFingerprint: null, attachedConversationRevision: null, headJobId: job.jobId, tailJobId: job.jobId, currentMenuOutboxId: null, status: 'active', nextAttemptAt: null, receivedAt: now, expiresAt: now + 2592000000 };
   const connection = { ...scope, recordType: 'connection', connectionRevision: 7, providerConnection: 'connected', paused: false, pausedReason: null, updatedAt: now, connectedAt: now, connectedRevision: 7, lastSignedInboundAt: now, lastHumanEchoAt: null, lastDeliveryAt: null, observationStatus: 'failed', observationRevision: null, observedAt: null };
   await seed(env, [set('platformWhatsAppJobs/' + job.jobId, job), set('platformWhatsAppJobs/head_' + digest, head), set('platformWhatsAppEvents/' + job.sourceEventId, event(now, { customerSentAt: now })), set('serverSettings/platform_whatsapp', connection)]);
+  const old = now - 86400000;
+  const expired = Array.from({ length: 50 }, (_, i) => ({ ...job, jobId: 'job_' + i.toString(16).padStart(64, '0'), sourceOccurredAt: old, sourceReceivedAt: old, createdAt: old, customerSentAt: old, bodyExpiresAt: now, windowExpiresAt: now, expiresAt: old + 2592000000 }));
+  for (const row of expired) assert.equal(isPlatformJob(row), true);
+  await seed(env, expired.map(row => set('platformWhatsAppJobs/' + row.jobId, row)));
   assert.equal(await hasPotentialPlatformWork(env, now), true);
   let wakes = 0; context.mock.method(Date, 'now', () => now);
   env.SARIN_APP = { idFromName: name => { assert.equal(name, 'sarin-global-app'); return name; }, get: () => ({ startAndWaitForPorts: async () => { wakes++; } }) };
   await worker.scheduled({}, env); assert.equal(wakes, 1);
   await worker.scheduled({}, { ...env, WHATSAPP_ENABLED: 'true' }); assert.equal(wakes, 2);
+  for (const row of expired) assert.deepEqual(await get(env, 'platformWhatsAppJobs/' + row.jobId), row);
   for (const patch of [{ PLATFORM_WHATSAPP_PROCESSING_ENABLED: 'false' }, { SARIN_MAINTENANCE: 'true' }, { PLATFORM_WHATSAPP_SEND_DAILY_BUDGET_MICROS: '0' }, { PLATFORM_WHATSAPP_WABA_ID: '999999' }]) assert.equal(await hasPotentialPlatformWork({ ...env, ...patch }, now), false);
   assert.equal(await hasPotentialPlatformWork(env, now + 86400000), false);
   await seed(env, [set('platformWhatsAppJobs/' + job.jobId, { ...job, extra: 'poison' })]); assert.equal(await hasPotentialPlatformWork(env, now), false);

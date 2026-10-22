@@ -5,6 +5,7 @@ import { buildSupportScenario } from './platform-support-fixtures';
 import { now } from './platform-whatsapp-test-fixtures';
 import { runPlatformSupportWork, answerPlatformSupport, consumePlatformGenerationCapability } from '@/lib/server/platform-support-bot';
 import { completeChat } from '@/lib/sarin/engine';
+import * as engineModule from '@/lib/sarin/engine';
 import { quotePlatformGeneration, reservePlatformGeneration } from '@/lib/server/platform-whatsapp-budget';
 import { takePlatformGenerationPermit } from '@/lib/server/platform-whatsapp-work-store';
 import { PLATFORM_SCOPE_REFUSAL, validatePlatformSupportOutput } from '@/lib/server/platform-support-knowledge';
@@ -80,4 +81,36 @@ it('denies outside context, structural capability and default closed mapping bef
 it('enforces strict output keys, source uniqueness, Unicode and public scope', () => {
   const sources = [{ id: 'sarin.support.v1' }];
   for (const value of [{ reply: '<script>x</script>', sourceIds: ['sarin.support.v1'] }, { reply: 'https://private.invalid', sourceIds: ['sarin.support.v1'] }, { reply: 'x'.repeat(1025), sourceIds: ['sarin.support.v1'] }, { reply: '\ud800', sourceIds: ['sarin.support.v1'] }, { reply: 'Contenido', sourceIds: [] }, { reply: 'Contenido', sourceIds: ['sarin.support.v1', 'sarin.support.v1'] }, { reply: 'Contenido', sourceIds: ['sarin.support.v1'], tool: 'pay' }]) expect(validatePlatformSupportOutput(JSON.stringify(value), sources)).toBeNull();
+});
+it.each(['actor', 'question', 'signal'] as const)('denies altered %s inside the real context without consuming its legitimate engine capability', async changed => {
+  const s = await buildSupportScenario(), { lease } = await s.question(), job = (await s.work.readAuthorized(lease))!;
+  if (job.authorityKind !== 'actor') throw new Error('Expected actor');
+  const real = engineModule.completePlatformSupport;
+  fetcher.mockResolvedValue(response(JSON.stringify({ reply: 'Soporte público.', sourceIds: ['sarin.support.v1'] })));
+  const intercepted = vi.spyOn(engineModule, 'completePlatformSupport').mockImplementation(async (capability, body, signal, usage) => {
+    const actor = workActor(job), question = JSON.parse(body).messages[1].content;
+    await expect(answerPlatformSupport(changed === 'actor' ? { ...actor, uid: 'other-synthetic-actor' } : actor, changed === 'question' ? 'changed question' : question, changed === 'signal' ? new AbortController().signal : signal)).rejects.toMatchObject({ status: 409 });
+    return real(capability, body, signal, usage);
+  });
+  await runPlatformSupportWork(lease, s.db, new AbortController().signal);
+  expect(intercepted).toHaveBeenCalledTimes(1); expect(fetcher).toHaveBeenCalledTimes(1);
+  expect([...s.rows.values()].filter(r => isBudgetCall(r) && r.stage === 'generation')).toHaveLength(1);
+  expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(1);
+});
+it.each(['body', 'model', 'signal'] as const)('burns the actual once capability on altered %s before network and preserves terminal uncertainty', async changed => {
+  const s = await buildSupportScenario(), { lease } = await s.question();
+  const real = engineModule.completePlatformSupport;
+  vi.spyOn(engineModule, 'completePlatformSupport').mockImplementation(async (capability, body, signal, usage) => {
+    const altered = JSON.parse(body);
+    if (changed === 'body') altered.messages[1].content = 'forged question';
+    if (changed === 'model') altered.model = 'unapproved-model';
+    await expect(real(capability, changed === 'signal' ? body : JSON.stringify(altered), changed === 'signal' ? new AbortController().signal : signal, usage)).rejects.toMatchObject({ status: 409 });
+    // Even restoring the exact original bytes cannot recover the consumed attempt.
+    return real(capability, body, signal, usage);
+  });
+  await expect(runPlatformSupportWork(lease, s.db, new AbortController().signal)).rejects.toThrow();
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(s.rows.get('platformWhatsAppJobs/' + lease.jobId)).toMatchObject({ status: 'unknown', generationState: 'unknown', outboxId: null });
+  expect([...s.rows.values()].find(r => isBudgetCall(r) && r.stage === 'generation')).toMatchObject({ status: 'uncertain', actualMicros: null });
+  expect([...s.rows.values()].filter(r => isPlatformOutbox(r) && r.outputKind === 'generated')).toHaveLength(0);
 });

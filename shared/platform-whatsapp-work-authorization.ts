@@ -27,8 +27,27 @@ export function currentWorkLink(job: PlatformJob, facts: { link: unknown; phone:
     && l.account.revision === job.accountRevision && l.account.fingerprint === job.accountFingerprint && l.account.receiptId === job.accountReceiptId && l.support.revision === job.supportRevision && l.support.fingerprint === job.supportFingerprint && l.support.receiptId === job.supportReceiptId;
 }
 
+export const WORK_CANDIDATE_PAGE = 25, WORK_CANDIDATE_PAGES = 4;
+export const platformCandidateField = (root: string, status: string) => root === 'platformWhatsAppOutbox' ? 'outboxId' : status === 'advance' ? 'conversationId' : 'jobId';
+type Candidate = { path: string; data: unknown };
+type Candidates = (root: string, status: string, after?: string) => Promise<Candidate[]>;
+/** Stable bounded pagination; ordinary expired rows consume scan budget, never wake authority. */
+export async function* boundedPlatformCandidates(candidates: Candidates, root: string, status: string) {
+  let after: string | undefined;
+  for (let page = 0; page < WORK_CANDIDATE_PAGES; page++) {
+    const rows = await candidates(root, status, after);
+    for (const row of rows) yield row;
+    if (rows.length < WORK_CANDIDATE_PAGE) return;
+    const last = rows.at(-1)!;
+    const id = last.data && typeof last.data === 'object' ? (last.data as Record<string, unknown>)[platformCandidateField(root, status)] : null;
+    const path = root + '/' + (status === 'advance' ? 'head_' : '') + id;
+    // A malformed cursor cannot justify skipping unknown records or another unbounded scan.
+    if (typeof id !== 'string' || last.path !== path || after !== undefined && id <= after) return;
+    after = id;
+  }
+}
 /** Read-only bounded scheduling proof. It never authorizes a stage effect. */
-export async function potentialPlatformWork(read: (path: string) => Promise<unknown>, candidates: (root: string, status: string) => Promise<Array<{ path: string; data: unknown }>>, env: Record<string, unknown>, now: number): Promise<boolean> {
+export async function potentialPlatformWork(read: (path: string) => Promise<unknown>, candidates: Candidates, env: Record<string, unknown>, now: number): Promise<boolean> {
   if (env.PLATFORM_WHATSAPP_PROCESSING_ENABLED !== 'true' || env.SARIN_MAINTENANCE === 'true') return false;
   const scope = { wabaId: env.PLATFORM_WHATSAPP_WABA_ID, phoneE164: env.PLATFORM_WHATSAPP_PHONE_E164, phoneNumberId: env.PLATFORM_WHATSAPP_PHONE_NUMBER_ID };
   const policy = parsePlatformWorkPolicy(env as WorkPolicyEnvironment); if (!policy) return false;
@@ -42,7 +61,7 @@ export async function potentialPlatformWork(read: (path: string) => Promise<unkn
     if (stage === 'audio' && env.PLATFORM_WHATSAPP_TRANSCRIPTION_ENABLED !== 'true') return false;
     return true;
   };
-  for (const status of ['prepared', 'claimed']) for (const row of await candidates('platformWhatsAppOutbox', status)) {
+  for (const status of ['prepared', 'claimed']) for await (const row of boundedPlatformCandidates(candidates, 'platformWhatsAppOutbox', status)) {
     const out = row.data;
     if (!isPlatformOutbox(out) || row.path !== 'platformWhatsAppOutbox/' + out.outboxId || out.status !== status || out.bodyState !== 'body_present') continue;
     const job = await read('platformWhatsAppJobs/' + out.jobId);
@@ -50,10 +69,11 @@ export async function potentialPlatformWork(read: (path: string) => Promise<unkn
     if (out.status === 'claimed') { const call = out.sendReservationId ? await read('platformWhatsAppBudgetCalls/' + out.sendReservationId) : null; if (!isBudgetCall(call) || call.status !== 'reserved' || call.stage !== 'send' || call.jobId !== job.jobId || call.epoch !== job.epoch || call.requestFingerprint !== job.requestFingerprint || call.expiresAt !== job.expiresAt || !workScopeEqual(call, job)) continue; }
     return true;
   }
-  for (const status of ['ready', 'leased', 'advance']) for (const row of await candidates('platformWhatsAppJobs', status)) {
+  for (const status of ['ready', 'leased', 'advance']) for await (const row of boundedPlatformCandidates(candidates, 'platformWhatsAppJobs', status)) {
     const value = row.data;
     const job = isControlHead(value) && value.status === 'advance' && row.path === 'platformWhatsAppJobs/head_' + value.conversationId && value.headJobId ? await read('platformWhatsAppJobs/' + value.headJobId) : value;
     if (!isPlatformJob(job) || !['ready', 'waiting', 'leased'].includes(job.status) || job.outboxId !== null || !['not_started', 'not_applicable'].includes(job.generationState) || !['not_started', 'not_applicable', 'completed'].includes(job.audioState)) continue;
+    if (status === 'advance' && (!isControlHead(value) || value.nextAttemptAt === null || value.nextAttemptAt > now)) continue;
     if (status !== 'advance' && (row.path !== 'platformWhatsAppJobs/' + job.jobId || job.nextAttemptAt === null || job.nextAttemptAt > now)) continue;
     if (await check(job, status === 'advance')) return true;
   }
