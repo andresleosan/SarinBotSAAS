@@ -53,7 +53,10 @@ export async function readPlatformAdminContext(actor: PlatformActor, db: Databas
   try { const page = await listSupportConversations({ uid: actor.uid, role: 'admin' }, null, db); web = page.conversations.length; webCoverage = page.hasMore ? 'truncada a una página' : 'sin truncamiento observado'; }
   catch (e) { if (!(e instanceof HttpError) || e.status !== 503) throw e; }
   await assertPlatformSuperadmin(actor, db);
-  return { snapshot, menu: { payments: snapshot.metrics.pendingPayments, support: inbox.conversations.filter(c => c.contentAvailable).length + web,
+  const support = inbox.conversations.filter(c => c.contentAvailable).length + web;
+  const limitations = [snapshot.coverage.paymentsTruncated && 'pagos truncados', snapshot.coverage.businessesTruncated && 'negocios truncados', inbox.truncated && 'WhatsApp parcial', webCoverage !== 'sin truncamiento observado' && 'web ' + webCoverage].filter(Boolean);
+  const channelSummary = `Consultados: ${snapshot.metrics.pendingPayments} pagos; ${support} consultas (no totales). Cobertura: ${limitations.join(', ') || 'sin truncamiento observado'}. Cupos sin verificar: ${snapshot.coverage.allowancesUnavailable}. Conexión observada; motor sin verificar.`;
+  return { snapshot, channelSummary, menu: { payments: snapshot.metrics.pendingPayments, support,
     health: `Registros consultados; pagos ${snapshot.coverage.paymentsTruncated ? 'truncados' : 'sin truncamiento observado'}; negocios ${snapshot.coverage.businessesTruncated ? 'truncados' : 'sin truncamiento observado'}; cupos no disponibles: ${snapshot.coverage.allowancesUnavailable}; soporte WhatsApp ${inbox.truncated ? 'truncado o no disponible' : 'sin truncamiento observado'}; consultas web vigentes ${web}, cobertura ${webCoverage}. Conexion observada recientemente; no acredita salud del motor. Conteos consultados, no totales ni no leídos.` } };
 }
 

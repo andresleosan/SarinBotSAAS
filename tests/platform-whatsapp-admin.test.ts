@@ -29,7 +29,7 @@ it('generates the private consulted payment answer through the once capability a
   expect(answer).toMatchObject({ sources: [{ id: 'payment-demo-payment', href: '/admin?focusPayment=demo-payment#payment-demo-payment' }] });
   const out = [...s.rows.values()].find(r => isPlatformOutbox(r) && r.outputKind === 'generated')!;
   expect(workPayload(out as never, now)?.text).toContain('https://sarinbotsaas.pages.dev/admin?focusPayment=demo-payment');
-  expect(workPayload(out as never, now)?.text).toContain('consultados: 1');
+  expect(workPayload(out as never, now)?.text).toContain('Consultados: 1 pagos');
   expect(JSON.stringify(fetcher.mock.calls)).not.toContain('private.invalid');
   expect([...s.rows.values()].find(r => isBudgetCall(r) && r.stage === 'generation')).toMatchObject({ status: 'settled', actualMicros: 8 });
   const claim = (await s.work.claimSend(out.outboxId as string))!;
@@ -74,6 +74,28 @@ it('rejects an oversized complete WhatsApp envelope even when the model reply al
   expect([...s.rows.entries()].find(([path]) => path.startsWith('aiUsageCalls/'))![1]).toMatchObject({ platformOutput: 'channel_envelope' });
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it.each([320, 500])('fits a %i-character verified reply with two realistic payment references', async length => {
+  const s = await privateScenario(), reply = 'x'.repeat(length);
+  const ids = ['a60befa0-1b37-4bc2-811f-41c5e8274011', 'b60befa0-1b37-4bc2-811f-41c5e8274022'];
+  for (const id of ids) s.seed('paymentReceipts/' + id, { tenantId: 'demo-business', tenantName: 'Demo business', status: 'pending', submittedAt: now, amountCOP: 1000 });
+  const fetcher = vi.fn().mockResolvedValue(response({ reply, sourceIds: ids.map(id => 'payment-' + id) })); vi.stubGlobal('fetch', fetcher);
+  await runPlatformSupportWork(s.lease, s.db, new AbortController().signal);
+  const out = [...s.rows.values()].find(r => isPlatformOutbox(r) && r.outputKind === 'generated')!;
+  const text = workPayload(out as never, now)!.text!;
+  expect(text.startsWith(reply + '\n')).toBe(true);
+  for (const id of ids) expect(text).toContain('https://sarinbotsaas.pages.dev/admin?focusPayment=' + id + '#payment-' + id);
+  expect(text).toContain('Consultados:');
+  expect(text).toContain('Cobertura:');
+  expect(text).toContain('motor sin verificar');
+  expect(text).toContain(new Date(now).toISOString());
+  if (!isPlatformOutbox(out)) throw new Error('Expected a validated outbox');
+  expect(text).toContain(new Date(out.bodyExpiresAt).toISOString());
+  expect(text.length).toBeLessThanOrEqual(1024);
+  expect(Buffer.byteLength(text, 'utf8')).toBeLessThanOrEqual(4096);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect([...s.rows.values()].find(r => isBudgetCall(r) && r.stage === 'generation')).toMatchObject({ status: 'settled', actualMicros: 8 });
+});
 it.each(['foreign', 'disabled', 'deleted', 'cutoff', 'role'] as const)('denies current %s private identity before a private snapshot', async loss => {
   const s = await privateScenario(), job = (await s.work.readAuthorized(s.lease))!;
   if (job.authorityKind !== 'actor') throw new Error('Expected actor');
@@ -111,6 +133,7 @@ it('adds consulted live web threads to the WA support count with explicit bounde
   const job = (await s.work.readAuthorized(s.lease))!; if (job.authorityKind !== 'actor') throw new Error('Expected actor');
   const result = await readPlatformAdminContext(workActor(job), s.db);
   expect(result.menu.support).toBe(2); expect(result.menu.health).toContain('web');
+  expect(result.channelSummary).toContain('2 consultas (no totales)');
 });
 import { AsyncLocalStorage } from 'node:async_hooks';
 it('gives foreign/client calls 403 without a bound context or private read', async () => {
@@ -173,6 +196,9 @@ it('keeps bounded and unknown coverage truthful and rejects forged server paths'
   expect(context.menu.payments).toBe(100); expect(context.menu.health).toContain('pagos truncados');
   expect(context.snapshot.businesses[0]).toMatchObject({ quotaState: 'unavailable', remainingResponses: null });
   expect(context.menu.health).toContain('cupos no disponibles: 1');
+  expect(context.channelSummary).toContain('pagos truncados');
+  expect(context.channelSummary).toContain('web no disponible');
+  expect(context.channelSummary).toContain('Cupos sin verificar: 1');
   expect(context.menu.support).toBe(1);
   expect(() => platformAdminSourceUrl({ ...context.snapshot.sources[0], href: '//private.invalid/image' })).toThrow();
 });

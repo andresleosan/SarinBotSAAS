@@ -123,7 +123,7 @@ async function generate(actor: PlatformActor, question: string, signal: AbortSig
     let text = answer?.reply ?? '';
     if (paymentLink) text = 'Propuesta preparada. Revisa el importe y confirma individualmente en el panel autenticado: ' + paymentLink + '\nCaduca a los cinco minutos. Abrir el enlace no confirma el pago.';
     if (snapshot && answer && 'sources' in answer) {
-      text += '\nFuentes: ' + (answer.sources.map(source => platformAdminSourceUrl(source)).join(', ') || 'sin referencias individuales') + '\nPagos consultados: ' + snapshot.metrics.pendingPayments + '; soporte consultado: ' + menu!.support + '. ' + menu!.health + '\nConsulta vigente al ' + new Date(snapshot.generatedAt).toISOString() + '. Contenido vence ' + new Date(job.bodyExpiresAt).toISOString() + '.';
+      text += '\nFuentes: ' + (answer.sources.map(source => platformAdminSourceUrl(source)).join(', ') || 'sin referencias individuales') + '\n' + privateContext!.channelSummary + '\nDatos: ' + new Date(snapshot.generatedAt).toISOString() + '; vence: ' + new Date(job.bodyExpiresAt).toISOString() + '.';
       if (!workText(text, 'reply')) { answer = null; platformOutput = 'channel_envelope'; }
     }
     try {
