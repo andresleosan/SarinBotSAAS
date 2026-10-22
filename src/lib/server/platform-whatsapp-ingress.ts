@@ -67,7 +67,7 @@ export async function ingestPlatformWhatsAppEvent(input: unknown, config: Platfo
   const originalBodyLive = Math.min(event.occurredAt, now) + PLATFORM_BODY_TTL > now;
   const eventEnvelope = originalBodyLive && (!newKind || event.kind === 'incoming_audio' && prepared) ? encryptPlatformWhatsAppContent(originalPlaintext, events.doc(eventId).path, config.contentKey) : null;
   const previewEnvelope = eventEnvelope ? encryptPlatformWhatsAppContent(event.kind === 'incoming_audio' ? { customerPhone: event.customerPhone, text: null } : originalPlaintext, conversationRef.path, config.contentKey) : null;
-  return database.runTransaction(async transaction => {
+  const result = await database.runTransaction<PlatformWhatsAppIngressResult>(async transaction => {
     const stageEvent = (id: string, value: PlatformWhatsAppStoredEvent) => {
       if (!isPlatformWhatsAppStoredEvent(value)) throw platformWhatsAppUnavailableError();
       transaction.set(events.doc(id), value);
@@ -179,4 +179,10 @@ export async function ingestPlatformWhatsAppEvent(input: unknown, config: Platfo
     if (!newKind || retentionIdentity || record.kind === 'incoming_choice' && record.ingressDisposition === 'choice_consumed' && admission.conversation) { stageConversation(conversationId, updated); transaction.set(connectionRef, connection); }
     return { outcome: 'stored', conversationId };
   });
+  if (process.env.PLATFORM_WHATSAPP_PROCESSING_ENABLED === 'true') {
+    const { kickPlatformWhatsAppWorker, recognizePlatformWorkCancellation } = await import('./platform-whatsapp-worker');
+    await recognizePlatformWorkCancellation(result.conversationId);
+    if (result.outcome === 'stored') kickPlatformWhatsAppWorker();
+  }
+  return result;
 }

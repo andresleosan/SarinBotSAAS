@@ -7,16 +7,16 @@ import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config
 import { applyPlatformWhatsAppConversationControl } from '@/lib/server/platform-whatsapp-conversations';
 import { updateConsent } from '@/lib/server/consent';
 import { createPlatformWorkStore, takePlatformSendPermit, takePlatformGenerationPermit, completePlatformGeneration } from '@/lib/server/platform-whatsapp-work-store';
-import { reservePlatformCost } from '@/lib/server/platform-whatsapp-budget';
+import { quotePlatformGeneration, reservePlatformGeneration } from '@/lib/server/platform-whatsapp-budget';
 import { isPlatformJob, workCatalog, emptyUsage, type Lease } from '../shared/platform-whatsapp-work';
 import { configureLink, seedConsents, phone, token } from './platform-whatsapp-link-fixtures';
 import { now, incoming, connection, connectionPath, memoryStore, echo } from './platform-whatsapp-test-fixtures';
-import { configureWork, workCircuit } from './platform-whatsapp-work-fixtures';
+import { configureWork, configureGenerationWork, workCircuit } from './platform-whatsapp-work-fixtures';
 
 describe('original actor authority and supplied transaction cancellation', () => {
   let s: ReturnType<typeof memoryStore>, work: ReturnType<typeof createPlatformWorkStore>, seq: number;
   beforeEach(async () => {
-    configureLink(); configureWork(); seq = 0; vi.spyOn(Date, 'now').mockReturnValue(now);
+    configureLink(); configureWork(); configureGenerationWork(); seq = 0; vi.spyOn(Date, 'now').mockReturnValue(now);
     auth.getUser.mockReset().mockImplementation(async uid => ({ uid, disabled: false })); s = memoryStore(); work = createPlatformWorkStore(s.db, () => now);
     s.seed(connectionPath, { ...connection({ providerConnection: 'connected' }), observationStatus: 'connected', observationRevision: 0, observedAt: now });
     for (const stage of ['audio', 'generation', 'send'] as const) { const c = workCircuit(undefined, stage); s.seed('platformWhatsAppBudgetPeriods/' + c.circuitId, c); }
@@ -31,7 +31,7 @@ describe('original actor authority and supplied transaction cancellation', () =>
     const lease = (await work.claimNext())!, job = (await work.readAuthorized(lease))!;
     expect(job).not.toBeNull(); const out = await work.saveReply(lease, workCatalog[job.catalogId!].text), claim = (await work.claimSend(out.outboxId))!;
     expect(await takePlatformSendPermit(out.outboxId, claim.token, s.db, now)).not.toBeNull();
-    await work.finishSend(out.outboxId, claim.token, { status: 'accepted', providerId: 'demo-provider-' + seq }); return out.outboxId;
+    await work.finishSend(out.outboxId, claim.token, { status: 'accepted', providerId: 'demo-provider-' + out.outboxId }); return out.outboxId;
   }
   async function choose(id: string, action: string) { const { text: _t, ...e } = event(); return ingest({ ...e, kind: 'incoming_choice', choiceId: `sarinbot.menu.v1:${action}:${id}` }, getPlatformWhatsAppConfig(), s.db, now); }
   async function enter() {
@@ -49,23 +49,23 @@ describe('original actor authority and supplied transaction cancellation', () =>
   });
   it.each(['disabled', 'deleted', 'revoked-cutoff', 'receipt', 'connection', 'deadline'])('fences %s before a generation permit', async failure => {
     await enter(); const lease = await question();
-    await reservePlatformCost(lease.jobId, 'generation', 2, s.db);
+    await reservePlatformGeneration((await work.readAuthorized(lease))!, quotePlatformGeneration('synthetic-request'), s.db);
     if (failure === 'disabled') auth.getUser.mockResolvedValue({ uid: token().uid, disabled: true });
     if (failure === 'deleted') auth.getUser.mockRejectedValue({ code: 'auth/user-not-found' });
     if (failure === 'revoked-cutoff') auth.getUser.mockResolvedValue({ uid: token().uid, disabled: false, tokensValidAfterTime: new Date(now + 1).toISOString() });
     if (failure === 'receipt') await seedConsents(s.db, token().uid, 2);
     if (failure === 'connection') s.seed(connectionPath, { ...s.rows.get(connectionPath), observationStatus: 'failed', observationRevision: null, observedAt: null });
-    expect(await takePlatformGenerationPermit(lease, s.db, failure === 'deadline' ? now + 120_000 : now)).toBeNull();
+    expect(await takePlatformGenerationPermit(lease, s.db, failure === 'deadline' ? now + 120_000 : now, quotePlatformGeneration('synthetic-request'))).toBeNull();
   });
   it('consumes a generation permit only once and requires its exact lease token', async () => {
-    await enter(); const lease = await question(); await reservePlatformCost(lease.jobId, 'generation', 2, s.db);
+    await enter(); const lease = await question(); await reservePlatformGeneration((await work.readAuthorized(lease))!, quotePlatformGeneration('synthetic-request'), s.db);
     expect(await takePlatformGenerationPermit({ ...lease, token: '00000000-0000-4000-8000-000000000099' }, s.db, now)).toBeNull();
-    expect(await takePlatformGenerationPermit(lease, s.db, now)).toMatchObject({ question: 'Synthetic support question' });
-    expect(await takePlatformGenerationPermit(lease, s.db, now)).toBeNull();
+    expect(await takePlatformGenerationPermit(lease, s.db, now, quotePlatformGeneration('synthetic-request'))).toMatchObject({ question: 'Synthetic support question' });
+    expect(await takePlatformGenerationPermit(lease, s.db, now, quotePlatformGeneration('synthetic-request'))).toBeNull();
   });
   it.each([false, true])('atomically persists a generated outbox or terminates oversized output (%s)', async oversized => {
-    const id = await enter(), lease = await question(); await reservePlatformCost(lease.jobId, 'generation', 2, s.db);
-    const permit = (await takePlatformGenerationPermit(lease, s.db, now))!;
+    const id = await enter(), lease = await question(); await reservePlatformGeneration((await work.readAuthorized(lease))!, quotePlatformGeneration('synthetic-request'), s.db);
+    const permit = (await takePlatformGenerationPermit(lease, s.db, now, quotePlatformGeneration('synthetic-request')))!;
     const result = await completePlatformGeneration(lease, permit.generationToken, { status: 'completed', text: oversized ? 'x'.repeat(1025) : 'Synthetic metered answer', actualMicros: 1, usage: { ...emptyUsage, usageInputTokens: 10, usageOutputTokens: 5 } }, s.db, now);
     if (oversized) {
       expect(result).toBeNull();
@@ -104,7 +104,7 @@ describe('original actor authority and supplied transaction cancellation', () =>
   });
   it('human echo atomically fences an in-flight actor and preserves unknown accounting', async () => {
     const id = await enter(), lease = await question();
-    await reservePlatformCost(lease.jobId, 'generation', 2, s.db); await takePlatformGenerationPermit(lease, s.db, now);
+    await reservePlatformGeneration((await work.readAuthorized(lease))!, quotePlatformGeneration('synthetic-request'), s.db); await takePlatformGenerationPermit(lease, s.db, now, quotePlatformGeneration('synthetic-request'));
     await ingest(echo({ eventId: 'demo-work-echo', messageId: 'demo-work-echo', whatsappMessageId: null }), getPlatformWhatsAppConfig(), s.db, now);
     expect(s.rows.get('platformWhatsAppJobs/head_' + id)).toMatchObject({ entryState: 'human_paused' });
     expect(await work.readAuthorized(lease)).toBeNull();

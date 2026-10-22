@@ -34,6 +34,13 @@ export async function cleanupPlatformWorkPhase(env: Env, root: typeof roots[numb
               if ((data.recordType !== 'job' && data.recordType !== 'outbox') || data.bodyState !== 'body_present' || data.bodyExpiresAt > now) throw new Error('Invalid body selection');
               staged.set(path, { op: 'set', path, data: { ...data, bodyState: 'body_erased', content: null } });
             } else {
+              if (data.recordType === 'provider_alias') {
+                const bytes = new TextEncoder().encode(JSON.stringify(['sarin/platform-whatsapp', 1, 'provider-alias', data.wabaId, data.phoneE164, data.phoneNumberId, data.providerId]));
+                const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
+                if (path !== 'platformWhatsAppOutbox/provider_' + digest) throw new Error('Invalid provider alias path');
+                const target = await read('platformWhatsAppOutbox/' + data.outboxId);
+                if (target && (target.recordType !== 'outbox' || target.providerId !== data.providerId || target.jobId !== data.jobId || target.epoch !== data.epoch || target.expiresAt !== data.expiresAt || target.wabaId !== data.wabaId || target.phoneE164 !== data.phoneE164 || target.phoneNumberId !== data.phoneNumberId)) throw new Error('Invalid provider alias target');
+              }
               if (data.expiresAt > now) throw new Error('Invalid expiry selection');
               if (data.recordType === 'job' || data.recordType === 'outbox') {
                 const hp = 'platformWhatsAppJobs/head_' + data.conversationId, head = await read(hp);

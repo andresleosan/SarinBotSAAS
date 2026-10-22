@@ -10,6 +10,8 @@ vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: 
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ user: { uid: state.uid } }), AuthGate: ({ admin, children }: { admin?: boolean; children: ReactNode }) => admin && !state.admin ? createElement("p", null, "Acceso restringido") : children }));
 vi.mock("@/components/app-shell", () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children, error }: { children: ReactNode; error?: boolean }) => createElement("p", { role: error ? "alert" : "status" }, children), buttonClass: "button", fieldClass: "field" }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
+// The owner-link panel has its own real-provider suite; keep this copilot fixture's API contract scoped.
+vi.mock("@/components/platform-whatsapp-link", () => ({ PlatformWhatsAppLink: () => createElement("section", { "aria-label": "Owner link fixture" }) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const text = (node: ReactTestInstance | string): string => typeof node === "string" ? node : node.children.map(text).join("");
 const source = { id: "business-fixture", kind: "business" as const, businessId: "fixture", label: "Clínica sintética", detail: "Revisar cuota", href: "/admin#business-fixture" };

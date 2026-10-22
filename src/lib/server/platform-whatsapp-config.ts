@@ -7,6 +7,8 @@ const idSchema = z.string().regex(PLATFORM_ID_PATTERN);
 const scopeSchema = z.object({ wabaId: idSchema, phoneE164: z.string().regex(PLATFORM_PHONE_PATTERN), phoneNumberId: idSchema }).strict();
 
 export interface PlatformWhatsAppConfig {
+  processingEnabled?: boolean;
+  transcriptionEnabled?: boolean;
   receiveEnabled: boolean;
   retentionEnabled: boolean;
   aiEnabled: boolean;
@@ -26,6 +28,7 @@ export function getPlatformWhatsAppConfig(): PlatformWhatsAppConfig {
     if (value !== undefined && value !== 'true' && value !== 'false') missingConfiguration.push(name);
     return value === 'true';
   }
+  const processingEnabled = flag('PLATFORM_WHATSAPP_PROCESSING_ENABLED'), transcriptionEnabled = flag('PLATFORM_WHATSAPP_TRANSCRIPTION_ENABLED');
   const receiveEnabled = flag('PLATFORM_WHATSAPP_RECEIVE_ENABLED');
   const retentionEnabled = flag('PLATFORM_WHATSAPP_RETENTION_ENABLED');
   if (!retentionEnabled && !missingConfiguration.includes('PLATFORM_WHATSAPP_RETENTION_ENABLED')) missingConfiguration.push('PLATFORM_WHATSAPP_RETENTION_ENABLED');
@@ -49,11 +52,12 @@ export function getPlatformWhatsAppConfig(): PlatformWhatsAppConfig {
       if (name && !missingConfiguration.includes(name)) missingConfiguration.push(name);
     }
   }
-  return { receiveEnabled, retentionEnabled, aiEnabled, sendEnabled, configured: missingConfiguration.length === 0, missingConfiguration, scope: scope.success ? scope.data : null, signingSecret, contentKey };
+  return { processingEnabled, transcriptionEnabled, receiveEnabled, retentionEnabled, aiEnabled, sendEnabled, configured: missingConfiguration.length === 0, missingConfiguration, scope: scope.success ? scope.data : null, signingSecret, contentKey };
 }
 
 export function publicPlatformWhatsAppConfig(config: PlatformWhatsAppConfig): PublicPlatformWhatsAppConfig {
   return {
+    processingEnabled: config.processingEnabled ?? false, transcriptionEnabled: config.transcriptionEnabled ?? false,
     receiveEnabled: config.receiveEnabled, retentionEnabled: config.retentionEnabled,
     aiEnabled: config.aiEnabled, sendEnabled: config.sendEnabled, configured: config.configured,
     missingConfiguration: [...config.missingConfiguration],

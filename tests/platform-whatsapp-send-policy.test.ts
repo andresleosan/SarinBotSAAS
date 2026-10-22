@@ -1,0 +1,35 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => { throw new Error('Default backend forbidden'); } }));
+import { configure, connection, connectionPath, incoming, memoryStore, now } from './platform-whatsapp-test-fixtures';
+import { configureWork, workCircuit } from './platform-whatsapp-work-fixtures';
+import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config';
+import { ingestPlatformWhatsAppEvent } from '@/lib/server/platform-whatsapp-ingress';
+import { createPlatformWorkStore, takePlatformSendPermit } from '@/lib/server/platform-whatsapp-work-store';
+import { parsePlatformWorkPolicy } from '../shared/platform-whatsapp-policy';
+import { workCatalog } from '../shared/platform-whatsapp-work';
+beforeEach(() => { configure(); configureWork(); vi.spyOn(Date, 'now').mockReturnValue(now); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+it('denies new send claim when global service tariff evidence is absent', async () => {
+  const tariff = JSON.parse(process.env.PLATFORM_WHATSAPP_TARIFF_POLICY!); delete tariff.sendEvidence;
+  vi.stubEnv('PLATFORM_WHATSAPP_TARIFF_POLICY', JSON.stringify(tariff));
+  const s = memoryStore(); s.seed(connectionPath, { ...connection({ providerConnection: 'connected' }), observationStatus: 'connected', observationRevision: 0, observedAt: now });
+  const circuit = workCircuit(); s.seed('platformWhatsAppBudgetPeriods/' + circuit.circuitId, circuit);
+  await ingestPlatformWhatsAppEvent(incoming({ customerSentAt: now }), getPlatformWhatsAppConfig(), s.db, now);
+  expect(await createPlatformWorkStore(s.db).claimNext()).toBeNull();
+});
+it.each([{ version: 'different' }, { currency: 'COP' }, { timezone: 'America/Bogota' }, { category: 'template' }, { destinationScope: 'selected' }, { rate: { numerator: 9, denominator: 1 } }])('rejects mismatched evidence %j', change => {
+  const tariff = JSON.parse(process.env.PLATFORM_WHATSAPP_TARIFF_POLICY!);
+  expect(parsePlatformWorkPolicy({ ...process.env, PLATFORM_WHATSAPP_TARIFF_POLICY: JSON.stringify({ ...tariff, sendEvidence: { ...tariff.sendEvidence, ...change } }) })).toBeNull();
+});
+it('binds exact destination to encrypted original outbox and fences policy change before send start', async () => {
+  const s = memoryStore(); s.seed(connectionPath, { ...connection({ providerConnection: 'connected' }), observationStatus: 'connected', observationRevision: 0, observedAt: now });
+  const circuit = workCircuit(); s.seed('platformWhatsAppBudgetPeriods/' + circuit.circuitId, circuit);
+  const event = incoming({ customerSentAt: now }); await ingestPlatformWhatsAppEvent(event, getPlatformWhatsAppConfig(), s.db, now);
+  const store = createPlatformWorkStore(s.db), lease = (await store.claimNext())!, out = await store.saveReply(lease, workCatalog.identification.text), claimed = (await store.claimSend(out.outboxId))!;
+  const original = process.env.PLATFORM_WHATSAPP_TARIFF_POLICY!;
+  const changed = JSON.parse(original); changed.version = changed.sendEvidence.version = 'synthetic-v2'; vi.stubEnv('PLATFORM_WHATSAPP_TARIFF_POLICY', JSON.stringify(changed));
+  await expect(takePlatformSendPermit(out.outboxId, claimed.token, s.db, now)).rejects.toThrow();
+  expect(s.rows.get('platformWhatsAppOutbox/' + out.outboxId)).toMatchObject({ status: 'claimed', sendStartedAt: null });
+  vi.stubEnv('PLATFORM_WHATSAPP_TARIFF_POLICY', original);
+  expect(await takePlatformSendPermit(out.outboxId, claimed.token, s.db, now)).toMatchObject({ to: event.customerPhone, externalId: out.outboxId });
+});

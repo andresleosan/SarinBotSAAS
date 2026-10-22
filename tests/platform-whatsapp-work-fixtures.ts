@@ -20,8 +20,16 @@ export function workHead(job = workJob(), extra: Partial<ControlHead> = {}): Con
 export function configureWork() {
   for (const stage of ['AUDIO', 'GENERATION', 'SEND']) vi.stubEnv('PLATFORM_WHATSAPP_' + stage + '_DAILY_BUDGET_MICROS', '100');
   for (const flag of ['AUDIO', 'AI', 'SEND']) vi.stubEnv('PLATFORM_WHATSAPP_' + flag + '_ENABLED', 'true');
-  vi.stubEnv('PLATFORM_WHATSAPP_TARIFF_POLICY', JSON.stringify({ version: 'demo-v1', audio: { numerator: 1, denominator: 120000 }, generationInput: { numerator: 1, denominator: 100 }, generationOutput: { numerator: 1, denominator: 100 }, send: { numerator: 10, denominator: 1 }, maximumInputTokens: 100, maximumOutputTokens: 100 }));
+  vi.stubEnv('PLATFORM_WHATSAPP_TARIFF_POLICY', JSON.stringify({ version: 'demo-v1', sendEvidence: { version: 'demo-v1', currency: 'USD', timezone: 'UTC', category: 'service', destinationScope: 'all_e164', rate: { numerator: 10, denominator: 1 } }, audio: { numerator: 1, denominator: 120000 }, generationInput: { numerator: 1, denominator: 100 }, generationOutput: { numerator: 1, denominator: 100 }, send: { numerator: 10, denominator: 1 }, maximumInputTokens: 100, maximumOutputTokens: 100 }));
 }
 export function workCircuit(job = workJob(), stage: CostStage = 'send'): BudgetCircuit {
   return { ...identity, recordType: 'budget_circuit', circuitId: budgetIds(job, stage, now).circuitId, stage, status: 'open', policyFingerprint: currentPlatformWorkPolicy().fingerprint, createdAt: now, expiresAt: now + 2_592_000_000, trippedAt: null, reason: null };
+}
+
+/** Explicit synthetic verified mapping. Never production configuration. */
+export function configureGenerationWork() {
+  const tariff = JSON.parse(process.env.PLATFORM_WHATSAPP_TARIFF_POLICY!);
+  vi.stubEnv('PLATFORM_WHATSAPP_TARIFF_POLICY', JSON.stringify({ ...tariff, generationInput: { numerator: 300, denominator: 1000 }, generationOutput: { numerator: 1200, denominator: 1000 }, maximumInputTokens: 132096, maximumOutputTokens: 4096 }));
+  vi.stubEnv('PLATFORM_WHATSAPP_GENERATION_DAILY_BUDGET_MICROS', '1000000');
+  vi.stubEnv('PLATFORM_WHATSAPP_GENERATION_POLICY', JSON.stringify({ version: 'synthetic-verified-v1', responseModels: ['synthetic-wire-model-v1'] }));
 }

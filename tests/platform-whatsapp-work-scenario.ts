@@ -5,12 +5,12 @@ import { createPlatformWorkStore, takePlatformSendPermit } from '@/lib/server/pl
 import { reservePlatformCost } from '@/lib/server/platform-whatsapp-budget';
 import { configureLink, seedConsents, token, phone } from './platform-whatsapp-link-fixtures';
 import { now, memoryStore, incoming, connection, connectionPath } from './platform-whatsapp-test-fixtures';
-import { configureWork, workCircuit } from './platform-whatsapp-work-fixtures';
+import { configureWork, configureGenerationWork, workCircuit } from './platform-whatsapp-work-fixtures';
 import { workCatalog } from '../shared/platform-whatsapp-work';
 
 /** Real link, menus, accepted outboxes and actor audio ingress; no seeded actors. */
-export async function buildWorkAudioScenario() {
-  configureLink(); configureWork(); const s = memoryStore(), work = createPlatformWorkStore(s.db, () => now); let seq = 0;
+export async function buildWorkAudioScenario(options: { generation?: boolean } = {}) {
+  configureLink(); configureWork(); if (options.generation) configureGenerationWork(); const s = memoryStore(), work = createPlatformWorkStore(s.db, () => now); let seq = 0;
   s.seed(connectionPath, { ...connection({ providerConnection: 'connected' }), observationStatus: 'connected', observationRevision: 0, observedAt: now });
   for (const stage of ['audio', 'generation', 'send'] as const) { const c = workCircuit(undefined, stage); s.seed('platformWhatsAppBudgetPeriods/' + c.circuitId, c); }
   await seedConsents(s.db);

@@ -17,13 +17,14 @@ interface NormalizedBase {
   messageId: string;
   whatsappMessageId: string | null;
 }
-export type NormalizedYCloudEvent = NormalizedBase & (
+type NormalizedYCloudInbound = NormalizedBase & (
   | { kind: 'incoming_text'; sourceEventType: 'whatsapp.inbound_message.received'; customerPhone: string; customerSentAt: number | null; text: string }
   | { kind: 'incoming_audio'; sourceEventType: 'whatsapp.inbound_message.received'; customerPhone: string; customerSentAt: number | null; audio: AudioDescriptor }
   | { kind: 'incoming_choice'; sourceEventType: 'whatsapp.inbound_message.received'; customerPhone: string; customerSentAt: number | null; choiceId: string }
   | { kind: 'human_echo'; sourceEventType: 'whatsapp.smb.message.echoes' | 'whatsapp.smb.message.created'; customerPhone: string; messageType: string; text: string | null }
-  | { kind: 'message_status'; sourceEventType: 'whatsapp.message.updated'; customerPhone: string | null; status: 'accepted' | 'sent' | 'delivered' | 'read' | 'failed' }
 );
+export type SignedYCloudStatus = { provider: 'ycloud'; eventId: string; occurredAt: number; messageId: string; whatsappMessageId: string | null; kind: 'message_status'; sourceEventType: 'whatsapp.message.updated'; status: 'accepted' | 'sent' | 'delivered' | 'read' | 'failed'; suppliedScope: { wabaId?: string; from?: string; to?: string; externalId?: string } };
+export type NormalizedYCloudEvent = NormalizedYCloudInbound | SignedYCloudStatus;
 
 const idSchema = z.string().min(1).max(256).refine((value) => !/[^\x21-\x7e]/.test(value));
 const wabaSchema = z.string().min(5).max(30).refine((value) => !/\D/.test(value));
@@ -34,7 +35,7 @@ const messageSchema = z.object({ id: idSchema, wamid: z.string().min(1).max(1024
 const textMessageSchema = messageSchema.extend({ type: z.string().min(1).max(64), text: z.unknown().optional() });
 const inboundSchema = textMessageSchema.extend({ sendTime: z.unknown().optional(), audio: z.unknown().optional(), interactive: z.unknown().optional() });
 const sendTimeSchema = z.iso.datetime({ offset: true }).max(40);
-const statusMessageSchema = messageSchema.partial({ wabaId: true, from: true, to: true }).extend({ status: z.string().min(1).max(64) });
+const statusMessageSchema = messageSchema.partial({ wabaId: true, from: true, to: true }).extend({ status: z.string().min(1).max(64), externalId: z.string().min(1).max(256).optional() });
 const textSchema = z.object({ body: z.string().min(1).max(4096) });
 const statusSchema = z.enum(['accepted', 'sent', 'delivered', 'read', 'failed']);
 
@@ -87,9 +88,9 @@ function normalize(value: unknown, scope: YCloudReaderScope, now: number): Norma
   }
   if (event.type === 'whatsapp.message.updated') {
     const message = parseEvent(statusMessageSchema, event.whatsappMessage);
-    if (message.wabaId !== scope.wabaId || message.from !== scope.phoneE164 || message.to === scope.phoneE164) return null;
+    if (message.wabaId !== undefined && message.wabaId !== scope.wabaId || message.from !== undefined && message.from !== scope.phoneE164 || message.to === scope.phoneE164) return null;
     const status = statusSchema.safeParse(message.status);
-    return status.success ? { ...common, kind: 'message_status', sourceEventType: event.type, customerPhone: message.to ?? null, messageId: message.id, whatsappMessageId: message.wamid ?? null, status: status.data } : null;
+    return status.success ? { provider: 'ycloud', eventId: event.id, occurredAt: Date.parse(event.createTime), kind: 'message_status', sourceEventType: event.type, messageId: message.id, whatsappMessageId: message.wamid ?? null, status: status.data, suppliedScope: { ...(message.wabaId === undefined ? {} : { wabaId: message.wabaId }), ...(message.from === undefined ? {} : { from: message.from }), ...(message.to === undefined ? {} : { to: message.to }), ...(message.externalId === undefined ? {} : { externalId: message.externalId }) } } : null;
   }
   return null;
 }

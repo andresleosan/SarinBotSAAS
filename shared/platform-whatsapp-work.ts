@@ -49,10 +49,16 @@ export type PlatformOutbox = SourceBinding & WorkAuthority & {
   status: 'prepared' | 'claimed' | 'started' | 'accepted' | 'rejected' | 'unknown' | 'cancelled';
   sendToken: string | null; sendClaimedAt: number | null; sendStartedAt: number | null; sendFinishedAt: number | null;
   providerId: string | null; sendReservationId: string | null;
+  deliveryStatus?: 'unobserved' | 'accepted' | 'sent' | 'delivered' | 'read'; deliveryFailed?: boolean; deliveryObservedAt?: number | null;
 };
 export type Usage = { usageAudioMilliseconds: number | null; usageInputTokens: number | null; usageOutputTokens: number | null; usageMessages: number | null };
 export const emptyUsage: Usage = { usageAudioMilliseconds: null, usageInputTokens: null, usageOutputTokens: null, usageMessages: null };
+export type GenerationQuote = { requestDigest: string; requestBytes: number; inputUpper: number; outputCap: 4096; provider: 'deepseek'; requestedModel: 'deepseek-flash'; modelPolicy: string; maximumMicros: number };
+export function isGenerationQuote(v: unknown): v is GenerationQuote {
+  return workObject(v) && workExact(v, ['requestDigest', 'requestBytes', 'inputUpper', 'outputCap', 'provider', 'requestedModel', 'modelPolicy', 'maximumMicros']) && workDigest(v.requestDigest) && workInteger(v.requestBytes) && v.requestBytes > 0 && v.requestBytes <= 128000 && v.inputUpper === v.requestBytes + 4096 && v.outputCap === 4096 && v.provider === 'deepseek' && v.requestedModel === 'deepseek-flash' && workDigest(v.modelPolicy) && v.maximumMicros === Math.ceil((v.requestBytes + 4096) * 300 / 1000) + Math.ceil(4096 * 1200 / 1000);
+}
 export interface BudgetCall extends PlatformWhatsAppIdentity, Usage {
+  quote?: GenerationQuote;
   recordType: 'budget_call'; reservationId: string; jobId: string; epoch: string; stage: CostStage; requestFingerprint: string;
   maximumMicros: number; actualMicros: number | null; tariffVersion: string; policyFingerprint: string; periodId: string; circuitId: string;
   createdAt: number; expiresAt: number; status: 'reserved' | 'started' | 'uncertain' | 'settled' | 'released';
@@ -67,7 +73,8 @@ export interface BudgetCircuit extends PlatformWhatsAppIdentity {
   createdAt: number; expiresAt: number; trippedAt: number | null; reason: 'overrun' | 'accounting_invalid' | null;
 }
 export interface ContactRate extends PlatformWhatsAppIdentity { recordType: 'contact_rate'; conversationId: string; acceptedAt: number[]; expiresAt: number }
-export type WorkRecord = ControlHead | PlatformJob | PlatformOutbox | BudgetCall | BudgetPeriod | BudgetCircuit | ContactRate;
+export interface ProviderAlias extends PlatformWhatsAppIdentity { recordType: 'provider_alias'; providerId: string; outboxId: string; jobId: string; epoch: string; expiresAt: number }
+export type WorkRecord = ProviderAlias | ControlHead | PlatformJob | PlatformOutbox | BudgetCall | BudgetPeriod | BudgetCircuit | ContactRate;
 type R = Record<string, unknown>;
 export const workObject = (v: unknown): v is R => !!v && typeof v === 'object' && !Array.isArray(v);
 export const workExact = (v: R, keys: readonly string[]) => Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
@@ -144,7 +151,8 @@ export function isPlatformJob(v: unknown): v is PlatformJob {
   return v.status === 'leased' ? v.leaseToken !== null && v.nextAttemptAt === v.leaseExpiresAt : v.status === 'reply_saved' ? v.outboxId !== null && workTime(v.nextAttemptAt) : ['cancelled', 'completed', 'unknown', 'waiting'].includes(String(v.status)) ? v.nextAttemptAt === null : v.leaseToken === null && workTime(v.nextAttemptAt);
 }
 export function isPlatformOutbox(v: unknown): v is PlatformOutbox {
-  if (!identity(v) || !workExact(v, [...sourceKeys, ...authorityKeys(v), 'recordType', 'outboxId', 'outputFingerprint', 'outputKind', 'menuPurpose', 'menuVersion', 'menuActions', 'consumedByEventId', 'consumedAt', 'status', 'sendToken', 'sendClaimedAt', 'sendStartedAt', 'sendFinishedAt', 'providerId', 'sendReservationId']) || v.recordType !== 'outbox' || !source(v) || !workUuid(v.outboxId) || !workDigest(v.outputFingerprint)) return false;
+  if (!identity(v) || !workExact(v, [...sourceKeys, ...authorityKeys(v), 'recordType', 'outboxId', 'outputFingerprint', 'outputKind', 'menuPurpose', 'menuVersion', 'menuActions', 'consumedByEventId', 'consumedAt', 'status', 'sendToken', 'sendClaimedAt', 'sendStartedAt', 'sendFinishedAt', 'providerId', 'sendReservationId', ...Object.hasOwn(v, 'deliveryStatus') ? ['deliveryStatus', 'deliveryFailed', 'deliveryObservedAt'] : []]) || v.recordType !== 'outbox' || !source(v) || !workUuid(v.outboxId) || !workDigest(v.outputFingerprint)) return false;
+  if (Object.hasOwn(v, 'deliveryStatus') && (!oneOf(v.deliveryStatus, ['unobserved', 'accepted', 'sent', 'delivered', 'read']) || typeof v.deliveryFailed !== 'boolean' || !nullable(v.deliveryObservedAt, workTime) || v.deliveryStatus === 'unobserved' && !v.deliveryFailed && v.deliveryObservedAt !== null || (v.deliveryStatus !== 'unobserved' || v.deliveryFailed) && v.deliveryObservedAt === null)) return false;
   if (!oneOf(v.outputKind, ['generated', 'catalog', 'audio_fallback']) || (v.outputKind === 'generated') !== (v.catalogId === null) || v.outputKind === 'audio_fallback' && v.catalogId !== 'audio_fallback' || !oneOf(v.menuPurpose, ['notice', 'support', 'admin', 'reply']) || v.menuVersion !== 1) return false;
   if (v.catalogId !== null && v.menuPurpose !== workCatalog[v.catalogId as CatalogId].purpose) return false;
   const actions = createPlatformMenu(v.outboxId, v.menuPurpose as PlatformOutbox['menuPurpose']).map(b => parsePlatformMenuChoice(b.id)!.action);
@@ -166,7 +174,7 @@ export function validUsage(v: Usage, stage: CostStage): boolean {
     : stage === 'generation' ? v.usageAudioMilliseconds === null && v.usageMessages === null && (v.usageInputTokens === null) === (v.usageOutputTokens === null) : v.usageAudioMilliseconds === null && v.usageInputTokens === null && v.usageOutputTokens === null && (v.usageMessages === null || v.usageMessages === 1));
 }
 export function isBudgetCall(v: unknown): v is BudgetCall {
-  if (!identity(v) || !workExact(v, [...identityKeys, ...usageKeys, 'recordType', 'reservationId', 'jobId', 'epoch', 'stage', 'requestFingerprint', 'maximumMicros', 'actualMicros', 'tariffVersion', 'policyFingerprint', 'periodId', 'circuitId', 'createdAt', 'expiresAt', 'status', 'effectToken', 'startedAt', 'finishedAt']) || v.recordType !== 'budget_call') return false;
+  if (!identity(v) || !workExact(v, [...identityKeys, ...usageKeys, 'recordType', 'reservationId', 'jobId', 'epoch', 'stage', 'requestFingerprint', 'maximumMicros', 'actualMicros', 'tariffVersion', 'policyFingerprint', 'periodId', 'circuitId', 'createdAt', 'expiresAt', 'status', 'effectToken', 'startedAt', 'finishedAt', ...Object.hasOwn(v, 'quote') ? ['quote'] : []]) || v.recordType !== 'budget_call' || Object.hasOwn(v, 'quote') && (v.stage !== 'generation' || !isGenerationQuote(v.quote) || v.maximumMicros !== v.quote.maximumMicros)) return false;
   if (!workId(v.reservationId, 'call') || !workId(v.jobId, 'job') || !workUuid(v.epoch) || !oneOf(v.stage, ['audio', 'generation', 'send']) || !workDigest(v.requestFingerprint) || !workInteger(v.maximumMicros) || !nullable(v.actualMicros, workInteger) || !identifier(v.tariffVersion) || !workDigest(v.policyFingerprint) || !workId(v.periodId, 'day') || !workId(v.circuitId, 'circuit') || !workTime(v.createdAt) || !workTime(v.expiresAt) || v.expiresAt <= v.createdAt || v.expiresAt > v.createdAt + PLATFORM_METADATA_TTL || !validUsage(Object.fromEntries(usageKeys.map(k => [k, v[k]])) as Usage, v.stage as CostStage) || !nullable(v.effectToken, workUuid) || !nullable(v.startedAt, workTime) || !nullable(v.finishedAt, workTime)) return false;
   const noUsage = usageKeys.every(k => v[k] === null);
   if (v.status === 'reserved') return v.actualMicros === null && v.effectToken === null && v.startedAt === null && v.finishedAt === null && noUsage;
@@ -188,8 +196,11 @@ export function isBudgetCircuit(v: unknown): v is BudgetCircuit {
 export function isContactRate(v: unknown): v is ContactRate {
   return identity(v) && workExact(v, [...identityKeys, 'recordType', 'conversationId', 'acceptedAt', 'expiresAt']) && v.recordType === 'contact_rate' && workDigest(v.conversationId) && Array.isArray(v.acceptedAt) && v.acceptedAt.length > 0 && v.acceptedAt.length <= 50 && v.acceptedAt.every((t, i, all) => workTime(t) && (i === 0 || t >= all[i - 1])) && workTime(v.expiresAt) && v.expiresAt === Number(v.acceptedAt.at(-1)) + PLATFORM_BODY_TTL;
 }
+export function isProviderAlias(v: unknown): v is ProviderAlias {
+  return identity(v) && workExact(v, [...identityKeys, 'recordType', 'providerId', 'outboxId', 'jobId', 'epoch', 'expiresAt']) && v.recordType === 'provider_alias' && workText(v.providerId, 'provider') && workUuid(v.outboxId) && workId(v.jobId, 'job') && workUuid(v.epoch) && workTime(v.expiresAt);
+}
 export function isWorkRecordAtPath(path: string, v: unknown): v is WorkRecord {
-  return isControlHead(v) ? path === 'platformWhatsAppJobs/head_' + v.conversationId
+  return isProviderAlias(v) ? /^platformWhatsAppOutbox\/provider_[a-f0-9]{64}$/.test(path) : isControlHead(v) ? path === 'platformWhatsAppJobs/head_' + v.conversationId
     : isPlatformJob(v) ? path === 'platformWhatsAppJobs/' + v.jobId : isPlatformOutbox(v) ? path === 'platformWhatsAppOutbox/' + v.outboxId
     : isBudgetCall(v) ? path === 'platformWhatsAppBudgetCalls/' + v.reservationId : isBudgetPeriod(v) ? path === 'platformWhatsAppBudgetPeriods/' + v.periodId
     : isBudgetCircuit(v) ? path === 'platformWhatsAppBudgetPeriods/' + v.circuitId : isContactRate(v) && path === 'platformWhatsAppBudgetPeriods/rate_' + v.conversationId;

@@ -10,7 +10,7 @@ export function workRef(db: Database, path: string) { const [root, id, extra] = 
 export async function readWork(tx: Transaction, db: Database, path: string): Promise<WorkRecord | null> {
   const v = (await tx.get(workRef(db, path))).data();
   if (v === undefined) return null;
-  if (!isWorkRecordAtPath(path, v)) throw new HttpError(503, 'El registro de trabajo no está disponible.', 'PLATFORM_WORK_CORRUPT');
+  if (!isWorkRecordAtPath(path, v) || v.recordType === 'provider_alias' && path !== providerAliasPath(v, v.providerId)) throw new HttpError(503, 'El registro de trabajo no está disponible.', 'PLATFORM_WORK_CORRUPT');
   return v;
 }
 export function stageWork(tx: Transaction, db: Database, path: string, v: WorkRecord): void {
@@ -18,3 +18,7 @@ export function stageWork(tx: Transaction, db: Database, path: string, v: WorkRe
   tx.set(workRef(db, path), v);
 }
 export function checkedAdd(...values: number[]) { let result = 0; for (const v of values) { if (!Number.isSafeInteger(v) || v < 0 || !Number.isSafeInteger(result + v)) throw platformWhatsAppUnavailableError(); result += v; } return result; }
+
+export function providerAliasPath(scope: { wabaId: string; phoneE164: string; phoneNumberId: string }, providerId: string): string {
+  return 'platformWhatsAppOutbox/provider_' + workHash('provider-alias', scope.wabaId, scope.phoneE164, scope.phoneNumberId, providerId);
+}

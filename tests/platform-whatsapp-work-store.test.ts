@@ -93,7 +93,7 @@ describe('real source to outbox to consumed choice', () => {
     const jobs = Array.from({ length: 26 }, (_, i) => workJob({ jobId: 'job_' + i.toString(16).padStart(64, '0'), status: 'waiting', nextAttemptAt: null, ...(i < 25 ? { sourceOccurredAt: source, sourceReceivedAt: source, createdAt: source, customerSentAt: source, windowExpiresAt: now, bodyExpiresAt: now, expiresAt: source + 2_592_000_000 } : {}) }));
     jobs.forEach((j, i) => { j.nextJobId = jobs[i + 1]?.jobId ?? null; s.seed('platformWhatsAppJobs/' + j.jobId, j); });
     let head = workHead(jobs[0], { status: 'advance', nextAttemptAt: now, tailJobId: jobs.at(-1)!.jobId }); s.seed('platformWhatsAppJobs/head_' + head.conversationId, head);
-    expect(await hasDuePlatformWork(s.db, now)).toBe(true);
+    expect(await hasDuePlatformWork(s.db, now)).toBe(false); // Raw expired edges alone cannot authorize a singleton wake.
     await s.db.runTransaction(async tx => { const apply = await prepareHeadAdvance(head, null, tx, s.db, now); apply(); });
     head = s.rows.get('platformWhatsAppJobs/head_' + head.conversationId) as unknown as typeof head;
     expect(head).toMatchObject({ status: 'advance', headJobId: jobs[20].jobId });

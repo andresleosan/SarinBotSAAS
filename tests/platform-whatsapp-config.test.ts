@@ -25,7 +25,7 @@ describe('platform configuration', () => {
   });
   it('reports exact missing names in evaluation order without revealing values', () => {
     const config = getPlatformWhatsAppConfig();
-    expect(config).toEqual({ receiveEnabled: false, retentionEnabled: false, aiEnabled: false, sendEnabled: false, configured: false, missingConfiguration: [names[1], ...names.slice(4)], scope: null, signingSecret: '', contentKey: Buffer.alloc(0) });
+    expect(config).toEqual({ processingEnabled: false, transcriptionEnabled: false, receiveEnabled: false, retentionEnabled: false, aiEnabled: false, sendEnabled: false, configured: false, missingConfiguration: [names[1], ...names.slice(4)], scope: null, signingSecret: '', contentKey: Buffer.alloc(0) });
   });
   it('allows configured preparation with reception absent or disabled', () => {
     configure();
@@ -69,7 +69,7 @@ describe('platform configuration', () => {
     configure();
     const config = getPlatformWhatsAppConfig();
     const publicConfig = publicPlatformWhatsAppConfig(config);
-    expect(Object.keys(publicConfig).sort()).toEqual(['aiEnabled', 'configured', 'missingConfiguration', 'receiveEnabled', 'retentionEnabled', 'scope', 'sendEnabled']);
+    expect(Object.keys(publicConfig).sort()).toEqual(['aiEnabled', 'configured', 'missingConfiguration', 'processingEnabled', 'receiveEnabled', 'retentionEnabled', 'scope', 'sendEnabled', 'transcriptionEnabled']);
     publicConfig.missingConfiguration.push('test');
     publicConfig.scope!.wabaId = '99999';
     expect(config.missingConfiguration).toEqual([]);

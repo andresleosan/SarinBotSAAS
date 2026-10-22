@@ -9,7 +9,7 @@ import * as webhook from '@/app/api/whatsapp/ycloud/platform/webhook/route';
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(), database: vi.fn(), status: vi.fn(), connection: vi.fn(), list: vi.fn(), control: vi.fn(),
   config: vi.fn(), observer: vi.fn(), summary: vi.fn(), close: vi.fn(), arm: vi.fn(), observe: vi.fn(),
-  normalConfig: vi.fn(), guard: vi.fn(), reader: vi.fn(), ingress: vi.fn(), linkVerifier: vi.fn(),
+  normalConfig: vi.fn(), guard: vi.fn(), reader: vi.fn(), ingress: vi.fn(), linkVerifier: vi.fn(), delivery: vi.fn(),
 }));
 // Keep real requireSuperadmin/readJson/apiError and real R3a schemas; isolate only external/domain effects.
 vi.mock('@/lib/firebase/admin', () => ({ getAdminAuth: () => ({ verifyIdToken: mocks.verify }), getAdminDb: mocks.database }));
@@ -19,6 +19,7 @@ vi.mock('@/lib/server/ycloud-retry-diagnostic', () => ({ getYCloudRetryDiagnosti
 vi.mock('@/lib/server/platform-whatsapp-config', () => ({ getPlatformWhatsAppConfig: mocks.normalConfig, requirePlatformWhatsAppReception: mocks.guard }));
 vi.mock('@/lib/server/ycloud-webhook', () => ({ readYCloudWebhook: mocks.reader }));
 vi.mock('@/lib/server/platform-whatsapp-ingress', () => ({ ingestPlatformWhatsAppEvent: mocks.ingress }));
+vi.mock('@/lib/server/platform-whatsapp-work-store', () => ({ recordPlatformDeliveryStatus: mocks.delivery }));
 vi.mock('@/lib/server/platform-whatsapp-link', () => ({ verifyPlatformWhatsAppLinkInbound: mocks.linkVerifier }));
 
 const db = { synthetic: true };
@@ -140,11 +141,13 @@ describe('public diagnostic precedence and ordinary dispatch', () => {
     await response(await webhook.POST(req), code, null); expect(mocks.observe).toHaveBeenCalledWith(req); expect(mocks.observer).toHaveBeenCalledWith(config, db);
     expect(mocks.normalConfig).not.toHaveBeenCalled(); expect(mocks.reader).not.toHaveBeenCalled(); expect(mocks.ingress).not.toHaveBeenCalled();
   });
-  it.each([null, { kind: 'message_status' }])('ordinary null/status acknowledges with no database', async event => {
+  it.each([null, { kind: 'message_status' }])('ordinary null/status acknowledges with only signed status correlation accessing database', async event => {
     mocks.reader.mockResolvedValue(event); const req = request();
     await response(await webhook.POST(req), 200, { received: true }); expect(mocks.guard).toHaveBeenCalledWith(normal);
     expect(mocks.reader).toHaveBeenCalledWith(req, { signingSecret: normal.signingSecret, scope: { wabaId: '10001', phoneE164: '+12025550100' } });
-    expect(mocks.database).not.toHaveBeenCalled(); expect(mocks.ingress).not.toHaveBeenCalled();
+    if (event) expect(mocks.delivery).toHaveBeenCalledExactlyOnceWith(event, db);
+    else expect(mocks.database).not.toHaveBeenCalled();
+    expect(mocks.ingress).not.toHaveBeenCalled();
   });
   it.each(['incoming_text', 'human_echo', 'incoming_audio', 'incoming_choice'])('dispatches%s only after signed reader and hides outcome', async kind => {
     const event = { kind }; mocks.reader.mockResolvedValue(event);
@@ -189,6 +192,7 @@ describe('signed control dispatch boundary', () => {
     expect(mocks.linkVerifier).not.toHaveBeenCalled();
     if (event && ['human_echo', 'incoming_audio', 'incoming_choice'].includes(event.kind))
       expect(mocks.ingress).toHaveBeenCalledExactlyOnceWith(event, normal, db);
+    else if (event?.kind === 'message_status') expect(mocks.delivery).toHaveBeenCalledExactlyOnceWith(event, db);
     else
       expect(mocks.database).not.toHaveBeenCalled();
   });

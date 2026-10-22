@@ -1,4 +1,5 @@
 import 'server-only';
+import { potentialPlatformWork } from '../../../shared/platform-whatsapp-work-authorization';
 import type { Database, Transaction } from '@/lib/storage/types';
 import type { ControlHead, PlatformJob } from '../../../shared/platform-whatsapp-work';
 import { readWork, stageWork } from './platform-whatsapp-work-records';
@@ -8,8 +9,7 @@ import type { WorkRecord } from '../../../shared/platform-whatsapp-work';
 
 export const dueWork = (db: Database, status: string, now: number, limit = 25) => db.collection('platformWhatsAppJobs').where('status', '==', status).where('nextAttemptAt', '<=', now).orderBy('nextAttemptAt', 'asc').limit(limit);
 export async function hasDuePlatformWork(db: Database, now: number): Promise<boolean> {
-  for (const status of ['ready', 'leased', 'reply_saved', 'advance']) if (!(await dueWork(db, status, now, 1).get()).empty) return true;
-  return false;
+  return potentialPlatformWork(async path => { const [root, id] = path.split('/'); return (await db.collection(root).doc(id).get()).data(); }, async (root, status) => { const q = root === 'platformWhatsAppJobs' ? dueWork(db, status, now, 1) : db.collection(root).where('status', '==', status).limit(1); return (await q.get()).docs.map(d => ({ path: root + '/' + d.id, data: d.data() })); }, process.env, now);
 }
 /** Reads <=20 exact queue edges. Returned closure performs writes only. */
 export async function prepareHeadAdvance(head: ControlHead, from: PlatformJob | null, tx: Transaction, db: Database, now: number) {

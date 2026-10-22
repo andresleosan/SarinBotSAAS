@@ -151,12 +151,13 @@ describe('YCloud authenticated normalization', () => {
   });
   it.each(['accepted', 'sent', 'delivered', 'read', 'failed'])('normalizes status %s with nullable customer and optional fields', async (status) => {
     const value = { ...envelope('whatsapp.message.updated'), whatsappMessage: { id: 'synthetic-message', wabaId: '12345', from: '+15550000001', status } };
-    expect(await read(request(value), options)).toEqual({ provider: 'ycloud', eventId: 'synthetic-event', occurredAt: 1577836800000, wabaId: '12345', businessPhone: '+15550000001', kind: 'message_status', sourceEventType: 'whatsapp.message.updated', customerPhone: null, messageId: 'synthetic-message', whatsappMessageId: null, status });
+    expect(await read(request(value), options)).toEqual({ provider: 'ycloud', eventId: 'synthetic-event', occurredAt: 1577836800000, kind: 'message_status', sourceEventType: 'whatsapp.message.updated', messageId: 'synthetic-message', whatsappMessageId: null, status, suppliedScope: { wabaId: '12345', from: '+15550000001' } });
   });
-  it('filters status scope/direction/missing fields and unknown enum', async () => {
+  it('preserves signed sparse status fields while rejecting supplied foreign scope and unknown enum', async () => {
     const status = { id: 'synthetic-message', wabaId: '12345', from: '+15550000001', status: 'read' };
-    for (const change of [{ wabaId: undefined }, { from: undefined }, { wabaId: '99999' }, { from: '+15550000003' }, { to: '+15550000001' }, { status: 'unknown' }]) expect(await read(request({ ...envelope('whatsapp.message.updated'), whatsappMessage: { ...status, ...change } }), options)).toBeNull();
-    expect(await read(request({ ...envelope('whatsapp.message.updated'), whatsappMessage: { ...status, to: '+15550000002', wamid: 'synthetic-wamid' } }), options)).toMatchObject({ customerPhone: '+15550000002', whatsappMessageId: 'synthetic-wamid' });
+    expect(await read(request({ ...envelope('whatsapp.message.updated'), whatsappMessage: { id: 'synthetic-message', status: 'read' } }), options)).toMatchObject({ kind: 'message_status', suppliedScope: {} });
+    for (const change of [{ wabaId: '99999' }, { from: '+15550000003' }, { to: '+15550000001' }, { status: 'unknown' }]) expect(await read(request({ ...envelope('whatsapp.message.updated'), whatsappMessage: { ...status, ...change } }), options)).toBeNull();
+    expect(await read(request({ ...envelope('whatsapp.message.updated'), whatsappMessage: { ...status, to: '+15550000002', wamid: 'synthetic-wamid' } }), options)).toMatchObject({ suppliedScope: { to: '+15550000002' }, whatsappMessageId: 'synthetic-wamid' });
     for (const change of [{ status: '' }, { to: null }, { from: 'bad' }]) await fails(read(request({ ...envelope('whatsapp.message.updated'), whatsappMessage: { ...status, ...change } }), options), 400);
   });
   it('does not add method or Content-Encoding restrictions at the reader layer', async () => {

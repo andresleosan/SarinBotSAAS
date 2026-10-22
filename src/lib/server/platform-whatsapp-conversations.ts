@@ -80,5 +80,6 @@ export async function applyPlatformWhatsAppConversationControl(input: unknown, a
     transaction.set(conversationRef, updated); transaction.set(auditRef, record);
     return updated;
   });
+  if (process.env.PLATFORM_WHATSAPP_PROCESSING_ENABLED === 'true') { const { recognizePlatformWorkCancellation } = await import('./platform-whatsapp-worker'); await recognizePlatformWorkCancellation(body.conversationId); }
   return presentConversation(body.conversationId, updated, config, now);
 }

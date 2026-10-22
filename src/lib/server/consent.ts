@@ -127,6 +127,7 @@ export async function updateConsent(user: ChatActor, supplied: ConsentInput, db:
     if (claimRef) tx.create(claimRef, { uid: user.uid, receiptId, occurredAt });
     if (accepting && input.scope === 'account' && !profile?.exists) tx.set(profileRef, { uid: user.uid, email: user.email ?? '', displayName: typeof user.name === 'string' ? user.name : '', visitedTenants: [], createdAt: occurredAt });
   });
+  if ((input.scope === 'account' || input.scope === 'platform_support') && process.env.PLATFORM_WHATSAPP_PROCESSING_ENABLED === 'true') { const { recognizePlatformWorkCancellation } = await import('./platform-whatsapp-worker'); await recognizePlatformWorkCancellation(); }
   const business = businessId ? (await db.collection('businesses').doc(businessId).get()).data() as ConsentBusiness : undefined;
   return readConsent(user.uid, input.scope, business, db);
 }

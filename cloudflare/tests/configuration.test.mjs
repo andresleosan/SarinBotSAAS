@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os';
 import { configureBuild } from '../scripts/configure-build.mjs';
 import { runtimeEnvironment } from '../src/router.ts';
 
-test('audio AI binding and own media key remain outside Node runtime environment', () => {
+test('audio AI binding stays Worker-only while A5 forwards the optional own provider key to Node', () => {
   const result = runtimeEnvironment({ FIREBASE_ADMIN_PROJECT_ID: 'synthetic-project', FIREBASE_ADMIN_CLIENT_EMAIL: 'synthetic@example.test', FIREBASE_ADMIN_PRIVATE_KEY: 'synthetic', SUPERADMIN_UID: 'synthetic', SARIN_TUNNEL_URL: 'https://engine.alsdevstudio.com/v1/chat/completions', OLLAMA_MAIN_MODEL: 'synthetic', CF_ACCESS_CLIENT_ID: 'synthetic', CF_ACCESS_CLIENT_SECRET: 'synthetic', AI: { run() {} }, PLATFORM_YCLOUD_API_KEY: 'synthetic-media-key' });
   assert.equal(result.AI, undefined);
-  assert.equal(result.PLATFORM_YCLOUD_API_KEY, undefined);
+  assert.equal(result.PLATFORM_YCLOUD_API_KEY, 'synthetic-media-key');
   assert.equal(result.PLATFORM_WHATSAPP_AUDIO_ENABLED, undefined);
 });
 

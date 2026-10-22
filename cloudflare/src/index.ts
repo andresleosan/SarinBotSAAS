@@ -1,9 +1,10 @@
+import { hasPotentialPlatformWork } from './platform-whatsapp-wake.ts';
 import { handlePlatformAudioOutbound } from './platform-whatsapp-audio.ts';
 import { Container, ContainerProxy, getContainer } from '@cloudflare/containers';
 import { handleIdentityOutbound, handlePublicIdentityRequest } from './identity.ts';
 import { handleDataOutbound } from './data.ts';
 import { cleanupPlatformWhatsAppRetention } from './platform-whatsapp-retention.ts';
-import { backgroundWorkEnabled, forwardToSingleton, runtimeEnvironment, wakeBackgroundSingleton } from './router.ts';
+import { backgroundWorkEnabled, forwardToSingleton, runtimeEnvironment, wakeBackgroundSingleton, SINGLETON_NAME } from './router.ts';
 
 export { SarinIdentity } from './identity.ts';
 export { ContainerProxy };
@@ -54,6 +55,7 @@ export default {
       const result = await cleanupPlatformWhatsAppRetention(env);
       console.info({ event: 'platform_whatsapp_retention', ...result });
     }
-    await wakeBackgroundSingleton(flags, (name) => getContainer(env.SARIN_APP, name));
+    if (backgroundWorkEnabled(flags)) await wakeBackgroundSingleton(flags, (name) => getContainer(env.SARIN_APP, name));
+    else if (await hasPotentialPlatformWork(env)) await getContainer(env.SARIN_APP, SINGLETON_NAME).startAndWaitForPorts();
   },
 } satisfies ExportedHandler<CloudflareBindings>;

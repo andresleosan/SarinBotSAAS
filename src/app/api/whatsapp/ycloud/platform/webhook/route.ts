@@ -1,3 +1,5 @@
+import { reconcilePlatformConnection } from '@/lib/server/platform-whatsapp-connection';
+import { recordPlatformDeliveryStatus } from '@/lib/server/platform-whatsapp-work-store';
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { apiError } from '@/lib/server/http';
@@ -21,7 +23,13 @@ export async function POST(request: Request) {
     requirePlatformWhatsAppReception(config);
     const event = await readYCloudWebhook(request, { signingSecret: config.signingSecret, scope: { wabaId: config.scope!.wabaId, phoneE164: config.scope!.phoneE164 } });
     if (event?.kind === 'incoming_text' && await verifyPlatformWhatsAppLinkInbound(event) !== 'not_control') return NextResponse.json({ received: true }, { headers });
-    if (event && event.kind !== 'message_status') await ingestPlatformWhatsAppEvent(event, config, getAdminDb());
+    if (event?.kind === 'message_status') await recordPlatformDeliveryStatus(event, getAdminDb());
+    else if (event) {
+      if (process.env.PLATFORM_WHATSAPP_PROCESSING_ENABLED === 'true' && event.kind !== 'human_echo' && !(event.kind === 'incoming_text' && event.text === 'SALIR')) {
+        try { await reconcilePlatformConnection(getAdminDb()); } catch { /* Preserve human reception; automation remains closed. */ }
+      }
+      await ingestPlatformWhatsAppEvent(event, config, getAdminDb());
+    }
     return NextResponse.json({ received: true }, { headers });
   } catch (error) { return apiError(error); }
 }

@@ -3,13 +3,13 @@ import { randomUUID } from 'node:crypto';
 import type { Database, Transaction } from '@/lib/storage/types';
 import { isPlatformWhatsAppConversationRecord } from '../../../shared/platform-whatsapp-records';
 import { createPlatformMenu, parsePlatformMenuChoice } from '../../../shared/platform-whatsapp-menu';
-import { WORK_DEADLINE_MS, WORK_LEASE_MS, workCatalog, workText, emptyUsage, outboxMatchesJob, type ControlHead, type CostStage, type DeliveryResult, type Lease, type PlatformJob, type PlatformOutbox, type Usage } from '../../../shared/platform-whatsapp-work';
+import { WORK_DEADLINE_MS, WORK_LEASE_MS, workCatalog, workText, emptyUsage, outboxMatchesJob, type ControlHead, type CostStage, type DeliveryResult, type Lease, type PlatformJob, type PlatformOutbox, type Usage, type GenerationQuote } from '../../../shared/platform-whatsapp-work';
 import { maximumPlatformCost } from '../../../shared/platform-whatsapp-policy';
 import { getPlatformWhatsAppConfig } from './platform-whatsapp-config';
 import { encryptPlatformWhatsAppContent, platformWhatsAppDigest } from './platform-whatsapp-crypto';
-import { platformWhatsAppConflictError, platformWhatsAppUnavailableError } from './platform-whatsapp-store';
-import { readWork, stageWork, checkedAdd } from './platform-whatsapp-work-records';
-import { prepareWorkIdentity, readWorkAuthority, workPayload, workActor } from './platform-whatsapp-work-authority';
+import { platformWhatsAppConflictError, platformWhatsAppUnavailableError, platformWhatsAppIdentity, samePlatformWhatsAppScope } from './platform-whatsapp-store';
+import { readWork, stageWork, checkedAdd, providerAliasPath } from './platform-whatsapp-work-records';
+import { prepareWorkIdentity, readWorkAuthority, workPayload, workActor, workContact } from './platform-whatsapp-work-authority';
 import { currentPlatformWorkPolicy, readPlatformReservation, stagePlatformReservation, stagePlatformCostStart, readPlatformSettlement, stagePlatformSettlement } from './platform-whatsapp-budget';
 import { dueWork, prepareHeadAdvance } from './platform-whatsapp-work-queue';
 import { readWorkCancellation, stageWorkCancellation } from './platform-whatsapp-work-cancellation';
@@ -19,7 +19,7 @@ const liveLease = (job: PlatformJob, lease: Lease, now: number) => job.jobId ===
 async function claimBudgetOpen(job: PlatformJob, stage: CostStage, tx: Transaction, db: Database, now: number): Promise<boolean> {
   try {
     const policy = currentPlatformWorkPolicy();
-    await readPlatformReservation(job, stage, maximumPlatformCost(policy.policy, stage), tx, db, now);
+    await readPlatformReservation(job, stage, stage === 'generation' ? 1 : maximumPlatformCost(policy.policy, stage), tx, db, now, undefined, stage === 'generation');
     return true;
   } catch (error) {
     if (!(error instanceof HttpError) || error.code !== 'PLATFORM_WORK_CLOSED') throw error;
@@ -50,13 +50,13 @@ export function prepareOutbox(job: PlatformJob, customerPhone: string, text: str
   const { recordType: _rt, sourceKind: _sk, kind: _k, status: _s, nextJobId: _next, nextAttemptAt: _at, leaseToken: _lt, leaseClaimedAt: _lc, leaseExpiresAt: _le, processingStartedAt: _ps, processingDeadlineAt: _pd,
     audioState: _as, audioToken: _at2, audioLeaseToken: _alt, audioReservationId: _ar, audioStartedAt: _ast, audioFinishedAt: _af,
     generationState: _gs, generationToken: _gt, generationLeaseToken: _glt, generationReservationId: _gr, generationStartedAt: _gst, generationFinishedAt: _gf, outboxId: _oid, outputKind: _ok, ...common } = job;
-  return { ...common, createdAt: now, recordType: 'outbox', outboxId: id, outputFingerprint: outboxFingerprint(job, text, purpose, actions), outputKind: job.catalogId === 'audio_fallback' ? 'audio_fallback' : job.catalogId ? 'catalog' : 'generated', menuPurpose: purpose, menuVersion: 1, menuActions: actions, consumedByEventId: null, consumedAt: null, status: 'prepared', sendToken: null, sendClaimedAt: null, sendStartedAt: null, sendFinishedAt: null, providerId: null, sendReservationId: null, bodyState: 'body_present', content: encryptPlatformWhatsAppContent({ customerPhone, text }, 'platformWhatsAppOutbox/' + id, getPlatformWhatsAppConfig().contentKey) };
+  return { ...common, createdAt: now, recordType: 'outbox', outboxId: id, outputFingerprint: outboxFingerprint(job, text, purpose, actions), outputKind: job.catalogId === 'audio_fallback' ? 'audio_fallback' : job.catalogId ? 'catalog' : 'generated', menuPurpose: purpose, menuVersion: 1, menuActions: actions, consumedByEventId: null, consumedAt: null, status: 'prepared', sendToken: null, sendClaimedAt: null, sendStartedAt: null, sendFinishedAt: null, providerId: null, sendReservationId: null, deliveryStatus: 'unobserved', deliveryFailed: false, deliveryObservedAt: null, bodyState: 'body_present', content: encryptPlatformWhatsAppContent({ customerPhone, text }, 'platformWhatsAppOutbox/' + id, getPlatformWhatsAppConfig().contentKey) };
 }
 export function stageReply(job: PlatformJob, outbox: PlatformOutbox, tx: Transaction, db: Database) {
   stageWork(tx, db, 'platformWhatsAppOutbox/' + outbox.outboxId, outbox);
   stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, { ...job, status: 'reply_saved', nextAttemptAt: job.processingDeadlineAt, outboxId: outbox.outboxId, outputKind: outbox.outputKind });
 }
-async function readOutboxPreparation(id: string, db: Database, now: number) {
+export async function readOutboxPreparation(id: string, db: Database, now: number) {
   const outbox = await db.runTransaction(tx => readWork(tx, db, 'platformWhatsAppOutbox/' + id));
   if (outbox?.recordType !== 'outbox') return null;
   const job = await db.runTransaction(tx => readWork(tx, db, 'platformWhatsAppJobs/' + outbox.jobId));
@@ -65,6 +65,13 @@ async function readOutboxPreparation(id: string, db: Database, now: number) {
   const payload = workPayload(outbox, now);
   if (payload && outbox.outputFingerprint !== outboxFingerprint(job, payload.text!, outbox.menuPurpose, outbox.menuActions)) throw platformWhatsAppUnavailableError();
   const prepared = await prepareWorkIdentity(job, db, now); return prepared ? { job, outbox, prepared } : null;
+}
+export async function readAuthorizedOutbox(id: string, db: Database, now = Date.now()) {
+  const p = await readOutboxPreparation(id, db, now); if (!p) return null;
+  return db.runTransaction(async tx => {
+    const job = await readWork(tx, db, 'platformWhatsAppJobs/' + p.job.jobId), outbox = await readWork(tx, db, 'platformWhatsAppOutbox/' + id);
+    return job?.recordType === 'job' && outbox?.recordType === 'outbox' && outboxMatchesJob(outbox, job) && job.status === 'reply_saved' && job.processingDeadlineAt !== null && job.processingDeadlineAt > now && await readWorkAuthority(job, p.prepared, tx, db, now) ? { job, outbox } : null;
+  });
 }
 export function createPlatformWorkStore(db: Database, clock: () => number = Date.now) {
   return {
@@ -159,9 +166,13 @@ export function createPlatformWorkStore(db: Database, clock: () => number = Date
         const current = !!authority && o.status !== 'cancelled' && j.status === 'reply_saved' && j.processingDeadlineAt !== null && now < j.processingDeadlineAt;
         const acceptedHead = current && result.status === 'accepted' ? { ...authority!.head, currentMenuOutboxId: outboxId } : head;
         const advance = acceptedHead?.recordType === 'control_head' && acceptedHead.headJobId === j.jobId && acceptedHead.controlEpoch === j.controlEpoch && acceptedHead.controlRevision === j.controlRevision ? await prepareHeadAdvance(acceptedHead, j, tx, db, now) : null;
+        const aliasPath = result.status === 'accepted' ? providerAliasPath(o, result.providerId) : null;
+        const alias = aliasPath ? await readWork(tx, db, aliasPath) : null;
+        if (alias && (alias.recordType !== 'provider_alias' || alias.outboxId !== outboxId || alias.jobId !== j.jobId || alias.epoch !== j.epoch || alias.expiresAt !== o.expiresAt)) throw platformWhatsAppConflictError();
+        if (aliasPath && result.status === 'accepted') stageWork(tx, db, aliasPath, { ...platformWhatsAppIdentity(o), recordType: 'provider_alias', providerId: result.providerId, outboxId, jobId: j.jobId, epoch: j.epoch, expiresAt: o.expiresAt });
         stagePlatformSettlement(costs, costs.call.status === 'reserved' ? 0 : null, emptyUsage, costs.call.effectToken, tx, db, now);
         const status = current ? result.status : 'cancelled';
-        stageWork(tx, db, 'platformWhatsAppOutbox/' + outboxId, { ...o, status, sendFinishedAt: now, providerId: result.status === 'accepted' ? result.providerId : o.providerId });
+        stageWork(tx, db, 'platformWhatsAppOutbox/' + outboxId, { ...o, status, sendFinishedAt: now, ...(result.status === 'accepted' ? { deliveryStatus: o.deliveryStatus === 'unobserved' || o.deliveryStatus === undefined ? 'accepted' as const : o.deliveryStatus, deliveryFailed: o.deliveryFailed ?? false, deliveryObservedAt: o.deliveryObservedAt ?? now } : {}), providerId: result.status === 'accepted' ? result.providerId : o.providerId });
         stageWork(tx, db, 'platformWhatsAppJobs/' + j.jobId, { ...j, status: status === 'unknown' ? 'unknown' : status === 'cancelled' ? 'cancelled' : 'completed', nextAttemptAt: null }); advance?.();
       });
     },
@@ -190,17 +201,18 @@ export async function takePlatformSendPermit(outboxId: string, token: string, db
     return { to: payload.customerPhone, text: payload.text!, buttons: createPlatformMenu(outboxId, o.menuPurpose), externalId: outboxId };
   });
 }
-export async function takePlatformGenerationPermit(lease: Lease, db: Database, now = Date.now()) {
+export async function takePlatformGenerationPermit(lease: Lease, db: Database, now = Date.now(), quote?: GenerationQuote) {
+  if (!quote) return null;
   const p = await preparedLease(lease, db, now); if (!p) return null;
   const token = randomUUID();
   return db.runTransaction(async tx => {
     const j = await readWork(tx, db, 'platformWhatsAppJobs/' + lease.jobId);
     if (j?.recordType !== 'job' || j.authorityKind !== 'actor' || j.catalogId !== null || j.generationState !== 'not_started' || j.outboxId !== null || !liveLease(j, lease, now) || j.sourceKind === 'audio' && j.audioState !== 'completed' || !await readWorkAuthority(j, p.prepared, tx, db, now)) return null;
     const payload = workPayload(j, now); if (!payload?.question) return null;
-    const { policy } = currentPlatformWorkPolicy(), maximum = maximumPlatformCost(policy, 'generation'), facts = await readPlatformReservation(j, 'generation', maximum, tx, db, now);
+    const { policy } = currentPlatformWorkPolicy(), maximum = quote.maximumMicros, facts = await readPlatformReservation(j, 'generation', maximum, tx, db, now, quote);
     if (!facts.call || !stagePlatformCostStart(facts, token, tx, db, now)) return null;
     stageWork(tx, db, 'platformWhatsAppJobs/' + j.jobId, { ...j, generationState: 'started', generationToken: token, generationLeaseToken: lease.token, generationReservationId: facts.call.reservationId, generationStartedAt: now });
-    return { generationToken: token, actor: workActor(j), question: payload.question, maximumOutputTokens: policy.tariff.maximumOutputTokens };
+    return { generationToken: token, actor: workActor(j), question: payload.question, maximumOutputTokens: quote.outputCap };
   });
 }
 export async function completePlatformGeneration(lease: Lease, generationToken: string, outcome: { status: 'completed'; text: string; actualMicros: number; usage: Usage } | { status: 'failed' | 'unknown'; actualMicros: number | null; usage: Usage }, db: Database, now = Date.now()) {
@@ -216,5 +228,23 @@ export async function completePlatformGeneration(lease: Lease, generationToken: 
     const updated: PlatformJob = { ...j, generationState: authority && valid ? outcome.status === 'completed' && !outbox ? 'failed' : outcome.status : 'cancelled', generationFinishedAt: now };
     if (authority && valid && outbox && outcome.status === 'completed') { stageReply(updated, outbox, tx, db); return { outboxId: id }; }
     stageWork(tx, db, 'platformWhatsAppJobs/' + j.jobId, { ...updated, status: outcome.status === 'unknown' ? 'unknown' : 'cancelled', nextAttemptAt: null }); advance?.(); return null;
+  });
+}
+
+export async function recordPlatformDeliveryStatus(event: Extract<import('./ycloud-webhook').NormalizedYCloudEvent, { kind: 'message_status' }>, db: Database, now = Date.now()): Promise<void> {
+  const scope = getPlatformWhatsAppConfig().scope; if (!scope) return;
+  const path = providerAliasPath(scope, event.messageId);
+  await db.runTransaction(async tx => {
+    const alias = await readWork(tx, db, path);
+    if (alias?.recordType !== 'provider_alias' || alias.expiresAt <= now || !samePlatformWhatsAppScope(alias, scope)) return;
+    const [out, job] = await Promise.all([readWork(tx, db, 'platformWhatsAppOutbox/' + alias.outboxId), readWork(tx, db, 'platformWhatsAppJobs/' + alias.jobId)]);
+    if (out?.recordType !== 'outbox' || job?.recordType !== 'job' || !outboxMatchesJob(out, job) || alias.epoch !== job.epoch || out.providerId !== event.messageId || out.expiresAt !== alias.expiresAt || !samePlatformWhatsAppScope(out, scope)) throw platformWhatsAppUnavailableError();
+    const supplied = event.suppliedScope;
+    if (!supplied || supplied.wabaId !== undefined && supplied.wabaId !== scope.wabaId || supplied.from !== undefined && supplied.from !== scope.phoneE164 || supplied.to !== undefined && workContact(supplied.to, scope) !== out.conversationId || supplied.externalId !== undefined && supplied.externalId !== out.outboxId) return;
+    const order = ['unobserved', 'accepted', 'sent', 'delivered', 'read'];
+    const status = out.deliveryStatus ?? 'unobserved', failed = (out.deliveryFailed ?? false) || event.status === 'failed';
+    const next = event.status !== 'failed' && order.indexOf(event.status) > order.indexOf(status) ? event.status : status;
+    if (next === status && failed === (out.deliveryFailed ?? false)) return;
+    stageWork(tx, db, 'platformWhatsAppOutbox/' + out.outboxId, { ...out, deliveryStatus: next, deliveryFailed: failed, deliveryObservedAt: Math.max(out.deliveryObservedAt ?? 0, now) });
   });
 }

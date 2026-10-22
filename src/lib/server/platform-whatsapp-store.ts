@@ -107,5 +107,6 @@ export async function applyPlatformWhatsAppConnectionControl(input: unknown, act
       expiresAt: now + PLATFORM_METADATA_TTL, actorUid, fingerprint: control.fingerprint, action: body.action, targetId: 'platform_whatsapp', resultRevision: updated.connectionRevision };
     transaction.set(connectionRef, updated); transaction.set(auditRef, record);
   });
+  if (process.env.PLATFORM_WHATSAPP_PROCESSING_ENABLED === 'true') { const { recognizePlatformWorkCancellation } = await import('./platform-whatsapp-worker'); await recognizePlatformWorkCancellation(); }
   return getPlatformWhatsAppStatus(database, now);
 }

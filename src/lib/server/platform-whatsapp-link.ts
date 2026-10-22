@@ -300,6 +300,7 @@ export async function revokePlatformWhatsAppLink(user: DecodedIdToken, input: st
     if (facts.challenge) stageChallenge(tx, db, owner.pendingChallengeId!, { ...facts.challenge, status: 'revoked' });
     stageOwner(tx, db, owner, null, null, now, generation); tx.create(db.collection(challenges).doc('revoke_' + requestDigest), record);
   });
+  if (process.env.PLATFORM_WHATSAPP_PROCESSING_ENABLED === 'true') { const { recognizePlatformWorkCancellation } = await import('./platform-whatsapp-worker'); await recognizePlatformWorkCancellation(); }
 }
 
 async function actorFacts(tx: Transaction, db: Database, config: Config, uidIndex: string, now: number) {

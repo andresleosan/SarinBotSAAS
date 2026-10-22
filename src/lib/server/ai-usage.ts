@@ -14,7 +14,7 @@ const usageSchema = z.object({ promptTokens: tokenCount, cacheHitTokens: tokenCo
 const timestamp = z.number().int().min(0).max(8_640_000_000_000_000);
 export const aiUsageProviderSchema = z.enum(['deepseek', 'gemini']);
 const observationSchema = z.object({ callId: z.string().uuid(), provider: aiUsageProviderSchema, serviceTier: z.enum(['standard', 'flex', 'priority']).nullable().optional(), model: z.string().regex(/^[A-Za-z0-9_.:-]{1,100}$/).nullable(), startedAt: timestamp, finishedAt: timestamp, success: z.boolean(), usage: usageSchema.nullable() }).refine(value => value.finishedAt >= value.startedAt);
-const contextSchema = z.object({ businessId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).nullable(), mode: z.enum(['sarin_client', 'sarin_owner_copilot', 'sarin_onboarding', 'sarin_admin_copilot']) });
+const contextSchema = z.object({ businessId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).nullable(), mode: z.enum(['sarin_client', 'sarin_owner_copilot', 'sarin_onboarding', 'sarin_admin_copilot', 'sarin_platform_support']) });
 export type AiUsageContext = z.infer<typeof contextSchema>;
 export const aiUsageMonthSchema = z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/);
 const totalsSchema = z.object({ calls: count, successfulCalls: count, failedCalls: count, usageReportedCalls: count, missingUsageCalls: count, costEstimatedCalls: count, unknownCostCalls: count, promptTokens: count, cacheHitTokens: count, cacheMissTokens: count, completionTokens: count, costNanoMin: count, costNanoMax: count });
