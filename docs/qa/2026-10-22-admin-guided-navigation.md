@@ -1,12 +1,12 @@
 # Navegación administrativa guiada — verificación local P1
 
-Ejecución: **23 de octubre de 2026**, America/Bogota. La fecha del archivo corresponde al diseño. Resultado de entrega local: **DONE_WITH_CONCERNS**. Tipos/build y el recorrido de navegador descrito terminaron; la suite completa conserva un timeout D1. La revisión independiente de esta entrega documental y del branch completo sigue pendiente. No representa aceptación totalmente verde ni publicación.
+Ejecución: **23 de octubre de 2026**, America/Bogota. La fecha del archivo corresponde al diseño. Resultado de entrega local: **DONE_WITH_CONCERNS**. La corrección final tiene 240 pruebas focales, tipos y build aprobados, más comprobaciones reales de foco. La revisión documental fue aprobada; la revisión global detectó dos fallos corregidos en la tanda final descrita abajo. La suite completa conserva un timeout D1 y falta la observación audible con lector de pantalla. No representa aceptación totalmente verde ni publicación.
 
 ## Fuente y alcance
 
 - Base efectiva: `463ae55f8c873468980746185fb3e91f55cb8681`.
-- Código de producto: `c1d5742390a10bf167a9342765f50a4cb6ba80b2`. Candidato posterior con corrección exclusivamente de fixture: `b55fb49051814c0f9539fd6ea0d38ca73824336e`, rama `codex/admin-guided-navigation-20261023`, worktree aislado `C:/Users/Drean Skate/AppData/Local/SarinBot/admin-navigation-20261023/source`.
-- Estado inicial de Git limpio. Task 5 agrega protocolo, este reporte y evidencia saneada; no cambia producto, tests, API, dependencias, configuración o lockfile.
+- Checkpoint previo de producto: `c1d5742390a10bf167a9342765f50a4cb6ba80b2`; corrección exclusivamente de fixture: `b55fb49051814c0f9539fd6ea0d38ca73824336e`. Corrección final de foco: `1f7886bf70784cf8b6e68d91427d945808d74354`, rama `codex/admin-guided-navigation-20261023`, worktree aislado `C:/Users/Drean Skate/AppData/Local/SarinBot/admin-navigation-20261023/source`.
+- Estado inicial de Git limpio. El checkpoint documental `f575bb0` agregó protocolo, este reporte y tres capturas; la posterior corrección final modifica únicamente la integración de foco, navegación compartida y sus tests. Se conservan API, dependencias, configuración y lockfile.
 - Runtime local de verificación: Node `v24.22.0`; pin `pnpm@11.23.0`; Vitest instalado `5.0.4`. El [protocolo reproducible](../../qa/tests/admin-guided-navigation.md) contiene los casos y límites.
 
 Los cambios organizan consola y asistente por tarea y ámbito, con selección validada en URL, shell según rol y paneles estables. Los permisos, consentimiento y acciones comerciales explícitas conservan sus controles. El alcance autorizado para esta fase es local; no hubo despliegue.
@@ -86,7 +86,7 @@ El cierre del recorrido comprobó ámbitos, recuperación y autoridad:
 - Una pregunta sintética privada permaneció en Consulta oculta al cambiar a Revisión de pagos; Cerrar sesión por teclado retiró inmediatamente los cinco paneles privados, la navegación administrativa y el borrador oculto.
 - Negocio local en la ruta administrativa recibió Acceso restringido. Landing → Mi negocio llegó a `/dashboard`, con los cuatro enlaces del dueño, cero enlaces administrativos y ningún texto privado de la sesión anterior. Se cerró también esa sesión.
 
-El smoke previo del dueño fue observado por el responsable con emuladores oficiales, un proyecto `demo-*`, negocio y comprobantes sintéticos; no usó cuentas productivas ni envíos externos. El shell revisado era `b0b4960`, que no cambió posteriormente en P1:
+El smoke previo del dueño fue observado por el responsable con emuladores oficiales, un proyecto `demo-*`, negocio y comprobantes sintéticos; no usó cuentas productivas ni envíos externos. El shell revisado era `b0b4960`, antes de la corrección final de menú y restauración del desplazamiento predeterminado del dueño:
 
 - A 320 px, menú visible en flujo, cuatro destinos, `aria-expanded`/`aria-controls`, botón de 44 px; Tab a Mi agenda y Escape devuelve el foco a Menú. Cerrado, los enlaces ocultos quedan fuera del recorrido de Tab.
 - Entrada real por las cuatro rutas existentes: agenda, configuración, QR y suscripción; ConsentPanel y contexto presentes, cierre de menú al navegar. Dueño ordinario sin enlace Administración.
@@ -94,21 +94,50 @@ El smoke previo del dueño fue observado por el responsable con emuladores ofici
 - Sin desbordamiento horizontal observado: 320/305, 390/375 y 1280/1265 (viewport/ancho de página). A 1280 los cuatro destinos visibles y Menú oculto.
 - Una carga directa inicial se atascó en el transporte Browser Use; landing → Mi negocio por enlace visible sí llegó al workspace. Una espera fría de QR agotó el tiempo de la herramienta y la URL/DOM posterior verificó la llegada; no se afirma garantía temporal.
 
-Estos resultados previos del dueño corresponden al shell que permaneció sin cambios; el cierre final volvió a verificar el límite de rol/acceso.
+Estos resultados previos del dueño no se presentan como un nuevo recorrido posterior a la corrección final. El cierre anterior volvió a verificar el límite de rol/acceso; las pruebas correctivas de navegación conservan sus cuatro destinos, consentimiento y desplazamiento predeterminado.
 
-La verificación final por API local guardada el **23 de octubre de 2026 a las 18:46:15.607 UTC** confirmó 501 comprobantes, todos pendientes, el comprobante dirigido presente y cero mensajes de soporte. La única propuesta efímera preparada para QA expiró normalmente; no hubo aprobación, rechazo, envío, guardado de configuración, activación de proveedor/canal, upload ni compra.
+La verificación final de aquel recorrido por API local guardada el **23 de octubre de 2026 a las 18:46:15.607 UTC** confirmó 501 comprobantes, todos pendientes, el comprobante dirigido presente y cero mensajes de soporte. Su única propuesta efímera expiró normalmente; no hubo aprobación, rechazo, envío, guardado de configuración, activación de proveedor/canal, upload ni compra.
 
 El responsable cerró todas sus pestañas, incluida la pestaña de soporte abierta explícitamente; restableció viewport/media/métricas y dejó vacíos los patrones de interceptación Fetch. Detuvo su wrapper y únicamente sus árboles de Next/emuladores; confirmó cero listeners en 3042/8080/9099/4400/4500. Los emuladores eran solo memoria, por lo que el estado sintético desapareció al apagarlos. La evidencia saneada externa permanece, sin tokens, claves o cuerpos privados exportados. No se tocaron otras pestañas, procesos o preferencias del usuario.
 
+## Corrección y verificación finales
+
+La revisión global independiente sobre `463ae55..f575bb0` pidió cambios: F1 importante, una respuesta tardía del pago o un envío de soporte ya iniciado podía quitar foco al aviso de preservación; F2 menor, elegir el destino móvil ya activo cerraba el menú dejando el foco sin control visible. No identificó fallos críticos. Su duda sobre desplazamiento de rutas del dueño no se consideró defecto reproducido: se restauró conservadoramente el comportamiento previo de Next para ese contexto.
+
+Una sola tanda, `1f7886b`, añade una condición de foco por tarea: el pago/soporte conservado mantiene sus operaciones, estado y destino fijado, pero sus resultados automáticos respetan el panel activo y el aviso posterior. Una interacción explícita de puntero, teclado o clic dentro de la tarea devuelve su comportamiento habitual. No se enfoca repetidamente el aviso ni se cancela, remonta o confirma la tarea. El menú devuelve foco a Menú al seleccionar el módulo ya activo; los clics modificados conservan apertura aparte. Solo los enlaces de plataforma conservan `scroll=false`.
+
+El implementador registró RED limpio de **15 fallidas / 221 aprobadas**, luego GREEN de 236. La autoinspección añadió un RED limpio de **una fallida / 239 aprobadas** para clic virtual de ayuda técnica, antes del GREEN final de **240 aprobadas en once archivos**, cero fallidas/omitidas. Los fallos de preparación de fixtures también se conservaron en el reporte del implementador; no se atribuyen todos a producto. Se añadió `tests/platform-support-ui.test.tsx` a los diez archivos anteriores; no se reescribe el checkpoint de 177 ni se suman conteos solapados.
+
+| Gate posterior a la corrección | Evidencia nueva y resultado |
+| --- | --- |
+| Focal | `2026-10-23T19-01-17-883Z-focal-1090f3a14a48`, 19:01:17.885–19:01:21.990 UTC; exit 0, 240/240 en once archivos. |
+| Tipos | `2026-10-23T19-01-17-896Z-typecheck-5b09ff32de74`, 19:01:17.898–19:01:22.938 UTC; exit 0, sin diagnósticos. |
+| Build real | `2026-10-23T19-03-07-635Z-build-37d90d627781`, 19:03:07.638–19:03:24.755 UTC sobre `1f7886b`; exit 0, 14/14 páginas incluidas las administrativas. |
+
+El responsable inspeccionó el JSON y las salidas reales. Focal/tipos verificaron el contenido exacto registrado después en el commit; su metadata conserva HEAD previo y diff local, incluido el protocolo documental independiente. Los comandos focales correctivos se mantuvieron con el mismo entorno/plazos, añadiendo solo el archivo afectado de soporte; focal/tipos finales se ejecutaron en paralelo. El build posterior fue separado, con el demo apagado. Se inspeccionó y restauró exclusivamente el cambio generado de imports en `next-env.d.ts`. No se repitió la suite completa ni D1: su último resultado sigue siendo 3.266 aprobadas / una fallida / 28 omitidas, anterior a esta corrección.
+
+El responsable reprodujo F1 antes de corregir: GET real de propuesta retenido, Consulta, Atrás **antes** de liberar el GET; aviso enfocado y carga pendiente; liberar la respuesta original desplazó foco a «Revisa antes de aprobar». Repitió la secuencia sobre el commit final exacto `1f7886b`: después de liberar, la revisión terminó de cargar y el foco permaneció en `assistant-sensitive-notice`. No se sustituyeron respuestas ni se confirmó un pago. Error tardío, A → B, envío de soporte pendiente e interacción explícita posterior están cubiertos por componentes reales y transporte sintético; no se atribuyen a envíos de navegador.
+
+Para F2, el navegador a 320 px reprodujo Menú → Tab a Resumen → Enter sobre su URL canónica: antes, foco BODY; después, botón Menú enfocado, altura 44 px y documento de 305 px. La navegación no cambió después de esa observación. Las capturas finales fueron revisadas visualmente:
+
+| Captura final | Qué demuestra |
+| --- | --- |
+| [Selección del módulo móvil ya activo](assets/admin-guided-navigation-20261023/admin-320-active-menu-focus.png) | Menú cerrado con foco visible en su botón a 320 px. |
+| [Aviso de tarea preservada](assets/admin-guided-navigation-20261023/assistant-preserved-notice-final.png) | Aviso enfocado después de un recorrido limpio de historial, en tamaño de escritorio predeterminado. La secuencia GET retenida tiene registro DOM separado; su primera captura agotó el tiempo de la herramienta. |
+
+En este nuevo demo se prepararon dos propuestas efímeras sintéticas para comparar antes/después, ninguna confirmada. Verificación API final **19:02:29.447 UTC**: 501 comprobantes, todos pendientes, destino antiguo presente y cero mensajes. Cerrar sesión retiró los cinco paneles privados y el aviso. Se cerró la pestaña propia, se restableció viewport y se vaciaron patrones Fetch; el wrapper propio terminó y todos sus puertos quedaron libres antes del build.
+
+La revisión independiente acotada de esta única tanda final dio **F1 y F2 ADDRESSED, restauración del desplazamiento del dueño ADDRESSED; Spec PASS y calidad Approved**, sin roturas nuevas en el diff. Leyó el paquete completo `f575bb0..1f7886b`, el reporte RED/GREEN y las observaciones de navegador; no repitió tests/build ni hizo una segunda revisión global. La aceptación de Task 5 permanece incompleta por el gate D1 y la observación audible pendiente. No se añadió zoom nativo ni se cambió backend/dependencias para obtener un resultado verde.
+
 ## Revisión y límites
 
-El delta de producto respecto a la base efectiva se limita a las dos páginas administrativas, shell, componentes y resolver de navegación; el resto son tests y documentación. No hay rutas nuevas de backend ni cambios de lockfile. Los paneles usan `hidden`/`inert` conservando los hijos montados; la autoridad del workspace cambia con UID/época/rol/salida. La fuente del límite de navegación incluye Suspense para `useSearchParams`.
+El delta de producto respecto a la base efectiva comprende las dos páginas administrativas, shell, componentes/resolver de navegación y el control de sus puntos existentes de foco en pago/chat; el resto son tests y documentación. No hay rutas nuevas de backend ni cambios de lockfile. Los paneles usan `hidden`/`inert` conservando los hijos montados; la autoridad del workspace cambia con UID/época/rol/salida. La fuente del límite de navegación incluye Suspense para `useSearchParams`.
 
 La búsqueda estática acotada de componentes administrativos no encontró `createPortal`, `<dialog` o `autoFocus`. Se conservan puntos de foco imperativo de pago/soporte/copilot y el nuevo encabezado de panel. Una búsqueda estática no sustituye inspección real del DOM activo ni prueba con lector de pantalla. El popup externo de reautenticación puede seguir abierto al cambiar sección; no se promete cerrarlo ni confirmar al retornar.
 
 Las pruebas automatizadas cubren selección única, estado/instancias conservados, navegación query/hash e historial, lecturas dirigidas, respuestas/callbacks viejos y autoridad. Los casos de estado incierto/requestId se atribuyen a automatización salvo observación de navegador explícitamente registrada. Los módulos ocultos siguen sus lecturas actuales; no se promete ahorro de red, borradores durables, cancelación automática ni arreglo del límite de settings sin CAS.
 
-La revisión independiente acotada del fixture está registrada arriba. La revisión de Task 5 y la revisión integral final del branch se realizarán después de este commit documental y **siguen pendientes**; la inspección local de fuente/documentos no se presenta como esas revisiones. Permanecen abiertos el gate completo D1, zoom nativo al 200 % no observado y prueba audible con lector de pantalla no realizada. El reflujo equivalente y árbol accesible observados se describen con su método y límites.
+La revisión independiente acotada del fixture está registrada arriba. La revisión documental de Task 5 aprobó su calidad con aceptación incompleta; la revisión integral y la corrección posterior se describen en el corte final anterior. Permanecen abiertos el gate completo D1, zoom nativo al 200 % no observado y prueba audible con lector de pantalla no realizada. El reflujo equivalente y árbol accesible observados se describen con su método y límites.
 
 ## Gates separados de publicación
 

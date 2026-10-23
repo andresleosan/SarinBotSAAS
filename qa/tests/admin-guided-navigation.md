@@ -12,10 +12,10 @@ Fecha de ejecución asociada: **23 de octubre de 2026**, America/Bogota. Este pr
 
 ## Comprobaciones automatizadas
 
-Ejecutar los diez archivos, sin filtro de nombre:
+Ejecutar los once archivos, sin filtro de nombre. La verificación final añade el componente real de soporte afectado por el control de foco:
 
 ```powershell
-pnpm exec vitest run tests/admin-navigation.test.ts tests/workspace-navigation.test.tsx tests/admin-modules.test.tsx tests/admin-assistant-navigation.test.tsx tests/user-avatar.test.tsx tests/admin-focus-navigation.test.tsx tests/admin-assistant-platform.test.tsx tests/admin-ai-page.test.tsx tests/admin-payment-confirmation.test.tsx tests/admin-deep-links.test.ts
+pnpm exec vitest run tests/admin-navigation.test.ts tests/workspace-navigation.test.tsx tests/admin-modules.test.tsx tests/admin-assistant-navigation.test.tsx tests/user-avatar.test.tsx tests/admin-focus-navigation.test.tsx tests/admin-assistant-platform.test.tsx tests/admin-ai-page.test.tsx tests/admin-payment-confirmation.test.tsx tests/admin-deep-links.test.ts tests/platform-support-ui.test.tsx
 pnpm test
 pnpm run typecheck
 pnpm run build
@@ -29,7 +29,7 @@ Cobertura que se debe contrastar con los tests: destinos validados y recuperaci�
 
 | Caso | Acción y criterio observable |
 | --- | --- |
-| Shell y rol | A 320, 390 y 1280 px comprobar contexto, enlaces del rol, destino activo y una sección visible. Cuenta ordinaria sin enlaces administrativos. Menú móvil con `aria-expanded`/`aria-controls`, acción de al menos 44 px, Tab, Escape y devolución del foco. |
+| Shell y rol | A 320, 390 y 1280 px comprobar contexto, enlaces del rol, destino activo y una sección visible. Cuenta ordinaria sin enlaces administrativos. Menú móvil con `aria-expanded`/`aria-controls`, acción de al menos 44 px, Tab, Escape y devolución del foco. Elegir por teclado el destino ya activo también deja foco visible. Conservar Ctrl/Meta/clic central para apertura aparte y el desplazamiento habitual de rutas del negocio. |
 | Accesibilidad y espacio | Comprobar teclado, foco visible, campos largos, ausencia de desbordamiento y acciones accesibles a zoom 200 %. Registrar el método de zoom. Comprobar movimiento reducido si se observa; no atribuirlo a otra prueba. |
 | Estado local | Editar un campo sintético sin guardar, cambiar módulo y volver: misma edición. Ocultar paneles sin desmontarlos; después cambiar/perder autoridad y verificar que desaparece el estado privado de todos los paneles. |
 | Comprobante dirigido | Sembrar más de 500 comprobantes pendientes; abrir el enlace al situado fuera del primer listado y comprobar sección, registro y foco. Actualizar sin reclamar foco. |
@@ -38,6 +38,7 @@ Cobertura que se debe contrastar con los tests: destinos validados y recuperaci�
 | Propuesta enlazada | Abrir una propuesta sintética vigente: solo lectura/revisión. Cambiar sección y volver conserva busy/estado/requestId. No confirmar ni preparar de nuevo para navegar. Un destino sensible posterior ofrece apertura explícita en otra pestaña sin reemplazar la tarea actual. |
 | Soporte | Abrir hilo sintético existente y el hash de soporte: sección y foco correctos, sin enviar ni crear conversación por navegar. Distinguir plataforma Sarin y negocios. |
 | Respuesta tardía | Con respuesta de pago/soporte controlada después de ocultar el panel, comprobar que foco sigue en la tarea activa y un lector de pantalla no anuncia el panel oculto. Si no se ejecuta realmente, registrar como no observado y limitar la atribución a tests concretos. |
+| Respuesta tras volver | Retener GET de propuesta A, ir a Consulta y volver con Atrás antes de liberar la respuesta: el aviso de preservación mantiene foco al terminar éxito/error de A. Cubrir también A → B sin sustituir A. Una interacción explícita posterior con la tarea conservada permite su foco habitual. El envío de soporte equivalente se cubre con transporte simulado; no enviar un mensaje desde navegador para este caso. |
 | Overlays | Buscar portales/diálogos fuera de paneles en fuente y comprobar overlays administrativos en el DOM activo al navegar. No prometer cerrar un popup externo de reautenticación ya abierto; su retorno exige la acción humana actual para confirmar. |
 | Dueño | Entrar por agenda, configuración, QR y suscripción; conservar ConsentPanel y contexto. Configuración conserva su control de logo y Guardar configuración, sin nuevos Guardar borrador/Publicar. No subir logo, preparar tarjeta, comprar o guardar para este smoke. |
 
