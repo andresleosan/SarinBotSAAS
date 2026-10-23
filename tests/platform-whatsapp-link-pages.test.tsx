@@ -10,6 +10,7 @@ const firebase = vi.hoisted(() => ({ user: null as User | null, listener: null a
 vi.mock('@/lib/firebase/client', () => ({ getFirebaseClient: () => ({ auth: { currentUser: firebase.user } }) }));
 vi.mock('firebase/auth', () => ({ GoogleAuthProvider: class {}, onIdTokenChanged: vi.fn((_auth, listener) => { firebase.listener = listener; return vi.fn(); }), signInWithPopup: vi.fn(), signInWithCredential: vi.fn(), signOut: vi.fn(), reauthenticateWithPopup: vi.fn() }));
 vi.mock('next/link', () => ({ default: ({ children, ...props }: { children: ReactNode; href: string }) => createElement('a', props, children) }));
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => window.location.search, useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: ReactNode }) => createElement('main', { 'data-admin-shell': true }, children) }));
 vi.mock('@/components/admin-copilot', () => ({ AdminCopilot: () => createElement('div', null, 'Copilot fixture') }));
 vi.mock('@/components/admin-platform-whatsapp', () => ({ AdminPlatformWhatsApp: () => createElement('div', null, 'Reception fixture') }));
@@ -19,7 +20,13 @@ vi.mock('@/components/admin-payment-confirmation', () => ({ AdminPaymentConfirma
 vi.mock('@/components/admin-platform-support', () => ({ AdminPlatformSupport: () => null }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let h: ReturnType<typeof createLinkHarness>;
-beforeEach(() => { firebase.user = null; firebase.listener = null; h = createLinkHarness(firebase); vi.mocked(reauthenticateWithPopup).mockReset().mockImplementation(async () => ({ user: h.user } as never)); vi.mocked(signOut).mockReset().mockImplementation(async () => { firebase.user = null; await firebase.listener?.(null); }); });
+beforeEach(() => {
+  firebase.user = null; firebase.listener = null; h = createLinkHarness(firebase);
+  // Supply the browser URL consumed by the real administrative navigation boundary.
+  Object.assign(h.browser.location, { pathname: '/admin/assistant', search: '?section=platform-whatsapp', hash: '' });
+  vi.mocked(reauthenticateWithPopup).mockReset().mockImplementation(async () => ({ user: h.user } as never));
+  vi.mocked(signOut).mockReset().mockImplementation(async () => { firebase.user = null; await firebase.listener?.(null); });
+});
 afterEach(async () => h.unmount());
 const pending = () => { h.data.status = { ...h.data.status, revokeGeneration: ids.generation, pending: { challengeId: ids.challenge, revision: 1, expiresAt: Date.now() + 600000, maskedPhone: '••••0001', proof: 'verified' } }; };
 
