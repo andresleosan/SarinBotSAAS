@@ -23,6 +23,7 @@ describe('workspace navigation', () => {
   it('ownerKeepsFourDestinations', async () => {
     await shell();
     const nav = renderer.root.findByProps({ 'aria-label': 'Navegación del negocio' });
+    expect(nav.findAllByType('a').every(link => link.props.scroll === undefined)).toBe(true);
     expect(nav.findAllByType('a').map(link => link.props.href)).toEqual(['/dashboard', '/dashboard/onboarding', '/dashboard/qr-kit', '/dashboard/billing']);
     expect(nav.findAllByType('a').map(link => link.findAllByType('span')[0].children.join(''))).toEqual(['Mi agenda', 'Mi negocio', 'Enlace y QR', 'Suscripci\u00f3n']);
     expect(renderer.root.findByProps({ href: '#workspace-content' }).children).toEqual(['Saltar al contenido']);
@@ -47,6 +48,8 @@ describe('workspace navigation', () => {
     const active = nav.findAllByType('a').filter(link => link.props['aria-current'] === 'page');
     expect(active.map(link => link.props.href)).toEqual(['/admin?module=access&section=receipts']);
     expect(nav.findAllByType('a')).toHaveLength(7);
+    expect(nav.findAllByType('a').filter(link => link.props.href !== '/dashboard').every(link => link.props.scroll === false)).toBe(true);
+    expect(nav.findByProps({ href: '/dashboard' }).props.scroll).toBeUndefined();
   });
 
   it('ordinaryAccountDoesNotReceiveAdministrativeLinksEvenInAdminShell', async () => {
@@ -72,9 +75,64 @@ describe('workspace navigation', () => {
     await act(async () => button.props.onClick());
     await act(async () => renderer.root.findByProps({ href: '/dashboard' }).props.onClick({}));
     expect(button.props['aria-expanded']).toBe(false);
+    expect(focus).toHaveBeenCalledTimes(2);
     await act(async () => button.props.onClick());
     await act(async () => renderer.update(createElement(WorkspaceNavigation, { ...props, activeId: 'business' })));
     expect(button.props['aria-expanded']).toBe(false);
+  });
+
+  it.each([
+    { search: 'module=summary&section=overview', href: '/admin?module=summary&section=overview' },
+    { search: 'focusPayment=old-payment', href: '/admin?module=access&section=receipts' },
+  ])('same platform panel returns focus to the visible menu button ($search)', async ({ search, href }) => {
+    const { AdminModulePanel } = await import('@/components/admin-module-panel');
+    state.pathname = '/admin'; state.isSuperadmin = true;
+    const focus = vi.fn();
+    const tree = (query: string) => createElement(AppShell, { admin: true, adminLocation: resolveAdminLocation('/admin', query, ''), children: createElement(AdminModulePanel, { id: 'current', title: 'Tarea actual', description: '', active: true, children: 'Datos' }) });
+    await act(async () => { renderer = create(tree(search), { createNodeMock: element => ['button', 'h2'].includes(String(element.type)) ? { focus: () => focus(element.type) } : null }); });
+    const button = renderer.root.findAllByType('button').find(node => node.props['aria-controls'])!;
+    await act(async () => button.props.onClick());
+    await act(async () => renderer.root.findByProps({ href }).props.onClick({ button: 0 }));
+    await act(async () => renderer.update(tree(href.split('?')[1])));
+    expect(button.props['aria-expanded']).toBe(false);
+    expect(focus.mock.calls).toEqual([['button']]);
+  });
+  it('a different section in the active module retains destination heading ownership', async () => {
+    const { WorkspaceNavigation } = await import('@/components/workspace-navigation');
+    const { AdminModulePanel } = await import('@/components/admin-module-panel');
+    const focus = vi.fn();
+    const tree = (receipts: boolean) => createElement('div', {}, createElement(WorkspaceNavigation, { context: 'platform', items: [{ id: 'access', label: 'Pagos y acceso', href: '/admin?module=access&section=receipts' }], activeId: 'access', isSuperadmin: true }), createElement(AdminModulePanel, { id: 'receipts', title: 'Comprobantes', description: '', active: receipts, children: 'Datos' }));
+    await act(async () => { renderer = create(tree(false), { createNodeMock: element => ({ focus: () => focus(element.type) }) }); });
+    await act(async () => renderer.root.findByType('button').props.onClick());
+    await act(async () => renderer.root.findByProps({ href: '/admin?module=access&section=receipts' }).props.onClick({}));
+    await act(async () => renderer.update(tree(true)));
+    expect(focus.mock.calls.at(-1)).toEqual(['h2']);
+    expect(renderer.root.findByType('button').props['aria-expanded']).toBe(false);
+  });
+
+  it.each([{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }, { currentTarget: { target: '_blank' } }])('modified selection keeps the mobile menu and focus (%j)', async event => {
+    const { WorkspaceNavigation } = await import('@/components/workspace-navigation');
+    const focus = vi.fn();
+    await act(async () => { renderer = create(createElement(WorkspaceNavigation, { context: 'platform', items: [{ id: 'summary', label: 'Resumen', href: '/admin?module=summary&section=overview' }], activeId: 'summary', isSuperadmin: true }), { createNodeMock: () => ({ focus }) }); });
+    const button = renderer.root.findByType('button');
+    await act(async () => button.props.onClick());
+    const preventDefault = vi.fn();
+    await act(async () => renderer.root.findByProps({ href: '/admin?module=summary&section=overview' }).props.onClick({ ...event, preventDefault }));
+    expect(button.props['aria-expanded']).toBe(true);
+    expect(focus).not.toHaveBeenCalled(); expect(preventDefault).not.toHaveBeenCalled();
+  });
+  it('a changed module owns heading focus after closing the menu', async () => {
+    const { WorkspaceNavigation } = await import('@/components/workspace-navigation');
+    const { AdminModulePanel } = await import('@/components/admin-module-panel');
+    const focus = vi.fn();
+    const tree = (activeId: string) => createElement('div', {}, createElement(WorkspaceNavigation, { context: 'platform', items: [{ id: 'summary', label: 'Resumen', href: '/admin' }, { id: 'businesses', label: 'Negocios', href: '/admin?module=businesses&section=list' }], activeId, isSuperadmin: true }), createElement(AdminModulePanel, { id: 'businesses', title: 'Negocios', description: '', active: activeId === 'businesses', children: 'Datos' }));
+    await act(async () => { renderer = create(tree('summary'), { createNodeMock: element => ({ focus: () => focus(element.type) }) }); });
+    const button = renderer.root.findByType('button');
+    await act(async () => button.props.onClick());
+    await act(async () => renderer.root.findByProps({ href: '/admin?module=businesses&section=list' }).props.onClick({}));
+    expect(button.props['aria-expanded']).toBe(false); expect(focus).not.toHaveBeenCalled();
+    await act(async () => renderer.update(tree('businesses')));
+    expect(focus.mock.calls).toEqual([['h2']]);
   });
 
   it('hiddenPanelCannotReceiveKeyboardFocus', async () => {

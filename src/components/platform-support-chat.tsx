@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth-provider';
 import { ConsentPanel, useAccountConsent } from '@/components/consent-panel';
 import { useConsent, type ConsentController } from '@/hooks/useConsent';
 import { apiFetch, ApiError } from '@/lib/client/api';
+import { useAdminTaskAutoFocus } from '@/components/admin-task-focus-boundary';
 import { useApiPoll } from '@/lib/client/use-api-poll';
 import { LEGAL_VERSION, PLATFORM_SUPPORT_LEGAL_VERSION } from '@/lib/legal';
 import type { SupportConversationPage, SupportConversationView, SupportMessageView, SupportNotificationState, SupportPage, SupportRecipientView } from '@/types/platform-support';
@@ -200,6 +201,7 @@ function SupportWorkspace({ context, initialThread }: { context: Context; initia
 }
 
 function SupportThread({ context, thread }: { context: Context; thread: string }) {
+  const canAutoFocus = useAdminTaskAutoFocus();
   const lifetime = useLifetime();
   const memory = useRef(emptySupportMessages());
   const sweepCursors = useRef(new Set<string>());
@@ -255,8 +257,8 @@ function SupportThread({ context, thread }: { context: Context; thread: string }
   useEffect(() => {
     if (busy || review || !focusAfterCommit.current) return;
     const current = focusAfterCommit.current; focusAfterCommit.current = null;
-    if (current()) textarea.current?.focus();
-  }, [busy, review, notice]);
+    if (current() && canAutoFocus()) textarea.current?.focus();
+  }, [busy, review, notice, canAutoFocus]);
   useExpiry(() => { const expired = expireSupportMessages(memory.current); if (expired.items.some((item, index) => item.text !== memory.current.items[index]?.text)) { memory.current = expired; poll.setValue(current => current && expireSupportMessages(current), { invalidate: false }); } tick(clock + 1); }, value.items.filter(item => item.text !== null).map(item => item.deadline));
   async function send() {
     if (!requestCurrent() || abortWrite.current || busy || review || !poll.value || !draft.trim() || [...draft].length > 4096 || value.catchingUp) return;

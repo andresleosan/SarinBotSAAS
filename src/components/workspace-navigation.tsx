@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight, Bot, CalendarDays, CreditCard, LayoutDashboard, Menu, QrCode, Settings2, ShieldCheck, Sparkles, Store, type LucideIcon } from "lucide-react";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { type WorkspaceNavItem } from "@/lib/admin-navigation";
 
 const icons: Record<string, LucideIcon> = {
@@ -27,6 +27,11 @@ export function WorkspaceNavigation({ context, items, activeId, isSuperadmin }: 
     setOpen(false);
     button.current?.focus();
   }
+  function select(event: MouseEvent<HTMLAnchorElement>, active = false) {
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || (event.button != null && event.button !== 0) || (event.currentTarget?.target && event.currentTarget.target !== '_self')) return;
+    setOpen(false);
+    if (open && active) button.current?.focus();
+  }
   const visibleItems = context === 'platform' && !isSuperadmin ? [] : items;
   return (
     <div onKeyDown={onKeyDown}>
@@ -38,11 +43,11 @@ export function WorkspaceNavigation({ context, items, activeId, isSuperadmin }: 
         {visibleItems.map(({ id, href, label }) => {
           const Icon = icons[id] ?? LayoutDashboard;
           const active = id === activeId;
-          return <Link key={id} href={href} scroll={false} aria-current={active ? 'page' : undefined} onClick={() => setOpen(false)} className={`flex min-h-11 min-w-0 items-center gap-3 rounded-[10px] px-3 py-3 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue ${active ? 'bg-sarin-soft text-sarin-blue' : 'text-sarin-muted hover:bg-sarin-canvas hover:text-sarin-ink'}`}><Icon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} /><span className="min-w-0 break-words">{label}</span>{active && <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-sarin-blue" />}</Link>;
+          return <Link key={id} href={href} scroll={context === 'platform' ? false : undefined} aria-current={active ? 'page' : undefined} onClick={event => select(event, active)} className={`flex min-h-11 min-w-0 items-center gap-3 rounded-[10px] px-3 py-3 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue ${active ? 'bg-sarin-soft text-sarin-blue' : 'text-sarin-muted hover:bg-sarin-canvas hover:text-sarin-ink'}`}><Icon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} /><span className="min-w-0 break-words">{label}</span>{active && <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-sarin-blue" />}</Link>;
         })}
-        {context === 'platform' && isSuperadmin && <Link href="/dashboard" onClick={() => setOpen(false)} className="mt-2 flex min-h-11 items-center gap-3 rounded-[10px] px-3 py-3 text-[13px] text-sarin-muted hover:text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><CalendarDays aria-hidden="true" className="h-[18px] w-[18px] shrink-0" />Volver a mi negocio</Link>}
+        {context === 'platform' && isSuperadmin && <Link href="/dashboard" onClick={select} className="mt-2 flex min-h-11 items-center gap-3 rounded-[10px] px-3 py-3 text-[13px] text-sarin-muted hover:text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><CalendarDays aria-hidden="true" className="h-[18px] w-[18px] shrink-0" />Volver a mi negocio</Link>}
       </nav>
-      {context === 'business' && isSuperadmin && <Link href="/admin" onClick={() => setOpen(false)} className="mx-5 mb-3 flex min-h-11 items-center gap-2 rounded-[10px] text-xs text-sarin-muted hover:text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue lg:mx-7"><ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0" />Administración de Sarin<ArrowUpRight aria-hidden="true" className="ml-auto h-3.5 w-3.5 shrink-0" /></Link>}
+      {context === 'business' && isSuperadmin && <Link href="/admin" onClick={select} className="mx-5 mb-3 flex min-h-11 items-center gap-2 rounded-[10px] text-xs text-sarin-muted hover:text-sarin-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue lg:mx-7"><ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0" />Administración de Sarin<ArrowUpRight aria-hidden="true" className="ml-auto h-3.5 w-3.5 shrink-0" /></Link>}
     </div>
   );
 }

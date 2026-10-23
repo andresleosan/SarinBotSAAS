@@ -5,6 +5,7 @@ import { useAuth } from "@/components/auth-provider";
 import { buttonClass, fieldClass } from "@/components/app-shell";
 import { ApiError, apiFetch, errorMessage } from "@/lib/client/api";
 import { reauthenticatePlatformWhatsAppOwner } from "@/lib/client/platform-whatsapp-reauth";
+import { useAdminTaskAutoFocus } from "@/components/admin-task-focus-boundary";
 import type { AdminCopilotSource } from "@/types/admin-copilot";
 import type { PaymentActionResult, PaymentActionView, PreparePaymentInput } from "@/types/admin-payment-actions";
 
@@ -29,6 +30,7 @@ export function AdminPaymentConfirmation(props: Props) {
 }
 
 function PaymentConfirmationSession({ payments, proposalId }: Props) {
+  const canAutoFocus = useAdminTaskAutoFocus();
   const { user, isSuperadmin, authEpoch, signingOut, isCurrentSession, invalidateSession } = useAuth();
   const uid = user!.uid;
   const current = useRef({ uid, authEpoch, isSuperadmin, signingOut, isCurrentSession });
@@ -112,7 +114,7 @@ function PaymentConfirmationSession({ payments, proposalId }: Props) {
     // The parent key owns the identity lifecycle; callbacks capture that exact session.
   }, []);
   useEffect(() => { if (proposalId) void read(proposalId); }, [proposalId]); // read-only deep link
-  useEffect(() => { if (error) alert.current?.focus(); else if (review) heading.current?.focus(); }, [error, review]);
+  useEffect(() => { if (!canAutoFocus()) return; if (error) alert.current?.focus(); else if (review) heading.current?.focus(); }, [error, review, canAutoFocus]);
 
   async function prepare(retry = false) {
     if (!valid() || phase === "uncertain") return;

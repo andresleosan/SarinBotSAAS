@@ -12,6 +12,7 @@ import { AdminPlatformWhatsApp } from "@/components/admin-platform-whatsapp";
 import { PlatformWhatsAppLink } from "@/components/platform-whatsapp-link";
 import { AdminNavigationBoundary } from "@/components/admin-navigation-boundary";
 import { AdminModulePanel } from "@/components/admin-module-panel";
+import { AdminTaskFocusBoundary } from "@/components/admin-task-focus-boundary";
 import { getAdminSectionItems, type AdminLocation } from "@/lib/admin-navigation";
 import type { AdminCopilotBusiness, AdminCopilotSource } from "@/types/admin-copilot";
 
@@ -48,7 +49,9 @@ function AssistantWorkspace({ location }: { location: AdminLocation }) {
       <AdminCopilot onBusinessesChange={setBusinesses} onPaymentsChange={setPayments} />
     </AdminModulePanel>
     <AdminModulePanel id="assistant-payments" active={location.section === "payments"} title="Revisión de pagos" description="Revisa una propuesta y confirma la decisión solo mediante su acción explícita.">
-      <AdminPaymentConfirmation payments={payments} proposalId={entry.current.proposalId} />
+      <AdminTaskFocusBoundary active={location.section === "payments"} noticeKey={laterTarget ? location.key : null}>
+        <AdminPaymentConfirmation payments={payments} proposalId={entry.current.proposalId} />
+      </AdminTaskFocusBoundary>
     </AdminModulePanel>
     <AdminModulePanel id="assistant-platform-whatsapp" active={location.section === "platform-whatsapp"} title="WhatsApp de Sarin" description="Administra las conversaciones y el vínculo del canal de plataforma.">
       <p className="mb-4 rounded-xl bg-sarin-soft p-3 text-sm text-sarin-blue">Ámbito: plataforma Sarin.</p>
@@ -61,7 +64,9 @@ function AssistantWorkspace({ location }: { location: AdminLocation }) {
     </AdminModulePanel>
     <div ref={supportHeading}>
       <AdminModulePanel id="assistant-web-support" active={location.section === "web-support"} title="Soporte web" description="Abre explícitamente el soporte privado de plataforma o continúa la consulta actual.">
-        <AdminPlatformSupport initialThread={entry.current.supportThread} />
+        <AdminTaskFocusBoundary active={location.section === "web-support"} noticeKey={laterTarget ? location.key : null}>
+          <AdminPlatformSupport initialThread={entry.current.supportThread} />
+        </AdminTaskFocusBoundary>
       </AdminModulePanel>
     </div>
   </div></AppShell>;
