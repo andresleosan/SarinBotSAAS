@@ -13,6 +13,7 @@ vi.mock("@/lib/firebase/client", () => ({ getFirebaseClient: () => ({ auth: { cu
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ user: state.uid ? { uid: state.uid } : null, isSuperadmin: state.admin, authEpoch: state.epoch, signingOut: state.signingOut, invalidateSession: state.invalidate, isCurrentSession: (uid: string, epoch: number) => uid === state.uid && epoch === state.epoch && !state.signingOut }), AuthGate: ({ children }: { children: ReactNode }) => state.admin && state.uid && !state.signingOut ? children : createElement("p", null, "Acceso restringido") }));
 vi.mock("@/components/app-shell", () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children, error }: { children: ReactNode; error?: boolean }) => createElement("p", { role: error ? "alert" : "status" }, children), buttonClass: "button", fieldClass: "field" }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
+vi.mock("next/navigation", () => ({ usePathname: () => '/admin/assistant', useSearchParams: () => window.location.search, useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/platform-whatsapp-link", () => ({ PlatformWhatsAppLink: () => null }));
 vi.mock("@/components/admin-platform-whatsapp", () => ({ AdminPlatformWhatsApp: () => null }));
 vi.mock("@/components/admin-whatsapp-conversations", () => ({ AdminWhatsAppConversations: () => null }));
@@ -29,7 +30,7 @@ async function mount() { await act(async () => { renderer = create(createElement
 beforeEach(() => {
   Object.assign(state, { uid: "admin-a", admin: true, epoch: 1, signingOut: false });
   view = { proposal: { id, paymentId: "fixture", action: "approve", revision: 1, expiresAt: Date.now() + 300000, state: "pending" }, business: { id: "business-fixture", name: "Negocio sintético" }, payment: { id: "fixture", amountCOP: 89000, planId: "monthly", kind: "subscription", status: "pending" }, effect: "El período empieza al confirmar o desde el final pagado vigente." };
-  vi.stubGlobal("window", { location: { search: `?paymentAction=${id}` }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal("window", { location: { pathname: '/admin/assistant', hash: '', search: `?paymentAction=${id}` }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
   state.api.mockReset().mockImplementation(async (path: string) => path.startsWith("/api/admin/copilot/payment-actions") ? view : snapshot);
   state.popup.mockReset().mockImplementation(async () => ({ user: { uid: state.uid, getIdTokenResult: state.token } }));
   state.token.mockReset().mockResolvedValue({});
@@ -210,7 +211,7 @@ describe("payment interaction and recovery", () => {
   it("rejects malformed or duplicate opaque IDs locally without a proposal read", async () => {
     window.location.search = `?paymentAction=${id}&paymentAction=${id}`; await mount();
     expect(state.api.mock.calls.some(([path]) => path.includes("payment-actions"))).toBe(false);
-    expect(text(root())).toContain("enlace de propuesta no es válido");
+    expect(text(root())).toContain("No pudimos abrir esa sección. Elige una tarea del menú");
   });
 });
 

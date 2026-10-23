@@ -7,9 +7,10 @@ import type { AdminCopilotSnapshot } from "@/types/admin-copilot";
 
 const state = vi.hoisted(() => ({ api: vi.fn(), uid: "admin-a", admin: true }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
-vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ user: { uid: state.uid } }), AuthGate: ({ admin, children }: { admin?: boolean; children: ReactNode }) => admin && !state.admin ? createElement("p", null, "Acceso restringido") : children }));
+vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ user: { uid: state.uid }, isSuperadmin: state.admin, authEpoch: 1, signingOut: false, isCurrentSession: (uid: string) => uid === state.uid, invalidateSession: vi.fn() }), AuthGate: ({ admin, children }: { admin?: boolean; children: ReactNode }) => admin && !state.admin ? createElement("p", null, "Acceso restringido") : children }));
 vi.mock("@/components/app-shell", () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children, error }: { children: ReactNode; error?: boolean }) => createElement("p", { role: error ? "alert" : "status" }, children), buttonClass: "button", fieldClass: "field" }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
+vi.mock("next/navigation", () => ({ usePathname: () => '/admin/assistant', useSearchParams: () => '', useRouter: () => ({ push: vi.fn() }) }));
 // The owner-link panel has its own real-provider suite; keep this copilot fixture's API contract scoped.
 vi.mock("@/components/platform-whatsapp-link", () => ({ PlatformWhatsAppLink: () => createElement("section", { "aria-label": "Owner link fixture" }) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -34,8 +35,12 @@ describe("private administrative copilot", () => {
   const root = () => renderer!.root;
   const button = (label: string) => root().findAllByType("button").find(node => text(node).includes(label))!;
   async function mount() { await act(async () => { renderer = create(createElement(AdminCopilot)); }); }
-  beforeEach(() => { data = snapshot(); state.uid = "admin-a"; state.admin = true; state.api.mockReset().mockResolvedValue(data); });
-  afterEach(async () => { await act(async () => renderer?.unmount()); });
+  beforeEach(() => {
+    data = snapshot(); state.uid = "admin-a"; state.admin = true; state.api.mockReset().mockResolvedValue(data);
+    vi.stubGlobal('window', { location: { pathname: '/admin/assistant', search: '', hash: '' }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    vi.stubGlobal('document', { addEventListener: vi.fn(), removeEventListener: vi.fn(), visibilityState: 'visible' });
+  });
+  afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); });
 
   it("renders the real snapshot and actionable sources without consuming AI", async () => {
     await mount();
