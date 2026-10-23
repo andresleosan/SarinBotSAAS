@@ -8,6 +8,7 @@ import { now, echo, memoryStore, configure, connection, connectionPath, identity
 import { configureWork, workCircuit } from './platform-whatsapp-work-fixtures';
 import { POST } from '@/app/api/whatsapp/ycloud/platform/webhook/route';
 import { processPlatformWhatsAppWork, startPlatformWhatsAppWorker, recognizePlatformWorkCancellation } from '@/lib/server/platform-whatsapp-worker';
+import { readOutboxDispatchPreparation, takePlatformSendPermit } from '@/lib/server/platform-whatsapp-work-store';
 import { runPlatformSupportWork } from '@/lib/server/platform-support-bot';
 import { getPlatformWhatsAppConfig } from '@/lib/server/platform-whatsapp-config';
 import { ingestPlatformWhatsAppEvent } from '@/lib/server/platform-whatsapp-ingress';
@@ -111,4 +112,51 @@ it('queue wait cannot cross the immutable deadline even while the sole renewal k
   for (let i = 0; i < 100 && global.__platformWorkDriver?.draining; i++) await vi.advanceTimersByTimeAsync(0);
   expect(s.rows.get('platformWhatsAppJobs/' + lease.jobId)).toMatchObject({ status: 'cancelled', outboxId: null });
   expect(global.__platformWorkDriver?.timer).toBeNull(); vi.useRealTimers();
+});
+
+it.each(['prepared', 'claimed'] as const)('rejects stale public %s dispatch before link identity reads without mutating reservations', async status => {
+  const s = await buildSupportScenario(), { lease } = await s.question(); fakeProvider();
+  await runPlatformSupportWork(lease, s.db, new AbortController().signal);
+  const id = (await s.work.readAuthorized(lease))!.outboxId!;
+  if (status === 'claimed') await s.work.claimSend(id);
+  const headPath = 'platformWhatsAppJobs/head_' + s.rows.get('platformWhatsAppJobs/' + lease.jobId)!.conversationId;
+  s.seed(headPath, { ...s.rows.get(headPath), headJobId: 'job_' + 'f'.repeat(64) });
+  const before = structuredClone([...s.rows]), reads = s.seen.length; runtime.getUser.mockClear();
+  expect(await readOutboxDispatchPreparation(id, s.db, now)).toBeNull();
+  expect(s.seen.slice(reads).filter(c => c.action === 'read' && c.read.kind === 'document').map(c => c.action === 'read' && c.read.path)).toEqual(['platformWhatsAppOutbox/' + id, 'platformWhatsAppJobs/' + lease.jobId, headPath]);
+  expect(runtime.getUser).not.toHaveBeenCalled(); expect([...s.rows]).toEqual(before);
+});
+it.each(['before-claim', 'before-permit', 'disabled'] as const)('keeps fresh full send authority after successful dispatch preparation: %s', async loss => {
+  const s = await buildSupportScenario(), { lease } = await s.question(); fakeProvider();
+  await runPlatformSupportWork(lease, s.db, new AbortController().signal);
+  const id = (await s.work.readAuthorized(lease))!.outboxId!;
+  expect(await readOutboxDispatchPreparation(id, s.db, now)).not.toBeNull();
+  const claim = loss === 'before-claim' ? null : (await s.work.claimSend(id))!;
+  if (loss === 'disabled') runtime.getUser.mockResolvedValue({ uid: 'demo-link-user', disabled: true });
+  else {
+    const headPath = 'platformWhatsAppJobs/head_' + s.rows.get('platformWhatsAppJobs/' + lease.jobId)!.conversationId;
+    s.seed(headPath, { ...s.rows.get(headPath), headJobId: 'job_' + 'f'.repeat(64) });
+  }
+  if (claim) expect(await takePlatformSendPermit(id, claim.token, s.db, now)).toBeNull();
+  else expect(await s.work.claimSend(id)).toBeNull();
+  expect(s.rows.get('platformWhatsAppOutbox/' + id)).toMatchObject({ status: claim ? 'claimed' : 'prepared', sendStartedAt: null });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it.each(['prepared', 'claimed'] as const)('preserves private stale %s cleanup and reserved-cost settlement during dispatch recovery', async status => {
+  vi.stubEnv('SUPERADMIN_UID', 'demo-link-user');
+  const s = await buildSupportScenario(), { lease } = await s.question('lista los pagos');
+  s.seed('paymentReceipts/demo-payment', { tenantId: 'demo-business', tenantName: 'Demo business', status: 'pending', submittedAt: now, amountCOP: 1000 });
+  fetcher.mockResolvedValue(Response.json({ model: 'synthetic-wire-model-v1', choices: [{ message: { content: JSON.stringify({ reply: 'Hay un pago pendiente.', sourceIds: ['payment-demo-payment'] }) } }], usage: { prompt_tokens: 10, prompt_cache_hit_tokens: 0, prompt_cache_miss_tokens: 10, completion_tokens: 5, total_tokens: 15 } }));
+  await runPlatformSupportWork(lease, s.db, new AbortController().signal);
+  const id = (await s.work.readAuthorized(lease))!.outboxId!;
+  if (status === 'claimed') await s.work.claimSend(id);
+  const out = s.rows.get('platformWhatsAppOutbox/' + id)!, headPath = 'platformWhatsAppJobs/head_' + out.conversationId;
+  s.seed(headPath, { ...s.rows.get(headPath), headJobId: 'job_' + 'f'.repeat(64) });
+  vi.stubEnv('SUPERADMIN_UID', 'other');
+  expect(await readOutboxDispatchPreparation(id, s.db, now)).toBeNull();
+  expect(s.rows.get('platformWhatsAppOutbox/' + id)).toMatchObject({ status: 'cancelled', sendStartedAt: null });
+  expect(s.rows.get('platformWhatsAppJobs/' + lease.jobId)).toMatchObject({ status: 'cancelled', nextAttemptAt: null });
+  if (out.sendReservationId) expect(s.rows.get('platformWhatsAppBudgetCalls/' + out.sendReservationId)).toMatchObject({ status: 'released', actualMicros: 0, startedAt: null });
+  expect(s.rows.get(headPath)).toMatchObject({ headJobId: 'job_' + 'f'.repeat(64) });
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });

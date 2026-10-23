@@ -1,10 +1,11 @@
 import { test } from 'node:test';
+import { potentialPlatformWork } from '../../shared/platform-whatsapp-work-authorization.ts';
 import assert from 'node:assert/strict';
 import { isPlatformJob, isControlHead, isWorkRecordAtPath, workText } from '../../shared/platform-whatsapp-work.ts';
 import { parsePlatformWorkPolicy, platformCost } from '../../shared/platform-whatsapp-policy.ts';
 import { cleanupPlatformWorkRetention } from '../src/platform-whatsapp-work-retention.ts';
 import { preparePlatformAudio, startPlatformAudio } from '../src/platform-whatsapp-work-stages.ts';
-import { fixture, now, scope, seed, set, get } from './platform-whatsapp-fixture.mjs';
+import { fixture, now, scope, seed, set, get, event } from './platform-whatsapp-fixture.mjs';
 
 const epoch = '00000000-0000-4000-8000-000000000001', digest = 'a'.repeat(64), sourceTime = now - 86_400_000;
 function job(index = 0, received = sourceTime) {
@@ -56,4 +57,30 @@ test('unprepared/missing audio attempts have no download or inference capability
   const env = await fixture(context), lease = { jobId: job().jobId, epoch, token: epoch };
   assert.equal(await preparePlatformAudio(lease, env, now), null); assert.equal(await startPlatformAudio(lease, epoch, env, now), false);
   assert.equal((await env.SARIN_DB.prepare('SELECT COUNT(*) AS n FROM app_commits').first()).n, 0);
+});
+
+// A disproved head must not spend reads on unrelated projection dependencies.
+test('wake rejects stale heads before unrelated reads and preserves full live/advance proofs', async () => {
+  const j = job(0, now), head = { ...scope, recordType: 'control_head', conversationId: digest, controlEpoch: epoch, controlRevision: 0, connectionRevision: 0, entryState: 'initial', botAuthorityFingerprint: null, attachedConversationRevision: null, headJobId: j.jobId, tailJobId: j.jobId, currentMenuOutboxId: null, status: 'active', nextAttemptAt: null, receivedAt: now, expiresAt: j.expiresAt };
+  const env = { PLATFORM_WHATSAPP_PROCESSING_ENABLED: 'true', PLATFORM_WHATSAPP_WABA_ID: scope.wabaId, PLATFORM_WHATSAPP_PHONE_E164: scope.phoneE164, PLATFORM_WHATSAPP_PHONE_NUMBER_ID: scope.phoneNumberId, PLATFORM_WHATSAPP_SEND_ENABLED: 'true', PLATFORM_WHATSAPP_SEND_DAILY_BUDGET_MICROS: '100', PLATFORM_WHATSAPP_TARIFF_POLICY: JSON.stringify({ version: 'demo-v1', sendEvidence: { version: 'demo-v1', currency: 'USD', timezone: 'UTC', category: 'service', destinationScope: 'all_e164', rate: { numerator: 10, denominator: 1 } }, audio: { numerator: 1, denominator: 120000 }, generationInput: { numerator: 1, denominator: 100 }, generationOutput: { numerator: 1, denominator: 100 }, send: { numerator: 10, denominator: 1 }, maximumInputTokens: 100, maximumOutputTokens: 100 }) };
+  for (const variant of ['stale', 'scope', 'malformed', 'live', 'bad-source', 'advance-future', 'advance-scope', 'advance-malformed', 'advance']) {
+    const advancing = variant.startsWith('advance');
+    const h = variant === 'stale' ? { ...head, headJobId: job(1, now).jobId } : variant === 'scope' ? { ...head, wabaId: '999999' } : variant === 'malformed' ? { ...head, extra: true } : advancing ? { ...head, status: 'advance', nextAttemptAt: variant === 'advance-future' ? now + 1 : now, ...(variant === 'advance-scope' ? { wabaId: '999999' } : variant === 'advance-malformed' ? { extra: true } : {}) } : head;
+    const reads = [], headPath = 'platformWhatsAppJobs/head_' + digest;
+    const answer = await potentialPlatformWork(async path => {
+      reads.push(path);
+      if (path === headPath) return h;
+      if (path === 'platformWhatsAppJobs/' + j.jobId) return j;
+      if (path === 'platformWhatsAppEvents/' + j.sourceEventId) return variant === 'bad-source' ? undefined : event(now, { connectionRevision: 0, customerSentAt: now });
+      if (path === 'platformWhatsAppConversations/' + digest) return undefined;
+      if (path === 'serverSettings/platform_whatsapp') return { ...scope, recordType: 'connection', connectionRevision: 0, providerConnection: 'connected', paused: false, pausedReason: null, updatedAt: now, connectedAt: null, connectedRevision: null, lastSignedInboundAt: null, lastHumanEchoAt: null, lastDeliveryAt: null };
+      throw new Error('unexpected dependency');
+    }, async (root, status) => root === 'platformWhatsAppJobs' && status === (advancing ? 'advance' : 'ready') ? [{ path: advancing ? headPath : path(j), data: advancing ? h : j }] : [], env, now);
+    assert.equal(answer, variant === 'live' || variant === 'advance', variant);
+    if (['stale', 'scope', 'malformed'].includes(variant)) assert.deepEqual(reads, [headPath], variant);
+    else if (variant === 'advance-future') assert.deepEqual(reads, ['platformWhatsAppJobs/' + j.jobId], variant);
+    else if (variant === 'advance-malformed') assert.deepEqual(reads, [], variant);
+    else if (variant === 'advance-scope') assert.deepEqual(reads, ['platformWhatsAppJobs/' + j.jobId, headPath], variant);
+    else assert.ok(reads.includes('platformWhatsAppEvents/' + j.sourceEventId), variant);
+  }
 });

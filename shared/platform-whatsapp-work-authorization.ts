@@ -55,7 +55,9 @@ export async function potentialPlatformWork(read: (path: string) => Promise<unkn
     if (['admin_query', 'operator_notification'].includes(job.kind) && (job.authorityKind !== 'actor' || typeof env.SUPERADMIN_UID !== 'string' || !env.SUPERADMIN_UID || env.SUPERADMIN_UID !== job.uid)) return false;
     if (job.wabaId !== scope.wabaId || job.phoneE164 !== scope.phoneE164 || job.phoneNumberId !== scope.phoneNumberId || job.bodyState !== 'body_present' || job.processingDeadlineAt !== null && now >= job.processingDeadlineAt) return false;
     const head = await read('platformWhatsAppJobs/head_' + job.conversationId);
-    const facts = { head: advance && isControlHead(head) && head.status === 'advance' ? { ...head, status: 'active' } : head, source: await read('platformWhatsAppEvents/' + job.sourceEventId), conversation: await read('platformWhatsAppConversations/' + job.conversationId), connection: await read('serverSettings/platform_whatsapp') };
+    // Negative-only shortcut; surviving candidates still require the complete projection below.
+    if (!isControlHead(head) || !workScopeEqual(job, head) || head.headJobId !== job.jobId) return false;
+    const facts = { head: advance && isControlHead(head) && head.status === 'advance' ? { ...head, status: 'active', nextAttemptAt: null } : head, source: await read('platformWhatsAppEvents/' + job.sourceEventId), conversation: await read('platformWhatsAppConversations/' + job.conversationId), connection: await read('serverSettings/platform_whatsapp') };
     if (!currentWorkProjection(job, facts, now, false)) return false;
     const stage = job.outboxId || job.catalogId || job.kind === 'operator_notification' ? 'send' : job.sourceKind === 'audio' && job.audioState !== 'completed' ? 'audio' : 'generation';
     if (!policy.enabled[stage] || policy.limits[stage] <= 0 || stage === 'send' && !policy.tariff.sendEvidence || stage === 'generation' && !parseGenerationPolicy(typeof env.PLATFORM_WHATSAPP_GENERATION_POLICY === 'string' ? env.PLATFORM_WHATSAPP_GENERATION_POLICY : undefined)) return false;

@@ -56,7 +56,7 @@ export function stageReply(job: PlatformJob, outbox: PlatformOutbox, tx: Transac
   stageWork(tx, db, 'platformWhatsAppOutbox/' + outbox.outboxId, outbox);
   stageWork(tx, db, 'platformWhatsAppJobs/' + job.jobId, { ...job, status: 'reply_saved', nextAttemptAt: job.processingDeadlineAt, outboxId: outbox.outboxId, outputKind: outbox.outputKind });
 }
-async function inspectOutboxPreparation(id: string, db: Database, now: number) {
+async function inspectOutboxPreparation(id: string, db: Database, now: number, dispatch = false) {
   const outbox = await db.runTransaction(tx => readWork(tx, db, 'platformWhatsAppOutbox/' + id));
   if (outbox?.recordType !== 'outbox') return null;
   const job = await db.runTransaction(tx => readWork(tx, db, 'platformWhatsAppJobs/' + outbox.jobId));
@@ -64,6 +64,11 @@ async function inspectOutboxPreparation(id: string, db: Database, now: number) {
   if (!outboxMatchesJob(outbox, job)) throw platformWhatsAppUnavailableError();
   const payload = workPayload(outbox, now);
   if (payload && outbox.outputFingerprint !== outboxFingerprint(job, payload.text!, outbox.menuPurpose, outbox.menuActions)) throw platformWhatsAppUnavailableError();
+  if (dispatch && !['admin_query', 'operator_notification'].includes(job.kind)) {
+    const head = await db.runTransaction(tx => readWork(tx, db, 'platformWhatsAppJobs/head_' + job.conversationId));
+    // Only reject a disproved public continuation. Private recovery retains its cancellation path.
+    if (head?.recordType === 'control_head' && samePlatformWhatsAppScope(head, job) && head.headJobId !== job.jobId) return null;
+  }
   const prepared = await prepareWorkIdentity(job, db, now); return { job, outbox, prepared };
 }
 export async function readOutboxPreparation(id: string, db: Database, now: number) {
@@ -72,7 +77,7 @@ export async function readOutboxPreparation(id: string, db: Database, now: numbe
 }
 /** Recovery cancellation is restricted to the actual private job already read. */
 export async function readOutboxDispatchPreparation(id: string, db: Database, now: number) {
-  const facts = await inspectOutboxPreparation(id, db, now);
+  const facts = await inspectOutboxPreparation(id, db, now, true);
   if (facts?.prepared) return { ...facts, prepared: facts.prepared };
   if (facts && ['admin_query', 'operator_notification'].includes(facts.job.kind)) await cancelUnauthorizedPrivateOutput(id, db, now);
   return null;
