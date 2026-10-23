@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -11,7 +11,15 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { AuthGate } from "@/components/auth-provider";
+import { AuthGate, useAuth } from "@/components/auth-provider";
+import { AdminNavigationBoundary } from "@/components/admin-navigation-boundary";
+import { AdminModulePanel } from "@/components/admin-module-panel";
+import {
+  adminConsoleReadPath,
+  buildAdminHref,
+  getAdminSectionItems,
+  type AdminLocation,
+} from "@/lib/admin-navigation";
 import {
   AppShell,
   Notice,
@@ -50,11 +58,10 @@ const subscriptionLabels: Record<Business["subscription"]["status"], string> = {
   past_due: "Pago pendiente",
   suspended: "Suspendida",
 };
-function adminReadPath() {
-  const focusPayment = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("focusPayment");
-  return focusPayment ? `/api/admin?focusPayment=${encodeURIComponent(focusPayment)}` : "/api/admin";
-}
-function Console() {
+function Console({ location }: { location: AdminLocation }) {
+  const { user } = useAuth();
+  const uid = user!.uid;
+  const focusPayment = location.focusPayment;
   const [data, setData] = useState<AdminData | null>(null);
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,44 +70,70 @@ function Console() {
   const [working, setWorking] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
-  const focusedRecord = useRef(false);
+  const focusedDestination = useRef<string | null>(null);
+  const readGeneration = useRef(0);
+  const activeRead = useRef<AbortController | null>(null);
+  const [loadedFocus, setLoadedFocus] = useState<string | null | undefined>(undefined);
+  const [readFailed, setReadFailed] = useState(false);
   const engine = useEngineHealth();
-  useEffect(() => {
+  const readConsole = useCallback(async (manual = false) => {
+    activeRead.current?.abort();
     const controller = new AbortController();
-    void apiFetch<AdminData>(adminReadPath(), { signal: controller.signal })
-      .then((response) => {
-        setData(response);
-        setSettings(response.settings);
-      })
-      .catch((cause: unknown) => {
-        if (!controller.signal.aborted) setError(errorMessage(cause));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, []);
+    activeRead.current = controller;
+    const generation = ++readGeneration.current;
+    const isCurrent = () => !controller.signal.aborted && generation === readGeneration.current;
+    setLoading(true);
+    setError(null);
+    setReadFailed(false);
+    if (manual) setWorking("refresh");
+    else setWorking(previous => previous === "refresh" ? null : previous);
+    try {
+      const response = await apiFetch<AdminData>(
+        adminConsoleReadPath(focusPayment), { signal: controller.signal }, uid, isCurrent,
+      );
+      if (!isCurrent()) return;
+      setData(response);
+      // Snapshot reads must not replace the private, locally edited billing draft.
+      setSettings(previous => previous ?? response.settings);
+    } catch (cause) {
+      if (!isCurrent()) return;
+      setError(errorMessage(cause));
+      setReadFailed(true);
+    } finally {
+      if (isCurrent()) {
+        setLoadedFocus(focusPayment);
+        setLoading(false);
+        if (manual) setWorking(previous => previous === "refresh" ? null : previous);
+      }
+    }
+  }, [focusPayment, uid]);
   useEffect(() => {
-    if (!data || focusedRecord.current || typeof window === "undefined") return;
-    const targetId = window.location.hash.slice(1);
-    if (!/^(business|payment)-[A-Za-z0-9_-]{1,128}$/.test(targetId)) return;
-    const target = document.getElementById(targetId);
+    void readConsole();
+    return () => {
+      activeRead.current?.abort();
+      readGeneration.current++;
+    };
+  }, [readConsole]);
+  const targetExists = location.targetId?.startsWith("payment-")
+    ? data?.receipts.some(item => `payment-${item.id}` === location.targetId)
+    : data?.businesses.some(item => `business-${item.id}` === location.targetId);
+  const recordNotice = Boolean(location.targetId && !loading && loadedFocus === focusPayment && (readFailed || !targetExists));
+  const destinationKey = JSON.stringify([location.module, location.section, location.targetId]);
+  useEffect(() => {
+    if (!location.targetId) {
+      focusedDestination.current = null;
+      return;
+    }
+    // A new target waits for its own read; refreshes never reclaim focus.
+    if (loading || loadedFocus !== focusPayment || focusedDestination.current === destinationKey) return;
+    const target = document.getElementById(recordNotice ? "admin-record-notice" : location.targetId);
     if (!target) return;
-    focusedRecord.current = true;
+    focusedDestination.current = destinationKey;
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "center" });
-  }, [data]);
+  }, [destinationKey, focusPayment, loadedFocus, loading, location.targetId, recordNotice]);
   async function refresh() {
-    setWorking("refresh");
-    setError(null);
-    try {
-      const response = await apiFetch<AdminData>(adminReadPath());
-      setData(response);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setWorking(null);
-    }
+    await readConsole(true);
   }
   async function viewImage(id: string) {
     if (images[id]) {
@@ -188,12 +221,9 @@ function Console() {
       setWorking(null);
     }
   }
-  if (loading) return <Notice>Cargando consola…</Notice>;
-  if (!data)
-    return <Notice error>{error || "No se pudo cargar la consola."}</Notice>;
-  const pending = data.receipts.filter((item) => item.status === "pending");
+  const pending = data?.receipts.filter((item) => item.status === "pending") ?? [];
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-widest text-sarin-blue">
@@ -204,11 +234,25 @@ function Console() {
             Administra las suscripciones, revisa pagos y elige la IA de los negocios.
           </p>
         </div>
-        <Link href="/admin/assistant" className={buttonClass}>Abrir asistente</Link>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => void refresh()} disabled={Boolean(working) || loading} className="min-h-11 text-sm text-sarin-blue underline disabled:opacity-50">Actualizar bandeja</button>
+          <Link href="/admin/assistant" className={buttonClass}>Abrir asistente</Link>
+        </div>
       </header>
+      <nav aria-label="Secciones del módulo" className="flex flex-wrap gap-2">
+        {getAdminSectionItems(location.module).map(item => <Link key={item.id} href={item.href} scroll={false} aria-current={location.section === item.id ? "page" : undefined} className={`inline-flex min-h-11 items-center rounded-[10px] px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue ${location.section === item.id ? "bg-sarin-soft font-semibold text-sarin-blue" : "text-sarin-muted underline"}`}>{item.label}</Link>)}
+      </nav>
+      {location.error && <Notice error>{location.error}</Notice>}
       {error && <Notice error>{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
-      <section className="grid gap-3 sm:grid-cols-3">
+      {loading && <Notice>Cargando consola…</Notice>}
+      {recordNotice && <div id="admin-record-notice" tabIndex={-1} className="rounded-xl border border-sarin-line p-4 focus-visible:outline-2 focus-visible:outline-sarin-blue"><Notice error={readFailed}>{readFailed ? "No se pudo consultar el registro enlazado." : "El registro enlazado no está entre los datos consultados"}</Notice><Link href={buildAdminHref({ module: "summary" })} scroll={false} className="inline-flex min-h-11 items-center text-sm text-sarin-blue underline">Ir al resumen</Link></div>}
+      {data && <>
+      <AdminModulePanel id="admin-overview" active={location.section === "overview"} title="Resumen" description="Revisa los registros consultados y elige la tarea que necesitas realizar.">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2"><Notice>{data.businesses.length} negocios entre los registros consultados.</Notice><Notice>{pending.length} comprobantes pendientes entre los registros consultados.</Notice></div>
+        <div className="mb-4 flex flex-wrap gap-4">{[{ module: "businesses", label: "Revisar negocios" }, { module: "access", label: "Revisar comprobantes" }, { module: "intelligence", label: "Revisar IA y canales" }, { module: "billing", label: "Revisar facturación" }].map(item => <Link key={item.module} href={buildAdminHref({ module: item.module as AdminLocation["module"] })} scroll={false} className="inline-flex min-h-11 items-center text-sm text-sarin-blue underline">{item.label}</Link>)}</div>
+        <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">Estado técnico</summary><p className="mb-3 text-xs text-sarin-muted">Estado del motor y la cola consultados. Estos datos no certifican la cobertura completa de negocios o pagos.</p>
+      <section className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-4">
           <p className="flex items-center gap-2 text-xs text-sarin-muted">
             <Cpu className="h-4 w-4" />
@@ -252,29 +296,43 @@ function Console() {
             </p>
           )}
         </div>
-        <div className="rounded-2xl border border-sarin-line bg-sarin-paper p-4">
-          <p className="text-xs text-sarin-muted">Comprobantes pendientes</p>
-          <p className="mt-2 text-3xl font-semibold text-sarin-blue">
-            {pending.length}
-          </p>
-          <button
-            onClick={() => void refresh()}
-            disabled={Boolean(working)}
-            className="mt-1 min-h-11 text-xs text-sarin-blue underline disabled:opacity-50"
-          >
-            Actualizar bandeja
-          </button>
-        </div>
       </section>
-      <AdminAiSettings onSaved={() => void engine.refresh()} />
-      <AdminAiBudget businesses={data.businesses} />
-      <AdminPlatformBudget />
-      <AdminBookingDataPolicy businesses={data.businesses} />
-      <AdminAiUsage businesses={data.businesses} />
-      <AdminWhatsApp businesses={data.businesses} />
-      <AdminInvitations onAccessChanged={refresh} />
+        </details>
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-provider" active={location.section === "provider"} title="Proveedor de IA" description="Elige el proveedor de los negocios y aplícalo mediante Guardar IA.">
+        <p className="mb-3 text-xs text-sarin-muted">Ámbito: IA comercial de los negocios.</p>
+        <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre la selección y las pruebas</summary><p>Consulta el proveedor activo y su disponibilidad. Seleccionar una opción solo cambia tu borrador; las pruebas de Gemini tienen su propio ámbito.</p></details>
+        <AdminAiSettings onSaved={() => void engine.refresh()} />
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-business-budget" active={location.section === "business-budget"} title="Presupuesto de IA de negocios" description="Revisa y ajusta el límite comercial de IA de cada negocio.">
+        <p className="mb-3 text-xs text-sarin-muted">Ámbito: negocios; separado del bot de plataforma.</p>
+        <AdminAiBudget businesses={data.businesses} />
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-platform-budget" active={location.section === "platform-budget"} title="Presupuesto de IA de Sarin" description="Consulta consumo y reservas antes de guardar los límites del bot.">
+        <p className="mb-3 text-xs text-sarin-muted">Ámbito: bot de WhatsApp de la plataforma Sarin.</p>
+        <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre límites y reservas</summary><p>El consumo confirmado y lo pendiente de confirmar se conservan al guardar. Los límites de plataforma se administran por separado de los negocios.</p></details>
+        <AdminPlatformBudget />
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-booking-policy" active={location.section === "booking-policy"} title="Política de datos de reservas" description="Revisa la clasificación de salud y menores de cada negocio.">
+        <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre la clasificación</summary><p>Revisa la actividad del negocio antes de cambiar su clasificación. Conserva los requisitos de consentimiento y las restricciones que muestra el formulario.</p></details>
+        <AdminBookingDataPolicy businesses={data.businesses} />
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-usage" active={location.section === "usage"} title="Uso de IA" description="Consulta el uso disponible y sus límites de cobertura.">
+        <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre la cobertura del consumo</summary><p>Consulta las fechas, el proveedor y las advertencias del registro. La falta de medición o de costo disponible no significa consumo cero.</p></details>
+        <AdminAiUsage businesses={data.businesses} />
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-business-whatsapp" active={location.section === "business-whatsapp"} title="WhatsApp de negocios" description="Configura el canal de WhatsApp de los negocios.">
+        <p className="mb-3 text-xs text-sarin-muted">Ámbito: negocios; el canal de Sarin se administra en Asistente y atención.</p>
+        <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre vinculación y conexión</summary><p>Revisa el negocio seleccionado y el estado verificado del canal. Guardar una vinculación conserva las condiciones de activación indicadas en el formulario.</p></details>
+        <AdminWhatsApp businesses={data.businesses} />
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-invitations" active={location.section === "invitations"} title="Invitaciones" description="Emite y controla invitaciones de cortesía mediante acciones explícitas.">
+        <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre códigos y cambios de acceso</summary><p>El código solo se muestra al emitirlo. Revisa el destinatario y el motivo antes de confirmar una revocación o un cambio de cortesía.</p></details>
+        <AdminInvitations onAccessChanged={refresh} />
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-receipts" active={location.section === "receipts"} title="Comprobantes de pago" description="Abre cada captura y revisa el comprobante antes de aprobar o rechazar.">
+      <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre la revisión de pagos</summary><p>Los importes y la duración corresponden al comprobante enviado. Aprobar o rechazar requiere tu acción explícita; el rechazo conserva su motivo.</p></details>
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Comprobantes de pago</h2>
         {data.receipts.length === 0 ? (
           <Notice>No hay comprobantes enviados.</Notice>
         ) : (
@@ -398,8 +456,10 @@ function Console() {
           </div>
         )}
       </section>
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-list" active={location.section === "list"} title="Negocios y suscripciones" description="Consulta el estado de los negocios incluidos en la lectura actual.">
+      <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre los registros consultados</summary><p>Esta tabla muestra los negocios incluidos en el snapshot disponible. Seleccionar un enlace público no cambia tu identidad ni te convierte en el dueño.</p></details>
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Negocios y suscripciones</h2>
         {data.businesses.length === 0 ? (
           <Notice>Todavía no hay negocios registrados.</Notice>
         ) : (
@@ -449,12 +509,14 @@ function Console() {
           </div>
         )}
       </section>
+      </AdminModulePanel>
+      <AdminModulePanel id="admin-settings" active={location.section === "settings"} title="Facturación de Sarin" description="Guarda los datos de cobro y las tarifas de la suscripción a Sarin.">
+      <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Acerca de estos datos</summary><p>El guardado actualiza la configuración agregada de facturación de Sarin. Revisa todos los campos antes de guardar.</p></details>
       {settings && (
         <form
           className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 sm:p-5"
           onSubmit={(event) => void saveSettings(event)}
         >
-          <h2 className="text-xl font-semibold">Datos de facturación</h2>
           <div className="max-w-md">
             <label className="block text-xs text-sarin-muted">
               Nombre comercial
@@ -579,15 +641,16 @@ function Console() {
           </div>
         </form>
       )}
+      </AdminModulePanel>
+      </>}
     </div>
   );
 }
 export default function SuperAdminConsolePage() {
+  const { user, authEpoch, isSuperadmin, signingOut } = useAuth();
   return (
     <AuthGate admin>
-      <AppShell admin>
-        <Console />
-      </AppShell>
+      {user && isSuperadmin && !signingOut && <AdminNavigationBoundary>{({ location }) => <AppShell admin adminLocation={location}><Console key={JSON.stringify([user.uid, authEpoch, isSuperadmin, signingOut])} location={location} /></AppShell>}</AdminNavigationBoundary>}
     </AuthGate>
   );
 }

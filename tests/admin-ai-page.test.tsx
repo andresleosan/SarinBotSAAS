@@ -7,9 +7,10 @@ import AdminPage from "@/app/admin/page";
 vi.mock('@/components/admin-platform-budget', () => ({ AdminPlatformBudget: () => null }));
 import type { AdminAiSettings } from "@/types/ai";
 
-const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn() }));
+const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn(), search: new URLSearchParams() }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
-vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children }));
+vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'demo-admin' }, authEpoch: 1, isSuperadmin: true, signingOut: false }) }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/admin', useSearchParams: () => state.search, useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/app-shell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => children,
   Notice: ({ children, error }: { children: ReactNode; error?: boolean }) => createElement("p", { role: error ? "alert" : "status" }, children),
@@ -37,12 +38,21 @@ describe("owner AI controls", () => {
   const patches = () => state.api.mock.calls.filter(([path, init]) => path === "/api/admin/ai" && init?.method === "PATCH");
   const active = () => text(renderer.root.findByProps({ "aria-label": "IA activa" }));
   const button = (label: string) => renderer.root.findAllByType("button").find(item => text(item).includes(label))!;
-  async function mount() { await act(async () => { renderer = create(createElement(AdminPage)); }); }
+  async function mount() {
+    await act(async () => { renderer = create(createElement(AdminPage)); });
+    state.search = new URLSearchParams('module=intelligence&section=provider');
+    Object.assign(window.location, { search: '?module=intelligence&section=provider' });
+    await act(async () => renderer.update(createElement(AdminPage)));
+    expect(renderer.root.find(node => node.type === 'section' && node.props.id === 'admin-provider').props.hidden).toBe(false);
+    expect(state.api.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(0);
+  }
   async function chooseDeepSeek() {
     expect(radios()).toHaveLength(3);
     await act(async () => { radios().find(input => input.props.value === "deepseek")!.props.onChange(); });
   }
   beforeEach(() => {
+    state.search = new URLSearchParams();
+    vi.stubGlobal('window', { location: { pathname: '/admin', search: '', hash: '' }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
     ai = { provider: "ollama", source: "environment", updatedAt: null, providers: [
       { provider: "ollama", configured: true, model: "local-model", online: true, checkedAt: 1800000000000 },
       { provider: "deepseek", configured: true, model: "deepseek-flash", online: true, checkedAt: 1800000000000 },
@@ -55,7 +65,7 @@ describe("owner AI controls", () => {
       throw new Error("Unexpected API request");
     });
   });
-  afterEach(async () => { await act(async () => renderer?.unmount()); });
+  afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); });
 
   it("changes AI only on explicit save and locks selection while the request is pending", async () => {
     await mount();

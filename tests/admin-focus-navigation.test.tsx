@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AdminPage from '@/app/admin/page';
 vi.mock('@/components/admin-platform-budget', () => ({ AdminPlatformBudget: () => null }));
 
-const state = vi.hoisted(() => ({ api: vi.fn() }));
+const state = vi.hoisted(() => ({ api: vi.fn(), search: new URLSearchParams('focusPayment=old-payment') }));
 vi.mock('@/lib/client/api', () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
 vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'admin' }, isSuperadmin: true, signOut: vi.fn() }) }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: true }), ConsentPanel: () => null }));
@@ -16,7 +16,7 @@ vi.mock('@/components/admin-booking-data-policy', () => ({ AdminBookingDataPolic
 vi.mock('@/components/admin-invitations', () => ({ AdminInvitations: () => createElement('span', {}, 'Invitation controls') }));
 vi.mock('@/components/admin-whatsapp', () => ({ AdminWhatsApp: () => null }));
 vi.mock('@/components/sarin-brand', () => ({ SarinBrand: () => createElement('span', {}, 'SarinBot') }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/admin' }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/admin', useSearchParams: () => state.search, useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('next/link', () => ({ default: ({ children, ...props }: { children: ReactNode; href: string }) => createElement('a', props, children) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -24,7 +24,7 @@ let renderer: ReactTestRenderer;
 const focus = vi.fn(), scrollIntoView = vi.fn();
 beforeEach(() => {
   focus.mockReset(); scrollIntoView.mockReset();
-  vi.stubGlobal('window', { location: { search: '?focusPayment=old-payment', hash: '#payment-old-payment' } });
+  vi.stubGlobal('window', { location: { pathname: '/admin', search: '?focusPayment=old-payment', hash: '#payment-old-payment' }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
   vi.stubGlobal('document', { getElementById: (id: string) => id === 'payment-old-payment' ? { focus, scrollIntoView } : null });
   state.api.mockReset().mockResolvedValue({ settings: { bankAccounts: [] }, businesses: [{ id: 'demo-business', name: 'Synthetic business', ownerEmail: 'demo@example.test', subscription: { status: 'active', currentPeriodEndsAt: 0 } }], receipts: [{ id: 'old-payment', tenantName: 'Synthetic business', ownerEmail: 'demo@example.test', amountCOP: 19000, bankSelected: 'Synthetic bank', status: 'pending', submittedAt: 1 }], allowances: {} });
 });

@@ -6,9 +6,10 @@ import AdminPage from "@/app/admin/page";
 vi.mock('@/components/admin-platform-budget', () => ({ AdminPlatformBudget: () => null }));
 import type { AdminWhatsAppSettings } from "@/types/whatsapp";
 
-const state = vi.hoisted(() => ({ api: vi.fn() }));
+const state = vi.hoisted(() => ({ api: vi.fn(), search: new URLSearchParams('module=intelligence&section=business-whatsapp') }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
-vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children }));
+vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'demo-admin' }, isSuperadmin: true, authEpoch: 1, signingOut: false }) }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/admin', useSearchParams: () => state.search, useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/app-shell", () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, buttonClass: "button", fieldClass: "field" }));
 vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => ({ health: null, checking: false, refresh: vi.fn() }) }));
 vi.mock("@/components/admin-ai-settings", () => ({ AdminAiSettings: () => null }));
@@ -25,8 +26,12 @@ describe("administrative WhatsApp preparation", () => {
   const inputs = () => section()!.findAllByType("input");
   const button = (label: string) => section()!.findAllByType("button").find(node => text(node).includes(label))!;
   const writes = () => state.api.mock.calls.filter(([, init]) => init?.method === "PATCH");
-  async function mount() { await act(async () => { renderer = create(createElement(AdminPage)); }); }
+  async function mount() {
+    await act(async () => { renderer = create(createElement(AdminPage)); });
+    expect(renderer.root.find(node => node.type === 'section' && node.props.id === 'admin-business-whatsapp').props.hidden).toBe(false);
+  }
   beforeEach(() => {
+    vi.stubGlobal('window', { location: { pathname: '/admin', search: '?module=intelligence&section=business-whatsapp', hash: '' }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
     data = { enabled: false, configured: false, graphApiVersion: "v25.0", missingConfiguration: ["WHATSAPP_APP_SECRET"], bindings: [], truncated: false };
     state.api.mockReset().mockImplementation(async (path: string, init?: RequestInit) => {
       if (path === "/api/admin" && !init?.method) return { settings, businesses: [business, { ...business, id: "second", name: "Segundo negocio" }], receipts: [], allowances: {} };
@@ -34,7 +39,7 @@ describe("administrative WhatsApp preparation", () => {
       throw new Error("Unexpected request");
     });
   });
-  afterEach(async () => { await act(async () => renderer?.unmount()); });
+  afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); });
   it("shows preparation without claiming connectivity or allowing enablement when server configuration is absent", async () => {
     await mount();
     expect(section()).toBeDefined();

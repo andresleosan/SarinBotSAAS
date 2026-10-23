@@ -8,9 +8,10 @@ vi.mock('@/components/admin-platform-budget', () => ({ AdminPlatformBudget: () =
 vi.mock("@/components/admin-whatsapp", () => ({ AdminWhatsApp: () => null }));
 import type { AdminAiUsage, AiUsageTotals } from "@/types/ai";
 
-const state = vi.hoisted(() => ({ api: vi.fn() }));
+const state = vi.hoisted(() => ({ api: vi.fn(), search: new URLSearchParams('module=intelligence&section=usage') }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message }));
-vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children }));
+vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'demo-admin' }, isSuperadmin: true, authEpoch: 1, signingOut: false }) }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/admin', useSearchParams: () => state.search, useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/app-shell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => children,
   Notice: ({ children, error }: { children: ReactNode; error?: boolean }) => createElement("p", { role: error ? "alert" : "status" }, children),
@@ -42,8 +43,12 @@ describe("monthly administrative AI usage", () => {
   }
   const reload = () => panel().findAllByType("button").find(item => text(item).includes("Actualizar consumo"))!;
   const summary = () => panel().findByType("dl").findAllByType("dd").map(text);
-  async function mount() { await act(async () => { renderer = create(createElement(AdminPage)); }); }
+  async function mount() {
+    await act(async () => { renderer = create(createElement(AdminPage)); });
+    expect(renderer.root.find(node => node.type === 'section' && node.props.id === 'admin-usage').props.hidden).toBe(false);
+  }
   beforeEach(() => {
+    vi.stubGlobal('window', { location: { pathname: '/admin', search: '?module=intelligence&section=usage', hash: '' }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-16T02:00:00Z"));
     usage = { month: "2026-10", timeZone: "America/Bogota", provider: "deepseek", model: "deepseek-flash", pricingVersion: "deepseek-flash-verified-2026-10-15", measurementStartedAt: Date.parse("2026-10-15T23:00:00Z"), coverage: "best_effort", telemetryProcessStartedAt: Date.parse("2026-10-15T23:00:00Z"), telemetryWriteFailures: 0, totals: counted, businesses: [], truncated: false };
     state.api.mockReset().mockImplementation(async (path: string) => {
@@ -52,7 +57,7 @@ describe("monthly administrative AI usage", () => {
       throw new Error("Unexpected API request");
     });
   });
-  afterEach(async () => { await act(async () => renderer?.unmount()); vi.useRealTimers(); });
+  afterEach(async () => { await act(async () => renderer?.unmount()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
   it("renders server estimates and joins business names without exposing additional identity data", async () => {
     usage.businesses = [

@@ -6,10 +6,11 @@ import BillingPage from "@/app/dashboard/billing/page";
 import AdminPage from "@/app/admin/page";
 import { ApiError } from "@/lib/client/api";
 
-const state = vi.hoisted(() => ({ api: vi.fn(), compress: vi.fn() }));
+const state = vi.hoisted(() => ({ api: vi.fn(), compress: vi.fn(), search: new URLSearchParams() }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: state.api, errorMessage: (error: Error) => error.message, ApiError: class extends Error { constructor(message: string, public status: number, public code?: string) { super(message); } } }));
 vi.mock("@/lib/utils/imageCompression", () => ({ compressReceiptToWebP: state.compress }));
-vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'owner' } }) }));
+vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'owner' }, isSuperadmin: true, authEpoch: 1, signingOut: false }) }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/admin', useSearchParams: () => state.search, useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/app-shell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => children,
   Notice: ({ children }: { children: ReactNode }) => children,
@@ -18,6 +19,9 @@ vi.mock("@/components/app-shell", () => ({
 vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => ({ health: null, checking: false, refresh: vi.fn() }) }));
 vi.mock("@/components/admin-ai-settings", () => ({ AdminAiSettings: () => null }));
 vi.mock("@/components/admin-ai-usage", () => ({ AdminAiUsage: () => null }));
+vi.mock("@/components/admin-ai-budget", () => ({ AdminAiBudget: () => null }));
+vi.mock("@/components/admin-platform-budget", () => ({ AdminPlatformBudget: () => null }));
+vi.mock("@/components/admin-booking-data-policy", () => ({ AdminBookingDataPolicy: () => null }));
 vi.mock("@/components/admin-whatsapp", () => ({ AdminWhatsApp: () => null }));
 vi.mock("@/components/admin-invitations", () => ({ AdminInvitations: () => null }));
 vi.mock("@/components/invitation-redeem", () => ({ InvitationRedeem: () => null }));
@@ -45,8 +49,13 @@ describe("billing plan screens", () => {
   let renderer: ReactTestRenderer;
   let billingData: Record<string, unknown>;
   let adminData: Record<string, unknown>;
-  async function mount(page = BillingPage) {
+  async function mount(page = BillingPage, search = '?module=access&section=receipts') {
+    if (page === AdminPage) {
+      state.search = new URLSearchParams(search);
+      Object.assign(window.location, { search });
+    }
     await act(async () => { renderer = create(createElement(page)); });
+    if (page === AdminPage) expect(renderer.root.find(node => node.type === 'section' && node.props.inert === false).props.hidden).toBe(false);
   }
   const inputs = () => renderer.root.findAllByType("input");
   const plans = () => inputs().filter((input) => input.props.name === "planId");
@@ -57,6 +66,7 @@ describe("billing plan screens", () => {
     await act(async () => { inputs().find((input) => input.props.type === "file")!.props.onChange({ target: { files: [new File(["synthetic"], "receipt.png", { type: "image/png" })] } }); });
   }
   beforeEach(() => {
+    vi.stubGlobal('window', { location: { pathname: '/admin', search: '', hash: '' }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
     billingData = { settings: { ...settings, whatsappPriceCOP: 149900, responsePackPriceCOP: 20000 }, receipts: [], business, allowance: null, whatsappAvailable: false };
     adminData = { settings, receipts: [], businesses: [business], allowances: {} };
     state.api.mockReset().mockImplementation(async (path: string, init?: RequestInit) => {
@@ -167,7 +177,7 @@ describe("billing plan screens", () => {
   });
 
   it("edits administrative subscription and pack prices without adding bank accounts", async () => {
-    await mount(AdminPage);
+    await mount(AdminPage, '?module=billing&section=settings');
     const prices = inputs().filter((input) => input.props.type === "number");
     expect(prices.map((input) => input.props.value)).toEqual([20000, 35000, 59900, 149900, 20000]);
     await act(async () => { prices[0].props.onChange({ target: { value: "21000" } }); });
@@ -198,7 +208,7 @@ describe("billing plan screens", () => {
 
   it("does not invent a payment expiry date for a business without an approved payment", async () => {
     adminData.businesses = [{ ...business, subscription: { ...business.subscription, currentPeriodEndsAt: 0 } }];
-    await mount(AdminPage);
+    await mount(AdminPage, '?module=businesses&section=list');
     const cells = renderer.root.findByType("tbody").findAllByType("td");
     expect(text(cells[3])).toBe("Sin pago aprobado");
   });
@@ -209,7 +219,7 @@ describe("billing plan screens", () => {
     expect(text(renderer.root)).toContain('Estado: Prueba de cortesía');
     await act(async () => renderer.unmount());
     adminData.businesses = [courtesy];
-    await mount(AdminPage);
+    await mount(AdminPage, '?module=businesses&section=list');
     expect(text(renderer.root.findByType('tbody').findAllByType('td')[1])).toBe('Prueba de cortesía');
   });
 
