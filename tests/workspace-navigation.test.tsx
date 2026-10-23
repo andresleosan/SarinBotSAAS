@@ -1,20 +1,20 @@
-import { act, createElement, useEffect, useInsertionEffect, useState, type ReactNode } from 'react';
+import { act, createElement, useEffect, useInsertionEffect, useMemo, useState, type ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from '@/components/app-shell';
 import { resolveAdminLocation } from '@/lib/admin-navigation';
 
-const state = vi.hoisted(() => ({ pathname: '/dashboard', search: '', isSuperadmin: false, push: vi.fn() }));
+const state = vi.hoisted(() => ({ pathname: '/dashboard', search: '', navigationKey: 0, isSuperadmin: false, push: vi.fn() }));
 vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: null, signOut: vi.fn(), isSuperadmin: state.isSuperadmin }) }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: true }), ConsentPanel: () => createElement('p', {}, 'Permisos de mi cuenta') }));
-vi.mock('next/navigation', () => ({ usePathname: () => state.pathname, useSearchParams: () => new URLSearchParams(state.search), useRouter: () => ({ push: state.push }) }));
+vi.mock('next/navigation', () => ({ usePathname: () => state.pathname, useSearchParams: () => useMemo(() => new URLSearchParams(state.search), [state.search, state.navigationKey]), useRouter: () => ({ push: state.push }) }));
 vi.mock('next/link', () => ({ default: ({ children, ...props }: { children: ReactNode }) => createElement('a', props, children) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('workspace navigation', () => {
   let renderer: ReactTestRenderer;
-  beforeEach(() => { state.pathname = '/dashboard'; state.search = ''; state.isSuperadmin = false; state.push.mockClear(); });
+  beforeEach(() => { state.pathname = '/dashboard'; state.search = ''; state.navigationKey = 0; state.isSuperadmin = false; state.push.mockClear(); });
   afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); });
   async function shell(admin = false) {
     await act(async () => { renderer = create(createElement(AppShell, { admin, adminLocation: resolveAdminLocation('/admin', 'module=access&section=invitations', ''), children: 'Trabajo' })); });
@@ -149,6 +149,44 @@ describe('workspace navigation', () => {
     await act(async () => browser.dispatchEvent(new Event('hashchange')));
     expect(selections.every(selection => selection.error === null)).toBe(true);
     expect(selections.at(-1)?.payment).toBe('receipt_2');
+    expect(state.push).not.toHaveBeenCalled();
+  });
+
+  it('nextHashOnlyUpdateSelectsTargetWithoutHashEventAndKeepsWorkspace', async () => {
+    const { AdminNavigationBoundary } = await import('@/components/admin-navigation-boundary');
+    const browser = Object.assign(new EventTarget(), { location: { pathname: '/admin', search: '', hash: '' } });
+    vi.stubGlobal('window', browser);
+    state.pathname = '/admin';
+    let mounts = 0;
+    function Workspace({ module, target }: { module: string; target: string | null }) {
+      const [draft, setDraft] = useState('');
+      useEffect(() => { mounts += 1; }, []);
+      return createElement('div', {}, createElement('p', { 'data-target': target }, module), createElement('input', { value: draft, onChange: () => setDraft('Retained draft') }));
+    }
+    function CommittedUrl({ hash }: { hash: string }) {
+      // Next changes canonicalUrl/searchParams identity for a hash-only update
+      // and commits with History API calls, without a native hashchange event.
+      useInsertionEffect(() => { browser.location.hash = hash; }, [hash]);
+      return createElement(AdminNavigationBoundary, { children: ({ location }) => createElement(Workspace, { module: location.module, target: location.targetId }) });
+    }
+    await act(async () => { renderer = create(createElement(CommittedUrl, { hash: '' })); });
+    expect(renderer.root.findByType('p').children).toEqual(['summary']);
+    await act(async () => renderer.root.findByType('input').props.onChange());
+    state.navigationKey += 1;
+    await act(async () => renderer.update(createElement(CommittedUrl, { hash: '#business-record_1' })));
+    expect(renderer.root.findByType('p').children).toEqual(['businesses']);
+    expect(renderer.root.findByType('p').props['data-target']).toBe('business-record_1');
+    state.navigationKey += 1;
+    await act(async () => renderer.update(createElement(CommittedUrl, { hash: '#business-record_2' })));
+    expect(renderer.root.findByType('p').props['data-target']).toBe('business-record_2');
+    state.navigationKey += 1;
+    await act(async () => renderer.update(createElement(CommittedUrl, { hash: '' })));
+    expect(renderer.root.findByType('p').children).toEqual(['summary']);
+    expect(renderer.root.findByType('p').props['data-target']).toBeNull();
+    expect(renderer.root.findByType('input').props.value).toBe('Retained draft');
+    expect(mounts).toBe(1);
+    expect(state.pathname).toBe('/admin');
+    expect(state.search).toBe('');
     expect(state.push).not.toHaveBeenCalled();
   });
 

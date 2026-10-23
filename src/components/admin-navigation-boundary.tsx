@@ -17,7 +17,8 @@ function NavigationLoading() {
 
 function AdminNavigationControllerBoundary({ children }: BoundaryProps) {
   const pathname = usePathname();
-  const search = useSearchParams().toString();
+  // Next changes this object on hash-only canonical URL updates too.
+  const search = useSearchParams();
   const router = useRouter();
   const [location, setLocation] = useState<AdminLocation | null>(null);
   useEffect(() => {
