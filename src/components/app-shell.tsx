@@ -2,38 +2,39 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Bot, CalendarDays, ChevronRight, CreditCard, LayoutDashboard, LogOut, QrCode, Settings2, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ChevronRight, LogOut } from "lucide-react";
 import { type ReactNode } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { SarinBrand } from "@/components/sarin-brand";
 import { UserAvatar } from "@/components/user-avatar";
 import { ConsentPanel, useAccountConsent } from './consent-panel';
+import { WorkspaceNavigation } from '@/components/workspace-navigation';
+import { getAdminNavigationItems, type AdminLocation, type WorkspaceNavItem } from '@/lib/admin-navigation';
 
-interface NavigationItem { href: string; label: string; icon: LucideIcon }
-const businessLinks: NavigationItem[] = [
-  { href: "/dashboard", label: "Mi agenda", icon: CalendarDays },
-  { href: "/dashboard/onboarding", label: "Mi negocio", icon: Settings2 },
-  { href: "/dashboard/qr-kit", label: "Enlace y QR", icon: QrCode },
-  { href: "/dashboard/billing", label: "Suscripción", icon: CreditCard },
-];
-const adminLinks: NavigationItem[] = [
-  { href: "/admin", label: "Control de SarinBot", icon: LayoutDashboard },
-  { href: "/admin/assistant", label: "Asistente", icon: Bot },
-  { href: "/dashboard", label: "Mi negocio", icon: CalendarDays },
+const businessLinks: WorkspaceNavItem[] = [
+  { id: "agenda", href: "/dashboard", label: "Mi agenda" },
+  { id: "business", href: "/dashboard/onboarding", label: "Mi negocio" },
+  { id: "qr", href: "/dashboard/qr-kit", label: "Enlace y QR" },
+  { id: "subscription", href: "/dashboard/billing", label: "Suscripción" },
 ];
 
 export function AppShell({
   children,
   admin = false,
+  adminLocation,
 }: {
   children: ReactNode;
   admin?: boolean;
+  adminLocation?: AdminLocation;
 }) {
   const { user, signOut, isSuperadmin } = useAuth();
   const accountConsent = useAccountConsent();
   const pathname = usePathname();
-  const links = admin ? adminLinks : businessLinks;
-  const active = links.find(item => item.href === pathname);
+  const links = admin ? getAdminNavigationItems() : businessLinks;
+  const activeId = admin
+    ? adminLocation?.module ?? (pathname === "/admin/assistant" ? "attention" : "summary")
+    : businessLinks.find(item => item.href === pathname)?.id ?? "";
+  const active = links.find(item => item.id === activeId);
   const name = user?.displayName || user?.email || "Mi cuenta";
   return (
     <div className="min-h-screen bg-sarin-canvas text-sarin-ink lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
@@ -41,14 +42,9 @@ export function AppShell({
       <aside className="border-b border-sarin-line bg-sarin-paper lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-b-0">
         <div className="flex items-center justify-between px-5 py-5 lg:px-6 lg:py-8">
           <Link href="/" aria-label="SarinBot, inicio"><SarinBrand /></Link>
-          <span className="rounded-full border border-sarin-line px-2.5 py-1 text-xs text-sarin-muted lg:hidden">{admin ? "ADMIN" : "NEGOCIO"}</span>
         </div>
-        <p className="sarin-eyebrow mb-3 hidden px-7 text-sarin-muted lg:block">{admin ? "Administración" : "Espacio de trabajo"}</p>
-        <nav aria-label={admin ? "Navegación de administración" : "Navegación del negocio"} className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:px-4">
-          {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-[10px] px-3 py-3 text-[13px] font-medium ${pathname === href ? "bg-sarin-soft text-sarin-blue" : "text-sarin-muted hover:bg-sarin-canvas hover:text-sarin-ink"}`}><Icon aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={1.7} /><span>{label}</span>{pathname === href && <span className="ml-auto hidden h-1.5 w-1.5 rounded-full bg-sarin-blue lg:block" />}</Link>)}
-        </nav>
+        <WorkspaceNavigation context={admin ? 'platform' : 'business'} items={links} activeId={activeId} isSuperadmin={isSuperadmin} />
         <div className="mt-auto hidden px-6 pb-6 pt-10 lg:block">
-          {isSuperadmin && !admin && <Link href="/admin" className="mb-5 flex min-h-11 items-center gap-2 text-xs text-sarin-muted hover:text-sarin-blue"><ShieldCheck aria-hidden="true" className="h-4 w-4" />Consola de administración<ArrowUpRight aria-hidden="true" className="ml-auto h-3.5 w-3.5" /></Link>}
           <div className="border-t border-sarin-line pt-5"><p className="text-sm text-sarin-ink">Un poco más de orden.</p><p className="mt-1 text-xs leading-6 text-sarin-muted">Un poco más de tiempo para ti.</p></div>
         </div>
       </aside>

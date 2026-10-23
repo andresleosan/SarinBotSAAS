@@ -45,8 +45,10 @@ it('loads and focuses the linked payment once while preserving focus during refr
 
 it('makes the assistant reachable from the console and its administrative navigation', async () => {
   await act(async () => { renderer = create(createElement(AdminPage)); });
-  const links = renderer.root.findAllByType('a').filter(node => node.props.href === '/admin/assistant');
-  expect(links).toHaveLength(2);
+  const links = renderer.root.findAllByType('a');
+  expect(links.filter(node => node.props.href === '/admin/assistant')).toHaveLength(1);
+  const navigation = renderer.root.findByProps({ 'aria-label': 'Navegaci\u00f3n de administraci\u00f3n' });
+  expect(navigation.findAllByType('a').some(node => node.props.href === '/admin/assistant?section=query')).toBe(true);
   expect(JSON.stringify(renderer.toJSON())).toContain('Budget controls');
   expect(JSON.stringify(renderer.toJSON())).toContain('Booking policy controls');
   expect(JSON.stringify(renderer.toJSON())).toContain('Invitation controls');

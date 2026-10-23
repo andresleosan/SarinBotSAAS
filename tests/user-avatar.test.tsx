@@ -5,15 +5,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UserAvatar } from '@/components/user-avatar';
 import { AppShell } from '@/components/app-shell';
 
-const state = vi.hoisted(() => ({ signOut: vi.fn(), user: { displayName: 'Cuenta sintética', email: 'fixture@example.test', photoURL: 'https://lh3.googleusercontent.com/synthetic-photo' } }));
-vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: state.user, signOut: state.signOut, isSuperadmin: false }) }));
+const state = vi.hoisted(() => ({ isSuperadmin: false, signOut: vi.fn(), user: { displayName: 'Cuenta sintética', email: 'fixture@example.test', photoURL: 'https://lh3.googleusercontent.com/synthetic-photo' } }));
+vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: state.user, signOut: state.signOut, isSuperadmin: state.isSuperadmin }) }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/dashboard/onboarding' }));
 vi.mock('next/link', () => ({ default: ({ children, ...props }: { children: ReactNode }) => createElement('a', props, children) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('Google account avatar', () => {
   let renderer: ReactTestRenderer;
-  afterEach(async () => { await act(async () => renderer?.unmount()); });
+  afterEach(async () => { state.isSuperadmin = false; await act(async () => renderer?.unmount()); });
   async function mount(photoURL?: string | null) {
     await act(async () => { renderer = create(createElement(UserAvatar, { name: 'Ángela', photoURL })); });
   }
@@ -55,8 +55,9 @@ describe('Google account avatar', () => {
   });
 
   it('keeps administration navigation focused on the commercial workspace', async () => {
+    state.isSuperadmin = true;
     await act(async () => { renderer = create(createElement(AppShell, { admin: true, children: 'Contenido' })); });
     const navigation = renderer.root.findByProps({ 'aria-label': 'Navegación de administración' });
-    expect(navigation.findAllByType('a').map(link => link.props.href)).toEqual(['/admin', '/admin/assistant', '/dashboard']);
+    expect(navigation.findAllByType('a').map(link => link.props.href)).toEqual(['/admin?module=summary&section=overview', '/admin?module=businesses&section=list', '/admin?module=access&section=receipts', '/admin?module=intelligence&section=provider', '/admin/assistant?section=query', '/admin?module=billing&section=settings', '/dashboard']);
   });
 });
