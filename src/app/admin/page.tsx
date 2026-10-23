@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -107,6 +107,16 @@ function Console({ location }: { location: AdminLocation }) {
       }
     }
   }, [focusPayment, uid]);
+  const committedRead = useRef<typeof readConsole | null>(null);
+  useLayoutEffect(() => {
+    committedRead.current = readConsole;
+    return () => { committedRead.current = null; };
+  }, [readConsole]);
+  // Hidden commands may retain this callback across destination changes.
+  // Delegate to the committed destination, or do nothing after authority unmounts.
+  const refresh = useCallback(async () => {
+    await committedRead.current?.(true);
+  }, []);
   useEffect(() => {
     void readConsole();
     return () => {
@@ -132,9 +142,6 @@ function Console({ location }: { location: AdminLocation }) {
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "center" });
   }, [destinationKey, focusPayment, loadedFocus, loading, location.targetId, recordNotice]);
-  async function refresh() {
-    await readConsole(true);
-  }
   async function viewImage(id: string) {
     if (images[id]) {
       setImages((previous) => {

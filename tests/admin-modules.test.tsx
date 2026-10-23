@@ -2,6 +2,7 @@ import { act, createElement, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AdminPage from '@/app/admin/page';
+import { AdminInvitations } from '@/components/admin-invitations';
 
 const state = vi.hoisted(() => ({
   api: vi.fn(), search: new URLSearchParams(),
@@ -201,4 +202,46 @@ it('manualRefreshCannotPopulateAnotherDestination', async () => {
   expect(request[1].signal.aborted).toBe(true); expect(request[3]()).toBe(false);
   await act(async () => pending.resolve({ ...initial, receipts: [] }));
   expect(tree.root.findAllByProps({ id: 'payment-old-payment' })).toHaveLength(1);
+});
+
+it('lateInvitationCompletionRefreshesTheCurrentDirectedPayment', async () => {
+  await mount('?module=access&section=invitations');
+  await act(async () => button('Revocar código').props.onClick());
+  await act(async () => panel('invitations').findByProps({ maxLength: 300 }).props.onChange({ target: { value: 'Synthetic review' } }));
+  const command = deferred();
+  state.api.mockImplementationOnce(() => command.promise);
+  await act(async () => { panel('invitations').findAllByType('form')[1].props.onSubmit({ preventDefault() {} }); });
+
+  // This payment is outside the ordinary snapshot, which contains only old-payment.
+  const firstDirectedRead = deferred();
+  state.api.mockImplementationOnce(() => firstDirectedRead.promise);
+  await navigate('?focusPayment=next-payment', '#payment-next-payment');
+  const latestDirectedRead = deferred();
+  state.api.mockImplementation((path: string) => path === '/api/admin?focusPayment=next-payment'
+    ? latestDirectedRead.promise : Promise.resolve(initial));
+  await act(async () => command.resolve({ invitation: { ...invitation, state: 'revoked' }, replayed: false }));
+  expect(reads().map(([path]) => path)).toEqual(['/api/admin', '/api/admin?focusPayment=next-payment', '/api/admin?focusPayment=next-payment']);
+  expect(reads()[2][2]).toBe('demo-admin');
+  expect(panel('receipts').props.hidden).toBe(false);
+  expect(patches()).toHaveLength(1);
+
+  await act(async () => latestDirectedRead.resolve({ ...initial, receipts: [{ ...initial.receipts[0], id: 'next-payment' }] }));
+  await act(async () => firstDirectedRead.resolve(initial));
+  expect(tree.root.findAllByProps({ id: 'payment-next-payment' })).toHaveLength(1);
+  expect(tree.root.findAllByProps({ id: 'payment-old-payment' })).toHaveLength(0);
+  expect(tree.root.findAllByProps({ id: 'admin-record-notice' })).toHaveLength(0);
+  expect(button('Actualizar bandeja').props.disabled).toBe(false);
+  expect(focus).toHaveBeenCalledTimes(1);
+  expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+});
+
+it('capturedCompletionRefreshCannotReadAfterAuthorityChange', async () => {
+  await mount('?module=access&section=invitations');
+  const oldCompletion = tree.root.findByType(AdminInvitations).props.onAccessChanged;
+  state.auth.user = { uid: 'demo-other' }; state.auth.authEpoch++;
+  await act(async () => tree.update(createElement(AdminPage)));
+  const count = reads().length;
+  await act(async () => oldCompletion());
+  expect(reads()).toHaveLength(count);
+  expect(reads().at(-1)![2]).toBe('demo-other');
 });
