@@ -91,6 +91,28 @@ describe('owner agenda bounded range reader', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it.each([401, 403])('authorization headers abort globally before stalled JSON can become a daily timeout: %s', async status => {
+    let finishBody!: (body: unknown) => void;
+    const json = vi.fn(() => new Promise<unknown>(resolve => { finishBody = resolve; }));
+    const signals: AbortSignal[] = [];
+    vi.mocked(fetch).mockImplementation(async (_, init) => {
+      signals.push(init!.signal!);
+      return signals.length === 1
+        ? { ok: false, status, json, headers: new Headers() } as unknown as Response
+        : new Promise<Response>(() => {});
+    });
+    const publish = vi.fn(), failure = vi.fn();
+    const result = read(week).then(publish, error => { failure(error); });
+    await flush();
+    // No deadline advancement: received authorization status must already have closed the cycle.
+    expect(failure).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ status }));
+    expect(signals).toHaveLength(2); expect(signals.every(signal => signal.aborted)).toBe(true);
+    expect(vi.getTimerCount()).toBe(0); expect(publish).not.toHaveBeenCalled();
+    finishBody({ appointments: [], error: 'Late private response' });
+    await result; await vi.advanceTimersByTimeAsync(40_000);
+    expect(failure).toHaveBeenCalledTimes(1); expect(publish).not.toHaveBeenCalled(); expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('abortStopsQueuedDates', async () => {
     const controller = new AbortController();
     vi.mocked(fetch).mockImplementation(() => new Promise<Response>(() => {}));

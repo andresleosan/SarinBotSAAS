@@ -19,6 +19,7 @@ export async function apiFetch<T>(
   init: RequestInit = {},
   expectedUid?: string,
   isCurrentScope?: () => boolean,
+  onHttpStatus?: (status: number) => void,
 ): Promise<T> {
   const user = getFirebaseClient().auth.currentUser;
   if (!user) throw new ApiError("Inicia sesión para continuar.", 401);
@@ -30,7 +31,9 @@ export async function apiFetch<T>(
     headers.set("Content-Type", "application/json");
   assertIdentity();
   const response = await fetch(path, { ...init, headers, cache: "no-store" });
-  if (isCurrentScope) assertIdentity();
+  if (isCurrentScope || onHttpStatus) assertIdentity();
+  // Opt-in consumers can react to authorization headers even if the body never settles.
+  onHttpStatus?.(response.status);
   const data: unknown = await response.json().catch(() => null);
   if (isCurrentScope) assertIdentity();
   if (!response.ok) {

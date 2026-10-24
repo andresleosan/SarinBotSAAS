@@ -7,6 +7,7 @@ import type { Appointment } from '@/types/firestore';
 import type { OwnerAgendaRange } from '@/lib/owner-agenda';
 
 vi.mock('@/lib/client/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/client/api')>(), apiFetch: vi.fn() }));
+vi.mock('@/lib/firebase/client', () => ({ getFirebaseClient: () => ({ auth: { currentUser: { uid: 'owner', getIdToken: async () => 'synthetic-token' } } }) }));
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const date = '2026-10-19';
@@ -73,7 +74,7 @@ describe('owner agenda scoped hook', () => {
     expect(predicate()).toBe(false); expect(vi.mocked(apiFetch).mock.calls[0][1]?.signal?.aborted).toBe(true);
     await act(async () => finish({ appointments: [{ ...appointment, id: 'late-private' }] }));
     expect(state.snapshot?.days[0]).toMatchObject({ state: 'ready', appointments: [{ id: 'one' }] });
-    expect(apiFetch).toHaveBeenLastCalledWith(expect.any(String), expect.anything(), 'other-owner', expect.any(Function));
+    expect(apiFetch).toHaveBeenLastCalledWith(expect.any(String), expect.anything(), 'other-owner', expect.any(Function), expect.any(Function));
   });
 
   it('business switch masks previous values and rejects stale callbacks', async () => {
@@ -138,6 +139,19 @@ describe('owner agenda scoped hook', () => {
   it('global authorization errors clear a previous confirmed snapshot', async () => {
     await mount(); vi.mocked(apiFetch).mockRejectedValueOnce(new ApiError('No autorizado', 403));
     await act(async () => state.refresh()); expect(state.snapshot).toBeNull(); expect(state.error).toBe('No autorizado');
+  });
+
+  it.each([401, 403])('real API authorization headers clear prior snapshot even when JSON stalls: %s', async status => {
+    await mount(); expect(state.snapshot).not.toBeNull();
+    const actual = await vi.importActual<typeof import('@/lib/client/api')>('@/lib/client/api');
+    vi.mocked(apiFetch).mockImplementation(actual.apiFetch);
+    let finishBody!: (body: unknown) => void;
+    const json = () => new Promise<unknown>(resolve => { finishBody = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status, json, headers: new Headers() })));
+    await act(async () => state.refresh());
+    expect(state.snapshot).toBeNull(); expect(state.error).toBe(`No se pudo completar la solicitud (${status}).`);
+    await act(async () => { finishBody({ appointments: [appointment], error: 'Late body' }); });
+    expect(state.snapshot).toBeNull(); expect(state.error).toBe(`No se pudo completar la solicitud (${status}).`);
   });
 
   it('unmount releases poll timers and visibility/focus listeners', async () => {

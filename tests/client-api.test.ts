@@ -7,6 +7,24 @@ vi.mock("@/lib/firebase/client", () => ({ getFirebaseClient: () => ({ auth: { cu
 beforeEach(() => { auth.uid = 'one'; auth.switchDuringToken = false; auth.token = null; });
 afterEach(() => vi.unstubAllGlobals());
 describe("client API error classification", () => {
+  it('preserves the default 403 application error body, code and retry metadata', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'Permiso denegado', code: 'OWNER_PERMISSION_DENIED' }), { status: 403, headers: { 'Retry-After': '30' } })));
+    await expect(apiFetch('/api/businesses/demo/appointments', {}, 'one', () => true)).rejects.toMatchObject({ status: 403, message: 'Permiso denegado', code: 'OWNER_PERMISSION_DENIED', retryAfterSeconds: 30 });
+  });
+  it('observes authenticated HTTP status before awaiting the response body without changing error parsing', async () => {
+    const sequence: string[] = [];
+    const observed = vi.fn((status: number) => { sequence.push(`status:${status}`); });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 403, headers: new Headers(), json: async () => { sequence.push('json'); return { error: 'Permiso denegado', code: 'OWNER_PERMISSION_DENIED' }; } })));
+    await expect(apiFetch('/api/businesses/demo/appointments', {}, 'one', () => true, observed)).rejects.toMatchObject({ status: 403, code: 'OWNER_PERMISSION_DENIED' });
+    expect(sequence).toEqual(['status:403', 'json']);
+  });
+  it('does not notify HTTP status observers after the account scope changes during fetch', async () => {
+    let current = true;
+    const observed = vi.fn(); const json = vi.fn(async () => ({}));
+    vi.stubGlobal('fetch', vi.fn(async () => { current = false; return { ok: false, status: 403, json }; }));
+    await expect(apiFetch('/api/businesses/demo/appointments', {}, 'one', () => current, observed)).rejects.toMatchObject({ status: 401, code: 'AUTH_IDENTITY_CHANGED' });
+    expect(observed).not.toHaveBeenCalled(); expect(json).not.toHaveBeenCalled();
+  });
   it('does not send a mutation after a same-UID session expires during token retrieval', async () => {
     let resolve!: (value: string) => void;
     auth.token = new Promise<string>(done => { resolve = done; });

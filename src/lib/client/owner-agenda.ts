@@ -47,7 +47,9 @@ export async function readOwnerAgendaRange(input: { businessId: string; ownerUid
       });
       // The race observes late rejection as well as resolution even when a token provider ignores abort.
       const response = await Promise.race([
-        apiFetch<unknown>(`/api/businesses/${encodeURIComponent(businessId)}/appointments?date=${dateKey}`, { signal: child.signal }, ownerUid, () => !cycle.signal.aborted && !child.signal.aborted && isCurrentScope()),
+        apiFetch<unknown>(`/api/businesses/${encodeURIComponent(businessId)}/appointments?date=${dateKey}`, { signal: child.signal }, ownerUid, () => !cycle.signal.aborted && !child.signal.aborted && isCurrentScope(), status => {
+          if (status === 401 || status === 403) cycle.abort(new ApiError(`No se pudo completar la solicitud (${status}).`, status));
+        }),
         interrupted,
       ]);
       assertCurrent();
