@@ -25,7 +25,7 @@ function snapshot() {
     schedules: [{ cron: '*/5 * * * *' }], subdomain: { enabled: false, previews_enabled: false },
     app: { id: 'a032778c-ce3d-4673-b65a-4bf13fa3e02c', account_id: account, name: 'sarin-bot-app-sarinapp', version: 30, max_instances: 1, scheduling_policy: 'default', constraints: { tiers: [1, 2] }, rollout_active_grace_period: 0, configuration: { image: `registry.cloudflare.com/${account}/sarin-bot-app@${digest}`, vcpu: 0.25, memory_mib: 1024, disk: { size_mb: 4000 } } },
     instances: { instances: [{ id: 'one', state: 'running', version: 30 }], result_info: { next_page_token: null } },
-    pages: { name: 'sarinbotsaas', production_branch: 'main', deployment_configs: { production: { env_vars: { SARIN_PUBLIC_ORIGIN: { type: 'plain_text', value: 'https://sarinbotsaas.pages.dev' } }, service_bindings: { SARIN_APP_HOST: { service: 'sarin-bot-app' } } } } },
+    pages: { name: 'sarinbotsaas', production_branch: 'main', deployment_configs: { production: { env_vars: { SARIN_PUBLIC_ORIGIN: { type: 'plain_text', value: 'https://sarinbotsaas.pages.dev' } }, services: { SARIN_APP_HOST: { service: 'sarin-bot-app', environment: 'production' } } } } },
   };
 }
 function adapters() {
@@ -79,7 +79,7 @@ test('snapshot rejects wrong backend, binding, replica, settings, partial invent
     s => { s.instances.result_info.next_page_token = 'next'; },
     s => { s.subdomain.enabled = true; },
     s => { s.schedules = []; },
-    s => { s.pages.deployment_configs.production.service_bindings.SARIN_APP_HOST.service = 'other'; },
+    s => { s.pages.deployment_configs.production.services.SARIN_APP_HOST.service = 'other'; },
     s => { s.pages.deployment_configs.production.env_vars.SARIN_PUBLIC_ORIGIN.value = 'https://other.test'; },
     s => { s.pages.deployment_configs.production.env_vars.SARIN_APP_ORIGIN = { type: 'secret_text' }; },
     s => { s.instances.instances.push({ id: 'two', state: 'running', version: 30 }); },
@@ -94,6 +94,16 @@ test('release configuration preserves runtime vars and limits; public build argu
   assert.equal(result.main, resolve('/repo', 'cloudflare/src/index.ts'));
   assert.deepEqual(result.d1_databases, config.d1_databases);
   assert.deepEqual(result.durable_objects, config.durable_objects);
+});
+
+test('Pages project API uses production.services for service bindings', () => {
+  // GET /accounts/{account_id}/pages/projects/{project_name} documented response.
+  const value = snapshot();
+  assert.doesNotThrow(() => validateSnapshot(value, config, account));
+  const production = value.pages.deployment_configs.production;
+  production.service_bindings = production.services;
+  delete production.services;
+  assert.throws(() => validateSnapshot(value, config, account), /PAGES_TARGET/);
 });
 
 test('reconciliation requires same tagged Worker, pinned image and sole running current instance', () => {

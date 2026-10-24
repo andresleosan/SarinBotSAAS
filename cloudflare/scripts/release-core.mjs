@@ -66,7 +66,7 @@ export function validateSnapshot(snapshot, config, account, { allowRollout = fal
   const states = new Set(['inactive', 'stopped', 'running', 'provisioning', 'stopping', 'unhealthy', 'failed']);
   if (instances.instances.some(item => !states.has(item.state))) fail('INSTANCE_STATE');
   if (instances.instances.filter(item => !['inactive', 'stopped'].includes(item.state)).length > 1) fail('MULTIPLE_ACTIVE_INSTANCES');
-  if (pages?.name !== PAGES || pages.production_branch !== 'main' || pages.deployment_configs?.production?.service_bindings?.SARIN_APP_HOST?.service !== WORKER) fail('PAGES_TARGET');
+  if (pages?.name !== PAGES || pages.production_branch !== 'main' || pages.deployment_configs?.production?.services?.SARIN_APP_HOST?.service !== WORKER) fail('PAGES_TARGET');
   if (pages.source && (pages.source.config?.production_deployments_enabled !== false || pages.source.config.preview_deployment_setting !== 'none')) fail('PAGES_GIT_AUTODEPLOY');
   const pageVars = pages.deployment_configs.production.env_vars;
   if (pageVars?.SARIN_PUBLIC_ORIGIN?.value !== 'https://sarinbotsaas.pages.dev' || ['SARIN_APP_ORIGIN', 'SARIN_APP_ACCESS_CLIENT_ID', 'SARIN_APP_ACCESS_CLIENT_SECRET'].some(key => key in pageVars)) fail('PAGES_ENVIRONMENT');
