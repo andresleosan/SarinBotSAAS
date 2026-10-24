@@ -158,6 +158,23 @@ describe('saved owner agenda occupancy', () => {
     expect(layout.warnings.transition).toEqual(['Horario no verificable']);
     expect(appointments[0].id).toBe('transition');
   });
+  it('repeatedHistoricalHourAssignsLanesByDisplayedStartWithoutReorderingRecords', () => {
+    const historicalDate = '1993-02-06';
+    const appointments = [appointment('first-in-time', {
+      dateKey: historicalDate, type: 'manual_block', startAt: Date.parse('1993-02-06T23:45:00-04:00'),
+      endAt: Date.parse('1993-02-06T23:55:00-04:00'), reservedUntilAt: Date.parse('1993-02-06T23:55:00-04:00'),
+    }), appointment('second-in-time', {
+      dateKey: historicalDate, type: 'manual_block', startAt: Date.parse('1993-02-06T23:15:00-05:00'),
+      endAt: Date.parse('1993-02-06T23:30:00-05:00'), reservedUntilAt: Date.parse('1993-02-06T23:30:00-05:00'),
+    })];
+    const layout = getOwnerAgendaDayLayout(historicalDate, appointments);
+    expect(layout.blocks.map(({ appointmentId, startMinute, serviceEndMinute, lane, laneCount }) => ({ appointmentId, startMinute, serviceEndMinute, lane, laneCount }))).toEqual([
+      { appointmentId: 'first-in-time', startMinute: 1425, serviceEndMinute: 1435, lane: 0, laneCount: 1 },
+      { appointmentId: 'second-in-time', startMinute: 1395, serviceEndMinute: 1410, lane: 0, laneCount: 1 },
+    ]);
+    expect(layout.warnings).toEqual({});
+    expect(appointments.map(item => item.id)).toEqual(['first-in-time', 'second-in-time']);
+  });
   it('invalidStartDoesNotDisruptChronologicalOrderingOrLanes', () => {
     const layout = getOwnerAgendaDayLayout(dateKey, [
       appointment('a-later', { startAt: at('10:00'), endAt: at('10:15'), reservedUntilAt: at('10:15') }),

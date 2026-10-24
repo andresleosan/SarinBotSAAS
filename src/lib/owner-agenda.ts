@@ -128,6 +128,8 @@ export function getOwnerAgendaDayLayout(dateKey: string, appointments: Appointme
     byResource.set(block.resourceId, resourceBlocks);
   }
   for (const resourceBlocks of byResource.values()) {
+    // An offset rollback can reverse wall-clock order while saved timestamps remain chronological.
+    resourceBlocks.sort((a, b) => a.startMinute - b.startMinute || compareIds(a.appointmentId, b.appointmentId));
     let group: OwnerAgendaBlock[] = [];
     let laneEnds: number[] = [];
     let groupEnd = -Infinity;
