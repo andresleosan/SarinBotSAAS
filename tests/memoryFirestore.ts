@@ -3,6 +3,9 @@ import type { Firestore } from 'firebase-admin/firestore';
 type Data = Record<string, unknown>;
 type Snapshot = { exists: boolean; id: string; data: () => Data | undefined };
 const copy = <T>(value: T): T => structuredClone(value);
+const nestedValue = (data: Data, field: string) => field.split('.').reduce<unknown>((current, key) =>
+  current && typeof current === 'object' ? (current as Data)[key] : undefined, data);
+const ordinal = (first: string, second: string) => first < second ? -1 : first > second ? 1 : 0;
 
 // Firestore is the external boundary. This optimistic in-memory adapter tracks
 // document versions, deliberately not query phantoms. Concurrent empty queries
@@ -22,17 +25,18 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
     async delete() { rows.delete(this.path); }
   }
   class Query {
-    constructor(public readonly path: string, public readonly filters: [string, string, unknown][] = [], public readonly cap = Infinity, public readonly ordering?: [string, string]) {}
+    constructor(public readonly path: string, public readonly filters: [string, string, unknown][] = [], public readonly cap = Infinity, public readonly ordering: [string, string][] = []) {}
     doc(id: string) { return new Reference(`${this.path}/${id}`); }
     where(field: string, operator: string, value: unknown) { return new Query(this.path, [...this.filters, [field, operator, value]], this.cap, this.ordering); }
     limit(cap: number) { return new Query(this.path, this.filters, cap, this.ordering); }
-    orderBy(field: string, direction = 'asc') { return new Query(this.path, this.filters, this.cap, [field, direction]); }
+    orderBy(field: string, direction = 'asc') { return new Query(this.path, this.filters, this.cap, [...this.ordering, [field, direction]]); }
     async get(source = rows) {
       const paths = [...source.keys()].filter((path) => path.startsWith(`${this.path}/`) && path.slice(this.path.length + 1).split('/').length === 1).filter((path) => this.filters.every(([field, operator, value]) => {
         const data = source.get(path)!.data;
-        const nested = field.split('.').reduce<unknown>((current, key) => current && typeof current === 'object' ? (current as Data)[key] : undefined, data);
+        const nested = nestedValue(data, field);
+        if (nested === undefined) return false;
         if (operator === '==') return nested === value;
-        const comparison = typeof nested === 'number' && typeof value === 'number' ? nested - value : typeof nested === 'string' && typeof value === 'string' ? nested.localeCompare(value) : null;
+        const comparison = typeof nested === 'number' && typeof value === 'number' ? nested - value : typeof nested === 'string' && typeof value === 'string' ? ordinal(nested, value) : null;
         if (comparison === null) throw new Error('Unsupported fixture comparison');
         if (operator === '<=') return comparison <= 0;
         if (operator === '>') return comparison > 0;
@@ -40,15 +44,18 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
         if (operator === '>=') return comparison >= 0;
         throw new Error('Unsupported fixture operator');
       }));
-      if (this.ordering) {
-        const [field, direction] = this.ordering;
-        paths.sort((a, b) => {
-          const first = source.get(a)!.data[field], second = source.get(b)!.data[field];
-          const comparison = typeof first === 'number' && typeof second === 'number' ? first - second : String(first).localeCompare(String(second));
-          return direction === 'desc' ? -comparison : comparison;
+      const orderedPaths = paths.filter(path => this.ordering.every(([field]) => nestedValue(source.get(path)!.data, field) !== undefined));
+      if (this.ordering.length) {
+        orderedPaths.sort((a, b) => {
+          for (const [field, direction] of this.ordering) {
+            const first = nestedValue(source.get(a)!.data, field), second = nestedValue(source.get(b)!.data, field);
+            const comparison = typeof first === 'number' && typeof second === 'number' ? first - second : ordinal(String(first), String(second));
+            if (comparison !== 0) return direction === 'desc' ? -comparison : comparison;
+          }
+          return ordinal(a, b);
         });
       }
-      const docs = paths.slice(0, this.cap).map(path => read(path, source));
+      const docs = orderedPaths.slice(0, this.cap).map(path => read(path, source));
       return { docs, empty: docs.length === 0, size: docs.length };
     }
   }

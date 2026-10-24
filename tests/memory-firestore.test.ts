@@ -28,3 +28,27 @@ describe('Firestore test adapter snapshots', () => {
     expect((await db.collection('users').doc('result').get()).data()).toEqual({ value: 4 });
   });
 });
+
+describe('Firestore test adapter compound queries', () => {
+  it('keeps primary order with ordinal ASCII ties and path fallback', async () => {
+    const { db } = memoryFirestore({
+      'items/late': { startAt: 1, id: 'z' }, 'items/Z': { startAt: 2, id: 'Z' },
+      'items/a': { startAt: 2, id: 'a' }, 'items/dash': { startAt: 2, id: '-a' },
+      'items/A': { startAt: 2, id: 'A' }, 'items/under': { startAt: 2, id: '_a' },
+      'items/duplicate-2': { startAt: 3, id: 'same' }, 'items/duplicate-1': { startAt: 3, id: 'same' },
+    });
+    const snapshot = await db.collection('items').orderBy('startAt', 'desc').orderBy('id', 'asc').get();
+    expect(snapshot.docs.map(doc => doc.id)).toEqual(['duplicate-1', 'duplicate-2', 'dash', 'A', 'Z', 'under', 'a', 'late']);
+  });
+  it('uses nested lookup for ordering and range comparisons and excludes absent ordered fields', async () => {
+    const { db } = memoryFirestore({
+      'items/a': { client: { uid: 'A' }, startAt: 2 }, 'items/z': { client: { uid: 'Z' }, startAt: 2 },
+      'items/lower': { client: { uid: 'a' }, startAt: 2 }, 'items/missing': { startAt: 2 },
+      'items/missing-time': { client: { uid: 'B' } },
+    });
+    const snapshot = await db.collection('items').where('client.uid', '>', 'A').orderBy('startAt', 'desc').orderBy('client.uid').get();
+    expect(snapshot.docs.map(doc => doc.id)).toEqual(['z', 'lower']);
+    const nested = await db.collection('items').orderBy('client.uid', 'desc').get();
+    expect(nested.docs.map(doc => doc.id)).toEqual(['lower', 'z', 'missing-time', 'a']);
+  });
+});

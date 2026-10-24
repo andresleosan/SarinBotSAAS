@@ -76,10 +76,10 @@ describe('private attendance history', () => {
   it('pagesTwentyPlusLookaheadWithoutDuplicates', async () => {
     const f = await scenario(); await seed(f, 45);
     const db = queryBoundary(f.db, query => {
-      const emitted = query as Query & { cap: number; filters: [string, string, unknown][]; ordering: [string, string] };
+      const emitted = query as Query & { cap: number; filters: [string, string, unknown][]; ordering: [string, string][] };
       expect(emitted.cap).toBe(21);
       expect(emitted.filters).toContainEqual(['appointmentId', '==', f.appointment.id]);
-      expect(emitted.ordering).toEqual(['sequence', 'desc']);
+      expect(emitted.ordering).toEqual([['sequence', 'desc']]);
     });
     const first = await history(f, undefined, db), second = await history(f, first.nextBeforeRevision!, db), third = await history(f, second.nextBeforeRevision!, db);
     expect([first.events.length, second.events.length, third.events.length]).toEqual([20, 20, 5]);
