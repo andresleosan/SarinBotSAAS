@@ -152,6 +152,7 @@ export interface TenantClientMemory {
 }
 
 export interface Appointment {
+  attendance?: import('@/lib/appointment-attendance').AppointmentAttendanceMetadata;
   rescheduleRevision?: number;
   lastRescheduleProposalId?: string;
   rescheduledAt?: number;
