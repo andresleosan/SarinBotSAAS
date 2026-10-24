@@ -59,3 +59,17 @@
 - [ ] Reconcile current runtime read-only metadata and candidate provenance. Preserve failed/auth-limited results; no deploy/merge/main push as a substitute for validation.
 - [ ] Record exact source, commands, environmental differences, real skips/failures, reviews and readiness limits. Commit documentary evidence.
 - [ ] One broad review of corrective range from3351698, then the single final fix wave/scoped re-review if needed. Integrate/publish only with required gates resolved and the user's deployment authorization applicable to the concrete result.
+
+### Task 4: Resolve the observed Undici audit failure
+
+Added after CI #32 and a fresh local audit reproduced one high/two moderate findings; this is a new observed dependency gate after Task3, not another P1 implementation or repetition of the broad application review.
+
+**Files:** `pnpm-workspace.yaml`, generated shared `pnpm-lock.yaml`; scoped report in the ignored SDD workspace. Preserve package manifests, application/test source, prior evidence and all existing dependency/security policies.
+
+**Interfaces:** Consumes locked Wrangler4.150.0→Miniflare5.20261006.2-beta→Undici7.29.1 and the new audit RED. Produces the same toolchain with only that Miniflare→Undici edge patched to7.30.1, new exact source/tree and frozen/audit/Worker/D1 evidence. Subsequent image publication must consume a newly built artifact and explicitly updated source/image bindings.
+
+- [ ] Read the diagnosis and official advisories/parent constraints; preserve the actual audit RED. Add exactly `'miniflare@5.20261006.2-beta>undici': '7.30.1'` under existing workspace overrides, then regenerate the shared lock with pnpm11.23.0 in a minimal external environment. Do not hand-edit a dependency version that contradicts an undeclared parent override.
+- [ ] Perform a real frozen install under unchanged lifecycle/supply-chain policies. Verify the resolved edge is7.30.1 and Wrangler/Miniflare/Next/React/Sharp are unchanged; fresh audit GREEN with no high/critical, preserving any other severities honestly.
+- [ ] Sequentially run root types, the actual Worker check and all22 original automation D1 cases with original50-row/pagination/deadline assertions. Use the existing isolated Windows runners where needed and record exact commands/differences. No broad unchanged browser/full-app rerun solely for a green screen; automatic candidate CI supplies its configured full checks.
+- [ ] Inspect only necessary override/lock churn, record command/exit/source evidence, commit the two-file fix, and obtain a fresh independent scoped review. Resolve findings before feature push; preserve all CI32/audit failures.
+- [ ] Observe automatic candidate CI, rebuild the Linux image from the new committed source, verify exact identity, and rebind/review only the affected external image/publication constants. Keep main/registry/deployment publication gated on the concrete reviewed candidate; record actual deployed identities and acceptance only after publication.
