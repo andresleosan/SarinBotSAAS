@@ -1,11 +1,12 @@
-# Corrección de bloqueos de publicación — evidencia local
+# Corrección de bloqueos de publicación — evidencia local y remota
 
-Estado: **Evidencia disponible; gates manuales/remotos abiertos**. Este informe registra la corrección posterior a P1 y no modifica su [informe histórico](2026-10-22-admin-guided-navigation.md). El verde local no acredita CI remota ni aceptación del runtime de producción. No se ha desplegado, publicado ni enviado a `main` durante esta validación.
+Estado: **Evidencia local conservada; CI remota y revisión correctiva aprobadas; observaciones manuales y aceptación de producción pendientes**. Corte de evidencia: **24 de octubre de 2026, 00:33 UTC (23 de octubre, 19:33 en Colombia)**; el cierre del demo se verificó a las 00:32:54 UTC. Este informe registra la corrección posterior a P1 y no modifica su [informe histórico](2026-10-22-admin-guided-navigation.md). Se publicó únicamente la rama de trabajo y se abrió el PR #1 como borrador. `main` permanece en `463ae55f8c873468980746185fb3e91f55cb8681`; no hubo merge, push a `main`, push de registry ni despliegue del backend. La evidencia local/remota no acredita aceptación del runtime de producción.
 
 ## Fuente y alcance
 
 - Base de la corrección: `3351698a2d8eb8f9df56cf7ad0cf9d7fd27a5b3f`.
 - Corrección D1: `8fa64c19c3d84eb5f6ee4b1761231c8024d8362b`; dependencias y **fuente exacta de los gates finales**: `2eb3a956f035b002d65c3e790ab52b631108709c`.
+- HEAD documental previo a esta actualización: `ba341870c901d27911074ec048471aee7473a80d`, cuya única diferencia respecto de `2eb3a956` es este informe QA. Esta actualización también es solo documental; no añade código de producto ni repite las suites de fuente.
 - Rama `codex/admin-guided-navigation-20261023`, worktree aislado `C:/Users/Drean Skate/AppData/Local/SarinBot/admin-navigation-20261023/source`. No se desarrolla desde el checkout mixto E: ni se modifica source-restoration.
 - Node `v24.22.0`, pnpm `11.23.0`, Vitest `5.0.4`; Next exacto `16.4.1`. React/React DOM `19.3.0` y Sharp `0.35.5` permanecen.
 
@@ -36,6 +37,18 @@ Las 28 omitidas de la completa son opt-ins separados: `deepseek-intent.live` (1)
 
 El archivo D1 completo pasó **22/22** dentro de la completa, en 68,577 s. Los casos stale-authority prepared/claimed tardaron **6.716,371 / 6.662,276 ms**; los expired prepared/claimed, **11.043,907 / 11.535,671 ms**. Se mantuvo el plazo original de 30 s. Esto cierra el fallo local observado en esta ejecución final; no promete ausencia de latencia bajo cualquier carga.
 
+## CI remota del PR #1
+
+[Verify Sarin #31, run `40039605722`](https://github.com/andresleosan/SarinBotSAAS/actions/runs/40039605722), intento 1 y evento `pull_request`, terminó **success a las 23:28:55 UTC del 23 de octubre: 3/3 jobs aprobados, 0 fallidos y 0 pendientes**. El [PR #1 en borrador](https://github.com/andresleosan/SarinBotSAAS/pull/1) tiene head `ba341870c901d27911074ec048471aee7473a80d` y base `main` `463ae55f8c873468980746185fb3e91f55cb8681`. Los tres jobs comprobaron realmente el **merge sintético `204ebbed9d2a7e247369b4d2b5e3dc953249c803`** de ese head sobre esa base; no fue un checkout aislado del head.
+
+| Job remoto | Evidencia |
+| --- | --- |
+| Types, tests and builds | App: 3.294 pasados, 28 omitidos; 216 archivos pasados, 4 omitidos. Gateway: 25 pasados. Tipos, auditoría de severidad alta, build Next, landing build/check y Pages aprobados; auditoría sin vulnerabilidades conocidas. |
+| Firebase rules and local journey | Reglas: 26 pasados en 2 archivos; journey completo: 1 pasado. |
+| Cloudflare configuration dry-run | 137 pasados, 0 fallidos/omitidos; tipos y dry-run Worker aprobados. |
+
+Los resúmenes sanitizados `readiness-remote-ci/ci-report.md` y `ci-status.json` conservan esta identidad y sus resultados. No se suman estos tests a los locales como cobertura adicional. La observación de CI fue de lectura, sin rerun, merge, despliegue ni publicación de imagen; el resultado no acredita lector audible, zoom nativo ni runtime desplegado.
+
 ## Entorno y resultados que se conservan
 
 Los arneses externos usan fuente fijada, HOME/config/cachés nuevos, TEMP corto y entorno permitido explícitamente; excluyen dotenv, credenciales heredadas y opt-ins vivos. La completa usa dos workers, `configLoader: 'runner'`, `envDir: false`, sin caché de resultados ni filtros, con los plazos originales. Tipos/build invocan las CLI instaladas tras validar los scripts; el build no recibió configuración Firebase ni credenciales. Demo apagado durante completa/build y gates pesados secuenciales. Estas diferencias respecto de CI permanecen explícitas.
@@ -58,7 +71,9 @@ La verificación del fixture a las 23:08:07.641 UTC confirmó 501 recibos, todos
 
 **Lector de pantalla audible: NO OBSERVADO. Zoom nativo 200%: NO OBSERVADO.** DOM/árbol accesible y reflow equivalente por viewport/DPR no prueban ninguna de esas observaciones. La evidencia histórica de P1 mantiene su alcance; no se relabela como una observación nueva.
 
-Al cierre de este corte documental, el demo manual permanece activo, con una nueva pestaña en Consulta y un GET retenido para coordinar NVDA con el titular. Todavía se espera su señal de preparación; no se ha observado el resultado audible ni se declara aprobada esa secuencia. Los resultados humanos o remotos posteriores requieren evidencia nueva fechada.
+En el corte anterior quedó una pestaña manual en Consulta con un GET retenido para coordinar NVDA. El 23 de octubre a las 19:32 en Colombia, el titular preguntó por qué NVDA era necesario para producción. Se aclaró que es una comprobación de accesibilidad y que NVDA no es un prerrequisito técnico de software para desplegar. El [protocolo QA](../../qa/tests/admin-guided-navigation.md), línea 40, dispone: «Si no se ejecuta realmente, registrar como no observado y limitar la atribución a tests concretos». El [plan correctivo](../superpowers/plans/2026-10-23-production-readiness.md), línea 58, también permite reportar el pendiente explícitamente. Esta aclaración no constituye una exención del titular, un pase de accesibilidad ni aceptación completa de P1.
+
+La observación manual se aplazó como **NO OBSERVADA** en `readiness-browser/manual-reader-deferred.json`, a las 00:32:21.215 UTC del 24 de octubre. Cancelar la intercepción antigua devolvió `Invalid InterceptionId`; no se considera una cancelación válida ni un resultado audible. Después se retiraron los patrones de Fetch, se cerró sesión (texto visible «Inicia sesión para continuar», cero paneles privados), se guardó la captura externa `manual-reader-deferred.jpg` y se cerró la pestaña propia. Se detuvieron los emuladores y el servidor propios; a las 00:32:54 UTC los puertos 3042, 8080, 9099, 4400, 4500 y 9150 no tenían listeners. No queda una solicitud humana retenida ni un demo activo en este corte. Los resultados humanos posteriores requieren evidencia nueva fechada.
 
 El demo se lanzó a las 23:02:27 UTC mediante el `start.mjs` externo existente, Firebase CLI oficial cacheada 15.33.0 y Next 16.4.1, con entorno demo canónico, en el puerto 3042; no fue una ejecución literal de `pnpm run dev:local`. El wrapper local preserva el script journey real: este elimina `NODE_OPTIONS` en su hijo. El guard loopback del launcher no cubre los workers Vitest/fixtures; allí rigen las protecciones existentes de entorno demo, inventario de emuladores, URLs loopback permitidas y rechazo de inferencia/credenciales. El aislamiento del servidor demo es independiente del guard del launcher.
 
@@ -74,11 +89,17 @@ La primera lectura CLI de Pages falló por autenticación/permisos; `whoami` exi
 
 Estas identidades corresponden al runtime anterior, **no a `2eb3a956`**. El push a `main` activa Pages estático/gateway; no reemplaza automáticamente el Next alojado en Worker/Container. La procedencia fuente→imagen del runtime anterior continúa sin verificarse independientemente.
 
-El preflight privado identificó 17 variables solo presentes en runtime y 18 bindings de secretos que deben preservarse. La preparación propone configuración externa revisada y `--keep-vars`; esto no preserva por sí solo triggers, rutas, observabilidad ni todos los ajustes del Container. Faltan comparación efectiva y verificación posterior a una publicación autorizada. Los valores privados y argumentos públicos de Firebase permanecen fuera de Git.
+El preflight privado identificó 17 variables solo presentes en runtime y 18 bindings de secretos que deben preservarse. El borrador externo usa `vars: {}` y `keep_vars: true`/`--keep-vars`: expresa la intención de heredar las variables existentes sin overrides locales; el deploy normal conserva por separado los bindings de secretos. Es preparación de preservación, no verificación posterior a un despliegue. Los valores privados y argumentos públicos de Firebase permanecen fuera de Git.
+
+La comparación efectiva del 23 de octubre a las 23:19 UTC confirmó igualdad de los **cinco campos no relacionados con la imagen que define el payload de actualización de Container**: `max_instances`, `scheduling_policy`, `rollout_active_grace_period`, `constraints` normalizadas y recursos resueltos de `configuration.instance_type`. La imagen se excluyó expresamente. El camino instalado no envía `network`, `command`, `entrypoint` ni `runtime`; su omisión no se presenta como un overwrite. No se requirieron overrides adicionales ni se ejecutó actualización remota.
+
+La lectura acotada de Worker a las 23:21:07 UTC confirmó igualdad de fecha/flags de compatibilidad, lista de cron, `workers_dev` y `preview_urls`. La respuesta **no expone los valores de observabilidad enabled/logs/traces**, por lo que los tres siguen **sin verificar**: no se afirma paridad completa ni deriva. Las rutas/dominios personalizados omitidos no se publican mediante listas vacías en este camino. `release-config-comparison.md`, su JSON sanitizado y `release-worker-settings-comparison.json` conservan método, tiempos e igualdad sin valores privados. Todavía falta la verificación posterior a la publicación autorizada.
 
 El dry-run Worker con rollout `none` valida empaquetado/configuración, **no construye ni arranca una imagen Linux**. Ese gate se complementó con una construcción Linux local real: `node <readiness-image>/run.mjs --build`, 23:14:06.849–23:14:57.848 UTC, 13 operaciones exit 0. El wrapper usó Docker config nueva, endpoint local named pipe verificado y cuatro argumentos públicos validados sin imprimir sus valores. Construyó desde un archivo de fuente versionada exacta `2eb3a956`, árbol `26c7c95e288ec34e8caada7c905bd86d5d6a9ef4`; la nueva QA sin versionar no forma parte de ese archivo.
 
 Imagen local `linux/amd64`: **`sha256:631eb0060cc7b8e3b51c76d0271ccc612eadc2f57697748146705cf4c6cbdd27`**. Inspect/IID y etiquetas de revisión OCI/árbol coincidieron. En este almacén containerd local, el ID coincide con el manifest digest de BuildKit; no se lo presenta como config digest ni como digest de registry. El responsable cotejó el log privado filtrado: frozen pnpm 11.23.0, Next 16.4.1 compilado y 14 páginas. Se conservan imagen y procedencia privadas externas; **no hubo push de registry ni arranque de la aplicación**. La construcción/identidad local no prueban salud, credenciales ADC, proveedores ni rollout singleton.
+
+El runner externo de publicación está en preparación y revisión de autor, sin ejecuciones. Antes de cualquier push se detectó que su verificación confundía el IID/manifest local de containerd con el config digest remoto; su corrección y revisión acotada permanecen pendientes en este corte. No es un cambio de código de producto ni evidencia de publicación. La identidad exacta del manifest en registry y la publicación secuenciada de Worker/Container todavía no se han establecido.
 
 ## Evidencia conservada y límites de cierre
 
@@ -86,4 +107,8 @@ Raíz externa: `../qa-runner/`. Completa/tipos/build: `final-checks/runs/2026-10
 
 El resultado de imagen está en `readiness-image/runs/0329f713-9406-42b6-aaf9-4444dacef4b7/result.private.json`; solo se cotejaron campos permitidos de fuente, identidad, estados y resultados, sin copiar argumentos/logs/procedencia BuildKit privados.
 
-Task 1 y Task 2 recibieron revisiones independientes acotadas Spec PASS/Approved. La revisión de Task 2 solo acredita su parche de dos archivos; su imposibilidad de establecer toda la release se mantiene cubierta por gates finales y por los límites que siguen abiertos aquí. Revisión global del rango correctivo: pendiente. CI remota, observaciones audible/zoom nativo, publicación y aceptación de producción: pendientes; no se declara readiness total.
+Task 1 y Task 2 recibieron revisiones independientes acotadas Spec PASS/Approved. La revisión de Task 2 solo acredita su parche de dos archivos; su imposibilidad de establecer toda la release se mantiene cubierta por gates finales y por los límites que siguen abiertos aquí. Task 3 recibió aprobación para su alcance documental con observaciones pendientes explícitas.
+
+La revisión global correctiva de `3351698a2d8eb8f9df56cf7ad0cf9d7fd27a5b3f` a `ba341870c901d27911074ec048471aee7473a80d`, conservada en `.superpowers/sdd/2026-10-23-production-readiness/final-review.md`, concluyó **implementación/spec PASS y calidad Approved**, sin nuevo defecto de código Critical/Important ni solicitud de ola correctiva. M1 conserva el ruido de avisos existente. Su R1 Important era un **gate de release en el corte de esa revisión**, cuando CI, observaciones humanas y preparación/aceptación del runtime seguían abiertas; no era un defecto nuevo de código ni aprobación general de producción.
+
+Este corte cierra la CI candidata y documenta la comparación de configuración con sus límites. Mantiene lector audible y zoom nativo 200% **NO OBSERVADOS**, observabilidad sin paridad verificable, revisión del runner de publicación en curso, identidad de registry/publicación y aceptación de salud/singleton pendientes. La aceptación posterior al despliegue se registra después de la acción autorizada, con evidencia nueva; no se presupone ahora. No se declara accesibilidad completa, aceptación completa de P1 ni readiness total.
