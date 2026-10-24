@@ -2,18 +2,16 @@ import 'server-only';
 import type { ChatResponse } from '@/types/chat';
 import type { Appointment, Business } from '@/types/firestore';
 import type { ChatIntent } from './chat-intent';
+import { renderBusinessLocationInformation, renderBusinessServiceInformation } from './business-receptionist-info';
 export const OUT_OF_SCOPE_REPLY = 'Puedo ayudarte con los servicios, horarios y citas de este negocio. ¿Qué necesitas reservar o consultar?';
-const money = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
 export const appointmentStatusLabel = (status: Appointment['status']) => ({ confirmed: 'Activa', completed: 'Completada', no_show: 'No asistió', cancelled_by_client: 'Cancelada por el cliente', cancelled_by_owner: 'Cancelada por el negocio' })[status];
 export function renderChatReply({ intent, business, data }: { intent: ChatIntent; business: Business; data: Record<string, unknown> }): ChatResponse {
-  const service = business.services.find(item => item.id === data.serviceId);
   let reply: string;
   switch (intent) {
     case 'out_of_scope': reply = OUT_OF_SCOPE_REPLY; break;
-    case 'services': reply = business.services.length ? `Servicios de ${business.name}:\n${business.services.map(item => `${item.name}: ${money(item.price)} · ${item.durationMinutes} minutos.`).join('\n')}` : 'El negocio todavía no ha publicado sus servicios. Completa el catálogo en Mi negocio.'; break;
-    case 'price': reply = service ? `${service.name}: ${money(service.price)} · ${service.durationMinutes} minutos.` : '¿De qué servicio quieres conocer el precio?'; break;
+    case 'services': case 'service_details': case 'price': reply = renderBusinessServiceInformation({ business, intent, serviceId: typeof data.serviceId === 'string' ? data.serviceId : undefined }); break;
     case 'contact': reply = business.phoneWhatsApp ? `Puedes contactar a ${business.name} en ${business.phoneWhatsApp}.` : 'El negocio todavía no ha publicado un teléfono de contacto.'; break;
-    case 'location': reply = `El negocio no ha publicado una dirección en SarinBot.${business.phoneWhatsApp ? ` Consulta la ubicación en ${business.phoneWhatsApp}.` : ' Contacta al negocio para confirmar la ubicación.'}`; break;
+    case 'location': reply = renderBusinessLocationInformation(business); break;
     case 'hours': reply = `Horario de Colombia:\n${Object.entries(business.weeklySchedule).map(([day, schedule]) => `${['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][Number(day)]}: ${schedule.isOpen ? schedule.intervals.map(interval => `${interval.start}–${interval.end}`).join(', ') : 'Cerrado'}`).join('\n')}`; break;
     case 'availability': {
       const availability = data.availability as { resourceName: string; slots: string[] }[] | undefined;
