@@ -19,11 +19,12 @@ const id = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).refine(value => !reserved.
 const time = z.string().length(5).refine(isTimeString, 'Usa HH:mm.');
 const date = z.string().length(10).refine(isDateKey, 'Fecha inválida.');
 const interval = z.object({ start: time, end: time }).strict().refine(value => value.start < value.end, 'El final debe ser posterior al inicio.');
-const day = z.object({ isOpen: z.boolean(), intervals: z.array(interval).max(5) }).strict().superRefine((value, context) => {
-  if ((value.isOpen && value.intervals.length === 0) || (!value.isOpen && value.intervals.length !== 0)) context.addIssue({ code: 'custom', path: ['intervals'], message: value.isOpen ? 'Añade un intervalo de atención.' : 'Un día cerrado no tiene intervalos.' });
+const commonDay = z.object({ isOpen: z.boolean(), intervals: z.array(interval).max(5) }).strict().superRefine((value, context) => {
+  if (value.isOpen && value.intervals.length === 0) context.addIssue({ code: 'custom', path: ['intervals'], message: 'Añade un intervalo de atención.' });
   const sorted = [...value.intervals].sort((a, b) => a.start < b.start ? -1 : a.start > b.start ? 1 : 0);
   for (let index = 1; index < sorted.length; index++) if (sorted[index].start < sorted[index - 1].end) context.addIssue({ code: 'custom', path: ['intervals'], message: 'Los intervalos se superponen.' });
 });
+const day = commonDay.superRefine((value, context) => { if (!value.isOpen && value.intervals.length !== 0) context.addIssue({ code: 'custom', path: ['intervals'], message: 'Un día cerrado no tiene intervalos.' }); });
 const weeklySchedule = z.object({ '0': day, '1': day, '2': day, '3': day, '4': day, '5': day, '6': day }).strict();
 const closureFields = { id, fromDateKey: date, throughDateKey: date, interval: interval.nullable(), label: z.string().max(120) };
 const closure = z.discriminatedUnion('scope', [
@@ -45,6 +46,12 @@ export const resourceScheduleRulesSchema = z.object({
 export const resourceSchedulePolicySchema = z.object({ version: z.literal(1), businessId: id, revision: z.number().int().nonnegative().safe(), rules: resourceScheduleRulesSchema, updatedAt: z.number().int().positive().safe().nullable() }).strict().superRefine((value, context) => {
   if ((value.revision === 0) !== (value.updatedAt === null)) context.addIssue({ code: 'custom', path: ['updatedAt'], message: 'No se puede verificar la revisión del horario.' });
 });
+export const resourceScheduleBasisSchema = z.object({ weeklySchedule: z.object({ '0': commonDay, '1': commonDay, '2': commonDay, '3': commonDay, '4': commonDay, '5': commonDay, '6': commonDay }).strict(), resources: z.array(z.object({ id, name: z.string().max(120), active: z.boolean() }).strict()).max(30) }).strict().refine(value => new Set(value.resources.map(item => item.id)).size === value.resources.length, 'Recursos repetidos.');
+export const resourceScheduleReceiptSchema = z.object({ requestId: z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/).refine(value => !/[\x00-\x1f\x7f]/.test(value)), operationHash: z.string().length(64).regex(/^[a-f0-9]+$/), resultRevision: z.number().int().positive().safe(), appliedAt: z.number().int().positive().safe() }).strict();
+const viewFields = { businessId: id, ownerUid: z.string().min(1).max(128).refine(value => !/[\x00-\x1f\x7f]/.test(value)), policy: resourceSchedulePolicySchema, basis: resourceScheduleBasisSchema, basisFingerprint: z.string().length(64).regex(/^[a-f0-9]+$/), writesEnabled: z.boolean(), serverNow: z.number().int().positive().safe(), operation: resourceScheduleReceiptSchema.nullable() };
+const validView = (value: { businessId: string; policy: ResourceSchedulePolicy; operation: ResourceScheduleReceipt | null }) => value.policy.businessId === value.businessId && (!value.operation || value.operation.resultRevision <= value.policy.revision);
+export const resourceScheduleViewSchema = z.object(viewFields).strict().refine(validView, 'La respuesta no corresponde al horario.');
+export const resourceScheduleSaveResultSchema = z.object({ ...viewFields, operation: resourceScheduleReceiptSchema, replayed: z.boolean() }).strict().refine(validView, 'La respuesta no corresponde al horario.');
 
 export function emptyResourceSchedulePolicy(businessId: string): ResourceSchedulePolicy {
   return { version: 1, businessId: id.parse(businessId), revision: 0, rules: { weekly: [], exceptions: [], closures: [] }, updatedAt: null };

@@ -12,6 +12,7 @@ interface __BaseEnv_CloudflareBindings {
 	WHATSAPP_ENABLED: "false";
 	WHATSAPP_RETENTION_ENABLED: "false";
 	SARIN_DATA_BACKEND: "d1";
+	SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED: "false";
 	SARIN_PUBLIC_BOOKING_ORIGIN: "https://sarinbotsaas.pages.dev";
 	SARIN_MAINTENANCE: "false";
 	PILOT_AI_BUDGET_ENFORCED: "true";

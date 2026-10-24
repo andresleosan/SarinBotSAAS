@@ -18,6 +18,7 @@
     "SARIN_DATA_BACKEND": "d1",
     "SARIN_PUBLIC_BOOKING_ORIGIN": "https://sarinbotsaas.pages.dev",
     "SARIN_MAINTENANCE": "false",
+    "SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED": "false",
     "PILOT_AI_BUDGET_ENFORCED": "true"
   },
   "observability": { "enabled": false, "logs": { "enabled": false }, "traces": { "enabled": false } },

@@ -2,6 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { forwardToSingleton, runtimeEnvironment, publicBuildArguments, SINGLETON_NAME } from '../src/router.ts';
 
+test('resource schedule write gate is private, boolean and forwarded without enabling by absence', () => {
+  assert.equal(runtimeEnvironment(certificateRuntime).SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED, undefined);
+  for (const value of ['false', 'true']) assert.equal(runtimeEnvironment({ ...certificateRuntime, SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED: value }).SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED, value);
+  assert.throws(() => runtimeEnvironment({ ...certificateRuntime, SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED: 'enabled' }));
+  assert.equal(publicBuildArguments({ ...certificateRuntime, SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED: 'true', NEXT_PUBLIC_FIREBASE_API_KEY: 'public-synthetic', NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'real-project.firebaseapp.com', NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'real-project', NEXT_PUBLIC_FIREBASE_APP_ID: 'app-id' }).SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED, undefined);
+});
+
 const certificateRuntime = {
   FIREBASE_ADMIN_PROJECT_ID: 'real-project', FIREBASE_ADMIN_CLIENT_EMAIL: 'configured@example.test', FIREBASE_ADMIN_PRIVATE_KEY: 'synthetic-key',
   SUPERADMIN_UID: 'owner', SARIN_TUNNEL_URL: 'https://ia-sarin.alsdevstudio.com/v1/chat/completions', OLLAMA_MAIN_MODEL: 'main-local',

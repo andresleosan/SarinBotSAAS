@@ -22,7 +22,7 @@ export async function createDataTestRuntime({ previousBusinessChildren = false, 
     plugins: [...(previousBusinessChildren ? [{ name: 'previous-business-children', setup(build) {
       build.onLoad({ filter: /[\\/]shared[\\/]data-protocol\.ts$/ }, ({ path }) => {
         const source = readFileSync(path, 'utf8');
-        const current = "businesses: ['appointments', 'attendanceEvents', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests']";
+        const current = "businesses: ['appointments', 'attendanceEvents', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests', 'resourceSchedulePolicies', 'resourceScheduleOperations']";
         const previous = "businesses: ['appointments', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests']";
         if (source.split(current).length !== 2) throw new Error('Previous businesses allowlist fixture must replace exactly one literal');
         return { contents: source.replace(current, previous), loader: 'ts' };

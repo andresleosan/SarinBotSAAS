@@ -25,6 +25,14 @@ async function fixture(context) {
 }
 const isError = code => error => error.code === code && !/private-payload/.test(error.message);
 
+test('resource schedule policy and operation children are private and atomic', async context => {
+  const env = await fixture(context);
+  const result = await executeDataCommand(commit(0, [set('businesses/demo/resourceSchedulePolicies/current', { revision: 1 }), set('businesses/demo/resourceScheduleOperations/receipt', { resultRevision: 1 })]), env);
+  assert.equal(result.revision, 1);
+  assert.equal((await executeDataCommand(read('businesses/demo/resourceSchedulePolicies/current'), env)).documents[0].data.revision, 1);
+  await assert.rejects(executeDataCommand(commit(1, [set('publicBusinesses/demo/resourceSchedulePolicies/current', { revision: 2 })]), env), isError('DATA_INVALID'));
+});
+
 test('attendance events use the private business child with exact paths and bounded typed queries', async context => {
   const env = await fixture(context);
   const migration = readFileSync(new URL('../migrations/0007_appointment_attendance.sql', import.meta.url), 'utf8').replace(/^--.*$/gm, '').replace(/\r?\n/g, ' ');
