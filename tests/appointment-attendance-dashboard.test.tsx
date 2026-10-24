@@ -35,3 +35,35 @@ it('staleParentActionsCannotMutateTheNewScope', async () => { await mount(); con
 it('savedAttendanceInvalidatesOlderAgendaRead', async () => { await mount(); const read = deferred<unknown>(); state.api.mockImplementation(async (_path: string, init?: RequestInit) => init?.method ? saved(JSON.parse(String(init.body)).requestId) : read.promise); await act(async () => vi.advanceTimersByTimeAsync(15000)); const oldRead = state.api.mock.calls.at(-1)!; await click('Atendida'); await click('Confirmar resultado'); expect(oldRead[1].signal.aborted).toBe(true); await act(async () => read.resolve({ appointments: [row] })); expect(content(tree!.root)).toContain('Atendida'); expect(button('Corregir resultado')).toBeDefined(); });
 it('representationAndClientPoliciesKeepLocalBusy', async () => { const pending = deferred<unknown>(); await mount(); expect(tree!.root.findByType(ClientPolicyControls).props.clients).toEqual([{ uid: 'client', name: 'Cliente demo' }]); state.api.mockReturnValue(pending.promise); await click('Registrar revisión realizada'); expect(button('Semana').props.disabled).toBe(false); expect(button('Registrar revisión realizada').props.disabled).toBe(true); });
 it('clientAndMinorDetailsRemainUnchanged', async () => { await mount(); state.api.mockImplementation(async (_p, init) => saved(JSON.parse(String(init.body)).requestId)); await click('Atendida'); await click('Confirmar resultado'); for (const value of ['Cliente demo', 'demo@example.invalid', 'Menor demo', 'Representación declarada']) expect(content(tree!.root)).toContain(value); expect(state.api.mock.calls.filter(call => !call[1]?.method)).toHaveLength(1); });
+it.each(['attendance-response-last', 'representation-response-last'] as const)('independent attendance and representation revisions survive %s', async order => {
+  const attendance = deferred<unknown>(), representation = deferred<unknown>();
+  const review = { revision: 1, status: 'reviewed' as const, reviewedBy: 'owner', reviewedAt: row.reservedUntilAt + 1 };
+  await mount();
+  state.api.mockImplementation((path: string) => path.endsWith('/representation-review') ? representation.promise : attendance.promise);
+  if (order === 'representation-response-last') {
+    await click('Registrar revisión realizada');
+    expect(button('Semana').props.disabled).toBe(false);
+  }
+  await click('Atendida'); await click('Confirmar resultado');
+  if (order === 'attendance-response-last') {
+    expect(button('Registrar revisión realizada').props.disabled).toBe(false);
+    await click('Registrar revisión realizada');
+  }
+  const call = writes().find(call => call[0].endsWith('/attendance'))!;
+  const receipt = saved(JSON.parse(call[1].body).requestId);
+  if (order === 'attendance-response-last') {
+    await act(async () => representation.resolve({ appointment: { ...receipt.appointment, representationReview: review } }));
+    expect(content(tree!.root)).toContain('Revisión realizada por el negocio');
+    await act(async () => attendance.resolve(receipt));
+  } else {
+    await act(async () => attendance.resolve({ ...receipt, appointment: { ...receipt.appointment, representationReview: review } }));
+    await act(async () => representation.resolve({ appointment: { ...row, representationReview: review } }));
+  }
+  const current = tree!.root.findByType(OwnerAgendaAppointments).props.day.appointments[0] as Appointment;
+  expect(current.attendance?.revision).toBe(1);
+  expect(current.status).toBe('completed');
+  expect(current.representationReview).toEqual(review);
+  expect(content(tree!.root)).toContain('Revisión realizada por el negocio');
+  expect(button('Corregir resultado')).toBeDefined();
+  expect(writes()).toHaveLength(2);
+});

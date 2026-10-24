@@ -25,6 +25,55 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(appointment.reservedUnti
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); });
 
 describe('attendance commands and private reads', () => {
+  it.each([
+    ['explicit', false], ['explicit', true], ['inflight', false], ['inflight', true],
+  ] as const)('successful %s history keeps the exact unknown command (newer=%s)', async (timing, newer) => {
+    const read = deferred<unknown>();
+    const write = deferred<unknown>();
+    vi.mocked(apiFetch).mockImplementation((_path, init) => init?.method ? write.promise : read.promise);
+    await mount();
+    if (timing === 'inflight') await act(async () => { void state.loadHistory(); });
+    await submit();
+    const original = vi.mocked(apiFetch).mock.calls.find(call => call[1]?.method)!;
+    const command = JSON.parse(String(original[1]?.body));
+    await act(async () => write.reject(new Error('lost response')));
+    if (timing === 'explicit') await act(async () => { void state.loadHistory(); });
+    const current = newer ? { ...appointment, status: 'completed' as const, attendance: { revision: 1, lastEventId: eventId } } : appointment;
+    await act(async () => read.resolve({ appointment: current, events: newer ? [event(1)] : [], nextBeforeRevision: null }));
+    expect(state.history?.appointment).toEqual(current);
+    expect(state.error).toContain('desconocido');
+    const calls = vi.mocked(apiFetch).mock.calls.length;
+    await act(async () => state.submit('no_show', newer ? 'recording_error' : undefined));
+    expect(apiFetch).toHaveBeenCalledTimes(calls);
+    vi.mocked(apiFetch).mockResolvedValue({ ...receipt(command.requestId), replayed: true });
+    await act(async () => state.retryPending());
+    expect(vi.mocked(apiFetch).mock.calls.at(-1)?.[1]?.body).toBe(original[1]?.body);
+    expect(state.result?.applied.requestId).toBe(command.requestId);
+    expect(state.error).toBeNull();
+  });
+  it('history after a write deadline does not resolve the unknown receipt', async () => {
+    vi.mocked(apiFetch).mockImplementation((_path, init) => init?.method ? new Promise(() => {}) : Promise.resolve(history));
+    await mount(); await submit();
+    const body = vi.mocked(apiFetch).mock.calls[0][1]?.body;
+    await act(async () => vi.advanceTimersByTimeAsync(20_000));
+    await act(async () => state.loadHistory());
+    expect(state.error).toContain('desconocido');
+    vi.mocked(apiFetch).mockResolvedValue({ ...receipt(JSON.parse(String(body)).requestId), replayed: true });
+    await act(async () => state.retryPending());
+    expect(vi.mocked(apiFetch).mock.calls.at(-1)?.[1]?.body).toBe(body);
+  });
+  it('a delayed receipt keeps a newer representation revision with the same attendance revision', async () => {
+    const pending = deferred<unknown>();
+    const representationReview = { revision: 1, status: 'reviewed' as const, reviewedBy: 'owner', reviewedAt: appointment.reservedUntilAt + 1 };
+    vi.mocked(apiFetch).mockReturnValue(pending.promise);
+    await mount(); await submit();
+    const command = JSON.parse(String(vi.mocked(apiFetch).mock.calls[0][1]?.body));
+    const known = { ...receipt(command.requestId).appointment, representationReview };
+    await update({ ...input, appointment: known });
+    await act(async () => pending.resolve(receipt(command.requestId)));
+    expect(state.result?.appointment.representationReview).toEqual(representationReview);
+    expect(state.result?.appointment.attendance?.revision).toBe(1);
+  });
   it('strictEffectReplayKeepsTheCurrentScopeUsable', async () => { vi.mocked(apiFetch).mockResolvedValue(history); await act(async () => { tree = create(createElement(StrictMode, null, createElement(Consumer, input))); }); await act(async () => state.loadHistory()); expect(state.history).toEqual(history); });
   it('historyInitiallyClosedAndFetchesOnlyOnOpen', async () => { await mount(); expect(apiFetch).not.toHaveBeenCalled(); vi.mocked(apiFetch).mockResolvedValue(history); await act(async () => state.loadHistory()); expect(state.history).toEqual(history); expect(apiFetch).toHaveBeenCalledTimes(1); });
   it('unknownWriteKeepsExactCommandForManualRetry', async () => { vi.mocked(apiFetch).mockRejectedValue(new Error('network')); await mount(); await submit(); const call = vi.mocked(apiFetch).mock.calls[0]; expect(state.error).toContain('desconocido'); await act(async () => state.submit('no_show')); expect(apiFetch).toHaveBeenCalledTimes(1); vi.mocked(apiFetch).mockResolvedValue(receipt(JSON.parse(String(call[1]?.body)).requestId)); await act(async () => state.retryPending()); expect(vi.mocked(apiFetch).mock.calls[1][1]?.body).toBe(call[1]?.body); expect(state.result?.applied.status).toBe('completed'); });

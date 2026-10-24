@@ -19,6 +19,7 @@ import {
 } from "@/components/app-shell";
 import { useBusiness } from "@/hooks/useBusiness";
 import { useOwnerAgenda } from '@/hooks/use-owner-agenda';
+import { preserveNewerAppointmentResults } from '@/hooks/use-appointment-attendance';
 import { OwnerAgendaCalendar } from '@/components/owner-agenda-calendar';
 import { OwnerAgendaAppointments } from '@/components/owner-agenda-appointments';
 import { agendaToday, getOwnerAgendaRange, getOwnerAgendaResources, type OwnerAgendaMode } from '@/lib/owner-agenda';
@@ -66,6 +67,10 @@ function Agenda() {
   const agenda = useOwnerAgenda({ businessId: business?.id ?? null, ownerUid: user?.uid ?? null, range, enabled });
   const day = agenda.snapshot?.days.find(item => item.dateKey === date) ?? null;
   const appointments = day?.state === 'ready' ? day.appointments : [];
+  const appointmentSnapshots = useRef({ scope: actionScope, source: appointments, rows: new Map(appointments.map(item => [item.id, item])) });
+  if (appointmentSnapshots.current.scope !== actionScope || appointmentSnapshots.current.source !== appointments) {
+    appointmentSnapshots.current = { scope: actionScope, source: appointments, rows: new Map(appointments.map(item => [item.id, item])) };
+  }
   const resources = getOwnerAgendaResources(business?.resources ?? [], agenda.snapshot?.days ?? []);
   const rangeResolved = agenda.snapshot?.days.every(item => item.state !== 'error') ?? false;
   useEffect(() => {
@@ -221,7 +226,13 @@ function Agenda() {
       <div className="flex justify-end"><Link href="/dashboard/qr-kit" className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-sarin-blue underline-offset-4 hover:underline"><QrCode className="h-4 w-4" />Compartir mi QR</Link></div>
       <OwnerAgendaAppointments key={`${user?.uid}:${business.id}:${date}`} business={business} dateKey={date} day={day} resourceId={selectedResourceId} saving={combinedBusy} onAttendanceBusyChange={onAttendanceBusyChange} onCancel={id => void cancel(id)} onSaved={saved => {
         if (scopeRef.current !== actionScope || saved.tenantId !== business.id || saved.dateKey !== date || !appointments.some(item => item.id === saved.id && item.tenantId === saved.tenantId && item.dateKey === saved.dateKey)) return;
-        agenda.replaceAppointment(saved);
+        const latest = appointmentSnapshots.current;
+        if (latest.scope !== actionScope) return;
+        const known = latest.rows.get(saved.id);
+        const replacement = known ? preserveNewerAppointmentResults(saved, known) : saved;
+        // Update synchronously so two accepted responses in one render batch also compose.
+        latest.rows.set(saved.id, replacement);
+        agenda.replaceAppointment(replacement);
       }} />
 
       <details className="group rounded-2xl border border-sarin-line bg-sarin-paper">

@@ -32,3 +32,31 @@ it('conflictRefreshRequiresAnotherExplicitReview', async () => { const { ApiErro
 it('ownBusyDisabledPropDoesNotAbortPatchOrClearCommand', async () => { let finish!: (value: unknown) => void; vi.mocked(apiFetch).mockImplementation(() => new Promise(resolve => { finish = resolve; })); function Parent() { const [disabled, setDisabled] = useState(false); return createElement(AppointmentAttendanceControls, { ...props(), disabled, onBusyChange: value => { busy(value); setDisabled(value); } }); } await act(async () => { tree = create(createElement(Parent)); }); await click('Atendida'); await click('Confirmar resultado'); const call = vi.mocked(apiFetch).mock.calls[0], body = JSON.parse(String(call[1]?.body)); expect(busy).toHaveBeenCalledWith(true); expect(call[1]?.signal?.aborted).toBe(false); expect(apiFetch).toHaveBeenCalledTimes(1); await act(async () => finish({ appointment: { ...row, status: 'completed', attendance: { revision: 1, lastEventId: 'a'.repeat(64) } }, applied: { eventId: 'a'.repeat(64), requestId: body.requestId, revision: 1, status: 'completed', recordedAt: row.reservedUntilAt }, replayed: false })); expect(saved).toHaveBeenCalledTimes(1); expect(busy).toHaveBeenLastCalledWith(false); expect(apiFetch).toHaveBeenCalledTimes(1); });
 it('readyHistoryRemainsVisibleWhileBusyWithoutNewLoads', async () => { vi.mocked(apiFetch).mockResolvedValueOnce({ appointment: row, events: [], nextBeforeRevision: null }).mockReturnValue(new Promise(() => {})); await mount(); await openHistory(); await click('Atendida'); await click('Confirmar resultado'); expect(text(tree!.root)).toContain('Sin auditoría registrada'); expect(button('Actualizar historial').props.disabled).toBe(true); await click('Actualizar historial'); expect(apiFetch).toHaveBeenCalledTimes(2); });
 it('aNewerAppointmentMasksOlderSavedResultDuringReview', async () => { vi.mocked(apiFetch).mockImplementation(async (_path, init) => ({ appointment: { ...row, status: 'completed', attendance: { revision: 1, lastEventId: 'a'.repeat(64) } }, applied: { eventId: 'a'.repeat(64), requestId: JSON.parse(String(init?.body)).requestId, revision: 1, status: 'completed', recordedAt: row.reservedUntilAt }, replayed: false })); await mount(); await click('Atendida'); await click('Confirmar resultado'); await act(async () => tree!.update(createElement(AppointmentAttendanceControls, props({ ...row, status: 'no_show', attendance: { revision: 2, lastEventId: 'b'.repeat(64) } })))); await click('Corregir resultado'); expect(button('Atendida')).toBeDefined(); expect(button('No asistió')).toBeUndefined(); });
+it.each([
+  ['explicit', false], ['explicit', true], ['inflight', false], ['inflight', true],
+] as const)('unknown replay stays visible after %s history (newer=%s)', async (timing, newer) => {
+  let finishHistory!: (value: unknown) => void;
+  const history = new Promise<unknown>(resolve => { finishHistory = resolve; });
+  const eventId = 'a'.repeat(64);
+  const recorded = { ...row, status: 'completed', attendance: { revision: 1, lastEventId: eventId } };
+  const event = { schemaVersion: 1, businessId: 'business', appointmentId: 'one', actorUid: 'owner', requestId: 'history-request', requestFingerprint: eventId, sequence: 1, previousStatus: 'confirmed', status: 'completed', recordedAt: row.reservedUntilAt, reason: 'initial', legacyPreviousOutcome: false, source: { dateKey: row.dateKey, resourceId: row.resourceId, startAt: row.startAt, endAt: row.endAt, reservedUntilAt: row.reservedUntilAt, rescheduleRevision: 0 } };
+  vi.mocked(apiFetch).mockImplementation((_path, init) => init?.method ? Promise.reject(new Error('lost response')) : history);
+  await mount();
+  if (timing === 'inflight') await openHistory();
+  await click('Atendida'); await click('Confirmar resultado');
+  const original = vi.mocked(apiFetch).mock.calls.find(call => call[1]?.method)!;
+  if (timing === 'explicit') await openHistory();
+  await act(async () => finishHistory({ appointment: newer ? recorded : row, events: newer ? [event] : [], nextBeforeRevision: null }));
+  expect(button('Reintentar comprobación')).toBeDefined();
+  expect(saved).not.toHaveBeenCalled();
+  const action = button(newer ? 'Corregir resultado' : 'Atendida');
+  expect(action.props.disabled).toBe(true);
+  await act(async () => action.props.onClick());
+  expect(button('Confirmar resultado')).toBeUndefined();
+  vi.mocked(apiFetch).mockResolvedValue({ appointment: recorded, applied: { eventId, requestId: JSON.parse(String(original[1]?.body)).requestId, revision: 1, status: 'completed', recordedAt: row.reservedUntilAt }, replayed: true });
+  await click('Reintentar comprobación');
+  const calls = vi.mocked(apiFetch).mock.calls.filter(call => call[1]?.method);
+  expect(calls).toHaveLength(2);
+  expect(calls[1][1]?.body).toBe(original[1]?.body);
+  expect(saved).toHaveBeenCalledExactlyOnceWith(recorded);
+});

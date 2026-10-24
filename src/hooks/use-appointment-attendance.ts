@@ -26,6 +26,26 @@ const INVALID = 'No se pudo comprobar el resultado.';
 function matches(appointment: { id: string; tenantId: string; dateKey: string }, scope: AttendanceScope) {
   return appointment.id === scope.appointmentId && appointment.tenantId === scope.businessId && appointment.dateKey === scope.dateKey;
 }
+
+/** Full responses may arrive out of order for these independently versioned results. */
+export function preserveNewerAppointmentResults(saved: Appointment, known: Appointment): Appointment {
+  const sameOccurrence = saved.id === known.id && saved.tenantId === known.tenantId && saved.dateKey === known.dateKey
+    && saved.type === known.type && saved.resourceId === known.resourceId
+    && saved.startAt === known.startAt && saved.endAt === known.endAt && saved.reservedUntilAt === known.reservedUntilAt
+    && (saved.rescheduleRevision ?? 0) === (known.rescheduleRevision ?? 0);
+  if (!sameOccurrence) return saved;
+
+  const version = (value: number | undefined) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  const newerAttendance = !!known.attendance && version(known.attendance.revision) > version(saved.attendance?.revision);
+  const newerRepresentation = !!known.representationReview && version(known.representationReview.revision) > version(saved.representationReview?.revision);
+  if (!newerAttendance && !newerRepresentation) return saved;
+  return {
+    ...saved,
+    ...(newerAttendance ? { status: known.status, attendance: known.attendance } : {}),
+    ...(newerRepresentation ? { representationReview: known.representationReview } : {}),
+  };
+}
+
 function parseUpdate(value: unknown, scope: AttendanceScope, command: AttendanceCommand): AttendanceUpdateResult {
   const result = updateSchema.parse(value);
   if (!matches(result.appointment, scope) || result.applied.requestId !== command.requestId || result.applied.status !== command.status
@@ -107,9 +127,11 @@ export function useAppointmentAttendance({ scope, appointment, enabled }: { scop
         () => active() && !controller.signal.aborted, status => denied(status, controller)));
       if (!active() || controller.signal.aborted) return null;
       const result = parseUpdate(response, scope, pending.command);
-      // A slow response can arrive after the agenda has already observed a later correction.
+      // Keep independently newer decisions already observed while this response was delayed.
       const known = appointmentSchema.safeParse(current.appointment);
-      if (known.success && matches(known.data, scope) && (known.data.attendance?.revision ?? 0) > (result.appointment.attendance?.revision ?? 0)) result.appointment = known.data as Appointment;
+      if (known.success && matches(known.data, scope)) {
+        result.appointment = preserveNewerAppointmentResults(result.appointment, known.data as Appointment);
+      }
       current.pending = null; current.appointment = result.appointment; current.result = result; current.blocked = false;
       current.historyVersion++; current.read?.abort(); current.read = null; current.history = null; current.historyLoading = false; current.historyError = null;
       publish(); return result;
@@ -148,7 +170,10 @@ export function useAppointmentAttendance({ scope, appointment, enabled }: { scop
       if (beforeRevision !== undefined && previous?.events.length && page.events.length
         && previous.events[previous.events.length - 1].previousStatus !== page.events[0].status) throw new Error(INVALID);
       current.history = beforeRevision === undefined ? page : { ...page, events: [...(previous?.events ?? []), ...page.events] };
-      current.appointment = page.appointment; current.blocked = false; current.error = null;
+      current.appointment = page.appointment;
+      current.blocked = false;
+      // A history snapshot cannot resolve the receipt for a previously sent command.
+      if (!current.pending) current.error = null;
     } catch (cause) {
       if (active() && current.historyVersion === version) { current.historyError = cause instanceof z.ZodError ? INVALID : errorMessage(cause); if (cause instanceof ApiError && [401, 403].includes(cause.status)) current.history = null; }
     } finally {
