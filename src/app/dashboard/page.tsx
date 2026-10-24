@@ -56,9 +56,13 @@ function Agenda() {
   const day = agenda.snapshot?.days.find(item => item.dateKey === date) ?? null;
   const appointments = day?.state === 'ready' ? day.appointments : [];
   const resources = getOwnerAgendaResources(business?.resources ?? [], agenda.snapshot?.days ?? []);
+  const rangeResolved = agenda.snapshot?.days.every(item => item.state !== 'error') ?? false;
   useEffect(() => {
-    if (mode === 'week' && !resources.some(item => item.id === selectedResourceId)) setSelectedResourceId(resources[0]?.id ?? null);
-  }, [ownerKey, mode, selectedResourceId, resources.map(item => item.id).join('\0')]);
+    if (resources.some(item => item.id === selectedResourceId)) return;
+    if (mode === 'week') {
+      if (selectedResourceId === null || rangeResolved) setSelectedResourceId(resources[0]?.id ?? null);
+    } else if (selectedResourceId !== null && day?.state === 'ready') setSelectedResourceId(null);
+  }, [ownerKey, mode, selectedResourceId, resources.map(item => item.id).join('\0'), day?.state, rangeResolved]);
   useEffect(() => {
     setError(null); setSaving(false); setBlockStart(''); setBlockEnd(''); setResource('');
     return () => {

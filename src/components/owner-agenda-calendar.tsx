@@ -26,6 +26,10 @@ export function OwnerAgendaCalendar({ business, mode, selectedDate, resourceId, 
   }, [selectedDate]);
   const days = error ? [] : snapshot?.days ?? [];
   const resources = getOwnerAgendaResources(business.resources, days);
+  if (resourceId !== null && !resources.some(resource => resource.id === resourceId)) {
+    const known = business.resources.find(resource => resource.id === resourceId);
+    resources.push({ id: resourceId, label: known ? `${known.name} · Inactivo` : `Recurso no disponible · ${resourceId}`, kind: known ? 'inactive' : 'unknown' });
+  }
   const visibleResources = resources.filter(resource => resourceId === null || resource.id === resourceId);
   const layouts = days.map(day => day.state === 'ready' ? getOwnerAgendaDayLayout(day.dateKey, day.appointments) : { blocks: [], warnings: {} });
   const scale = range ? getOwnerAgendaScale(business.weeklySchedule, range, layouts) : { startMinute: 480, endMinute: 1080 };
@@ -68,7 +72,7 @@ export function OwnerAgendaCalendar({ business, mode, selectedDate, resourceId, 
           const day = days.find(day => day.dateKey === column.dateKey);
           const rows = day?.state === 'ready' ? day.appointments.filter(item => !column.resource || item.resourceId === column.resource.id) : [];
           const outside = range.outsideDates.includes(column.dateKey) || day?.state === 'outside';
-          const state = outside ? 'Fuera del rango consultable' : day?.state === 'error' ? `No pudimos cargar este día · ${day.message}` : day?.state === 'ready' ? `${rows.length} registros · ${rows.filter(item => item.status === 'confirmed').length} confirmados` : 'Cargando este día…';
+          const state = outside ? 'Fuera del rango consultable' : day?.state === 'error' ? day.message === 'No pudimos cargar este día' ? day.message : `No pudimos cargar este día · ${day.message}` : day?.state === 'ready' ? `${rows.length} registros · ${rows.filter(item => item.status === 'confirmed').length} confirmados` : 'Cargando este día…';
           return <div key={`${column.dateKey}:${column.resource?.id ?? index}`} className="min-w-0 flex-1 basis-44 rounded-xl border border-sarin-line bg-white p-3 text-xs"><p className="break-words font-medium [overflow-wrap:anywhere]">{mode === 'week' ? dayLabel(column.dateKey) : column.resource?.label}</p><p className="mt-1 leading-5 text-sarin-muted">{state}</p>{mode === 'week' && <button type="button" data-agenda-day={true} aria-pressed={selectedDate === column.dateKey} disabled={busy || outside} onClick={() => selectDay(column.dateKey)} className="mt-2 min-h-11 rounded-lg px-2 py-2 text-left font-medium text-sarin-blue outline-none hover:bg-sarin-soft focus-visible:ring-2 focus-visible:ring-sarin-blue disabled:opacity-50">Ver citas · {dayLabel(column.dateKey)}</button>}</div>;
         })}</div>
         {mode === 'week' && !resourceId && <p className="text-sm text-sarin-muted">No hay un recurso seleccionado para mostrar su ocupación semanal.</p>}

@@ -27,7 +27,7 @@ export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, sa
     </div>
     {!validDate ? <p className="py-6 text-sm text-sarin-muted">Elige el día que quieres revisar.</p>
       : !day ? <p role="status" className="py-6 text-sm text-sarin-muted">Cargando citas del día…</p>
-        : day.state === 'error' ? <div role="status" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><p className="font-medium">No pudimos cargar este día</p><p className="mt-1">{day.message}</p></div>
+        : day.state === 'error' ? <div role="status" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><p className="font-medium">No pudimos cargar este día</p>{day.message !== 'No pudimos cargar este día' && <p className="mt-1">{day.message}</p>}</div>
           : day.state === 'outside' ? <p className="rounded-xl border border-sarin-line bg-sarin-canvas p-4 text-sm text-sarin-muted">Fuera del rango consultable</p>
             : !selected.length ? <div className="rounded-2xl border border-dashed border-sarin-line px-5 py-8 text-center"><p className="font-medium">Sin registros para este día{resourceId ? ' y recurso' : ''}.</p><p className="mt-2 text-sm text-sarin-muted">Todavía no hay citas ni bloqueos registrados en esta selección.</p></div>
               : <ol className="space-y-3">{selected.map(appointment => {

@@ -73,6 +73,18 @@ it('partialDayHasErrorNotZero', async () => {
   expect(content(root())).not.toContain('Todavía no hay');
 });
 
+it.each(['No pudimos cargar este día', 'La consulta de este día tardó demasiado. Actualiza para intentarlo de nuevo', 'La agenda cambió; actualiza'])('dailyFailureUsesOneHeadingAndPreservesSpecificDetails: %s', async message => {
+  const day: OwnerAgendaDay = { dateKey: dates[0], state: 'error', message };
+  await calendar({ resourceId: 'a', snapshot: { days: [day], checkedAt: 1 } });
+  const summary = root().findByProps({ 'aria-label': 'Resumen de ocupación' });
+  expect(content(summary).split('No pudimos cargar este día')).toHaveLength(2);
+  if (message !== 'No pudimos cargar este día') expect(content(summary)).toContain(message);
+  await act(async () => renderer?.unmount()); await list(day);
+  const failure = root().findByProps({ role: 'status' });
+  expect(content(failure).split('No pudimos cargar este día')).toHaveLength(2);
+  if (message !== 'No pudimos cargar este día') expect(content(failure)).toContain(message);
+});
+
 it('outsideDayDoesNotClaimEmpty', async () => {
   await list({ dateKey: dates[0], state: 'outside' });
   expect(content(root())).toContain('Fuera del rango consultable');

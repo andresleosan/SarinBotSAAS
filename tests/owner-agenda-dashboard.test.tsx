@@ -70,6 +70,31 @@ describe('owner agenda dashboard integration', () => {
   it('scopeChangeAbortsDashboardMutationAndMasksDetails', async () => { const pending = deferred<unknown>(); await mount(); const read = state.api.getMockImplementation()!; state.api.mockImplementation((path, init) => init?.method ? pending.promise : read(path, init)); await click('Cancelar cita'); const call = writes()[0]; state.user = { uid: 'other-owner' }; await update(); expect(call[1].signal.aborted).toBe(true); expect(call[3]()).toBe(false); expect(content(renderer.root)).not.toContain('Cliente sintético'); await act(async () => pending.reject(new Error('Error privado anterior'))); expect(content(renderer.root)).not.toContain('Error privado anterior'); });
   it('masksAnExistingMutationErrorDuringTheFirstRenderOfAnotherBusiness', async () => { await mount(); state.api.mockRejectedValue(new Error('Error privado anterior')); await click('Cancelar cita'); expect(content(renderer.root)).toContain('Error privado anterior'); state.business = { ...state.business!, id: 'other-business' }; await update(); expect(state.notices.filter(notice => notice.businessId === 'other-business').map(notice => notice.message)).not.toContain('Error privado anterior'); });
   it('anotherBusinessDoesNotInheritThePreviousResourceFilter', async () => { await mount(); await act(async () => resource().props.onChange({ target: { value: 'active' } })); state.business = { ...state.business!, id: 'other-business', resources: [{ id: 'other-resource', name: 'Otro recurso', active: true }] }; state.api.mockResolvedValue({ appointments: [fixture('2026-10-20', { tenantId: 'other-business', resourceId: 'other-resource' })] }); await update(); expect(resource().props.value).toBe(''); expect(content(renderer.root)).not.toContain('Recurso no disponible · active'); });
+  it.each(['retired', 'removed'])('missingHistoricalDayFilterResetsOnlyAfterTheNewDayIsReady %s', async resourceId => {
+    state.api.mockResolvedValue({ appointments: [fixture('2026-10-20', { resourceId })] }); await mount(); await act(async () => resource().props.onChange({ target: { value: resourceId } }));
+    const pending = deferred<unknown>(); state.api.mockReturnValue(pending.promise); await changeDate('2026-10-21');
+    expect(resource().props.value).toBe(resourceId); expect(resource().findAllByType('option').map(node => node.props.value)).toContain(resourceId);
+    await act(async () => pending.resolve({ appointments: [fixture('2026-10-21', { serviceName: 'Cita del nuevo día' })] }));
+    expect(resource().props.value).toBe(''); expect(content(renderer.root)).toContain('Cita del nuevo día'); expect(renderer.root.findAllByProps({ 'data-agenda-service': 'demo-2026-10-21' })).toHaveLength(1);
+  });
+  it('historicalDayFilterSurvivesLoadingWhenTheNewDayAlsoHasThatResource', async () => {
+    state.api.mockResolvedValue({ appointments: [fixture('2026-10-20', { resourceId: 'retired' })] }); await mount(); await act(async () => resource().props.onChange({ target: { value: 'retired' } }));
+    const pending = deferred<unknown>(); state.api.mockReturnValue(pending.promise); await changeDate('2026-10-21'); expect(resource().props.value).toBe('retired');
+    await act(async () => pending.resolve({ appointments: [fixture('2026-10-21', { resourceId: 'retired' })] })); expect(resource().props.value).toBe('retired'); expect(content(renderer.root)).toContain('Servicio sintético');
+  });
+  it('weekToDayReconcilesHistoricalSelectionAfterItsSelectedDayLoads', async () => {
+    state.api.mockImplementation(async (path: string) => { const dateKey = new URL(path, 'https://example.invalid').searchParams.get('date')!; return { appointments: [fixture(dateKey, { resourceId: dateKey === '2026-10-20' ? 'retired' : 'active' })] }; });
+    await mount(); await act(async () => resource().props.onChange({ target: { value: 'retired' } })); await click('Semana'); await changeDate('2026-10-21');
+    const pending = deferred<unknown>(); state.api.mockReturnValue(pending.promise); await click('Día'); expect(resource().props.value).toBe('retired'); expect(resource().findAllByType('option').map(node => node.props.value)).toContain('retired');
+    await act(async () => pending.resolve({ appointments: [fixture('2026-10-21', { serviceName: 'Solo recurso activo' })] })); expect(resource().props.value).toBe(''); expect(content(renderer.root)).toContain('Solo recurso activo');
+  });
+  it('weeklyHistoricalSelectionIsNotDiscardedWhileTheNewRangeLoads', async () => {
+    state.api.mockImplementation(async (path: string) => { const dateKey = new URL(path, 'https://example.invalid').searchParams.get('date')!; return { appointments: [fixture(dateKey, { resourceId: 'retired' })] }; });
+    await mount(); await act(async () => resource().props.onChange({ target: { value: 'retired' } })); await click('Semana');
+    const pending = deferred<unknown>(); state.api.mockImplementation((path: string) => pending.promise.then(() => { const dateKey = new URL(path, 'https://example.invalid').searchParams.get('date')!; return { appointments: [fixture(dateKey, { resourceId: 'retired' })] }; }));
+    await click('Siguiente'); expect(resource().props.value).toBe('retired'); expect(resource().findAllByType('option').map(node => node.props.value)).toContain('retired');
+    await act(async () => pending.resolve(null)); expect(resource().props.value).toBe('retired');
+  });
   it('selectingAnotherDayWithinTheWeekReusesReadsAndPoliciesUseOnlyThatDay', async () => {
     state.api.mockImplementation(async (path: string) => { const dateKey = new URL(path, 'https://example.invalid').searchParams.get('date')!; return { appointments: [fixture(dateKey, { client: { uid: `client-${dateKey}`, name: dateKey } as Appointment['client'] })] }; });
     await mount(); await click('Semana'); expect(reads()).toHaveLength(8); await changeDate('2026-10-21'); expect(reads()).toHaveLength(8); expect(renderer.root.findByType(ClientPolicyControls).props.clients).toEqual([{ uid: 'client-2026-10-21', name: '2026-10-21' }]);
