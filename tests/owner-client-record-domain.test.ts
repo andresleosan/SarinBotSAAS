@@ -16,7 +16,7 @@ const item = (id: string, patch: Partial<Appointment> = {}) => make({ id, startA
 function scenario(appointments = [item('A')]) {
   const memory = memoryFirestore({
     [`businesses/${businessId}`]: { id: businessId, ownerUid: owner.uid, resources, subscription: { status: 'expired' } },
-    [`${collection}/${sourceId}`]: item(sourceId, { startAt: start - 100000 }),
+    [`${collection}/${sourceId}`]: { ...item(sourceId, { startAt: start - 100000 }) },
     ...Object.fromEntries(appointments.map(appointment => [`${collection}/${appointment.id}`, appointment])),
   });
   return { ...memory, db: memory.db as unknown as Database };

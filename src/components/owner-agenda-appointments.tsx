@@ -10,9 +10,10 @@ export type OwnerAgendaAppointmentsProps = {
   business: Business; dateKey: string; day: OwnerAgendaDay | null; resourceId: string | null; saving: boolean;
   onAttendanceBusyChange: (appointmentId: string, busy: boolean) => void;
   onCancel: (appointmentId: string) => void; onSaved: (saved: Appointment) => void;
+  onOpenClientRecord: (appointment: Appointment) => void;
 };
 
-export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, saving, onCancel, onSaved, onAttendanceBusyChange }: OwnerAgendaAppointmentsProps) {
+export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, saving, onCancel, onSaved, onAttendanceBusyChange, onOpenClientRecord }: OwnerAgendaAppointmentsProps) {
   const appointments = day?.state === 'ready' ? day.appointments : [];
   const resources = getOwnerAgendaResources(business.resources, day ? [day] : []);
   const warnings = getOwnerAgendaDayLayout(dateKey, appointments).warnings;
@@ -40,7 +41,7 @@ export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, sa
                 const resource = resources.find(item => item.id === appointment.resourceId)?.label ?? `Recurso no disponible · ${appointment.resourceId}`;
                 const cardContext = { appointmentId: appointment.id, dateKey, businessId: business.id };
                 return <li key={appointment.id} className="min-w-0">
-                  <details className={'group rounded-2xl border border-sarin-line ' + (blocked ? 'bg-sarin-canvas' : 'bg-white')}>
+                  <details data-owner-appointment-id={appointment.id} data-owner-appointment-business={business.id} data-owner-appointment-date={dateKey} className={'group rounded-2xl border border-sarin-line ' + (blocked ? 'bg-sarin-canvas' : 'bg-white')}>
                     <summary className="min-h-11 cursor-pointer rounded-2xl p-4 outline-none focus-visible:ring-2 focus-visible:ring-sarin-blue sm:p-5">
                       <span className="ml-1 inline-flex max-w-[calc(100%_-_1.5rem)] flex-wrap items-start gap-x-4 gap-y-2 align-top">
                         <span className="shrink-0 tabular-nums text-sm font-semibold">{appointment.startTimeStr || 'Hora sin registrar'}–{appointment.endTimeStr || 'sin registrar'}</span>
@@ -51,6 +52,7 @@ export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, sa
                     <div className="space-y-3 border-t border-sarin-line px-4 py-4 text-sm sm:px-5">
                       {Object.hasOwn(warnings, appointment.id) && warnings[appointment.id].map(warning => <p key={warning} className="text-amber-800">{warning}</p>)}
                       {appointment.client && <div className="space-y-1"><p className="break-words text-sarin-ink">{appointment.client.name}</p><p className="break-all text-xs text-sarin-muted">{appointment.client.phone || appointment.client.email}</p></div>}
+                      {!blocked && typeof appointment.client?.uid === 'string' && appointment.client.uid.length >= 1 && appointment.client.uid.length <= 128 && !/[\x00-\x1f\x7f]/.test(appointment.client.uid) && <button type="button" disabled={saving} onClick={() => { if (!saving) onOpenClientRecord(appointment); }} className="min-h-11 rounded-xl border border-sarin-line px-4 py-2 text-xs font-medium text-sarin-blue transition hover:bg-sarin-soft disabled:opacity-50">Reservas de esta cuenta</button>}
                       {!blocked && <p className="break-words [overflow-wrap:anywhere]">{appointment.beneficiary?.kind === 'represented_minor' ? <>Para: {appointment.beneficiary.displayName} · Gestionada por {appointment.client?.name || 'la cuenta reservante'}</> : appointment.beneficiary?.kind === 'self' ? <>Para la persona que reserva · Gestionada por {appointment.client?.name || 'la cuenta reservante'}</> : 'Registro anterior sin beneficiario declarado'}</p>}
                       <RepresentationReviewControls businessId={business.id} appointment={appointment} onSaved={saved => {
                         if (saved.id === cardContext.appointmentId && saved.dateKey === cardContext.dateKey && saved.tenantId === cardContext.businessId) onSaved(saved);

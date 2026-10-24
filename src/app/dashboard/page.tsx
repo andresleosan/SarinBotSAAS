@@ -22,6 +22,8 @@ import { useOwnerAgenda } from '@/hooks/use-owner-agenda';
 import { preserveNewerAppointmentResults } from '@/hooks/use-appointment-attendance';
 import { OwnerAgendaCalendar } from '@/components/owner-agenda-calendar';
 import { OwnerAgendaAppointments } from '@/components/owner-agenda-appointments';
+import { OwnerClientRecordPanel } from '@/components/owner-client-record-panel';
+import type { OwnerClientRecordScope } from '@/hooks/use-owner-client-record';
 import { agendaToday, getOwnerAgendaRange, getOwnerAgendaResources, type OwnerAgendaMode } from '@/lib/owner-agenda';
 import { apiFetch, errorMessage } from "@/lib/client/api";
 import { isSubscriptionAllowed } from "@/lib/sarin/subscription";
@@ -46,6 +48,13 @@ function Agenda() {
   const scopeRef = useRef({ key: scope });
   if (scopeRef.current.key !== scope) scopeRef.current = { key: scope };
   const actionScope = scopeRef.current;
+  type RecordSelection = { authority: typeof actionScope; scope: OwnerClientRecordScope; invalidation: number };
+  const [recordSelection, setRecordSelection] = useState<RecordSelection | null>(null);
+  const recordSelectionRef = useRef<RecordSelection | null>(null);
+  const navigationOwner = JSON.stringify([user?.uid, business?.id, authEpoch, enabled]);
+  const [recordNavigation, setRecordNavigation] = useState<{ owner: string; appointmentId: string; dateKey: string } | null>(null);
+  const navigationGeneration = useRef({ target: recordNavigation, scope: actionScope });
+  if (navigationGeneration.current.target !== recordNavigation) navigationGeneration.current = { target: recordNavigation, scope: actionScope };
   const actionRequest = useRef<AbortController | null>(null);
   const [actionError, setActionError] = useState<{ scope: typeof actionScope; message: string } | null>(null);
   const setError = (message: string | null) => setActionError(message === null ? null : { scope: actionScope, message });
@@ -71,6 +80,30 @@ function Agenda() {
   if (appointmentSnapshots.current.scope !== actionScope || appointmentSnapshots.current.source !== appointments) {
     appointmentSnapshots.current = { scope: actionScope, source: appointments, rows: new Map(appointments.map(item => [item.id, item])) };
   }
+  const recordSource = recordSelection?.authority === actionScope && enabled ? appointments.find(item => item.id === recordSelection.scope.sourceAppointmentId && item.tenantId === recordSelection.scope.businessId && item.dateKey === recordSelection.scope.dateKey && item.type === 'appointment' && item.client?.uid === recordSelection.scope.clientUid) : undefined;
+  const selectedRecord = recordSource ? recordSelection : null;
+  // Mask a departed scope/source during render; an earlier private page cannot return on a later visit.
+  recordSelectionRef.current = selectedRecord;
+  useEffect(() => { if (recordSelection && !selectedRecord) setRecordSelection(null); }, [recordSelection, selectedRecord]);
+  const invalidateRecord = (known: Appointment) => {
+    const selected = recordSelectionRef.current;
+    if (!selected || selected.authority !== actionScope || known.client?.uid !== selected.scope.clientUid) return;
+    const next = { ...selected, invalidation: selected.invalidation + 1 };
+    recordSelectionRef.current = next;
+    setRecordSelection(next);
+  };
+  const activeNavigation = recordNavigation?.owner === navigationOwner && recordNavigation.dateKey === date && mode === 'day' ? recordNavigation : null;
+  useEffect(() => {
+    if (!recordNavigation) return;
+    if (!activeNavigation || navigationGeneration.current.scope !== actionScope) { setRecordNavigation(null); return; }
+    if (agenda.loading || day?.state !== 'ready') return;
+    const canonical = appointments.find(item => item.id === activeNavigation.appointmentId && item.tenantId === business?.id && item.dateKey === date);
+    if (canonical) {
+      const card = Array.from(document.querySelectorAll<HTMLDetailsElement>('[data-owner-appointment-id]')).find(node => node.dataset.ownerAppointmentId === canonical.id && node.dataset.ownerAppointmentBusiness === canonical.tenantId && node.dataset.ownerAppointmentDate === canonical.dateKey);
+      if (card) { card.open = true; card.querySelector<HTMLElement>('summary')?.focus(); }
+    } else setError('La cita ya no está en este día. Puede haber cambiado; actualiza la agenda.');
+    setRecordNavigation(null);
+  }, [recordNavigation, activeNavigation, actionScope, agenda.loading, day, appointments, business?.id, date]);
   const resources = getOwnerAgendaResources(business?.resources ?? [], agenda.snapshot?.days ?? []);
   const rangeResolved = agenda.snapshot?.days.every(item => item.state !== 'error') ?? false;
   useEffect(() => {
@@ -124,6 +157,8 @@ function Agenda() {
       if (!currentAction(controller)) return;
       const saved = response?.appointment;
       if (!saved || saved.id !== appointmentId || saved.tenantId !== business.id || saved.dateKey !== date || !['cancelled_by_owner', 'cancelled_by_client', 'completed', 'no_show'].includes(saved.status)) throw new Error('No se pudo comprobar el resultado. Actualiza la agenda.');
+      const known = appointmentSnapshots.current.scope === actionScope ? appointmentSnapshots.current.rows.get(appointmentId) : undefined;
+      if (known) invalidateRecord(known);
       agenda.refresh();
     } catch (cause) {
       if (currentAction(controller)) setError(errorMessage(cause));
@@ -224,7 +259,15 @@ function Agenda() {
         onResourceChange={value => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setSelectedResourceId(value); }}
         onRefresh={() => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) agenda.refresh(); }} />
       <div className="flex justify-end"><Link href="/dashboard/qr-kit" className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-sarin-blue underline-offset-4 hover:underline"><QrCode className="h-4 w-4" />Compartir mi QR</Link></div>
-      <OwnerAgendaAppointments key={`${user?.uid}:${business.id}:${date}`} business={business} dateKey={date} day={day} resourceId={selectedResourceId} saving={combinedBusy} onAttendanceBusyChange={onAttendanceBusyChange} onCancel={id => void cancel(id)} onSaved={saved => {
+      <OwnerAgendaAppointments key={`${user?.uid}:${business.id}:${date}`} business={business} dateKey={date} day={day} resourceId={selectedResourceId} saving={combinedBusy} onAttendanceBusyChange={onAttendanceBusyChange} onCancel={id => void cancel(id)} onOpenClientRecord={appointment => {
+        if (scopeRef.current !== actionScope || !enabled || actionRequest.current || pendingAttendance() || !user || !business) return;
+        const known = appointmentSnapshots.current.scope === actionScope ? appointmentSnapshots.current.rows.get(appointment.id) : undefined;
+        const uid = known?.client?.uid;
+        if (known !== appointment || known.type !== 'appointment' || known.tenantId !== business.id || known.dateKey !== date || typeof uid !== 'string' || uid.length < 1 || uid.length > 128 || /[\x00-\x1f\x7f]/.test(uid)) return;
+        const next = { authority: actionScope, scope: { businessId: business.id, ownerUid: user.uid, dateKey: date, sourceAppointmentId: known.id, clientUid: uid }, invalidation: 0 };
+        recordSelectionRef.current = next;
+        setRecordSelection(next);
+      }} onSaved={saved => {
         if (scopeRef.current !== actionScope || saved.tenantId !== business.id || saved.dateKey !== date || !appointments.some(item => item.id === saved.id && item.tenantId === saved.tenantId && item.dateKey === saved.dateKey)) return;
         const latest = appointmentSnapshots.current;
         if (latest.scope !== actionScope) return;
@@ -232,8 +275,20 @@ function Agenda() {
         const replacement = known ? preserveNewerAppointmentResults(saved, known) : saved;
         // Update synchronously so two accepted responses in one render batch also compose.
         latest.rows.set(saved.id, replacement);
+        if (known) invalidateRecord(known);
         agenda.replaceAppointment(replacement);
       }} />
+      {selectedRecord && <OwnerClientRecordPanel scope={selectedRecord.scope} contextName={recordSource?.client?.name} disabled={combinedBusy} invalidation={selectedRecord.invalidation} onClose={() => {
+        if (recordSelectionRef.current !== selectedRecord) return;
+        recordSelectionRef.current = null;
+        setRecordSelection(null);
+      }} onOpenAppointment={target => {
+        if (scopeRef.current !== actionScope || recordSelectionRef.current !== selectedRecord || !enabled || actionRequest.current || pendingAttendance()) return;
+        recordSelectionRef.current = null;
+        setRecordSelection(null);
+        setRecordNavigation({ owner: navigationOwner, appointmentId: target.appointmentId, dateKey: target.dateKey });
+        setMode('day'); setDate(target.dateKey); setSelectedResourceId(null);
+      }} />}
 
       <details className="group rounded-2xl border border-sarin-line bg-sarin-paper">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">

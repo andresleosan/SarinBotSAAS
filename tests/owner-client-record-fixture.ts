@@ -7,7 +7,7 @@ export const ownerClientRecordResources: TenantResource[] = [
   { id: 'demo-chair', name: 'Demo resource', active: true },
   { id: 'demo-inactive', name: 'Previous demo resource', active: false },
 ];
-export const ownerClientRecordAppointment: Appointment = {
+export const ownerClientRecordAppointment = {
   id: 'demo-record-appointment', tenantId: ownerClientRecordBusinessId, dateKey: '2030-01-07',
   startAt: 1894024800000, endAt: 1894026600000, reservedUntilAt: 1894027500000,
   startTimeStr: '09:00', endTimeStr: '09:30', type: 'appointment', status: 'confirmed',
@@ -18,7 +18,7 @@ export const ownerClientRecordAppointment: Appointment = {
   subjectAuthorization: { receiptId: 'demo-receipt', bookingRequestId: 'demo-booking-request', policyRevision: 1 },
   representationReview: { revision: 1, status: 'reviewed', reviewedBy: 'demo-owner', reviewedAt: 1894020000000 },
   createdBy: 'sarin_client', createdAt: 1893938400000,
-};
+} satisfies Appointment;
 export function makeOwnerClientRecordAppointment(overrides: Partial<Appointment> = {}): Appointment {
   return { ...structuredClone(ownerClientRecordAppointment), ...overrides };
 }

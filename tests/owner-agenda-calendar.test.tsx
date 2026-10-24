@@ -31,7 +31,7 @@ async function calendar(extra: Partial<Props> = {}) {
   await act(async () => { renderer = create(createElement(OwnerAgendaCalendar, props)); });
 }
 async function list(day: OwnerAgendaDay | null = ready(), extra: Partial<Parameters<typeof OwnerAgendaAppointments>[0]> = {}) {
-  await act(async () => { renderer = create(createElement(OwnerAgendaAppointments, { business, dateKey: dates[0], day, resourceId: null, saving: false, onAttendanceBusyChange: vi.fn(), onCancel: vi.fn(), onSaved: vi.fn(), ...extra })); });
+  await act(async () => { renderer = create(createElement(OwnerAgendaAppointments, { business, dateKey: dates[0], day, resourceId: null, saving: false, onAttendanceBusyChange: vi.fn(), onCancel: vi.fn(), onSaved: vi.fn(), onOpenClientRecord: vi.fn(), ...extra })); });
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -119,7 +119,7 @@ it('cancelledRowsRetainStatusWithoutChartBlock', async () => {
   await act(async () => renderer?.unmount());
   await list(ready([cancelled]));
   expect(content(root())).toContain('Cancelada por negocio');
-  expect(root().findAllByType('button')).toHaveLength(0);
+  expect(root().findAllByType('button').map(content)).toEqual(['Reservas de esta cuenta']);
 });
 
 it('smallEventsHaveFullListDetails', async () => {
@@ -198,7 +198,7 @@ it('unknownStatusAndInvalidTimesStayExplicitInList', async () => {
   await list(ready([{ ...source, status: 'legacy' as Appointment['status'], startAt: NaN }]));
   expect(content(root())).toContain('Estado sin reconocer');
   expect(content(root())).toContain('Horario no verificable');
-  expect(root().findAllByType('button')).toHaveLength(0);
+  expect(root().findAllByType('button').map(content)).toEqual(['Reservas de esta cuenta']);
 });
 
 it('navigationUsesModeAndPreservesBlankDateWithoutInventingRequests', async () => {
