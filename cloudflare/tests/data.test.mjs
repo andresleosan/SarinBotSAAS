@@ -25,6 +25,28 @@ async function fixture(context) {
 }
 const isError = code => error => error.code === code && !/private-payload/.test(error.message);
 
+test('attendance events use the private business child with exact paths and bounded typed queries', async context => {
+  const env = await fixture(context);
+  const migration = readFileSync(new URL('../migrations/0007_appointment_attendance.sql', import.meta.url), 'utf8').replace(/^--.*$/gm, '').replace(/\r?\n/g, ' ');
+  await env.SARIN_DB.exec(migration);
+  await env.SARIN_DB.exec(migration);
+  const path = 'businesses/demo-attendance/attendanceEvents/demo-event';
+  const event = { appointmentId: 'demo-appointment', sequence: 1, status: 'completed' };
+  await executeDataCommand(commit(0, [set(path, event)]), env);
+  assert.deepEqual((await executeDataCommand(read(path), env)).documents, [{ path, data: event }]);
+  const result = await executeDataCommand(query('businesses/demo-attendance/attendanceEvents',
+    [{ field: 'appointmentId', op: '==', value: 'demo-appointment' }, { field: 'sequence', op: '<', value: 2 }],
+    [{ field: 'sequence', direction: 'desc' }], 21), env);
+  assert.deepEqual(result.documents, [{ path, data: event }]);
+  assert.deepEqual((await executeDataCommand(query('businesses/demo-other/attendanceEvents'), env)).documents, []);
+  const noAccess = new Proxy({}, { get() { assert.fail('Invalid attendance command accessed storage.'); } });
+  for (const command of [read(path + '/nested/secret'), query(path + '/nested'), read('attendanceEvents/demo-event'),
+    read('businesses/demo-attendance/unknownEvents/demo-event'), query('businesses/demo-attendance/attendanceEvents', [{ field: 'sequence', op: '<', value: '2' }]),
+    commit(1, [set(path, { payload: 'é'.repeat(524288) })])]) {
+    await assert.rejects(executeDataCommand(command, noAccess), error => ['DATA_INVALID', 'DATA_LIMIT'].includes(error.code));
+  }
+});
+
 test('reads a missing document with the current global revision and preserves nested JSON', async context => {
   const env = await fixture(context);
   assert.deepEqual(await executeDataCommand(read('users/missing'), env), { revision: 0, documents: [] });

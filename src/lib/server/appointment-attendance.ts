@@ -5,9 +5,9 @@ import type { Appointment, Business } from '@/types/firestore';
 import type { ChatActor } from '@/types/chat';
 import type { Database, Transaction } from '@/lib/storage/types';
 import {
-  AttendanceModelError, appointmentAttendanceCommandSchema, appointmentAttendanceEventSchema,
+  AttendanceModelError, appointmentAttendanceCommandSchema, appointmentAttendanceCursorSchema, appointmentAttendanceEventSchema,
   assertAttendanceTransition, readAttendanceMetadata,
-  type AttendanceCommand, type AttendanceUpdateResult, type AppointmentAttendanceEvent,
+  type AttendanceCommand, type AttendanceHistoryPage, type AttendanceUpdateResult, type AppointmentAttendanceEvent,
 } from '@/lib/appointment-attendance';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { assertOwner, stableDocumentId } from './businesses';
@@ -58,6 +58,37 @@ export async function readVerifiedAttendanceHead(tx: Transaction, db: Database, 
   if (appointment.type !== 'appointment' || head.sequence !== attendance.revision || head.status !== appointment.status || !matchesOccurrence(head, appointment)) throw unverifiable();
   // Core delivery has no clear operation or legitimate cancelled positive head.
   return head;
+}
+
+/** Private, read-only pages remain available without subscription or consent gates. */
+export async function readAppointmentAttendanceHistory(owner: ChatActor, businessId: string, appointmentId: string, beforeRevision?: number, db: Database = getAdminDb()): Promise<AttendanceHistoryPage> {
+  documentIdSchema.parse(businessId); documentIdSchema.parse(appointmentId);
+  if (beforeRevision !== undefined && (typeof beforeRevision !== 'number' || !appointmentAttendanceCursorSchema.safeParse(String(beforeRevision)).success)) throw new HttpError(400, 'Cursor inválido.');
+  const businessRef = db.collection('businesses').doc(businessId), appointmentRef = businessRef.collection('appointments').doc(appointmentId);
+  return db.runTransaction(async tx => {
+    const [businessDoc, appointmentDoc] = await Promise.all([tx.get(businessRef), tx.get(appointmentRef)]);
+    if (!businessDoc.exists || !appointmentDoc.exists) throw new HttpError(404, 'La cita no existe.');
+    const business = businessDoc.data() as Business, appointment = appointmentDoc.data() as Appointment;
+    assertOwner(business, owner.uid);
+    if (business.id !== businessId || appointment.id !== appointmentId || appointment.tenantId !== businessId) throw unverifiable();
+    const head = await readVerifiedAttendanceHead(tx, db, businessId, appointment), revision = head?.sequence ?? 0;
+    if (beforeRevision !== undefined && beforeRevision > revision) throw new HttpError(400, 'Cursor inválido.');
+    let query = businessRef.collection('attendanceEvents').where('appointmentId', '==', appointmentId);
+    if (beforeRevision !== undefined) query = query.where('sequence', '<', beforeRevision);
+    const page = await tx.get(query.orderBy('sequence', 'desc').limit(21));
+    const upperRevision = beforeRevision === undefined ? revision : beforeRevision - 1;
+    // The lookahead is part of the verified chain: a short page cannot silently
+    // terminate a positive revision before reaching the first real event.
+    if (page.docs.length !== Math.min(21, upperRevision)) throw unverifiable();
+    const events = page.docs.map((snapshot, index) => {
+      const event = verifiedEvent(snapshot.data(), snapshot.id, businessId, appointmentId);
+      if (event.sequence !== upperRevision - index || !matchesOccurrence(event, appointment)) throw unverifiable();
+      return event;
+    });
+    if (beforeRevision === undefined && head && page.docs[0]?.id !== appointment.attendance!.lastEventId) throw unverifiable();
+    for (let index = 1; index < events.length; index++) if (events[index - 1].previousStatus !== events[index].status) throw unverifiable();
+    return { appointment, events: events.slice(0, 20), nextBeforeRevision: events.length === 21 ? events[19].sequence : null };
+  });
 }
 
 function applied(eventId: string, event: AppointmentAttendanceEvent): AttendanceUpdateResult['applied'] {
