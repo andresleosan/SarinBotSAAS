@@ -201,7 +201,8 @@ it('revocation through a second D1 handle aborts an actual queued driver before 
   vi.stubEnv('PLATFORM_WHATSAPP_PROCESSING_ENABLED', 'true');
   const processing = processPlatformWhatsAppWork(lease).catch(error => error);
   try {
-    await vi.waitFor(() => expect(getSarinQueueStats().normalQueued).toBe(1));
+    // Real D1 authorization reads precede queue admission and can exceed 1s on CI.
+    await vi.waitFor(() => expect(getSarinQueueStats().normalQueued).toBe(1), { timeout: 5000 });
     await revoke(second, 'queued');
     await processing;
     expect(getSarinQueueStats().normalQueued).toBe(0);
