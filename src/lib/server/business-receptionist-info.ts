@@ -60,7 +60,7 @@ function basicServiceInformation(service: TenantService): string {
 }
 
 export function renderBusinessServiceInformation({ business, intent, serviceId }: BusinessServiceInformationInput): string {
-  if (!business.services.length) return 'El negocio todavía no ha publicado sus servicios. Contacta al negocio para confirmarlos.';
+  if (!business.services.length && (intent === 'services' || !serviceId)) return 'El negocio todavía no ha publicado sus servicios. Contacta al negocio para confirmarlos.';
   if (intent === 'services') {
     if (!business.services.every(hasValidBasicInformation)) return 'El negocio debe revisar su catálogo. Contacta al negocio para confirmarlo.';
     return `Servicios de ${business.name}:\n${business.services.map(basicServiceInformation).join('\n')}`;

@@ -121,6 +121,11 @@ describe('saved business service information', () => {
     }
   });
 
+  it.each(['price', 'service_details'] as const)('removedLastServiceKeepsUnavailableSelectionFallback (%s)', (intent) => {
+    expect(renderBusinessServiceInformation({ business: { ...business, services: [] }, intent, serviceId: 'removed' }))
+      .toBe('Ese servicio no está disponible en el catálogo actual. Consulta los servicios del negocio.');
+  });
+
   it('invalidBasicServiceDoesNotPublishFabricatedDetails', () => {
     const invalidFields = [
       { name: '' }, { name: '   ' }, { name: 'n'.repeat(121) }, { name: null },
