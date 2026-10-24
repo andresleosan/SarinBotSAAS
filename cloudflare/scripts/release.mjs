@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { publicBuildArguments } from '../src/router.ts';
-import { APP, WORKER, PAGES, boundedJson, fail, hash, releaseConfig, runRelease, verifyImage, workerReady, pagesReady } from './release-core.mjs';
+import { APP, WORKER, PAGES, boundedJson, fail, hash, releaseConfig, runRelease, verifyImage, workerReady, pagesReady, commandDiagnostic } from './release-core.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const wrangler = join(root, 'cloudflare/node_modules/wrangler/bin/wrangler.js');
@@ -18,19 +18,28 @@ const json = value => { try { return JSON.parse(value); } catch { fail('COMMAND_
 const required = key => { const value = environment[key]; if (!value || /[\r\n\0]/.test(value)) fail('ENVIRONMENT'); return value; };
 const baseEnvironment = () => Object.fromEntries(['PATH', 'HOME', 'USERPROFILE', 'SYSTEMROOT', 'TEMP', 'TMP', 'TMPDIR', 'DOCKER_HOST', 'DOCKER_CONTEXT'].filter(key => environment[key]).map(key => [key, environment[key]]));
 
-function command(binary, args, { cwd = temporary, env = {}, timeout = 120_000, limit = 16_000_000 } = {}) {
+function command(binary, args, { cwd = temporary, env = {}, timeout = 120_000, limit = 16_000_000, diagnosticOperation } = {}) {
   return new Promise((resolveCommand, reject) => {
     const child = spawn(binary, args, { cwd, env: { ...baseEnvironment(), CI: 'true', NO_COLOR: '1', ...env }, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
-    const chunks = []; let size = 0; let failure;
+    const chunks = []; const errorChunks = []; let errorSize = 0; let size = 0; let failure; let reported = false;
+    const report = (exitCode, startupCode = '') => {
+      if (!diagnosticOperation || reported) return;
+      reported = true;
+      console.error(JSON.stringify(commandDiagnostic({ operation: diagnosticOperation, exitCode, stdout: Buffer.concat(chunks).toString('utf8'), stderr: startupCode + Buffer.concat(errorChunks).toString('utf8') })));
+    };
     const stop = code => {
       failure ??= code;
       try { if (process.platform === 'win32') child.kill('SIGKILL'); else process.kill(-child.pid, 'SIGKILL'); } catch { /* process already exited */ }
     };
     const timer = setTimeout(() => stop('COMMAND_TIMEOUT'), timeout);
     child.stdout.on('data', data => { size += data.length; if (size > limit) stop('COMMAND_OUTPUT_LIMIT'); else chunks.push(data); });
-    child.stderr.on('data', data => { size += data.length; if (size > limit) stop('COMMAND_OUTPUT_LIMIT'); });
-    child.on('error', () => { clearTimeout(timer); reject(new Error('COMMAND_START')); });
-    child.on('close', code => { clearTimeout(timer); if (failure || code !== 0) reject(new Error(failure ?? 'COMMAND_FAILED')); else resolveCommand(Buffer.concat(chunks).toString('utf8').trim()); });
+    child.stderr.on('data', data => {
+      size += data.length;
+      if (diagnosticOperation && errorSize < 65_536) { const chunk = data.subarray(0, 65_536 - errorSize); errorChunks.push(chunk); errorSize += chunk.length; }
+      if (size > limit) stop('COMMAND_OUTPUT_LIMIT');
+    });
+    child.on('error', error => { clearTimeout(timer); report(null, error.code === 'ENOENT' ? 'ENOENT' : ''); reject(new Error('COMMAND_START')); });
+    child.on('close', code => { clearTimeout(timer); if (failure || code !== 0) { report(code); reject(new Error(failure ?? 'COMMAND_FAILED')); } else resolveCommand(Buffer.concat(chunks).toString('utf8').trim()); });
   });
 }
 
@@ -119,8 +128,8 @@ async function main() {
     deployWorker: async image => {
       progress('WORKER_DEPLOY');
       const path = join(temporary, 'release.json');
-      await writeFile(path, JSON.stringify(releaseConfig(config, image.reference, root)), { mode: 0o600 });
-      await cli(['deploy', '--config', path, '--autoconfig=false', '--keep-vars', '--containers-rollout=immediate', '--tag', sha, '--message', `GitHub main ${sha}`], { timeout: 300_000 });
+      await writeFile(path, JSON.stringify(releaseConfig(config, image.reference, root, dirname(path))), { mode: 0o600 });
+      await cli(['deploy', '--config', path, '--autoconfig=false', '--keep-vars', '--containers-rollout=immediate', '--tag', sha, '--message', `GitHub main ${sha}`], { timeout: 300_000, diagnosticOperation: 'WRANGLER_DEPLOY' });
     },
     waitForWorker: async (image, baseline) => {
       progress('WORKER_RECONCILE');
@@ -135,7 +144,7 @@ async function main() {
     deployPages: async () => {
       progress('PAGES_DEPLOY');
       if (!workerReady(await snapshot(), acceptedWorker)) fail('WORKER_CHANGED_BEFORE_PAGES');
-      await cli(['pages', 'deploy', join(root, 'landing/out'), '--project-name', PAGES, '--branch', 'main', '--commit-hash', sha, '--commit-message', `GitHub main ${sha}`, '--commit-dirty=false'], { timeout: 180_000 });
+      await cli(['pages', 'deploy', join(root, 'landing/out'), '--project-name', PAGES, '--branch', 'main', '--commit-hash', sha, '--commit-message', `GitHub main ${sha}`, '--commit-dirty=false'], { timeout: 180_000, diagnosticOperation: 'WRANGLER_PAGES_DEPLOY' });
     },
     waitForPages: async () => {
       progress('PAGES_RECONCILE');

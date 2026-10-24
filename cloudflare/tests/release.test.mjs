@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { runRelease, validateSnapshot, releaseConfig, boundedJson, verifyImage, workerReady, pagesReady } from '../scripts/release-core.mjs';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { resolve, join, posix, win32 } from 'node:path';
+import { runRelease, validateSnapshot, releaseConfig, boundedJson, verifyImage, workerReady, pagesReady, commandDiagnostic } from '../scripts/release-core.mjs';
 
 const sha = 'a'.repeat(40);
 const account = 'b'.repeat(32);
@@ -87,13 +90,36 @@ test('snapshot rejects wrong backend, binding, replica, settings, partial invent
   for (const change of changes) { const value = snapshot(); change(value); assert.throws(() => validateSnapshot(value, config, account)); }
 });
 test('release configuration preserves runtime vars and limits; public build arguments are not runtime overrides', () => {
-  const result = releaseConfig(config, `registry.cloudflare.com/${account}/sarin-bot-app@${digest}`, '/repo');
+  const result = releaseConfig(config, `registry.cloudflare.com/${account}/sarin-bot-app@${digest}`, resolve('/repo'), resolve('/tmp/release'));
   assert.deepEqual(result.vars, {}); assert.equal(result.keep_vars, true);
   assert.equal(result.containers[0].max_instances, 1); assert.equal(result.containers[0].image_vars, undefined);
   assert.equal(result.containers[0].image_build_context, undefined);
   assert.equal(result.main, resolve('/repo', 'cloudflare/src/index.ts'));
   assert.deepEqual(result.d1_databases, config.d1_databases);
   assert.deepEqual(result.durable_objects, config.durable_objects);
+});
+
+test('temporary release tsconfig resolves correctly through Wrangler path.join on Linux and Windows', () => {
+  for (const [paths, root, directory] of [[posix, '/home/runner/work/sarin/source', '/tmp/sarin-release'], [win32, 'C:\\repo with spaces\\source', 'C:\\temp\\sarin-release']]) {
+    const result = releaseConfig(config, `registry.cloudflare.com/${account}/sarin-bot-app@${digest}`, root, directory, paths);
+    assert.equal(paths.isAbsolute(result.tsconfig), false);
+    assert.equal(paths.join(directory, result.tsconfig), paths.join(root, 'cloudflare/tsconfig.json'));
+    // Wrangler resolves main with resolve(), unlike tsconfig's join().
+    assert.equal(paths.resolve(directory, result.main), paths.join(root, 'cloudflare/src/index.ts'));
+  }
+});
+
+test('installed Wrangler reads the generated config with the actual checkout tsconfig', async () => {
+  const { unstable_readConfig } = await import('wrangler');
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const directory = await mkdtemp(join(tmpdir(), 'sarin-release-config-test-'));
+  try {
+    const path = join(directory, 'release.json');
+    await writeFile(path, JSON.stringify(releaseConfig(config, `registry.cloudflare.com/${account}/sarin-bot-app@${digest}`, root, directory)));
+    const normalized = unstable_readConfig({ config: path });
+    assert.equal(resolve(normalized.tsconfig), resolve(root, 'cloudflare/tsconfig.json'));
+    assert.equal(normalized.main, resolve(root, 'cloudflare/src/index.ts'));
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
 test('Pages project API uses production.services for service bindings', () => {
@@ -172,4 +198,20 @@ test('registry verification binds manifest to locally built image and source/pla
   assert.equal(verifyImage({ local, manifest, sha, account }).reference, reference);
   assert.throws(() => verifyImage({ local: { ...local, Architecture: 'arm64' }, manifest, sha, account }));
   assert.throws(() => verifyImage({ local, manifest: { ...manifest, Descriptor: { ...manifest.Descriptor, digest: configDigest } }, sha, account }));
+});
+
+test('CLI diagnostics expose only fixed operation, bounded numeric codes and fixed error classes', () => {
+  const secret = 'Bearer private-token /private/path https://private.test/?key=secret';
+  const result = commandDiagnostic({ operation: 'WRANGLER_DEPLOY', exitCode: 1, stdout: secret, stderr: `Authentication error [code: 10000]\n${secret}\n[code: 10000] [code: 123456789]` });
+  assert.deepEqual(result, { operation: 'WRANGLER_DEPLOY', exitCode: 1, cloudflareCodes: [10000], errorClass: 'AUTHORIZATION' });
+  const cases = [['Could not resolve "private-module"', 'MODULE_RESOLUTION'], ['Invalid configuration file at /private/path', 'CONFIGURATION'], ['Unknown argument: private-flag', 'CONFIGURATION'], ['spawn private-command ENOENT', 'COMMAND_NOT_FOUND'], [secret, 'UNKNOWN']];
+  for (const [stderr, errorClass] of cases) {
+    const value = commandDiagnostic({ operation: secret, exitCode: secret, stderr });
+    assert.equal(value.errorClass, errorClass);
+    assert.equal(value.operation, 'UNKNOWN'); assert.equal(value.exitCode, null);
+    assert.equal(JSON.stringify(value).includes('private'), false);
+  }
+  const many = Array.from({ length: 20 }, (_, i) => `[code: ${10000 + i}]`).join(' ');
+  assert.equal(commandDiagnostic({ stderr: many }).cloudflareCodes.length, 8);
+  assert.deepEqual(commandDiagnostic({ stderr: 'x'.repeat(65_536) + '[code: 10000]' }).cloudflareCodes, []);
 });

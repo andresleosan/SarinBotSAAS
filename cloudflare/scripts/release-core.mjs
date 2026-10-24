@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { resolve } from 'node:path';
+import path from 'node:path';
 
 export const WORKER = 'sarin-bot-app';
 export const PAGES = 'sarinbotsaas';
@@ -9,6 +9,22 @@ const canonical = value => value && typeof value === 'object' ? Array.isArray(va
 export const hash = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 const same = (a, b) => hash(a) === hash(b);
 const sha256 = value => /^sha256:[a-f0-9]{64}$/.test(value ?? '');
+
+/** Never return provider text, arguments, paths, URLs or permission guesses. */
+export function commandDiagnostic({ operation, exitCode, stdout = '', stderr = '' } = {}) {
+  const text = `${String(stderr)}\n${String(stdout)}`.slice(0, 65_536);
+  const cloudflareCodes = [...new Set([...text.matchAll(/\[code:\s*(\d{1,8})\]/g)].map(match => Number(match[1])))].slice(0, 8);
+  let errorClass = 'UNKNOWN';
+  if (/Cannot find (?:module|package)|Could not resolve|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND/i.test(text)) errorClass = 'MODULE_RESOLUTION';
+  else if (/Unknown (?:argument|option)|Invalid configuration|Error parsing configuration|Missing entry-point/i.test(text)) errorClass = 'CONFIGURATION';
+  else if (/Authentication error|Authorization error|not authori[sz]ed|insufficient permissions?|permission denied|\bForbidden\b|\bUnauthorized\b/i.test(text)) errorClass = 'AUTHORIZATION';
+  else if (/\bENOENT\b|command not found|executable (?:was )?not found/i.test(text)) errorClass = 'COMMAND_NOT_FOUND';
+  return {
+    operation: ['WRANGLER_DEPLOY', 'WRANGLER_PAGES_DEPLOY'].includes(operation) ? operation : 'UNKNOWN',
+    exitCode: Number.isInteger(exitCode) && exitCode >= 0 && exitCode <= 255 ? exitCode : null,
+    cloudflareCodes, errorClass,
+  };
+}
 
 /** Provider bodies and URLs are deliberately absent from errors and evidence. */
 export async function boundedJson(url, { fetch: request = globalThis.fetch, headers = {}, timeout = 20_000, limit = 2_000_000 } = {}) {
@@ -89,10 +105,12 @@ export function pagesReady(pages, sha) {
   return deployment?.environment === 'production' && deployment.latest_stage?.status === 'success' && deployment.deployment_trigger?.metadata?.commit_hash === sha;
 }
 
-export function releaseConfig(config, image, root) {
+export function releaseConfig(config, image, root, configDirectory, paths = path) {
   const next = structuredClone(config);
-  next.main = resolve(root, 'cloudflare/src/index.ts');
-  next.tsconfig = resolve(root, 'cloudflare/tsconfig.json');
+  next.main = paths.resolve(root, 'cloudflare/src/index.ts');
+  // Wrangler 4.150 joins tsconfig to its config directory (main uses resolve).
+  next.tsconfig = paths.relative(configDirectory, paths.resolve(root, 'cloudflare/tsconfig.json'));
+  if (paths.isAbsolute(next.tsconfig)) fail('RELEASE_CONFIG_PATH');
   delete next.$schema;
   next.vars = {}; next.keep_vars = true;
   next.containers[0].image = image;
