@@ -1,5 +1,7 @@
 {
   "indexes": [
+    { "collectionGroup": "appointments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "client.uid", "order": "ASCENDING" }, { "fieldPath": "type", "order": "ASCENDING" }, { "fieldPath": "startAt", "order": "DESCENDING" }, { "fieldPath": "id", "order": "ASCENDING" }] },
+    { "collectionGroup": "appointments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "client.uid", "order": "ASCENDING" }, { "fieldPath": "type", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "startAt", "order": "DESCENDING" }, { "fieldPath": "id", "order": "ASCENDING" }] },
     { "collectionGroup": "attendanceEvents", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "appointmentId", "order": "ASCENDING" }, { "fieldPath": "sequence", "order": "DESCENDING" }] },
     { "collectionGroup": "reminderReceipts", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "ownerUid", "order": "ASCENDING" }, { "fieldPath": "appointmentId", "order": "ASCENDING" }] },
     { "collectionGroup": "appointments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "client.uid", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "type", "order": "ASCENDING" }, { "fieldPath": "startAt", "order": "ASCENDING" }] },
