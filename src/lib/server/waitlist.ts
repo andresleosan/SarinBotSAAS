@@ -1,4 +1,5 @@
 import 'server-only';
+import { readResourceSchedulePolicy } from './resource-schedules';
 import { z } from 'zod';
 import type { ChatActor } from '@/types/chat';
 import type { Appointment, Business } from '@/types/firestore';
@@ -121,7 +122,7 @@ async function projection(tx: Transaction, user: ChatActor, businessId: string, 
   const existingAppointments = await appointments(tx, current, item.dateKey), now = Date.now();
   if (item.expiresAt <= now) return response(user, businessId, current.record, view(item, 'expired', null));
   if (!isSubscriptionAllowed(business, now)) return response(user, businessId, current.record, view(item, 'suspended', null, 'business_unavailable'));
-  const slots = getAvailableSlots({ tenant: business, dateKey: item.dateKey, serviceId: item.serviceId, ...(item.resourceId ? { resourceId: item.resourceId } : {}), existingAppointments, now });
+  const slots = getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(tx, business.id, db), tenant: business, dateKey: item.dateKey, serviceId: item.serviceId, ...(item.resourceId ? { resourceId: item.resourceId } : {}), existingAppointments, now });
   return response(user, businessId, current.record, view(item, slots.some(resource => resource.slots.length) ? 'available' : 'waiting', now));
 }
 function replay(record: WaitlistRecord | null, input: { requestId: string; expectedRevision: number }, operationHash: string): boolean {
@@ -160,7 +161,7 @@ export async function joinWaitlist(user: ChatActor, businessId: string, supplied
     const now = Date.now(), expiresAt = expiry(input.dateKey);
     if (input.dateKey < dateAt(now) || input.dateKey > dateAt(now + 366 * DAY) || expiresAt <= now) throw new HttpError(400, 'Elige un día entre hoy y los próximos 366 días.');
     if (!isSubscriptionAllowed(business, now)) throw new HttpError(402, 'Las nuevas reservas están en pausa.');
-    const slots = getAvailableSlots({ tenant: business, dateKey: input.dateKey, serviceId: input.serviceId, resourceId: input.resourceId, existingAppointments, now });
+    const slots = getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(tx, business.id, db), tenant: business, dateKey: input.dateKey, serviceId: input.serviceId, resourceId: input.resourceId, existingAppointments, now });
     if (slots.some(resource => resource.slots.length)) throw new HttpError(409, 'Ya hay horarios disponibles. Consulta el calendario para elegir uno.', 'WAITLIST_SLOTS_AVAILABLE');
     const request: SavedRequest = { id: waitlistEntryId(user.uid, businessId, input.requestId), case: input.case, ...selection, createdAt: now, expiresAt,
       anchors: { account: permit.account, business: permit.business, subject: permit.subject, policyRevision: permit.status.capability.revision } };

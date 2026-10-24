@@ -1,4 +1,5 @@
 import 'server-only';
+import { readResourceSchedulePolicy } from './resource-schedules';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { getAdminDb } from '@/lib/firebase/admin';
@@ -90,7 +91,7 @@ export async function createBookingProposal(user: ChatActor, businessId: string,
     const now = Date.now();
     if (source && reschedule) { assertRescheduleSource(source, user, businessId, reschedule, now); assertRescheduleAccess(business, now); }
     if (toColombiaTimestamp(selection.dateKey, '00:00') > now + 366 * 86400000) throw new HttpError(400, 'Puedes reservar hasta un año por adelantado.');
-    if (!getAvailableSlots({ tenant: business, ...selection, existingAppointments: appointments.docs.filter(doc => doc.id !== source?.id).map(doc => doc.data() as Appointment), now }).some(item => item.slots.includes(selection.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible.');
+    if (!getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(tx, business.id, db), tenant: business, ...selection, existingAppointments: appointments.docs.filter(doc => doc.id !== source?.id).map(doc => doc.data() as Appointment), now }).some(item => item.slots.includes(selection.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible.');
     const metadata: AppointmentRescheduleMetadata | undefined = source && reschedule ? { appointmentId: source.id, sourceRevision: reschedule.sourceRevision, sourceFingerprint: appointmentRescheduleFingerprint(source), requestId, source: { dateKey: source.dateKey, startTimeStr: source.startTimeStr, endTimeStr: source.endTimeStr, resourceId: source.resourceId, ...(business.resources.find(item => item.id === source.resourceId)?.name ? { resourceName: business.resources.find(item => item.id === source.resourceId)!.name } : {}), ...(source.price !== undefined ? { priceCOP: source.price } : {}) }, targetServiceId: service.id, targetResourceId: resource.id } : undefined;
     const proposal: Proposal = proposalSchema.parse({ version: subject ? 2 : 1, id, businessId, actorUid: user.uid, selection, service, resource, intakeFields: subject && (capability.dataMode === 'health' || subject.case.subjectKind === 'represented_minor') ? [] : business.sarinConfig.intakeFields, createdAt: now, expiresAt: now + 600000, appointmentId: null,
       ...(subject ? { subjectCase: subject.case, beneficiaryHash: bookingSubjectHash(subject.beneficiary), policyRevision: capability.revision, authorization } : {}), ...(metadata ? { reschedule: metadata } : {}) });

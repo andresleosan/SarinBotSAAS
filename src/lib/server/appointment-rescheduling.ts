@@ -1,4 +1,5 @@
 import 'server-only';
+import { readResourceSchedulePolicy } from './resource-schedules';
 import type { z } from 'zod';
 import type { Appointment, Business } from '@/types/firestore';
 import type { ChatActor } from '@/types/chat';
@@ -72,7 +73,7 @@ export async function readAppointmentRescheduleAvailability(user: ChatActor, bus
     const appointments = await tx.get(db.collection('businesses').doc(businessId).collection('appointments').where('dateKey', '==', input.dateKey).where('status', '==', 'confirmed'));
     const now = Date.now(); assertRescheduleSource(source, user, businessId, input, now); assertRescheduleAccess(business, now);
     if (toColombiaTimestamp(input.dateKey, '00:00') > now + 366 * 86400000) throw new HttpError(400, 'Puedes reservar hasta un año por adelantado.');
-    return getAvailableSlots({ tenant: business, dateKey: input.dateKey, serviceId: service.id, resourceId: input.resourceId, existingAppointments: appointments.docs.filter(doc => doc.id !== source.id).map(doc => doc.data() as Appointment), now });
+    return getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(tx, business.id, db), tenant: business, dateKey: input.dateKey, serviceId: service.id, resourceId: input.resourceId, existingAppointments: appointments.docs.filter(doc => doc.id !== source.id).map(doc => doc.data() as Appointment), now });
   });
 }
 export async function createAppointmentRescheduleProposal(user: ChatActor, businessId: string, supplied: z.input<typeof appointmentRescheduleProposalSchema>, db: Database = getAdminDb()) {
@@ -103,7 +104,7 @@ export async function rescheduleAppointmentInTransaction(tx: Transaction, user: 
   if (expiresAt <= now) return null;
   assertRescheduleSource(source, user, business.id, context, now); assertRescheduleAccess(business, now);
   if (toColombiaTimestamp(selection.dateKey, '00:00') > now + 366 * 86400000) throw new HttpError(400, 'Puedes reservar hasta un año por adelantado.');
-  if (!getAvailableSlots({ tenant: business, ...selection, existingAppointments: appointments.docs.filter(doc => doc.id !== source.id).map(doc => doc.data() as Appointment), now }).some(resource => resource.slots.includes(selection.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible. Consulta otra hora.');
+  if (!getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(tx, business.id, db), tenant: business, ...selection, existingAppointments: appointments.docs.filter(doc => doc.id !== source.id).map(doc => doc.data() as Appointment), now }).some(resource => resource.slots.includes(selection.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible. Consulta otra hora.');
   const startAt = toColombiaTimestamp(selection.dateKey, selection.startTimeStr), endAt = startAt + service.durationMinutes * 60000;
   const revision = metadata.sourceRevision + 1;
   const appointment: Appointment = { ...source, dateKey: selection.dateKey, startTimeStr: selection.startTimeStr, endTimeStr: toTimeStr(toMinutes(selection.startTimeStr) + service.durationMinutes), startAt, endAt, reservedUntilAt: endAt + service.bufferMinutes * 60000, resourceId: selection.resourceId, serviceName: service.name, price: service.price, rescheduleRevision: revision, lastRescheduleProposalId: proposalId, rescheduledAt: now };

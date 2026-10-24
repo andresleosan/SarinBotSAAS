@@ -1,4 +1,5 @@
 import 'server-only';
+import { readResourceSchedulePolicy } from './resource-schedules';
 import type { ChatActor } from '@/types/chat';
 import type { Database as Firestore, Transaction } from '@/lib/storage/types';
 import type { Appointment, Business } from '@/types/firestore';
@@ -31,10 +32,16 @@ export async function readAppointments(businessId: string, dateKey: string, user
 
 export async function readAvailability(business: Business, dateKey: string, serviceId: string, resourceId?: string, db: Firestore = getAdminDb()) {
   assertDate(dateKey);
-  if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
-  if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'La suscripción del negocio está vencida.');
-  const snapshot = await db.collection('businesses').doc(business.id).collection('appointments').where('dateKey', '==', dateKey).where('status', '==', 'confirmed').get();
-  return getAvailableSlots({ tenant: business, dateKey, serviceId, resourceId, existingAppointments: snapshot.docs.map((document) => document.data() as Appointment) });
+  return db.runTransaction(async transaction => {
+    const reference = db.collection('businesses').doc(business.id), document = await transaction.get(reference);
+    if (!document.exists) throw new HttpError(404, 'El negocio no existe.');
+    const current = document.data() as Business;
+    if (!current.sarinConfig.onboardingCompleted || !current.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
+    if (!isSubscriptionAllowed(current)) throw new HttpError(402, 'La suscripción del negocio está vencida.');
+    const resourceSchedulePolicy = await readResourceSchedulePolicy(transaction, business.id, db);
+    const snapshot = await transaction.get(reference.collection('appointments').where('dateKey', '==', dateKey).where('status', '==', 'confirmed'));
+    return getAvailableSlots({ resourceSchedulePolicy, tenant: current, dateKey, serviceId, resourceId, existingAppointments: snapshot.docs.map((document) => document.data() as Appointment) });
+  });
 }
 
 export async function createAppointment(user: ChatActor, businessId: string, input: BookingInput, requestId: string, db: Firestore = getAdminDb()): Promise<Appointment> {
@@ -78,7 +85,7 @@ export async function createAppointmentInTransaction(transaction: Transaction, u
     if (business.sarinConfig.intakeFields.some((field) => field.required && !input.intakeAnswers[field.key]?.trim())) throw new HttpError(400, 'Faltan respuestas obligatorias para agendar.');
     const query = businessReference.collection('appointments').where('dateKey', '==', input.dateKey).where('resourceId', '==', input.resourceId).where('status', '==', 'confirmed');
     const snapshot = await transaction.get(query);
-    const availability = getAvailableSlots({ tenant: business, dateKey: input.dateKey, serviceId: input.serviceId, resourceId: input.resourceId, existingAppointments: snapshot.docs.map((document) => document.data() as Appointment) });
+    const availability = getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(transaction, business.id, db), tenant: business, dateKey: input.dateKey, serviceId: input.serviceId, resourceId: input.resourceId, existingAppointments: snapshot.docs.map((document) => document.data() as Appointment) });
     if (!availability.some((resource) => resource.slots.includes(input.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible. Consulta otra hora.');
     const startAt = toColombiaTimestamp(input.dateKey, input.startTimeStr);
     const endAt = startAt + service.durationMinutes * 60000;

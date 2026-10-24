@@ -1,4 +1,5 @@
 import 'server-only';
+import { readResourceSchedulePolicy } from './resource-schedules';
 import type { z } from 'zod';
 import type { ChatActor } from '@/types/chat';
 import type { Business, Appointment } from '@/types/firestore';
@@ -48,9 +49,10 @@ export async function readNextStructuredAvailability(user: ChatActor, businessId
     // exceeded. Truncating confirmed appointments could invent available slots.
     const appointments = await tx.get(db.collection('businesses').doc(businessId).collection('appointments').where('dateKey', '>=', fromDateKey).where('dateKey', '<=', throughDateKey).where('status', '==', 'confirmed'));
     const existingAppointments = appointments.docs.map(document => document.data() as Appointment), availabilityNow = Date.now();
+    const resourceSchedulePolicy = await readResourceSchedulePolicy(tx, business.id, db);
     for (let date = from; date <= through; date += DAY_MILLISECONDS) {
       const dateKey = colombiaDateKey(date);
-      const availability = getAvailableSlots({ tenant: business, dateKey, serviceId: input.serviceId, resourceId: input.resourceId, existingAppointments, now: availabilityNow });
+      const availability = getAvailableSlots({ resourceSchedulePolicy, tenant: business, dateKey, serviceId: input.serviceId, resourceId: input.resourceId, existingAppointments, now: availabilityNow });
       if (availability.some(resource => resource.slots.length > 0)) return { dateKey, availability, fromDateKey, throughDateKey };
     }
     return { dateKey: null, availability: [], fromDateKey, throughDateKey };
@@ -63,7 +65,7 @@ export async function readStructuredAvailability(user: ChatActor, businessId: st
     const ref = db.collection('businesses').doc(businessId), business = await readBookingBusiness(tx, user, businessId, input.case, db, Date.now());
     if (!business.services.some(service => service.id === input.serviceId && (!input.resourceId || service.resourceIds.includes(input.resourceId)))) throw new HttpError(400, 'Selecciona un servicio del negocio.');
     const appointments = await tx.get(ref.collection('appointments').where('dateKey', '==', input.dateKey).where('status', '==', 'confirmed'));
-    return getAvailableSlots({ tenant: business, ...input, existingAppointments: appointments.docs.map(document => document.data() as Appointment) });
+    return getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(tx, business.id, db), tenant: business, ...input, existingAppointments: appointments.docs.map(document => document.data() as Appointment) });
   });
 }
 export async function createStructuredBookingProposal(user: ChatActor, businessId: string, supplied: z.input<typeof structuredProposalSchema>, db: Database = getAdminDb()) {
