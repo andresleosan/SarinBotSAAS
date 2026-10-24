@@ -31,7 +31,7 @@ import type { Appointment } from "@/types/firestore";
 function Agenda() {
   const accountConsent = useAccountConsent();
   const { business, loading, error: businessError } = useBusiness();
-  const { user } = useAuth();
+  const { user, authEpoch } = useAuth();
   const [date, setDate] = useState(() => agendaToday(Date.now()));
   const [mode, setMode] = useState<OwnerAgendaMode>('day');
   const ownerKey = JSON.stringify([user?.uid, business?.id]);
@@ -41,7 +41,7 @@ function Agenda() {
   const [now, setNow] = useState(Date.now());
   const range = getOwnerAgendaRange(date, mode, now);
   const enabled = !loading && !businessError && !!user && business?.ownerUid === user.uid && !!business?.sarinConfig.onboardingCompleted;
-  const scope = JSON.stringify([user?.uid, business?.id, date, range?.dates, range?.queryDates, range?.outsideDates, enabled]);
+  const scope = JSON.stringify([user?.uid, business?.id, date, range?.dates, range?.queryDates, range?.outsideDates, enabled, authEpoch]);
   const scopeRef = useRef({ key: scope });
   if (scopeRef.current.key !== scope) scopeRef.current = { key: scope };
   const actionScope = scopeRef.current;
@@ -49,6 +49,17 @@ function Agenda() {
   const [actionError, setActionError] = useState<{ scope: typeof actionScope; message: string } | null>(null);
   const setError = (message: string | null) => setActionError(message === null ? null : { scope: actionScope, message });
   const [saving, setSaving] = useState(false);
+  const attendanceRegistry = useRef({ scope: actionScope, ids: new Set<string>() });
+  if (attendanceRegistry.current.scope !== actionScope) attendanceRegistry.current = { scope: actionScope, ids: new Set<string>() };
+  const registry = attendanceRegistry.current;
+  const [attendancePending, setAttendancePending] = useState<{ registry: typeof registry; count: number } | null>(null);
+  const combinedBusy = saving || (attendancePending?.registry === registry && attendancePending.count > 0);
+  const pendingAttendance = () => scopeRef.current === actionScope && attendanceRegistry.current === registry && registry.ids.size > 0;
+  const onAttendanceBusyChange = (appointmentId: string, busy: boolean) => {
+    if (scopeRef.current !== actionScope || attendanceRegistry.current !== registry) return;
+    if (busy) registry.ids.add(appointmentId); else registry.ids.delete(appointmentId);
+    setAttendancePending({ registry, count: registry.ids.size });
+  };
   const [blockStart, setBlockStart] = useState('');
   const [blockEnd, setBlockEnd] = useState('');
   const [resource, setResource] = useState('');
@@ -78,7 +89,7 @@ function Agenda() {
   async function block(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const resourceId = resource || business?.resources.find(item => item.active)?.id;
-    if (!enabled || !user || !business || !range || !accountConsent.active || !resourceId || !business.resources.some(item => item.id === resourceId && item.active) || actionRequest.current) return;
+    if (scopeRef.current !== actionScope || !enabled || !user || !business || !range || !accountConsent.active || !resourceId || !business.resources.some(item => item.id === resourceId && item.active) || actionRequest.current || pendingAttendance()) return;
     const controller = actionRequest.current = new AbortController();
     setSaving(true); setError(null);
     try {
@@ -98,7 +109,7 @@ function Agenda() {
     }
   }
   async function cancel(appointmentId: string) {
-    if (!enabled || !user || !business || !range || !appointments.some(item => item.id === appointmentId && item.status === 'confirmed') || actionRequest.current) return;
+    if (scopeRef.current !== actionScope || !enabled || !user || !business || !range || !appointments.some(item => item.id === appointmentId && item.status === 'confirmed') || actionRequest.current || pendingAttendance()) return;
     const controller = actionRequest.current = new AbortController();
     setSaving(true); setError(null);
     try {
@@ -202,13 +213,13 @@ function Agenda() {
       <PaidTrialStatus subscription={sub} />
       {day?.state === 'ready' ? <ClientPolicyControls businessId={business.id} ownerUid={business.ownerUid} clients={[...new Map(appointments.filter(item => item.client?.uid).map(item => [item.client!.uid, { uid: item.client!.uid, name: item.client!.name }])).values()]} /> : <p className="text-sm text-sarin-muted">Las políticas de clientes estarán disponibles cuando cargue el día seleccionado.</p>}
       {actionError?.scope === actionScope && <Notice error>{actionError.message}</Notice>}
-      <OwnerAgendaCalendar business={business} mode={mode} selectedDate={date} resourceId={selectedResourceId} range={range} snapshot={agenda.snapshot} loading={agenda.loading} error={agenda.error} busy={saving}
-        onModeChange={value => { if (!actionRequest.current) setMode(value); }}
-        onDateChange={value => { if (!actionRequest.current) setDate(value); }}
-        onResourceChange={value => { if (!actionRequest.current) setSelectedResourceId(value); }}
-        onRefresh={agenda.refresh} />
+      <OwnerAgendaCalendar business={business} mode={mode} selectedDate={date} resourceId={selectedResourceId} range={range} snapshot={agenda.snapshot} loading={agenda.loading} error={agenda.error} busy={combinedBusy}
+        onModeChange={value => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setMode(value); }}
+        onDateChange={value => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setDate(value); }}
+        onResourceChange={value => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setSelectedResourceId(value); }}
+        onRefresh={() => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) agenda.refresh(); }} />
       <div className="flex justify-end"><Link href="/dashboard/qr-kit" className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-sarin-blue underline-offset-4 hover:underline"><QrCode className="h-4 w-4" />Compartir mi QR</Link></div>
-      <OwnerAgendaAppointments key={`${user?.uid}:${business.id}:${date}`} business={business} dateKey={date} day={day} resourceId={selectedResourceId} saving={saving} onCancel={id => void cancel(id)} onSaved={saved => {
+      <OwnerAgendaAppointments key={`${user?.uid}:${business.id}:${date}`} business={business} dateKey={date} day={day} resourceId={selectedResourceId} saving={combinedBusy} onAttendanceBusyChange={onAttendanceBusyChange} onCancel={id => void cancel(id)} onSaved={saved => {
         if (scopeRef.current !== actionScope || saved.tenantId !== business.id || saved.dateKey !== date || !appointments.some(item => item.id === saved.id && item.tenantId === saved.tenantId && item.dateKey === saved.dateKey)) return;
         agenda.replaceAppointment(saved);
       }} />
@@ -276,7 +287,7 @@ function Agenda() {
           </label>
           <button
             disabled={
-              !accountConsent.active || saving || !range || !business.resources.some((item) => item.active)
+              !accountConsent.active || combinedBusy || !range || !business.resources.some((item) => item.active)
             }
             className={buttonClass + " self-end"}
           >

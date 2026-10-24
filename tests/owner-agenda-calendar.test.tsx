@@ -8,6 +8,7 @@ import type { Appointment, Business } from '@/types/firestore';
 import type { OwnerAgendaDay } from '@/lib/owner-agenda';
 
 vi.mock('@/components/representation-review', () => ({ RepresentationReviewControls: vi.fn(() => null) }));
+vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { uid: 'demo-owner' } }) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const business: Business = {
   id: 'demo-shop', slug: 'demo-shop', ownerUid: 'demo-owner', ownerEmail: 'owner@example.test', name: 'Negocio demo', category: 'Belleza', phoneWhatsApp: '573000000000', timezone: 'America/Bogota',
@@ -30,7 +31,7 @@ async function calendar(extra: Partial<Props> = {}) {
   await act(async () => { renderer = create(createElement(OwnerAgendaCalendar, props)); });
 }
 async function list(day: OwnerAgendaDay | null = ready(), extra: Partial<Parameters<typeof OwnerAgendaAppointments>[0]> = {}) {
-  await act(async () => { renderer = create(createElement(OwnerAgendaAppointments, { business, dateKey: dates[0], day, resourceId: null, saving: false, onCancel: vi.fn(), onSaved: vi.fn(), ...extra })); });
+  await act(async () => { renderer = create(createElement(OwnerAgendaAppointments, { business, dateKey: dates[0], day, resourceId: null, saving: false, onAttendanceBusyChange: vi.fn(), onCancel: vi.fn(), onSaved: vi.fn(), ...extra })); });
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -156,7 +157,7 @@ it('helpAndAppointmentDetailsAreInitiallyCollapsed', async () => {
   await act(async () => renderer?.unmount());
   await list();
   expect(root().findByType('details').props.open).not.toBe(true);
-  const summary = content(root().findByType('summary'));
+  const summary = content(root().findAllByType('summary')[0]);
   for (const value of ['09:00', '09:05', source.serviceName!, business.resources[0].name, 'Confirmada']) expect(summary).toContain(value);
   expect(summary).not.toContain('Cliente privado');
   expect(content(root())).toContain('3. Abre una cita para ver sus detalles');
@@ -166,7 +167,7 @@ it('appointmentActionsRemainInsideTheirDetails', async () => {
   const onCancel = vi.fn(), onSaved = vi.fn();
   await list(ready(), { onCancel, onSaved });
   const details = root().findByType('details');
-  const cancel = details.findByType('button');
+  const cancel = details.findAllByType('button').find(node => content(node) === 'Cancelar cita')!;
   expect(content(cancel)).toBe('Cancelar cita');
   await act(async () => cancel.props.onClick());
   expect(onCancel).toHaveBeenCalledWith(source.id);
@@ -253,12 +254,12 @@ it.each(['__proto__', 'constructor', 'toString'])('warningFreePrototypeId %s Kee
   expect(content(root())).toContain('Otra cita del día');
   expect(content(root())).not.toContain('Margen no registrado');
   const card = root().findAllByType('details').find(node => content(node).includes('Servicio con ID histórico'))!;
-  await act(async () => card.findByType('button').props.onClick());
+  await act(async () => card.findAllByType('button').find(node => content(node) === 'Cancelar cita')!.props.onClick());
   expect(onCancel).toHaveBeenCalledExactlyOnceWith(id);
 });
 
 it('ownWarningForPrototypeIdRemainsVisible', async () => {
   await list(ready([{ ...source, id: '__proto__', reservedUntilAt: NaN }]));
   expect(content(root())).toContain('Margen no registrado');
-  expect(root().findAllByType('details')).toHaveLength(1);
+  expect(root().findAllByType('details').filter(node => node.props.className?.startsWith('group '))).toHaveLength(1);
 });

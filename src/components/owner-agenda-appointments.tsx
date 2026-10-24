@@ -4,13 +4,15 @@ import type { Appointment, Business } from '@/types/firestore';
 import type { OwnerAgendaDay } from '@/lib/owner-agenda';
 import { getOwnerAgendaDayLayout, getOwnerAgendaResources } from '@/lib/owner-agenda';
 import { RepresentationReviewControls } from '@/components/representation-review';
+import { AppointmentAttendanceControls } from '@/components/appointment-attendance-controls';
 
 export type OwnerAgendaAppointmentsProps = {
   business: Business; dateKey: string; day: OwnerAgendaDay | null; resourceId: string | null; saving: boolean;
+  onAttendanceBusyChange: (appointmentId: string, busy: boolean) => void;
   onCancel: (appointmentId: string) => void; onSaved: (saved: Appointment) => void;
 };
 
-export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, saving, onCancel, onSaved }: OwnerAgendaAppointmentsProps) {
+export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, saving, onCancel, onSaved, onAttendanceBusyChange }: OwnerAgendaAppointmentsProps) {
   const appointments = day?.state === 'ready' ? day.appointments : [];
   const resources = getOwnerAgendaResources(business.resources, day ? [day] : []);
   const warnings = getOwnerAgendaDayLayout(dateKey, appointments).warnings;
@@ -33,7 +35,7 @@ export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, sa
               : <ol className="space-y-3">{selected.map(appointment => {
                 const blocked = appointment.type === 'manual_block';
                 const labels: Record<Appointment['status'], string> = { confirmed: blocked ? 'Bloqueado' : 'Confirmada', cancelled_by_client: 'Cancelada por cliente', cancelled_by_owner: 'Cancelada por negocio', completed: 'Completada', no_show: 'No asistió' };
-                const status = Object.hasOwn(labels, appointment.status) ? labels[appointment.status] : 'Estado sin reconocer';
+                const status = !blocked && appointment.status === 'completed' ? 'Atendida' : !blocked && appointment.status === 'confirmed' && Number.isFinite(appointment.reservedUntilAt) && Date.now() >= appointment.reservedUntilAt ? 'Pendiente de registrar' : Object.hasOwn(labels, appointment.status) ? labels[appointment.status] : 'Estado sin reconocer';
                 const cancelled = appointment.status === 'cancelled_by_client' || appointment.status === 'cancelled_by_owner';
                 const resource = resources.find(item => item.id === appointment.resourceId)?.label ?? `Recurso no disponible · ${appointment.resourceId}`;
                 const cardContext = { appointmentId: appointment.id, dateKey, businessId: business.id };
@@ -53,6 +55,9 @@ export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, sa
                       <RepresentationReviewControls businessId={business.id} appointment={appointment} onSaved={saved => {
                         if (saved.id === cardContext.appointmentId && saved.dateKey === cardContext.dateKey && saved.tenantId === cardContext.businessId) onSaved(saved);
                       }} />
+                      {!blocked && <AppointmentAttendanceControls businessId={business.id} ownerUid={business.ownerUid} appointment={appointment} disabled={saving} onBusyChange={busy => onAttendanceBusyChange(appointment.id, busy)} onSaved={saved => {
+                        if (saved.id === cardContext.appointmentId && saved.dateKey === cardContext.dateKey && saved.tenantId === cardContext.businessId) onSaved(saved);
+                      }} />}
                       {appointment.status === 'confirmed' && <div className="flex justify-end border-t border-sarin-line pt-3"><button type="button" disabled={saving} onClick={() => { if (!saving) onCancel(appointment.id); }} className="min-h-11 rounded-xl border border-sarin-line px-4 py-2 text-xs font-medium text-sarin-muted transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sarin-blue disabled:opacity-50">Cancelar {blocked ? 'bloqueo' : 'cita'}</button></div>}
                     </div>
                   </details>
