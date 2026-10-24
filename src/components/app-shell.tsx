@@ -22,10 +22,12 @@ export function AppShell({
   children,
   admin = false,
   adminLocation,
+  businessNavigationPath,
 }: {
   children: ReactNode;
   admin?: boolean;
   adminLocation?: AdminLocation;
+  businessNavigationPath?: '/dashboard' | '/dashboard/onboarding' | '/dashboard/qr-kit' | '/dashboard/billing';
 }) {
   const { user, signOut, isSuperadmin } = useAuth();
   const accountConsent = useAccountConsent();
@@ -33,7 +35,7 @@ export function AppShell({
   const links = admin ? getAdminNavigationItems() : businessLinks;
   const activeId = admin
     ? adminLocation?.module ?? (pathname === "/admin/assistant" ? "attention" : "summary")
-    : businessLinks.find(item => item.href === pathname)?.id ?? "";
+    : businessLinks.find(item => item.href === (businessNavigationPath ?? pathname))?.id ?? "";
   const active = links.find(item => item.id === activeId);
   const name = user?.displayName || user?.email || "Mi cuenta";
   return (

@@ -21,6 +21,7 @@ describe('owner guided configuration workspace', () => {
   let renderer: ReactTestRenderer;
   const saved = vi.fn(); const discarded = vi.fn(); const changed = vi.fn(); const mountedAssistant = vi.fn(); const focus = vi.fn();
   let current: OwnerConfigurationController;
+  it('scheduleLinkDoesNotSubmitAggregateConfig', async () => { await mount({ section: 'schedule' }); const link = renderer.root.findAll(node => node.type === 'a' && node.props.href === '/dashboard/schedule')[0]; expect(link).toBeDefined(); expect(link.props.target).toBe('_blank'); expect(link.props.rel).toContain('noopener'); expect(JSON.stringify(link.children)).toContain('otra pestaña'); expect(saved).not.toHaveBeenCalled(); });
   const initialSession = (section: OwnerConfigurationSession['section']): OwnerConfigurationSession => ({ scope: { uid: business.ownerUid, authEpoch: 1, businessId: business.id }, draft: structuredClone(draft), baseline: structuredClone(draft), section, phase: 'idle', issues: [], external: null, savedConfiguration: null, pendingCommand: null, error: null });
   function OptionalAssistant() { mountedAssistant(); return createElement('p', {}, 'Asistente opcional'); }
   async function mount(options: { configured?: boolean; section?: OwnerConfigurationSession['section']; health?: boolean; ready?: boolean; blocked?: boolean; busy?: boolean; dirty?: boolean; issues?: OwnerConfigurationSession['issues'] } = {}) {

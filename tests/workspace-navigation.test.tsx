@@ -29,6 +29,15 @@ describe('workspace navigation', () => {
     expect(renderer.root.findByProps({ href: '#workspace-content' }).children).toEqual(['Saltar al contenido']);
     expect(JSON.stringify(renderer.toJSON())).toContain('Permisos de mi cuenta');
   });
+  it('scheduleUsesBusinessContextWithoutFifthDestinationAndAdminIgnoresOverride', async () => {
+    state.pathname = '/dashboard/schedule';
+    await act(async () => { renderer = create(createElement(AppShell, { businessNavigationPath: '/dashboard/onboarding', children: 'Turnos' })); });
+    const nav = renderer.root.findByProps({ 'aria-label': 'Navegación del negocio' });
+    expect(nav.findAllByType('a')).toHaveLength(4);
+    expect(nav.findByProps({ href: '/dashboard/onboarding' }).props['aria-current']).toBe('page');
+    await act(async () => renderer.update(createElement(AppShell, { admin: true, businessNavigationPath: '/dashboard/onboarding', children: 'Admin' })));
+    expect(renderer.root.findAllByType('a').some(link => link.props.href === '/dashboard/schedule')).toBe(false);
+  });
 
   it('onlySuperadminGetsContextSwitchOnMobile', async () => {
     await shell();

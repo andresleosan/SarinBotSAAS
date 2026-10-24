@@ -6,7 +6,7 @@ import type { ChatActor } from '@/types/chat';
 import type { Database, Transaction } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { StorageError } from '@/lib/storage/database';
-import { canonicalResourceScheduleRules, emptyResourceSchedulePolicy, resolveResourceDaySchedule, resourceScheduleBasisSchema, resourceSchedulePolicySchema, resourceScheduleReceiptSchema, resourceScheduleRulesSchema, type ResourceScheduleBasis, type ResourceScheduleCommand, type ResourceSchedulePolicy, type ResourceScheduleRules, type ResourceScheduleSaveResult, type ResourceScheduleView } from '@/lib/resource-schedules';
+import { canonicalResourceScheduleRules, resourceScheduleCommandText, emptyResourceSchedulePolicy, resolveResourceDaySchedule, resourceScheduleBasisSchema, resourceSchedulePolicySchema, resourceScheduleReceiptSchema, resourceScheduleRulesSchema, type ResourceScheduleBasis, type ResourceScheduleCommand, type ResourceSchedulePolicy, type ResourceScheduleRules, type ResourceScheduleSaveResult, type ResourceScheduleView } from '@/lib/resource-schedules';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { assertOwner, stableDocumentId } from './businesses';
 import { assertConsent } from './consent';
@@ -25,7 +25,7 @@ function canonical(value: unknown): unknown {
 }
 const serialized = (value: unknown) => JSON.stringify(canonical(value));
 const hash = (value: unknown) => createHash('sha256').update(serialized(value)).digest('hex');
-export const resourceScheduleOperationHash = (command: ResourceScheduleCommand) => hash({ ...command, rules: canonicalResourceScheduleRules(command.rules) });
+export const resourceScheduleOperationHash = (command: ResourceScheduleCommand) => createHash('sha256').update(resourceScheduleCommandText(command)).digest('hex');
 function basisFor(business: Business): ResourceScheduleBasis {
   if (!business.weeklySchedule || typeof business.weeklySchedule !== 'object' || Array.isArray(business.weeklySchedule) || !Array.isArray(business.resources)) throw unavailable();
   const parsed = resourceScheduleBasisSchema.safeParse({ weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [i, business.weeklySchedule[i] ?? { isOpen: false, intervals: [] }])), resources: business.resources.map(item => ({ id: item.id, name: item.name, active: item.active })) });

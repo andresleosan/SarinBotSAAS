@@ -67,6 +67,16 @@ export function canonicalResourceScheduleRules(rules: ResourceScheduleRules): Re
   };
 }
 
+/** Shared byte representation for server receipts and browser verification. */
+export function resourceScheduleCommandText(command: ResourceScheduleCommand): string {
+  const canonical = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, item]) => [key, canonical(item)]));
+    return value;
+  };
+  return JSON.stringify(canonical({ ...command, rules: canonicalResourceScheduleRules(command.rules) }));
+}
+
 /** Preserve each common interval boundary, including adjacent intervals. */
 export function resolveResourceDaySchedule({ business, policy, resourceId, dateKey }: { business: Pick<Business, 'weeklySchedule'>; policy: ResourceSchedulePolicy; resourceId: string; dateKey: string }): DaySchedule {
   const closed = (): DaySchedule => ({ isOpen: false, intervals: [] });
