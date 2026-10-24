@@ -47,9 +47,11 @@ pnpm test
 pnpm run build:pages
 ```
 
-`types` regenera `worker-configuration.d.ts`; no lo edites manualmente. `check` ejecuta pruebas, TypeScript y un dry-run del Worker con `--containers-rollout=none`. No publica recursos ni construye la imagen. El dry-run completo `pnpm --filter sarin-cloudflare-host dry-run` construye la imagen y requiere Docker activo. Workers Builds ofrece la alternativa de construirla en Cloudflare. La verificación final registró 675 pruebas de aplicación aprobadas con 20 integraciones omitidas, 18 del CLI de migración y 67 del Worker. El gateway conserva sus 25 pruebas de la fase anterior. La evidencia de builds y aceptación externa autenticada se registra por separado en [QA de datos](../docs/qa/2026-10-16-cloudflare-data-migration.md).
+`types` regenera `worker-configuration.d.ts`; no lo edites manualmente. `check` ejecuta pruebas, TypeScript y un dry-run del Worker con `--containers-rollout=none`. No publica recursos ni construye la imagen. El dry-run completo `pnpm --filter sarin-cloudflare-host dry-run` construye la imagen y requiere Docker activo. Workers Builds admite construirla en Cloudflare, pero sustituir Actions por ese mecanismo exige retirar el coordinador anterior; no habilitar ambos autodeploys. La verificación histórica del corte registró 675 pruebas de aplicación aprobadas con 20 integraciones omitidas, 18 del CLI de migración y 67 del Worker. El gateway conserva sus 25 pruebas de la fase anterior. La evidencia de builds y aceptación externa autenticada se registra por separado en [QA de datos](../docs/qa/2026-10-16-cloudflare-data-migration.md).
 
 ## Build y runtime
+
+El flujo normal es **push a `main` → verificación en GitHub Actions → imagen y Worker/Container → Pages**. Ver [configuración y recuperación del despliegue](../docs/main-cloudflare-release.md). El flujo conserva variables y secretos de runtime y fija la imagen por digest. `configure:build`, descrito a continuación, se conserva como herramienta local; su archivo generado no es la configuración de publicación usada por Actions.
 
 `cloudflare/wrangler.jsonc` mantiene `@cloudflare/containers` 0.3.7, un contenedor `basic`, máximo una instancia y el nombre constante `sarin-global-app`. `configure:build` genera `cloudflare/wrangler.build.json`, ignorado por Git, con únicamente los cuatro argumentos públicos Firebase:
 
