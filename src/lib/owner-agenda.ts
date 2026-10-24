@@ -15,6 +15,20 @@ const MINUTE_MS = 60000;
 const colombiaDate = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit',
 });
+const colombiaTime = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota', calendar: 'iso8601', numberingSystem: 'latn',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  second: '2-digit', fractionalSecondDigits: 3, hourCycle: 'h23',
+});
+
+// A UTC-shaped coordinate for the actual Bogotá wall clock, including historical offsets.
+function wallTimestamp(value: number): number | null {
+  if (!Number.isFinite(value) || !Number.isFinite(new Date(value).getTime())) return null;
+  const parts = Object.fromEntries(colombiaTime.formatToParts(value).map(part => [part.type, part.value]));
+  const day = dateTimestamp(`${parts.year.padStart(4, '0')}-${parts.month}-${parts.day}`);
+  if (day === null) return null;
+  return day + Number(parts.hour) * 60 * MINUTE_MS + Number(parts.minute) * MINUTE_MS + Number(parts.second) * 1000 + Number(parts.fractionalSecond);
+}
 
 function dateTimestamp(dateKey: string): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
@@ -64,14 +78,12 @@ export function getOwnerAgendaDayLayout(dateKey: string, appointments: Appointme
   const blocks: OwnerAgendaBlock[] = [];
   const warnings: Record<string, string[]> = {};
   const timestamp = dateTimestamp(dateKey);
-  const dayStart = timestamp === null ? NaN : timestamp + 5 * 60 * MINUTE_MS;
-  const dayEnd = dayStart + DAY_MS;
   const warn = (id: string, message: string) => {
     // IDs are server data; define an own property even for names such as __proto__.
     if (!Object.hasOwn(warnings, id)) Object.defineProperty(warnings, id, { value: [], enumerable: true });
     warnings[id].push(message);
   };
-  const minute = (value: number) => Math.max(0, Math.min(1440, (value - dayStart) / MINUTE_MS));
+  const clipMinute = (value: number) => Math.max(0, Math.min(1440, value));
   const ordered = [...appointments].sort((a, b) => {
     const aStart = Number.isFinite(a.startAt) ? a.startAt : Infinity;
     const bStart = Number.isFinite(b.startAt) ? b.startAt : Infinity;
@@ -79,7 +91,7 @@ export function getOwnerAgendaDayLayout(dateKey: string, appointments: Appointme
   });
   for (const item of ordered) {
     const manual = item.type === 'manual_block';
-    if (!Number.isFinite(dayStart) || !Number.isFinite(item.startAt) || !Number.isFinite(item.endAt) || item.endAt <= item.startAt) {
+    if (timestamp === null || !Number.isFinite(item.startAt) || !Number.isFinite(item.endAt) || item.endAt <= item.startAt) {
       warn(item.id, 'Horario no verificable');
       continue;
     }
@@ -88,13 +100,25 @@ export function getOwnerAgendaDayLayout(dateKey: string, appointments: Appointme
       if (Number.isFinite(item.reservedUntilAt) && item.reservedUntilAt >= item.endAt) reservedEnd = item.reservedUntilAt;
       else warn(item.id, 'Margen no registrado');
     }
-    if (reservedEnd <= dayStart || item.startAt >= dayEnd) {
+    const startWall = wallTimestamp(item.startAt);
+    const endWall = wallTimestamp(item.endAt);
+    const reservedWall = wallTimestamp(reservedEnd);
+    // A fixed 24-hour graphic cannot faithfully represent an interval across an offset change.
+    if (startWall === null || endWall === null || reservedWall === null ||
+      endWall - startWall !== item.endAt - item.startAt || reservedWall - endWall !== reservedEnd - item.endAt) {
       warn(item.id, 'Horario no verificable');
       continue;
     }
-    if (item.startAt < dayStart || reservedEnd > dayEnd) warn(item.id, 'El registro continúa fuera de este día');
+    const startMinute = (startWall - timestamp) / MINUTE_MS;
+    const serviceEndMinute = (endWall - timestamp) / MINUTE_MS;
+    const reservedEndMinute = (reservedWall - timestamp) / MINUTE_MS;
+    if (reservedEndMinute <= 0 || startMinute >= 1440) {
+      warn(item.id, 'Horario no verificable');
+      continue;
+    }
+    if (startMinute < 0 || reservedEndMinute > 1440) warn(item.id, 'El registro continúa fuera de este día');
     if (item.status !== 'confirmed') continue;
-    blocks.push({ appointmentId: item.id, resourceId: item.resourceId, startMinute: minute(item.startAt), serviceEndMinute: minute(item.endAt), reservedEndMinute: minute(reservedEnd), lane: 0, laneCount: 1, manual });
+    blocks.push({ appointmentId: item.id, resourceId: item.resourceId, startMinute: clipMinute(startMinute), serviceEndMinute: clipMinute(serviceEndMinute), reservedEndMinute: clipMinute(reservedEndMinute), lane: 0, laneCount: 1, manual });
   }
 
   const byResource = new Map<string, OwnerAgendaBlock[]>();

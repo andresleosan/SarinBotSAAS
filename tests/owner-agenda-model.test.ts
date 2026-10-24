@@ -119,6 +119,45 @@ describe('saved owner agenda occupancy', () => {
     expect(layout.warnings).toEqual({ cross: ['El registro continúa fuera de este día'], bad: ['Horario no verificable'], backwards: ['Horario no verificable'], 'wrong-day': ['Horario no verificable'] });
     expect(appointments.map(item => item.id)).toEqual(['cross', 'bad', 'backwards', 'wrong-day']);
   });
+  it('historicalBogotaOffsetKeepsNineAtNine', () => {
+    const historicalDate = '1992-06-01';
+    const layout = getOwnerAgendaDayLayout(historicalDate, [appointment('historical', {
+      dateKey: historicalDate,
+      startAt: Date.parse('1992-06-01T09:00:00-04:00'),
+      endAt: Date.parse('1992-06-01T09:30:00-04:00'),
+      reservedUntilAt: Date.parse('1992-06-01T09:45:00-04:00'),
+    })]);
+    expect(layout.blocks[0]).toMatchObject({ startMinute: 540, serviceEndMinute: 570, reservedEndMinute: 585 });
+    expect(layout.warnings).toEqual({});
+  });
+  it('historicalBogotaDayClipsAtItsOwnLocalMidnight', () => {
+    const historicalDate = '1992-06-01';
+    const appointments = [appointment('early', {
+      dateKey: historicalDate, startAt: Date.parse('1992-06-01T00:15:00-04:00'),
+      endAt: Date.parse('1992-06-01T00:30:00-04:00'), reservedUntilAt: Date.parse('1992-06-01T00:45:00-04:00'),
+    }), appointment('late', {
+      dateKey: historicalDate, startAt: Date.parse('1992-06-01T23:30:00-04:00'),
+      endAt: Date.parse('1992-06-02T00:15:00-04:00'), reservedUntilAt: Date.parse('1992-06-02T00:30:00-04:00'),
+    })];
+    const layout = getOwnerAgendaDayLayout(historicalDate, appointments);
+    expect(layout.blocks.map(({ appointmentId, startMinute, serviceEndMinute, reservedEndMinute }) => ({ appointmentId, startMinute, serviceEndMinute, reservedEndMinute }))).toEqual([
+      { appointmentId: 'early', startMinute: 15, serviceEndMinute: 30, reservedEndMinute: 45 },
+      { appointmentId: 'late', startMinute: 1410, serviceEndMinute: 1440, reservedEndMinute: 1440 },
+    ]);
+    expect(layout.warnings).toEqual({ late: ['El registro continúa fuera de este día'] });
+    expect(appointments).toHaveLength(2);
+  });
+  it('offsetTransitionStaysInTheListWithoutAnAmbiguousGraphInterval', () => {
+    const historicalDate = '1992-05-03';
+    const appointments = [appointment('transition', {
+      dateKey: historicalDate, startAt: Date.parse('1992-05-02T23:30:00-05:00'),
+      endAt: Date.parse('1992-05-03T01:30:00-04:00'), reservedUntilAt: Date.parse('1992-05-03T01:45:00-04:00'),
+    })];
+    const layout = getOwnerAgendaDayLayout(historicalDate, appointments);
+    expect(layout.blocks).toEqual([]);
+    expect(layout.warnings.transition).toEqual(['Horario no verificable']);
+    expect(appointments[0].id).toBe('transition');
+  });
   it('invalidStartDoesNotDisruptChronologicalOrderingOrLanes', () => {
     const layout = getOwnerAgendaDayLayout(dateKey, [
       appointment('a-later', { startAt: at('10:00'), endAt: at('10:15'), reservedUntilAt: at('10:15') }),
