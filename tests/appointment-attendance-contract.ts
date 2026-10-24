@@ -30,6 +30,10 @@ export const attendanceCommand = {
   requestId: 'demo-attendance-request', expectedRevision: 0, expectedRescheduleRevision: 0,
   expectedStatus: 'confirmed' as const, status: 'completed' as const,
 };
+export const attendanceCorrectionCommand = {
+  requestId: 'demo-attendance-correction', expectedRevision: 1, expectedRescheduleRevision: 0,
+  expectedStatus: 'completed' as const, status: 'no_show' as const, correctionReason: 'recording_error' as const,
+};
 
 /** Synthetic local fixture shared by memory, D1 and route characterizations. */
 export async function attendanceFixture(db: Database) {
