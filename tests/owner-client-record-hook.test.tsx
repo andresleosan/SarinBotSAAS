@@ -69,6 +69,67 @@ it('headRefreshDoesNotMixOldPages', async () => { fetchMock.mockResolvedValueOnc
 it('repeatedIdFromCurrentPageRequiresRefresh', async () => { const duplicate = page(1, 20); duplicate.rows[0].appointmentId = 'demo-000'; fetchMock.mockResolvedValueOnce(response(page(20))).mockResolvedValueOnce(response(duplicate)); await mount(); await act(async () => result.loadOlder()); expect(result.page?.rows).toHaveLength(20); expect(result.error).toMatch(/Actualizar/); await act(async () => result.loadOlder()); expect(fetchMock).toHaveBeenCalledTimes(2); });
 it('anchorChangedOffersRestart', async () => { fetchMock.mockResolvedValueOnce(response(page(20))).mockResolvedValueOnce(response({ code: 'CLIENT_RECORD_CHANGED' }, 409)).mockResolvedValueOnce(response(page(1))); await mount(); await act(async () => result.loadOlder()); expect(result.error).toMatch(/Actualizar/); await act(async () => result.loadOlder()); expect(fetchMock).toHaveBeenCalledTimes(2); await act(async () => result.refresh()); expect(result.page?.rows).toHaveLength(1); });
 it('failedHeadRefreshKeepsChangedAnchorBlocked', async () => { fetchMock.mockResolvedValueOnce(response(page(20))).mockResolvedValueOnce(response({}, 409)).mockResolvedValueOnce(response({}, 503)); await mount(); await act(async () => result.loadOlder()); await act(async () => result.refresh()); await act(async () => result.loadOlder()); expect(fetchMock).toHaveBeenCalledTimes(3); expect(result.error).toMatch(/Actualizar/); });
+it('409HeadersWithHangingBodyKeepCursorBlockedAfterDeadlineAndFailedHeadRefresh', async () => {
+  const body = deferred<never>();
+  fetchMock.mockResolvedValueOnce(response(page(20)))
+    .mockResolvedValueOnce({ ...response(null, 409), json: () => body.promise } as Response)
+    .mockResolvedValueOnce(response({}, 503))
+    .mockResolvedValueOnce(response(page(20)))
+    .mockResolvedValueOnce(response(page(1, 20)));
+  await mount();
+  await act(async () => { void result.loadOlder(); });
+  await act(async () => vi.advanceTimersByTimeAsync(10_000));
+  expect(result.page?.rows).toHaveLength(20);
+  expect(result.error).toMatch(/Actualizar/);
+  await act(async () => result.loadOlder());
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  await act(async () => result.refresh());
+  expect(JSON.parse(String(init(2).body))).not.toHaveProperty('cursor');
+  await act(async () => result.loadOlder());
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(result.error).toMatch(/Actualizar/);
+  await act(async () => result.refresh());
+  await act(async () => result.loadOlder());
+  expect(result.page?.rows[0].appointmentId).toBe('demo-020');
+  expect(fetchMock).toHaveBeenCalledTimes(5);
+  await act(async () => body.reject(new Error('late 409 body failure')));
+  expect(result.error).toBeNull();
+});
+it('409HeadersSettleImmediatelySoExplicitRefreshDoesNotWaitForBody', async () => {
+  const body = deferred<never>();
+  fetchMock.mockResolvedValueOnce(response(page(20)))
+    .mockResolvedValueOnce({ ...response(null, 409), json: () => body.promise } as Response)
+    .mockResolvedValueOnce(response(page(1)));
+  await mount();
+  let settled = false;
+  await act(async () => { void result.loadOlder().then(() => { settled = true; }); });
+  expect(settled).toBe(true);
+  expect(result.loading).toBe(false);
+  expect(result.error).toMatch(/Actualizar/);
+  expect(init(1).signal?.aborted).toBe(true);
+  expect(vi.getTimerCount()).toBe(0);
+  await act(async () => result.refresh());
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(result.page?.rows).toHaveLength(1);
+  await act(async () => body.reject(new Error('late 409 body failure')));
+});
+it('stale409HeadersCannotBlockContinuationInNewScope', async () => {
+  const pending = deferred<Response>();
+  fetchMock.mockResolvedValueOnce(response(page(20))).mockReturnValueOnce(pending.promise);
+  await mount();
+  await act(async () => { void result.loadOlder(); });
+  const nextScope = { ...scope, sourceAppointmentId: 'new-source' };
+  const nextPage = (count: number, offset = 0) => ({ ...page(count, offset), scope: { ...page().scope, sourceAppointmentId: nextScope.sourceAppointmentId } });
+  input = { ...input, scope: nextScope };
+  fetchMock.mockResolvedValueOnce(response(nextPage(20))).mockResolvedValueOnce(response(nextPage(1, 20)));
+  await update();
+  await act(async () => pending.resolve(response({}, 409)));
+  expect(result.error).toBeNull();
+  await act(async () => result.loadOlder());
+  expect(fetchMock).toHaveBeenCalledTimes(4);
+  expect(result.page?.scope.sourceAppointmentId).toBe('new-source');
+  expect(result.page?.rows[0].appointmentId).toBe('demo-020');
+});
 it('disablingAbortsAndMasksWithoutReportingAuthorizationLoss', async () => { const close = vi.fn(); input.onAccessLost = close; await mount(); const pending = deferred<Response>(); fetchMock.mockReturnValue(pending.promise); await act(async () => { void result.refresh(); }); input = { ...input, enabled: false }; renders = []; await update(); expect(renders[0].page).toBeNull(); expect(init(1).signal?.aborted).toBe(true); expect(close).not.toHaveBeenCalled(); await act(async () => pending.resolve(response({}, 403))); expect(close).not.toHaveBeenCalled(); await act(async () => vi.advanceTimersByTimeAsync(60_000)); expect(fetchMock).toHaveBeenCalledTimes(2); });
 it('callbackIdentityChangesDoNotRestartReads', async () => { input.onAccessLost = vi.fn(); await mount(); input = { ...input, onAccessLost: vi.fn() }; await update(); expect(fetchMock).toHaveBeenCalledTimes(1); });
 it('explicitReopenCanReadSameScopeAfterAuthorizationLoss', async () => { fetchMock.mockResolvedValueOnce(response({}, 403)); await mount(); expect(result.page).toBeNull(); input = { ...input, enabled: false }; await update(); input = { ...input, enabled: true }; await update(); expect(result.page?.rows).toHaveLength(1); });

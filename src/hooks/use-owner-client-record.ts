@@ -84,7 +84,13 @@ export function useOwnerClientRecord(input: {
       const path = `/api/businesses/${encodeURIComponent(scope.businessId)}/appointments/${encodeURIComponent(scope.sourceAppointmentId)}/client-record`;
       // Both handlers stay attached after cancellation: late token/body failures are consumed.
       void apiFetch<unknown>(path, { method: 'POST', body: JSON.stringify(body.data), signal: controller.signal }, scope.ownerUid, owns,
-        status => { if (status === 401 || status === 403) loseAccess(); })
+        status => {
+          if (status === 401 || status === 403) loseAccess();
+          if (status === 409 && owns()) {
+            publish({ key, page: previous?.page ?? null, loading: false, error: changedMessage, restart: true });
+            finish(true);
+          }
+        })
         .then(raw => {
           if (!owns()) return;
           const parsed = ownerClientRecordPageSchema.safeParse(raw);
