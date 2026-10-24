@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
   buildImportSql, buildReversePlan, canonicalJson, captureFirestoreSnapshot, collectFirestoreDocuments, decodeFirestoreValue,
-  prepareMigration, privateDirectory, restoreFirestoreWrites, sha256, verifyImportedRows, verifyMigration, normalizeImportedRow,
+  prepareMigration, privateDirectory, restoreFirestoreWrites, sha256, verifyImportedRows, verifyMigration, normalizeImportedRow, encodeFirestoreValue,
   readPreparedBundle, resolveBackupDirectory, writePreparedBundle, writeSourceBackup,
 } from '../scripts/lib/data-migration.mjs';
 import { firestoreRequester, googleCloudSdkCommand, parseArguments, queryD1 } from '../scripts/cloudflare-data-migration.mjs';
 import { createDataTestRuntime } from '../cloudflare/tests/data-runtime.mjs';
 import { verifyD1Backup } from '../scripts/verify-d1-backup.mjs';
+import { attendanceCorrectionCommand, attendanceFixture, attendanceNow } from './appointment-attendance-contract';
+import { updateAppointmentAttendance } from '@/lib/server/appointment-attendance';
+import { memoryFirestore } from './memoryFirestore';
 
 const prefix = 'projects/sarinbotsaas/databases/(default)/documents/';
 const stamp = '2026-10-16T12:00:00.123456Z';
@@ -34,6 +37,55 @@ function snapshot() {
 }
 
 describe('Firestore migration artifacts', () => {
+  it('preserves attendance IDs fingerprints sequence and private actors through snapshot reverse reconciliation and actual SQL R2 backup recovery', async () => {
+    const memory = memoryFirestore(), f = await attendanceFixture(memory.db);
+    // Use real domain-produced audit documents; keep all data synthetic.
+    const { vi } = await import('vitest');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(attendanceNow);
+    const encodeRow = ([path, row]: [string, { data: Record<string, unknown> }]) => rawDocument(path, Object.fromEntries(Object.entries(row.data).map(([key, value]) => [key, encodeFirestoreValue(value)])));
+    let runtime: Awaited<ReturnType<typeof createDataTestRuntime>> | undefined;
+    const directory = await mkdtemp(join(tmpdir(), 'sarin-migration-fixture-'));
+    try {
+      await updateAppointmentAttendance(f.owner, f.business.id, f.appointment.id, f.command, memory.db);
+      const baseline = { ...snapshot(), documents: [...snapshot().documents, ...[...memory.rows].map(encodeRow)] };
+      await updateAppointmentAttendance(f.owner, f.business.id, f.appointment.id, attendanceCorrectionCommand, memory.db);
+      const current = { ...snapshot(), documents: [...snapshot().documents, ...[...memory.rows].map(encodeRow)] };
+      const bundle = prepareMigration(current, { updatedAt: attendanceNow });
+      runtime = await createDataTestRuntime();
+      await runtime.db.exec(buildImportSql(bundle));
+      for (const blob of bundle.blobs) await runtime.bucket.put(blob.key, blob.bytes, { httpMetadata: { contentType: blob.contentType } });
+      const rows = (await runtime.db.prepare('SELECT * FROM app_documents ORDER BY path').all()).results;
+      expect(verifyImportedRows(bundle, rows).documents).toBe(bundle.rows.length);
+      const plan = buildReversePlan({ baseline, rows, blobs: bundle.blobs, revision: 0 });
+      expect(plan.deletionCandidates).toEqual([]);
+      const eventWrites = plan.upserts.filter((write: { update: { name: string } }) => write.update.name.includes('/attendanceEvents/'));
+      expect(eventWrites).toHaveLength(2);
+      expect(eventWrites.map((write: { currentDocument: unknown }) => write.currentDocument)).toContainEqual({ exists: false });
+      const roundtrip = prepareMigration({ ...current, documents: plan.upserts.map((write: { update: { name: string; fields: Record<string, unknown> } }) => ({ ...write.update, createTime: stamp, updateTime: stamp })) }, { updatedAt: attendanceNow });
+      expect(roundtrip.rows).toEqual(bundle.rows);
+      const events = bundle.rows.filter((row: { path: string }) => row.path.includes('/attendanceEvents/')).sort((a: { data: { sequence: number } }, b: { data: { sequence: number } }) => a.data.sequence - b.data.sequence);
+      expect(events.map((row: { data: { sequence: number } }) => row.data.sequence)).toEqual([1, 2]);
+      for (const event of events) {
+        expect(event.data.actorUid === f.owner.uid).toBe(true);
+        expect(event.data.requestFingerprint).toMatch(/^[a-f0-9]{64}$/);
+      }
+      const migrations = new URL('../cloudflare/migrations/', import.meta.url);
+      const schema = (await Promise.all((await readdir(migrations)).filter(name => /^\d+.*\.sql$/.test(name)).sort().map(name => readFile(new URL(name, migrations), 'utf8')))).join('\n');
+      const sqlBytes = Buffer.from(`${schema}\n${buildImportSql(bundle)}`), sqlHash = sha256(sqlBytes);
+      await writeFile(join(directory, 'sarin-bot-data.sql'), sqlBytes);
+      await writeFile(join(directory, 'export-manifest.json'), JSON.stringify({ ok: true, filename: 'sarin-bot-data.sql', sha256: sqlHash, bytes: sqlBytes.length }));
+      await mkdir(join(directory, 'r2-objects'));
+      for (const blob of bundle.blobs) await writeFile(join(directory, 'r2-objects', blob.sha256), blob.bytes);
+      await writeFile(join(directory, 'r2-backup-manifest.json'), JSON.stringify({ sourceSqlSha256: sqlHash, bucket: 'sarin-bot-files', references: bundle.manifest.blobs }));
+      const recovered = await verifyD1Backup(directory);
+      expect(recovered).toMatchObject({ ok: true, localOnly: true, dataPrinted: false, remoteMutations: false, integrity: 'ok', tables: { app_documents: { count: bundle.rows.length }, app_commits: { count: 0 }, app_revision: { count: 1 } }, r2: { objects: 1, verified: true } });
+      expect(recovered.schema.count).toBe((await runtime.db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE tbl_name IN ('app_commits','app_documents','app_revision') AND name NOT LIKE 'sqlite_%'").all()).results.length);
+    } finally {
+      clock.mockRestore(); await runtime?.dispose();
+      expect(dirname(resolve(directory))).toBe(resolve(tmpdir())); expect(basename(directory).startsWith('sarin-migration-fixture-')).toBe(true);
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 60000);
   it('preserves both R2 prefixes with identical bytes and reopens old-style hash-named files', async () => {
     const bytes = webp(), source = snapshot();
     source.documents.push(logoDocument(bytes), rawDocument('paymentImages/shared', { receiptDataUrl: { stringValue: `data:image/webp;base64,${bytes.toString('base64')}` } }));

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { initializeTestEnvironment, assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, setLogLevel } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, setLogLevel } from 'firebase/firestore';
 
 describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real emulator', () => {
   let environment: RulesTestEnvironment;
@@ -37,6 +37,30 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
     });
   });
   afterAll(async () => { await environment?.cleanup(); });
+  it('denies private attendance audit to every browser SDK while authorized appointment reads preserve only metadata', async () => {
+    const appointment = { client: { uid: 'customer' }, dateKey: '2026-10-14', status: 'completed', attendance: { revision: 1, lastEventId: 'synthetic-event' } };
+    await environment.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'businesses/one/appointments/mine'), appointment);
+      await setDoc(doc(context.firestore(), 'businesses/one/attendanceEvents/synthetic-event'), { actorUid: 'owner-one', reason: 'recording_error', sequence: 1, appointmentId: 'mine' });
+    });
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('owner-one'), environment.authenticatedContext('customer'), environment.authenticatedContext('other-account'), environment.authenticatedContext('stale-admin', { isSuperadmin: true })]) {
+      const db = context.firestore(), ref = doc(db, 'businesses/one/attendanceEvents/synthetic-event');
+      await assertFails(getDoc(ref));
+      await assertFails(getDocs(collection(db, 'businesses/one/attendanceEvents')));
+      await assertFails(getDocs(query(collection(db, 'businesses/one/attendanceEvents'), where('appointmentId', '==', 'mine'))));
+      await assertFails(setDoc(doc(db, 'businesses/one/attendanceEvents/forged'), { actorUid: 'owner-one' }));
+      await assertFails(updateDoc(ref, { reason: 'recording_error' }));
+      await assertFails(deleteDoc(ref));
+    }
+    for (const uid of ['owner-one', 'customer']) {
+      const ref = doc(environment.authenticatedContext(uid).firestore(), 'businesses/one/appointments/mine');
+      const read = await assertSucceeds(getDoc(ref));
+      expect(read.data()).toEqual(appointment);
+      expect(read.data()).not.toHaveProperty('actorUid'); expect(read.data()).not.toHaveProperty('reason'); expect(read.data()).not.toHaveProperty('events');
+      await assertFails(updateDoc(ref, { status: 'no_show', attendance: { revision: 2 } }));
+    }
+    await assertFails(getDoc(doc(environment.authenticatedContext('other-account').firestore(), 'businesses/one/appointments/mine')));
+  });
   it('allows owner queries and denies cross-tenant reads and browser writes', async () => {
     const db = environment.authenticatedContext('owner-one').firestore();
     await assertSucceeds(getDoc(doc(db,'businesses','one')));

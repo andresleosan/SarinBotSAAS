@@ -20,6 +20,10 @@ import sharp from 'sharp';
 import { createBookingProposal, confirmBookingProposal } from '@/lib/server/booking-proposals';
 import { updateClientPolicy } from '@/lib/server/client-policy';
 import { acceptSyntheticConsent } from './consent-fixtures';
+import { attendanceCorrectionCommand, attendanceFixture } from './appointment-attendance-contract';
+import { updateAppointmentAttendance } from '@/lib/server/appointment-attendance';
+import { clientPolicyKey } from '@/lib/server/client-policy';
+import { toColombiaTimestamp } from '@/lib/sarin/availability';
 
 function user(uid: string): DecodedIdToken { return { uid, sub:uid, aud:'demo-sarin-bot', auth_time:0, exp:9999999999, iat:0, iss:'https://securetoken.google.com/demo-sarin-bot', firebase:{identities:{},sign_in_provider:'google.com'}, email:`${uid}@example.test`, name:uid }; }
 
@@ -47,6 +51,43 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     return createBusiness(identity, chosenConfig, db);
   }
   afterAll(async () => { if (db) { await db.terminate(); const app = getApps().find(value => value.name === 'sarin-admin'); if (app) await deleteApp(app); } });
+  it('serializes attendance and corrections with appointment event and both locks through independent Admin SDK handles', async () => {
+    // This test must never select a real Firebase project or a remote endpoint.
+    expect(process.env.FIRESTORE_EMULATOR_HOST).toMatch(/^(?:127\.0\.0\.1|localhost):\d+$/);
+    const app = initializeApp({ projectId: 'demo-sarin-bot' }, `demo-attendance-${crypto.randomUUID()}`), secondDb = getFirestore(app);
+    try {
+      const f = await attendanceFixture(db);
+      // Real SDK deadlines mix new Date() and Date.now(); keep their real clock
+      // intact and put only this saved occurrence on the previous Colombia day.
+      const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() - 86400000));
+      const appointment = { ...f.appointment, dateKey: day, startAt: toColombiaTimestamp(day, '09:00'), endAt: toColombiaTimestamp(day, '09:30'), reservedUntilAt: toColombiaTimestamp(day, '09:45') };
+      await f.appointmentRef.set(appointment);
+      const earliestRecordAt = Date.now();
+      const save = (handle: Firestore, command = f.command as { requestId: string; expectedRevision: number; expectedRescheduleRevision: number; expectedStatus: 'confirmed' | 'completed' | 'no_show'; status: 'completed' | 'no_show'; correctionReason?: 'recording_error' }) => updateAppointmentAttendance(f.owner, f.business.id, f.appointment.id, command, handle);
+      const outcomes = await Promise.allSettled([save(db), save(secondDb, { ...f.command, requestId: 'demo-admin-competitor', status: 'no_show' })]);
+      expect(outcomes.filter(row => row.status === 'fulfilled')).toHaveLength(1);
+      expect(outcomes.find(row => row.status === 'rejected')).toMatchObject({ reason: { code: 'ATTENDANCE_SOURCE_CHANGED' } });
+      const first = (await f.appointmentRef.get()).data()!;
+      const correction = { ...attendanceCorrectionCommand, expectedStatus: first.status as 'completed' | 'no_show', status: first.status === 'completed' ? 'no_show' as const : 'completed' as const };
+      const changes = await Promise.allSettled([save(db, correction), save(secondDb, { ...correction, requestId: 'demo-admin-correction-competitor' })]);
+      expect(changes.filter(row => row.status === 'fulfilled')).toHaveLength(1);
+      expect(changes.find(row => row.status === 'rejected')).toMatchObject({ reason: { code: 'ATTENDANCE_SOURCE_CHANGED' } });
+      const current = (await f.appointmentRef.get()).data()!;
+      expect(current).toMatchObject({ attendance: { revision: 2 }, beneficiary: f.appointment.beneficiary, client: f.appointment.client, subjectAuthorization: f.appointment.subjectAuthorization });
+      const events = await f.businessRef.collection('attendanceEvents').orderBy('sequence').get();
+      expect(events.docs.map(row => row.data()?.sequence)).toEqual([1, 2]);
+      expect(events.docs[1].id).toBe(current.attendance.lastEventId);
+      for (const event of events.docs) {
+        expect(event.data().recordedAt).toBeGreaterThanOrEqual(earliestRecordAt);
+        expect(event.data().recordedAt).toBeLessThanOrEqual(Date.now());
+        expect(event.data().source).toMatchObject({ dateKey: day, startAt: appointment.startAt, endAt: appointment.endAt, reservedUntilAt: appointment.reservedUntilAt });
+      }
+      for (const key of [`${day}_demo-chair`, `client_${clientPolicyKey(f.appointment.client!.uid)}`]) expect((await f.businessRef.collection('bookingLocks').doc(key).get()).data()).toMatchObject({ version: 2, updatedAt: events.docs[1].data()?.recordedAt });
+      expect((await f.businessRef.collection('bookingLocks').get()).size).toBe(2);
+      expect((await f.businessRef.collection('appointments').get()).size).toBe(1);
+      expect((await f.businessRef.get()).data()).toEqual(f.business);
+    } finally { await secondDb.terminate(); await deleteApp(app); }
+  }, 120000);
   it('confirms the three subject cases with scoped authorization across independent Firestore handles', async () => {
     const prior = process.env.SUPERADMIN_UID; process.env.SUPERADMIN_UID = subjectAdmin.uid;
     const app = initializeApp({ projectId: 'demo-sarin-bot' }, `demo-subject-${crypto.randomUUID()}`), secondDb = getFirestore(app);
