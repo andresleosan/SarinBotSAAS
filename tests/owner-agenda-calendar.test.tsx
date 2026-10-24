@@ -9,7 +9,13 @@ import type { OwnerAgendaDay } from '@/lib/owner-agenda';
 
 vi.mock('@/components/representation-review', () => ({ RepresentationReviewControls: vi.fn(() => null) }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-const business = { id: 'demo-shop', resources: [{ id: 'a', name: 'Ana · especialista de cabello y cuidado personal', active: true }, { id: 'b', name: 'Beatriz', active: true }, { id: 'old', name: 'Profesional anterior', active: false }], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '18:00' }] } } } as Business;
+const business: Business = {
+  id: 'demo-shop', slug: 'demo-shop', ownerUid: 'demo-owner', ownerEmail: 'owner@example.test', name: 'Negocio demo', category: 'Belleza', phoneWhatsApp: '573000000000', timezone: 'America/Bogota',
+  subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 9999999999999 },
+  sarinConfig: { onboardingCompleted: true, tone: 'cercano', customRules: '', intakeFields: [] },
+  resources: [{ id: 'a', name: 'Ana · especialista de cabello y cuidado personal', active: true }, { id: 'b', name: 'Beatriz', active: true }, { id: 'old', name: 'Profesional anterior', active: false }],
+  services: [], weeklySchedule: { 1: { isOpen: true, intervals: [{ start: '09:00', end: '18:00' }] } }, createdAt: 1,
+};
 const source: Appointment = { id: 'demo-visit', tenantId: business.id, dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:05', startAt: Date.parse('2030-01-07T14:00:00Z'), endAt: Date.parse('2030-01-07T14:05:00Z'), reservedUntilAt: Date.parse('2030-01-07T14:15:00Z'), type: 'appointment', resourceId: 'a', serviceName: 'Servicio completo de cinco minutos', status: 'confirmed', client: { uid: 'demo-client', name: 'Cliente privado', email: 'private@example.test', phone: '573111111111', intakeAnswers: { health: 'Dato de salud privado' } }, beneficiary: { kind: 'represented_minor', displayName: 'Beneficiario privado', representativeRole: 'parent' }, representationReview: { revision: 1, status: 'declared', reviewedBy: null, reviewedAt: null }, createdBy: 'sarin_client', createdAt: 1 };
 const dates = ['2030-01-07', '2030-01-08', '2030-01-09', '2030-01-10', '2030-01-11', '2030-01-12', '2030-01-13'];
 const ready = (appointments = [source], dateKey = dates[0]): OwnerAgendaDay => ({ dateKey, state: 'ready', appointments });
@@ -155,8 +161,13 @@ it('appointmentActionsRemainInsideTheirDetails', async () => {
   const review = vi.mocked(RepresentationReviewControls).mock.calls.at(-1)![0];
   expect(review.businessId).toBe(business.id);
   expect(review.appointment).toBe(source);
-  review.onSaved(source);
-  expect(onSaved).toHaveBeenCalledWith(source);
+  review.onSaved({ ...source, id: 'demo-different-card' });
+  review.onSaved({ ...source, dateKey: dates[1] });
+  review.onSaved({ ...source, tenantId: 'demo-other-shop' });
+  expect(onSaved).not.toHaveBeenCalled();
+  const saved = { ...source, representationReview: { ...source.representationReview!, revision: 2, status: 'reviewed' as const } };
+  review.onSaved(saved);
+  expect(onSaved).toHaveBeenCalledExactlyOnceWith(saved);
   expect(Object.keys(review).sort()).toEqual(['appointment', 'businessId', 'onSaved']);
   expect(content(root())).not.toMatch(/Mover|Completar|Marcar ausencia|Reservar aquí/);
 });
@@ -220,4 +231,22 @@ it('outsideWeekDayCannotBecomeSelectedDate', async () => {
   expect(outsideHeader.props.disabled).toBe(true);
   await act(async () => outsideHeader.props.onClick());
   expect(props.onDateChange).not.toHaveBeenCalled();
+});
+
+it.each(['__proto__', 'constructor', 'toString'])('warningFreePrototypeId %s KeepsBothCardsUsable', async id => {
+  const onCancel = vi.fn();
+  await list(ready([{ ...source, id, serviceName: 'Servicio con ID histórico' }, { ...source, id: 'demo-ordinary', serviceName: 'Otra cita del día' }]), { onCancel });
+  expect(root().findAllByType('li')).toHaveLength(2);
+  expect(content(root())).toContain('Servicio con ID histórico');
+  expect(content(root())).toContain('Otra cita del día');
+  expect(content(root())).not.toContain('Margen no registrado');
+  const card = root().findAllByType('details').find(node => content(node).includes('Servicio con ID histórico'))!;
+  await act(async () => card.findByType('button').props.onClick());
+  expect(onCancel).toHaveBeenCalledExactlyOnceWith(id);
+});
+
+it('ownWarningForPrototypeIdRemainsVisible', async () => {
+  await list(ready([{ ...source, id: '__proto__', reservedUntilAt: NaN }]));
+  expect(content(root())).toContain('Margen no registrado');
+  expect(root().findAllByType('details')).toHaveLength(1);
 });

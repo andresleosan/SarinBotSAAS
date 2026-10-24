@@ -36,6 +36,7 @@ export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, sa
                 const status = Object.hasOwn(labels, appointment.status) ? labels[appointment.status] : 'Estado sin reconocer';
                 const cancelled = appointment.status === 'cancelled_by_client' || appointment.status === 'cancelled_by_owner';
                 const resource = resources.find(item => item.id === appointment.resourceId)?.label ?? `Recurso no disponible · ${appointment.resourceId}`;
+                const cardContext = { appointmentId: appointment.id, dateKey, businessId: business.id };
                 return <li key={appointment.id} className="min-w-0">
                   <details className={'group rounded-2xl border border-sarin-line ' + (blocked ? 'bg-sarin-canvas' : 'bg-white')}>
                     <summary className="min-h-11 cursor-pointer rounded-2xl p-4 outline-none focus-visible:ring-2 focus-visible:ring-sarin-blue sm:p-5">
@@ -46,10 +47,12 @@ export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, sa
                       </span>
                     </summary>
                     <div className="space-y-3 border-t border-sarin-line px-4 py-4 text-sm sm:px-5">
-                      {warnings[appointment.id]?.map(warning => <p key={warning} className="text-amber-800">{warning}</p>)}
+                      {Object.hasOwn(warnings, appointment.id) && warnings[appointment.id].map(warning => <p key={warning} className="text-amber-800">{warning}</p>)}
                       {appointment.client && <div className="space-y-1"><p className="break-words text-sarin-ink">{appointment.client.name}</p><p className="break-all text-xs text-sarin-muted">{appointment.client.phone || appointment.client.email}</p></div>}
                       {!blocked && <p className="break-words [overflow-wrap:anywhere]">{appointment.beneficiary?.kind === 'represented_minor' ? <>Para: {appointment.beneficiary.displayName} · Gestionada por {appointment.client?.name || 'la cuenta reservante'}</> : appointment.beneficiary?.kind === 'self' ? <>Para la persona que reserva · Gestionada por {appointment.client?.name || 'la cuenta reservante'}</> : 'Registro anterior sin beneficiario declarado'}</p>}
-                      <RepresentationReviewControls businessId={business.id} appointment={appointment} onSaved={onSaved} />
+                      <RepresentationReviewControls businessId={business.id} appointment={appointment} onSaved={saved => {
+                        if (saved.id === cardContext.appointmentId && saved.dateKey === cardContext.dateKey && saved.tenantId === cardContext.businessId) onSaved(saved);
+                      }} />
                       {appointment.status === 'confirmed' && <div className="flex justify-end border-t border-sarin-line pt-3"><button type="button" disabled={saving} onClick={() => { if (!saving) onCancel(appointment.id); }} className="min-h-11 rounded-xl border border-sarin-line px-4 py-2 text-xs font-medium text-sarin-muted transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sarin-blue disabled:opacity-50">Cancelar {blocked ? 'bloqueo' : 'cita'}</button></div>}
                     </div>
                   </details>
