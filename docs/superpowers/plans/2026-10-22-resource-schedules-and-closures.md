@@ -50,7 +50,7 @@
 
 `owner-configuration-workspace` y `owner-agenda-calendar` son archivos producidos por planes anteriores, no archivos existentes en463. Integrar esos incrementos primero. Si cambian nombres durante ejecución, reconciliar interfaces antes de tocar código; no crear una segunda agenda/formulario. La reprogramación del dueño posterior consume funciones de tarea2, no implementa otro resolver.
 
-### Task1: Modelo, schemas y resolver puro
+### Task 1: Modelo, schemas y resolver puro
 
 **Files:** crear `src/lib/resource-schedules.ts`, `src/lib/sarin/calendar-time.ts`, `tests/resource-schedules.test.ts`; modificar `src/lib/sarin/availability.ts`, `tests/availability.test.ts`.
 
@@ -72,7 +72,7 @@ resolveResourceDaySchedule(input: { business: Pick<Business, 'weeklySchedule'>; 
 - [ ] Afirmar que común09:00–18:00 con seis cierres cortos disjuntos devuelve siete segmentos efectivos y ningún slot invade esos cierres. Max5 valida solo jornadas de entrada; no aplicar daySchema.max(5), slice(0,5) ni otra pérdida a los intervalos derivados, incluidos los que fragmenten intersecciones de semana/excepción.
 - [ ] Repetir pruebas; confirmar GREEN. Actualizar fixtures de tests que invocan getAvailableSlots con policy explícita, sin aflojar aserciones. Commit futuro focalizado `feat: resolve resource schedules and closures`.
 
-### Task2: Persistencia, CAS y recibos verificables de dueño
+### Task 2: Persistencia, CAS y recibos verificables de dueño
 
 **Files:** crear servidor/ruta y pruebas server/routes/integration de la tabla; modificar shared/data-protocol, cloudflare/tests/data.test.mjs y router/config/tests del gate de la tabla.
 
@@ -87,7 +87,7 @@ resolveResourceDaySchedule(input: { business: Pick<Business, 'weeklySchedule'>; 
 - [ ] Crear integración D1 con createDataTestRuntime/createCloudflareDatabase y **dos handles**, patrón `tests/appointment-reschedule.integration.test.ts`. Probar dos comandos expectedRevision0: exactamente uno escribe revision1; mismo requestId concurrente crea una revisión/recibo; response loss reenvía commit idéntico y replay de dominio reconoce evidencia después de revision2. Corromper policy existente ⇒ error explícito, no herencia. Verificar documentos de negocio/publicBusiness/citas/cuotas sin cambios por PUT.
 - [ ] Ejecutar `pnpm exec vitest run tests/resource-schedules-server.test.ts tests/resource-schedules-routes.test.ts tests/resource-schedules.integration.test.ts` y `pnpm --filter sarin-cloudflare-host test` (script real node --test tests/*.test.mjs). Registrar resultados reales, no afirmar prueba por existir fixture. Commit futuro `feat: persist resource schedules with revision receipts`.
 
-### Task3: Aplicación uniforme en reserva, propuesta, reprogramación y espera
+### Task 3: Aplicación uniforme en reserva, propuesta, reprogramación y espera
 
 **Files:** modificar los cinco módulos servidor de tabla; actualizar suites existentes `tests/bookings.test.ts`, `tests/appointment-reschedule.test.ts`, `tests/appointment-reschedule.integration.test.ts`, `tests/next-availability.test.ts`, `tests/next-availability-d1.integration.test.ts`, `tests/waitlist-d1.test.ts`; ampliar `tests/resource-schedules.integration.test.ts`.
 
@@ -100,7 +100,7 @@ resolveResourceDaySchedule(input: { business: Pick<Business, 'weeklySchedule'>; 
 - [ ] No aplicar jornada al origen de una reprogramación, cancelación o resultado retrospectivo. Confirmación nueva valida destino actual. No modificar createManualBlock para exigir turno ni reemplazar sus controles de colisión.
 - [ ] Ejecutar `pnpm exec vitest run tests/resource-schedules.test.ts tests/resource-schedules.integration.test.ts tests/availability.test.ts tests/bookings.test.ts tests/appointment-reschedule.test.ts tests/appointment-reschedule.integration.test.ts tests/next-availability.test.ts tests/next-availability-d1.integration.test.ts tests/waitlist-d1.test.ts`; confirmar todas GREEN. `rg -n 'getAvailableSlots\(' src` debe mostrar policy explícita en todos los callers; typecheck también lo impone. Commit futuro `feat: enforce resource schedules across booking flows`.
 
-### Task4: Controlador, edición por pasos y recuperación de operación
+### Task 4: Controlador, edición por pasos y recuperación de operación
 
 **Files:** crear hook/workspace/ruta y `tests/use-resource-schedules.test.tsx`, `tests/resource-schedule-workspace.test.tsx`; modificar shell y OwnerConfigurationWorkspace.
 
@@ -129,7 +129,7 @@ ResourceScheduleWorkspace(props: { controller: ResourceScheduleController }): Re
 - [ ] Implementar ruta `/dashboard/schedule` y tres tareas de spec, revisión y guardar; sin portal/diálogos ocultos ni autofocus en vista ausente. AppShell recibe `businessNavigationPath='/dashboard/onboarding'`, unión opcional limitada a las cuatro rutas principales, ignorada en admin; introducir ese contrato si todavía no existe y FAQ lo reutiliza después. Enlace secundario Turnos y cierres desde Horarios de Mi negocio, en otra pestaña explícita, sin POST ni quinto destino principal. Probar `ownerKeepsFourDestinations` y contexto activo Mi negocio de la ruta nueva; conservar enlaces/guardias de otros incrementos. Mantener Configuración común en su ruta/guardado actual. Label genérico sin datos de clientes; no exponerlo al público. GET view.basis actual alimenta preview, no semana cacheada de otro poller.
 - [ ] Ejecutar `pnpm exec vitest run tests/use-resource-schedules.test.tsx tests/resource-schedule-workspace.test.tsx tests/owner-configuration-workspace.test.tsx tests/workspace-navigation.test.tsx`; GREEN. Commit futuro `feat: guide owners through resource schedule changes`.
 
-### Task5: Contexto readonly en agenda y verificación integrada
+### Task 5: Contexto readonly en agenda y verificación integrada
 
 **Files:** modificar OwnerAgendaCalendar/dashboard; crear `tests/resource-schedule-agenda.test.tsx`; QA futura de tabla.
 

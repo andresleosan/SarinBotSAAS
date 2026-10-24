@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getAvailableSlots } from '../src/lib/sarin/availability';
+import { emptyResourceSchedulePolicy } from '@/lib/resource-schedules';
 import type { Appointment, Tenant } from '../src/types/firestore';
 
 const tenant = {
@@ -14,7 +15,7 @@ const appointment = {
   reservedUntilAt: Date.parse('2030-01-07T09:45:00-05:00'), status: 'confirmed',
 } as Appointment;
 function slots(existingAppointments: Appointment[] = [], dateKey = '2030-01-07') {
-  return getAvailableSlots({ tenant, dateKey, serviceId: 'cut', existingAppointments })[0]?.slots ?? [];
+  return getAvailableSlots({ tenant, resourceSchedulePolicy: emptyResourceSchedulePolicy(tenant.id), dateKey, serviceId: 'cut', existingAppointments })[0]?.slots ?? [];
 }
 
 describe('real availability boundaries', () => {
@@ -36,6 +37,6 @@ describe('real availability boundaries', () => {
     expect(slots([], '2030-02-30')).toEqual([]);
   });
   it('rejects a zero step instead of looping forever', () => {
-    expect(() => getAvailableSlots({ tenant, dateKey: '2030-01-07', serviceId: 'cut', existingAppointments: [], stepMinutes: 0 })).toThrow();
+    expect(() => getAvailableSlots({ tenant, resourceSchedulePolicy: emptyResourceSchedulePolicy(tenant.id), dateKey: '2030-01-07', serviceId: 'cut', existingAppointments: [], stepMinutes: 0 })).toThrow();
   });
 });
