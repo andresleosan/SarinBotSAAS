@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { publicBuildArguments } from '../src/router.ts';
-import { APP, WORKER, PAGES, boundedJson, fail, hash, releaseConfig, runRelease, verifyImage, workerReady, pagesReady, commandDiagnostic } from './release-core.mjs';
+import { APP, WORKER, PAGES, boundedJson, fail, hash, releaseConfig, runRelease, verifyImage, workerReady, pagesReady, commandDiagnostic, pagesConfigFingerprint } from './release-core.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const wrangler = join(root, 'cloudflare/node_modules/wrangler/bin/wrangler.js');
@@ -107,7 +107,7 @@ async function main() {
       const body = await boundedJson(`https://api.github.com/repos/${repository}/git/ref/heads/main`, { headers: { Authorization: `Bearer ${githubToken}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
       return body.object?.sha;
     },
-    snapshot: async () => { progress('PREFLIGHT'); const value = await snapshot(); baselinePagesHash = hash(value.pages.deployment_configs); return value; },
+    snapshot: async () => { progress('PREFLIGHT'); const value = await snapshot(); baselinePagesHash = pagesConfigFingerprint(value.pages.deployment_configs); return value; },
     buildAndPush: async source => {
       progress('IMAGE_BUILD');
       const context = join(temporary, 'source'); await mkdir(context);
@@ -151,7 +151,7 @@ async function main() {
       return poll(async () => {
         const value = await snapshot();
         if (!workerReady(value, acceptedWorker)) fail('WORKER_CHANGED_AFTER_PAGES');
-        if (hash(value.pages.deployment_configs) !== baselinePagesHash) fail('PAGES_RUNTIME_CHANGED');
+        if (pagesConfigFingerprint(value.pages.deployment_configs) !== baselinePagesHash) fail('PAGES_RUNTIME_CHANGED');
         if (!pagesReady(value.pages, sha) || !await wake()) return false;
         return { pagesDeployment: value.pages.canonical_deployment.id };
       }, 2, 'PAGES_TIMEOUT');

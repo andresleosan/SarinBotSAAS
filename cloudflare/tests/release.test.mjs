@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { resolve, join, posix, win32 } from 'node:path';
-import { runRelease, validateSnapshot, releaseConfig, boundedJson, verifyImage, workerReady, pagesReady, commandDiagnostic } from '../scripts/release-core.mjs';
+import { runRelease, validateSnapshot, releaseConfig, boundedJson, verifyImage, workerReady, pagesReady, commandDiagnostic, pagesConfigFingerprint } from '../scripts/release-core.mjs';
 
 const sha = 'a'.repeat(40);
 const account = 'b'.repeat(32);
@@ -130,6 +130,37 @@ test('Pages project API uses production.services for service bindings', () => {
   production.service_bindings = production.services;
   delete production.services;
   assert.throws(() => validateSnapshot(value, config, account), /PAGES_TARGET/);
+});
+
+test('Pages config fingerprint ignores only the per-environment Wrangler source hash', () => {
+  const configs = snapshot().pages.deployment_configs;
+  configs.production.wrangler_config_hash = 'prior-production-config';
+  configs.preview = { env_vars: {}, wrangler_config_hash: 'prior-preview-config' };
+  const baseline = pagesConfigFingerprint(configs);
+  const after = structuredClone(configs);
+  delete after.production.wrangler_config_hash;
+  after.preview.wrangler_config_hash = 'new-preview-config';
+  assert.equal(pagesConfigFingerprint(after), baseline);
+  after.production.wrangler_config_hash = 'new-production-config';
+  delete after.preview.wrangler_config_hash;
+  assert.equal(pagesConfigFingerprint(after), baseline);
+  assert.equal(configs.production.wrangler_config_hash, 'prior-production-config');
+  for (const [key, value] of Object.entries({ env_vars: {}, services: {}, compatibility_date: '2026-10-24', compatibility_flags: ['nodejs_compat'], always_use_latest_compatibility_date: true, fail_open: false, build_image_major_version: 3, usage_model: 'standard', limits: { cpu_ms: 50 }, placement: { mode: 'smart' }, future_runtime_setting: true })) {
+    const changed = structuredClone(after); changed.production[key] = value;
+    assert.notEqual(pagesConfigFingerprint(changed), baseline, key);
+  }
+});
+
+test('Worker reconciliation survives Pages source-hash removal but blocks service runtime drift', () => {
+  const value = snapshot();
+  value.version.annotations['workers/tag'] = sha;
+  value.pages.deployment_configs.production.wrangler_config_hash = 'previous-git-build';
+  const baseline = validateSnapshot(value, config, account);
+  const parameters = { config, account, sha, image: { reference: value.app.configuration.image }, baseline };
+  delete value.pages.deployment_configs.production.wrangler_config_hash;
+  assert.equal(workerReady(value, parameters), true);
+  value.pages.deployment_configs.production.services.SARIN_APP_HOST.entrypoint = 'OtherHandler';
+  assert.throws(() => workerReady(value, parameters), /POST_DEPLOY_RUNTIME_CHANGED/);
 });
 
 test('reconciliation requires same tagged Worker, pinned image and sole running current instance', () => {

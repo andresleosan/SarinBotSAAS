@@ -7,6 +7,15 @@ export const APP = 'a032778c-ce3d-4673-b65a-4bf13fa3e02c';
 export const fail = code => { throw new Error(code); };
 const canonical = value => value && typeof value === 'object' ? Array.isArray(value) ? value.map(canonical) : Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
 export const hash = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
+export function pagesConfigFingerprint(configs) {
+  const runtime = structuredClone(configs);
+  // This describes the config file used by a deployment, not its runtime.
+  // Direct upload without a Wrangler Pages config may remove this metadata.
+  for (const environment of ['production', 'preview']) {
+    if (runtime?.[environment] && typeof runtime[environment] === 'object') delete runtime[environment].wrangler_config_hash;
+  }
+  return hash(runtime);
+}
 const same = (a, b) => hash(a) === hash(b);
 const sha256 = value => /^sha256:[a-f0-9]{64}$/.test(value ?? '');
 
@@ -89,7 +98,7 @@ export function validateSnapshot(snapshot, config, account, { allowRollout = fal
   // Raw values remain only in memory. Hashes detect drift without logging values.
   return {
     deploymentId: deployment.id, workerVersion: version.id, containerVersion: app.version, image: app.configuration.image,
-    preservedHash: hash({ bindings: [...bindings].sort((a, b) => a.name.localeCompare(b.name)), container: actualContainer, containerRuntime, compatibility_date: settings.compatibility_date, compatibility_flags: settings.compatibility_flags, crons: schedules.map(item => item.cron).sort(), subdomain, observability: settings.observability ?? null, containerObservability: app.observability ?? null, pagesConfig: pages.deployment_configs }),
+    preservedHash: hash({ bindings: [...bindings].sort((a, b) => a.name.localeCompare(b.name)), container: actualContainer, containerRuntime, compatibility_date: settings.compatibility_date, compatibility_flags: settings.compatibility_flags, crons: schedules.map(item => item.cron).sort(), subdomain, observability: settings.observability ?? null, containerObservability: app.observability ?? null, pagesConfig: pagesConfigFingerprint(pages.deployment_configs) }),
   };
 }
 
