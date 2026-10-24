@@ -5,6 +5,7 @@ import type { Business } from '@/types/firestore';
 import type { ChatActor } from '@/types/chat';
 import type { Database, Transaction } from '@/lib/storage/types';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { StorageError } from '@/lib/storage/database';
 import { canonicalResourceScheduleRules, emptyResourceSchedulePolicy, resolveResourceDaySchedule, resourceScheduleBasisSchema, resourceSchedulePolicySchema, resourceScheduleReceiptSchema, resourceScheduleRulesSchema, type ResourceScheduleBasis, type ResourceScheduleCommand, type ResourceSchedulePolicy, type ResourceScheduleRules, type ResourceScheduleSaveResult, type ResourceScheduleView } from '@/lib/resource-schedules';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { assertOwner, stableDocumentId } from './businesses';
@@ -46,7 +47,11 @@ export async function readResourceSchedulePolicy(tx: Transaction, businessId: st
     const parsed = resourceSchedulePolicySchema.safeParse(snapshot.data());
     if (!parsed.success || parsed.data.businessId !== businessId) throw unavailable();
     return { ...parsed.data, rules: canonicalResourceScheduleRules(parsed.data.rules) };
-  } catch { throw unavailable(); }
+  } catch (error) {
+    // The adapter must retry a transaction whose reads crossed revisions.
+    if (error instanceof StorageError && error.code === 'DATA_CONFLICT') throw error;
+    throw unavailable();
+  }
 }
 function validateContext(next: ResourceScheduleRules, previous: ResourceScheduleRules, business: Business, now: number) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);

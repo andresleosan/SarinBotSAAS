@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Database } from '@/lib/storage/types';
 import type { ResourceScheduleCommand, ResourceScheduleRules } from '@/lib/resource-schedules';
-import { resourceScheduleBasisFingerprint, readOwnerResourceSchedules, saveOwnerResourceSchedules } from '@/lib/server/resource-schedules';
+import { resourceScheduleBasisFingerprint, readResourceSchedulePolicy, readOwnerResourceSchedules, saveOwnerResourceSchedules } from '@/lib/server/resource-schedules';
+import { StorageError } from '@/lib/storage/database';
+import type { Transaction } from '@/lib/storage/types';
 import { memoryFirestore } from './memoryFirestore';
 import { scheduleNow, seedScheduleFixture } from './resource-schedules-fixture';
 const empty = (): ResourceScheduleRules => ({ weekly: [], exceptions: [], closures: [] });
 async function fixture(consent = true) { const memory = memoryFirestore(); const db = memory.db as unknown as Database; return { ...await seedScheduleFixture(db, consent), db, rows: memory.rows }; }
 async function command(f: Awaited<ReturnType<typeof fixture>>, requestId = 'demo-schedule-one', rules = empty()): Promise<ResourceScheduleCommand> { const view = await readOwnerResourceSchedules(f.owner, f.business.id, undefined, f.db); return { requestId, expectedRevision: view.policy.revision, expectedBasisFingerprint: view.basisFingerprint, rules }; }
 const close = (fromDateKey = '2030-01-07', id = 'closed') => ({ weekly: [], exceptions: [], closures: [{ id, scope: 'business' as const, fromDateKey, throughDateKey: fromDateKey, interval: null, label: '' }] });
+it('transactionRevisionConflictReachesAdapterForRetry', async () => { const f = await fixture(), conflict = new StorageError(409, 'DATA_CONFLICT'); const tx = { get: async () => { throw conflict; } } as unknown as Transaction; await expect(readResourceSchedulePolicy(tx, f.business.id, f.db)).rejects.toBe(conflict); });
 beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(scheduleNow); vi.stubEnv('SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED', 'true'); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
