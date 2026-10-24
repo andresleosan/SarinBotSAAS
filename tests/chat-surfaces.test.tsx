@@ -1,7 +1,8 @@
 import { act, createElement, Suspense, useEffect, type ReactNode } from "react";
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import OnboardingPage from "@/app/dashboard/onboarding/page";
+import { ConfigurationAssistant } from "@/components/configuration-assistant";
+import { createOwnerConfigurationDraft } from "@/lib/owner-configuration";
 import ClientPage from "@/app/b/[slug]/page";
 import DashboardPage from "@/app/dashboard/page";
 vi.mock('@/components/client-policy-controls', () => ({ ClientPolicyControls: () => null }));
@@ -165,12 +166,19 @@ describe("chat pause surfaces", () => {
   it("allows a new configuration message after the server reports the earlier turn completed", async () => {
     state.chat.error = "Solicitud ya atendida";
     state.chat.requestAlreadyCompleted = true;
-    await act(async () => { renderer = create(createElement(OnboardingPage)); });
+    const business = { ...state.business!, weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: false, intervals: [] }])) };
+    await act(async () => { renderer = create(createElement(ConfigurationAssistant, {
+      uid: state.user.uid, business, enabled: true, busy: false,
+      draft: createOwnerConfigurationDraft(business), onDraft: vi.fn(),
+    })); });
     const input = renderer.root.findAllByType("input").find((node) => node.props["aria-label"] === "Mensaje para SarinBot")!;
     await act(async () => input.props.onChange({ target: { value: "Nueva consulta" } }));
     const send = renderer.root.findAllByType("button").find((node) => node.props["aria-label"] === "Enviar mensaje")!;
     expect(send.props.disabled).toBe(false);
     expect(renderer.root.findAllByType("button").filter((node) => text(node).includes("Reintentar mensaje"))).toHaveLength(0);
+    await act(async () => renderer.root.findByProps({ 'aria-label': 'Conversación de configuración' }).props.onSubmit({ preventDefault: vi.fn() }));
+    expect(state.send).toHaveBeenCalledExactlyOnceWith("Nueva consulta");
+    expect(state.retry).not.toHaveBeenCalled();
   });
   it("pauses public chat without removing confirmed appointments or offering a subscription to the customer", async () => {
     state.chat.error = "Quota details are private";

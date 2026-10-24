@@ -2,6 +2,9 @@ import { act, createElement, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OnboardingPage from '@/app/dashboard/onboarding/page';
+import { OwnerConfigurationProvider } from '@/components/owner-configuration-provider';
+import { OwnerConfigurationWorkspace } from '@/components/owner-configuration-workspace';
+import { configurationFingerprint, type OwnerConfigurationSection } from '@/lib/owner-configuration';
 import { apiFetch } from '@/lib/client/api';
 import type { Business } from '@/types/firestore';
 import type { BusinessConfig } from '@/lib/server/schemas';
@@ -17,30 +20,34 @@ const fixture: Business = {
   weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: false, intervals: [] }])), createdAt: 2000000000000,
 };
 const state = vi.hoisted(() => ({ business: null as Business | null, draft: undefined as BusinessConfig | undefined, setBusiness: vi.fn() }));
-vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null, setBusiness: state.setBusiness }) }));
+vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null, refresh: () => {}, setBusiness: state.setBusiness }) }));
 vi.mock('@/hooks/useBookingDataPolicy', () => ({ useBookingDataPolicy: () => ({ ready: true, capability: { configured: true, revision: 1, dataMode: 'general', representedMinorsEnabled: false } }) }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: true }) }));
-vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'demo-owner' } }) }));
+vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: { uid: 'demo-owner' }, authEpoch: 1, isCurrentSession: () => true }) }));
 vi.mock('@/components/business-logo-field', () => ({ BusinessLogoField: () => null }));
 vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, fieldClass: 'field', buttonClass: 'button' }));
 vi.mock('@/hooks/useDebouncedChat', () => ({ useDebouncedChat: () => ({ messages: [], configurationDraft: state.draft, isGenerating: false, isWaitingBatch: false, quotaExhausted: false }) }));
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement('a', { href }, children) }));
-vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), errorMessage: (error: Error) => error.message }));
+vi.mock('@/lib/client/api', () => ({ apiFetch: vi.fn(), ApiError: class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }, errorMessage: (error: Error) => error.message }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const text = (node: ReactTestInstance | string): string => typeof node === 'string' ? node : node.children.map(text).join('');
+
+const posts = () => vi.mocked(apiFetch).mock.calls.filter(([, init]) => init?.method === 'POST');
 
 describe('owner location publication', () => {
   let renderer: ReactTestRenderer;
   const field = (label: string) => renderer.root.findByProps({ 'aria-label': label });
   const choose = (value: string) => act(async () => field('Modalidad de atención').props.onChange({ target: { value } }));
   const change = (label: string, value: string) => act(async () => field(label).props.onChange({ target: { value } }));
-  const save = () => act(async () => renderer.root.findByProps({ 'aria-label': 'Datos de tu negocio' }).props.onSubmit({ preventDefault() {} }));
-  const payload = () => JSON.parse(String(vi.mocked(apiFetch).mock.calls.at(-1)?.[1]?.body));
-  const update = () => act(async () => renderer.update(createElement(OnboardingPage)));
-  async function mount() { await act(async () => { renderer = create(createElement(OnboardingPage)); }); }
+  const open = (section: OwnerConfigurationSection) => act(async () => renderer.root.findByType(OwnerConfigurationWorkspace).props.controller.go(section));
+  const save = async () => { await act(async () => renderer.root.findByType(OwnerConfigurationWorkspace).props.controller.review()); await act(async () => renderer.root.findByType(OwnerConfigurationWorkspace).props.controller.save()); await open('identity'); };
+  const payload = () => JSON.parse(String(posts().at(-1)?.[1]?.body));
+  const update = () => act(async () => renderer.update(createElement(OwnerConfigurationProvider, { children: createElement(OnboardingPage) })));
+  async function applyProposal() { await open('assistant'); await act(async () => renderer.root.findAllByType('button').find(button => button.children.join('') === 'Preparar con Sarin')!.props.onClick()); await act(async () => renderer.root.findAllByType('button').find(button => button.children.join('') === 'Revisar propuesta')!.props.onClick()); await act(async () => renderer.root.findAllByType('button').find(button => button.children.join('') === 'Usar propuesta en el borrador')!.props.onClick()); }
+  async function mount() { await act(async () => { renderer = create(createElement(OwnerConfigurationProvider, { children: createElement(OnboardingPage) })); }); await open('identity'); }
   beforeEach(() => {
     state.business = structuredClone(fixture); state.draft = undefined; state.setBusiness.mockReset();
-    vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockResolvedValue({ business: fixture });
+    vi.mocked(apiFetch).mockReset(); vi.mocked(apiFetch).mockImplementation(async (_path, init) => { const current = state.business; if (init?.method !== 'POST' || !current) return { business: current }; const payload = JSON.parse(String(init.body)); state.business = { ...current, ...payload, sarinConfig: { onboardingCompleted: true, tone: payload.tone, customRules: payload.customRules, intakeFields: payload.intakeFields } }; return { business: state.business }; });
   });
   afterEach(async () => { await act(async () => renderer?.unmount()); });
 
@@ -56,7 +63,7 @@ describe('owner location publication', () => {
     expect(field('Indicaciones de ubicación').props.required).not.toBe(true);
     await change('Dirección del local', 'Calle sintética 123');
     await change('Indicaciones de ubicación', 'Piso 2\nTocar el timbre');
-    expect(apiFetch).not.toHaveBeenCalled();
+    expect(posts()).toHaveLength(0);
     await save();
     expect(payload().location).toEqual({ mode: 'at_business', address: 'Calle sintética 123', instructions: 'Piso 2\nTocar el timbre' });
   });
@@ -92,7 +99,7 @@ describe('owner location publication', () => {
     state.business = { ...fixture, location: { mode: 'at_business', address: 123 } } as unknown as Business;
     await mount();
     expect(field('Modalidad de atención').props.value).toBe('');
-    expect(apiFetch).not.toHaveBeenCalled();
+    expect(posts()).toHaveLength(0);
     await save(); expect(payload().location).toBeNull();
   });
 
@@ -102,7 +109,11 @@ describe('owner location publication', () => {
     state.business = { ...state.business, name: 'Nombre remoto', location: { mode: 'online', instructions: 'Nueva modalidad remota' } } as Business;
     await update();
     expect(field('Dirección del local').props.value).toBe('Edición local');
-    await save(); expect(payload().location).toEqual({ mode: 'at_business', address: 'Edición local' });
+    await act(async () => renderer.root.findByType(OwnerConfigurationWorkspace).props.controller.review());
+    expect(posts()).toHaveLength(0);
+    const external = renderer.root.findByType(OwnerConfigurationWorkspace).props.controller.session.external;
+    await act(async () => renderer.root.findByType(OwnerConfigurationWorkspace).props.controller.save(configurationFingerprint(external)));
+    expect(payload().location).toEqual({ mode: 'at_business', address: 'Edición local' });
   });
 
   it('refreshes location from a business poll when the form has no local changes', async () => {
@@ -119,7 +130,7 @@ describe('owner location publication', () => {
       tone: 'Claro', customRules: '', resources: fixture.resources, services: fixture.services, weeklySchedule: fixture.weeklySchedule, intakeFields: [] });
     await mount();
     if (action === 'remove') await choose(''); else await change('Dirección del local', 'Edición local');
-    await act(async () => renderer.root.findAllByType('button').find(button => text(button) === 'Usar propuesta en el formulario')!.props.onClick());
+    await applyProposal();
     await save();
     expect(payload().location).toEqual(action === 'remove' ? null : { mode: 'at_business', address: 'Edición local' });
   });
