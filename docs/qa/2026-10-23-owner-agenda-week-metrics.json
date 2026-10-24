@@ -1,0 +1,42 @@
+{
+  "count": 7,
+  "maxConcurrent": 2,
+  "durationMs": 645,
+  "requests": [
+    {
+      "date": "2026-10-19",
+      "status": 200,
+      "durationMs": 172
+    },
+    {
+      "date": "2026-10-20",
+      "status": 200,
+      "durationMs": 191
+    },
+    {
+      "date": "2026-10-21",
+      "status": 200,
+      "durationMs": 117
+    },
+    {
+      "date": "2026-10-22",
+      "status": 200,
+      "durationMs": 152
+    },
+    {
+      "date": "2026-10-23",
+      "status": 200,
+      "durationMs": 208
+    },
+    {
+      "date": "2026-10-24",
+      "status": 200,
+      "durationMs": 203
+    },
+    {
+      "date": "2026-10-25",
+      "status": 200,
+      "durationMs": 103
+    }
+  ]
+}
