@@ -24,6 +24,10 @@ import { attendanceCorrectionCommand, attendanceFixture } from './appointment-at
 import { updateAppointmentAttendance } from '@/lib/server/appointment-attendance';
 import { clientPolicyKey } from '@/lib/server/client-policy';
 import { toColombiaTimestamp } from '@/lib/sarin/availability';
+import { readFileSync } from 'node:fs';
+import { readOwnerClientRecord, ownerClientRecordCursorRevision } from '@/lib/server/owner-client-record';
+import { ownerClientRecordPageSchema, type OwnerClientRecordCursor, type OwnerClientRecordFilter } from '@/lib/owner-client-record';
+import { makeOwnerClientRecordAppointment, ownerClientRecordUid, ownerClientRecordResources } from './owner-client-record-fixture';
 
 function user(uid: string): DecodedIdToken { return { uid, sub:uid, aud:'demo-sarin-bot', auth_time:0, exp:9999999999, iat:0, iss:'https://securetoken.google.com/demo-sarin-bot', firebase:{identities:{},sign_in_provider:'google.com'}, email:`${uid}@example.test`, name:uid }; }
 
@@ -51,6 +55,84 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     return createBusiness(identity, chosenConfig, db);
   }
   afterAll(async () => { if (db) { await db.terminate(); const app = getApps().find(value => value.name === 'sarin-admin'); if (app) await deleteApp(app); } });
+  it('reads owner account records with 45 reservations, 25 ties, status filters, private minor DTO and changed anchors on real Admin SDK', async () => {
+    expect(process.env.FIRESTORE_EMULATOR_HOST).toMatch(/^(?:127\.0\.0\.1|localhost):\d+$/);
+    const app = initializeApp({ projectId: 'demo-sarin-bot' }, `demo-owner-record-${crypto.randomUUID()}`), secondDb = getFirestore(app);
+    const businessId = `demo-record-${crypto.randomUUID()}`, owner = { uid: `demo-owner-${crypto.randomUUID()}` };
+    const businessRef = db.collection('businesses').doc(businessId), appointments = businessRef.collection('appointments');
+    const start = 1894024800000, sourceId = 'a0000';
+    const rows = Array.from({ length: 45 }, (_, index) => makeOwnerClientRecordAppointment({
+      id: `a${String(index).padStart(4, '0')}`, tenantId: businessId,
+      startAt: index < 25 ? start : start - (index - 24) * 60000,
+      status: (['confirmed', 'completed', 'no_show'] as const)[index % 3],
+    }));
+    const read = (cursor?: OwnerClientRecordCursor, filter: OwnerClientRecordFilter = 'all', actor = owner) => readOwnerClientRecord(actor, businessId, sourceId, { clientUid: ownerClientRecordUid, filter, ...(cursor ? { cursor } : {}) }, db);
+    try {
+      const batch = db.batch();
+      batch.set(businessRef, { id: businessId, ownerUid: owner.uid, resources: ownerClientRecordResources, subscription: { status: 'expired' } });
+      for (const row of rows) batch.set(appointments.doc(row.id), row);
+      batch.set(appointments.doc('foreign-account'), makeOwnerClientRecordAppointment({ id: 'foreign-account', tenantId: businessId, client: { ...makeOwnerClientRecordAppointment().client!, uid: 'demo-another-account' } }));
+      await batch.commit();
+      for (const filter of ['all', 'completed', 'no_show'] as const) {
+        const found: string[] = []; let cursor: OwnerClientRecordCursor | undefined;
+        do {
+          const page = await read(cursor, filter); expect(ownerClientRecordPageSchema.safeParse(page).success).toBe(true);
+          expect(page.coverage).toEqual({ mode: 'indexed_appointments', completeness: 'not_guaranteed' });
+          found.push(...page.rows.map(row => row.appointmentId)); cursor = page.nextCursor ?? undefined;
+        } while (cursor);
+        expect(found).toEqual(rows.filter(row => filter === 'all' || row.status === filter).map(row => row.id));
+        expect(new Set(found).size).toBe(found.length);
+        // Explicit cursor also exercises tail plus older for both small filters.
+        const anchor = rows.filter(row => row.startAt === start && (filter === 'all' || row.status === filter)).at(-2)!;
+        const tail = await read({ appointmentId: anchor.id, startAt: anchor.startAt, revision: ownerClientRecordCursorRevision(anchor) }, filter);
+        expect(tail.rows.map(row => row.appointmentId)).toEqual(rows.filter(row => (filter === 'all' || row.status === filter) && row.id > anchor.id).slice(0, 20).map(row => row.id));
+      }
+      const page = await read();
+      expect(page.rows[0].beneficiaryKind).toBe('represented_minor');
+      expect(Object.keys(page.rows[0]).sort()).toEqual(['appointmentId', 'beneficiaryKind', 'dateKey', 'endAt', 'resourceLabel', 'startAt', 'status']);
+      expect(JSON.stringify(page)).not.toMatch(/Synthetic|phone|email|intakeAnswers|subjectAuthorization|representationReview|receiptId/);
+      for (const uid of [ownerClientRecordUid, 'demo-other-owner', 'demo-admin']) await expect(read(undefined, 'all', { uid })).rejects.toMatchObject({ status: 403 });
+      await expect(readOwnerClientRecord(owner, businessId, sourceId, { clientUid: 'demo-guessed', filter: 'all' }, db)).rejects.toMatchObject({ status: 404 });
+      const anchor = rows.find(row => row.id === page.nextCursor!.appointmentId)!;
+      const remote = secondDb.collection('businesses').doc(businessId).collection('appointments').doc(anchor.id);
+      for (const patch of [{ startAt: start + 1, rescheduleRevision: 1 }, { status: 'completed', attendance: { revision: 1, lastEventId: 'demo-correction' } }]) {
+        await remote.set({ ...anchor, ...patch });
+        await expect(read(page.nextCursor!)).rejects.toMatchObject({ status: 409, code: 'CLIENT_RECORD_CHANGED' });
+      }
+      await remote.delete(); await expect(read(page.nextCursor!)).rejects.toMatchObject({ status: 409, code: 'CLIENT_RECORD_CHANGED' });
+      await remote.set(anchor);
+      // Emulator success does not certify production composite-index availability.
+      // Verify the deployed declaration independently; Admin SDK bypasses browser
+      // rules, so owner authorization above must remain in the server domain.
+      const declared = JSON.parse(readFileSync(new URL('../firestore.indexes.json', import.meta.url), 'utf8')).indexes;
+      for (const status of [false, true]) expect(declared).toContainEqual({ collectionGroup: 'appointments', queryScope: 'COLLECTION', fields: [
+        { fieldPath: 'client.uid', order: 'ASCENDING' }, { fieldPath: 'type', order: 'ASCENDING' },
+        ...(status ? [{ fieldPath: 'status', order: 'ASCENDING' }] : []),
+        { fieldPath: 'startAt', order: 'DESCENDING' }, { fieldPath: 'id', order: 'ASCENDING' },
+      ] });
+    } finally { await db.recursiveDelete(businessRef); await secondDb.terminate(); await deleteApp(app); }
+  }, 120000);
+  it('real Firestore orderBy omits missing ordering values and returned corrupt values fail closed without repairing data', async () => {
+    expect(process.env.FIRESTORE_EMULATOR_HOST).toMatch(/^(?:127\.0\.0\.1|localhost):\d+$/);
+    const businessId = `demo-record-legacy-${crypto.randomUUID()}`, sourceId = 'demo-source', owner = { uid: 'demo-legacy-owner' };
+    const businessRef = db.collection('businesses').doc(businessId), appointments = businessRef.collection('appointments');
+    const saved = makeOwnerClientRecordAppointment({ id: sourceId, tenantId: businessId });
+    const noStart: Record<string, unknown> = { ...saved, id: 'missing-start' }, noId: Record<string, unknown> = { ...saved };
+    delete noStart.startAt; delete noId.id;
+    const read = () => readOwnerClientRecord(owner, businessId, sourceId, { clientUid: ownerClientRecordUid, filter: 'all' }, db);
+    try {
+      const batch = db.batch();
+      batch.set(businessRef, { id: businessId, ownerUid: owner.uid, resources: ownerClientRecordResources });
+      batch.set(appointments.doc(sourceId), saved); batch.set(appointments.doc('missing-start'), noStart); batch.set(appointments.doc('missing-id'), noId);
+      await batch.commit();
+      const before = (await appointments.orderBy('__name__').get()).docs.map(row => ({ id: row.id, data: row.data(), updateTime: row.updateTime.toMillis() }));
+      const page = await read(); expect(page.rows.map(row => row.appointmentId)).toEqual([sourceId]);
+      expect(page.coverage).toEqual({ mode: 'indexed_appointments', completeness: 'not_guaranteed' });
+      expect((await appointments.orderBy('__name__').get()).docs.map(row => ({ id: row.id, data: row.data(), updateTime: row.updateTime.toMillis() }))).toEqual(before);
+      await appointments.doc('corrupt').set({ ...saved, id: 'corrupt', startAt: saved.startAt + 1, rescheduleRevision: -1 });
+      await expect(read()).rejects.toMatchObject({ status: 503, code: 'CLIENT_RECORD_UNVERIFIABLE' });
+    } finally { await db.recursiveDelete(businessRef); }
+  }, 120000);
   it('serializes attendance and corrections with appointment event and both locks through independent Admin SDK handles', async () => {
     // This test must never select a real Firebase project or a remote endpoint.
     expect(process.env.FIRESTORE_EMULATOR_HOST).toMatch(/^(?:127\.0\.0\.1|localhost):\d+$/);
