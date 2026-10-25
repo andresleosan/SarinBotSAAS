@@ -36,7 +36,7 @@ function Configuration() {
     {!config.consentActive && <Notice>Necesitas aceptar las condiciones y autorizar los datos para editar y guardar la configuración.</Notice>}
     <OwnerConfigurationWorkspace
       business={business} capability={config.capability} policyReady={config.policyReady} consentActive={config.consentActive} controller={controller}
-      assistantScope={<BusinessAssistantScopeNotice configured={business.sarinConfig.onboardingCompleted} dataMode={config.capability.dataMode} representedMinorsEnabled={config.capability.representedMinorsEnabled} />}
+      assistantScope={<BusinessAssistantScopeNotice configured={business.sarinConfig.onboardingCompleted} dataMode={config.capability.dataMode} representedMinorsEnabled={config.capability.representedMinorsEnabled} faqHref="/dashboard/faq" />}
       logo={business.sarinConfig.onboardingCompleted ? <BusinessLogoField business={business} onSaved={config.onLogoSaved} /> : null}
       assistant={config.capability.dataMode === 'general' && user ? <ConfigurationAssistant uid={user.uid} business={business} enabled={config.consentActive} draft={controller.session.draft} busy={controller.writeBlocked} onDraft={next => { controller.change(next); controller.go('review'); }} /> : null}
     />

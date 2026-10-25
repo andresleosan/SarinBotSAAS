@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 
-export function BusinessAssistantScopeNotice({ configured, dataMode, representedMinorsEnabled }: {
+export function BusinessAssistantScopeNotice({ configured, dataMode, representedMinorsEnabled, faqHref }: {
   configured: boolean;
   dataMode: 'general' | 'health';
   representedMinorsEnabled: boolean;
+  faqHref?: '/dashboard/faq';
 }): ReactNode {
   return <details className="min-w-0 rounded-xl border border-sarin-line bg-sarin-canvas p-3 text-sm">
     <summary className="min-h-11 cursor-pointer rounded-lg py-3 font-semibold text-sarin-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sarin-blue focus-visible:ring-offset-2">Información y alcance de Sarin</summary>
@@ -21,6 +22,7 @@ export function BusinessAssistantScopeNotice({ configured, dataMode, represented
       </>}
       {!configured && <p>Al guardar la configuración se actualiza tu página de reservas.</p>}
       {representedMinorsEnabled && <p>Las reservas para menores usan el formulario y la representación autorizada; no se gestionan mediante este chat general.</p>}
+      {faqHref && configured && dataMode === 'general' && !representedMinorsEnabled && <a href={faqHref} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-lg font-semibold text-sarin-blue focus-visible:outline-2 focus-visible:outline-sarin-blue">Gestionar información para clientes (abre en otra pestaña)</a>}
     </div>
   </details>;
 }
