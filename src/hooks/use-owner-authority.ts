@@ -13,13 +13,14 @@ type Authority = {
 };
 
 /** Protection keeps this identity alive. Only authoritative loss purges its commands. */
-export function useOwnerAuthority(input: { ownerUid: string; authEpoch: number; businessId: string }) {
+export function useOwnerAuthority(input: { ownerUid: string; authEpoch: number; businessId: string; isCurrentWorkspace?: () => boolean }) {
   const auth = useAuth(), latest = useRef(auth); latest.current = auth;
   const key = JSON.stringify([input.ownerUid, input.authEpoch, input.businessId]);
   const state = useRef<Authority | null>(null), [, render] = useReducer(value => value + 1, 0);
   if (!state.current || state.current.key !== key) {
     const record: Authority = { key, live: true, protected: false, revoked: false, checking: false, featureCode: null, error: null, readGeneration: 0, requestScope: null as unknown as OwnerRequestScope, probe: null };
     const current = () => state.current === record && record.live && !record.revoked
+      && (input.isCurrentWorkspace?.() ?? true)
       && latest.current.user?.uid === input.ownerUid && latest.current.authEpoch === input.authEpoch
       && latest.current.isCurrentSession(input.ownerUid, input.authEpoch);
     const deny = (failure: OwnerAccessFailure) => {

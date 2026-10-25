@@ -5,14 +5,15 @@ import { useAuth } from '@/components/auth-provider';
 import { useAppointmentAttendance } from '@/hooks/use-appointment-attendance';
 import type { AttendanceStatus } from '@/lib/appointment-attendance';
 import type { Appointment } from '@/types/firestore';
+import type { OwnerRequestScope } from '@/lib/client/owner-request-scope';
 
-export type AppointmentAttendanceControlsProps = { businessId: string; ownerUid: string; appointment: Appointment; disabled: boolean; onSaved: (appointment: Appointment) => void; onBusyChange: (busy: boolean) => void };
+export type AppointmentAttendanceControlsProps = { businessId: string; ownerUid: string; appointment: Appointment; disabled: boolean; onSaved: (appointment: Appointment) => void; onBusyChange: (busy: boolean) => void; requestScope?: OwnerRequestScope; canStart?: () => boolean };
 const buttonClass = 'min-h-11 rounded-xl border border-sarin-line px-4 py-2 text-sm text-sarin-blue outline-none focus-visible:ring-2 focus-visible:ring-sarin-blue disabled:opacity-50';
 function label(status: Appointment['status']) { return status === 'completed' ? 'Atendida' : status === 'no_show' ? 'No asistió' : status === 'confirmed' ? 'Pendiente de registrar' : 'Cancelada'; }
 function timestamp(value: number) { return new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }).format(value); }
 
-function Controls({ businessId, ownerUid, appointment, disabled, onSaved, onBusyChange, enabled }: AppointmentAttendanceControlsProps & { enabled: boolean }) {
-  const attendance = useAppointmentAttendance({ scope: { businessId, ownerUid, appointmentId: appointment.id, dateKey: appointment.dateKey }, appointment, enabled });
+function Controls({ businessId, ownerUid, appointment, disabled, onSaved, onBusyChange, enabled, requestScope, canStart }: AppointmentAttendanceControlsProps & { enabled: boolean }) {
+  const attendance = useAppointmentAttendance({ scope: { businessId, ownerUid, appointmentId: appointment.id, dateKey: appointment.dateKey }, appointment, enabled, requestScope });
   const [draft, setDraft] = useState<{ signature: string; status: AttendanceStatus } | null>(null);
   const [correction, setCorrection] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -21,24 +22,29 @@ function Controls({ businessId, ownerUid, appointment, disabled, onSaved, onBusy
   const current = [attendance.result?.appointment, attendance.history?.appointment].reduce<Appointment>((latest, candidate) => candidate && newer(candidate, latest) ? candidate : latest, appointment);
   const signature = JSON.stringify([current.status, current.attendance?.revision ?? 0, current.rescheduleRevision ?? 0, current.startAt, current.endAt, current.reservedUntilAt, current.resourceId]);
   const proposal = draft?.signature === signature ? draft.status : null;
-  const callback = useRef({ onSaved, onBusyChange }); callback.current = { onSaved, onBusyChange };
-  const lifecycle = useRef({ active: true, busy: false });
+  const callback = useRef({ onSaved, onBusyChange, canStart }); callback.current = { onSaved, onBusyChange, canStart };
+  const lifecycle = useRef({ active: true, busy: false, reported: false });
   const review = useRef<HTMLDivElement>(null);
   useEffect(() => { if (proposal) review.current?.focus(); }, [proposal]);
   useEffect(() => {
     const token = lifecycle.current; token.active = true;
-    return () => { token.active = false; if (token.busy) { token.busy = false; callback.current.onBusyChange(false); } };
+    return () => { token.active = false; if (token.reported) { token.busy = false; token.reported = false; callback.current.onBusyChange(false); } };
   }, []);
+  useEffect(() => {
+    const value = attendance.busy || attendance.hasPending;
+    if (lifecycle.current.reported === value) return;
+    lifecycle.current.reported = value; callback.current.onBusyChange(value);
+  }, [attendance.busy, attendance.hasPending]);
   async function perform(retry = false) {
     const token = lifecycle.current;
-    if (disabled || token.busy || (!retry && !proposal)) return;
-    token.busy = true; callback.current.onBusyChange(true);
+    if (disabled || token.busy || (!retry && !proposal) || callback.current.canStart?.() === false) return;
+    token.busy = true; token.reported = true; callback.current.onBusyChange(true);
     try {
       const result = await (retry ? attendance.retryPending() : attendance.submit(proposal!, current.status === 'confirmed' ? undefined : 'recording_error'));
       if (!token.active) return;
       setDraft(null); setCorrection(false);
       if (result) callback.current.onSaved(result.appointment);
-    } finally { if (token.active && token.busy) { token.busy = false; callback.current.onBusyChange(false); } }
+    } finally { if (token.active && token.busy) { token.busy = false; token.reported = attendance.hasPending; callback.current.onBusyChange(token.reported); } }
   }
   const tooEarly = !Number.isFinite(current.reservedUntilAt) || Date.now() < current.reservedUntilAt;
   const terminal = current.status === 'completed' || current.status === 'no_show';

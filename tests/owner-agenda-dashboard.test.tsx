@@ -1,3 +1,4 @@
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/dashboard', useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock('@/hooks/use-resource-schedules', () => ({ useResourceSchedules: vi.fn(() => ({ view: null, phase: 'loading' })) }));
 import { act, createElement, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
@@ -10,7 +11,7 @@ import { ClientPolicyControls } from '@/components/client-policy-controls';
 import type { Appointment, Business } from '@/types/firestore';
 
 const state = vi.hoisted(() => ({ user: { uid: 'demo-owner' }, business: null as Business | null, loading: false, businessError: null as string | null, consent: true, api: vi.fn(), notices: [] as { businessId: string | undefined; message: ReactNode }[] }));
-vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user }) }));
+vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user, authEpoch: 0, isCurrentSession: (uid: string, epoch: number) => uid === state.user.uid && epoch === 0, invalidateSession: vi.fn() }) }));
 vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: state.loading, error: state.businessError }) }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: state.consent }) }));
 vi.mock('@/components/client-policy-controls', () => ({ ClientPolicyControls: () => null }));

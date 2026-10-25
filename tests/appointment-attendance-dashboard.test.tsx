@@ -1,3 +1,4 @@
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/dashboard', useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock('@/hooks/use-resource-schedules', () => ({ useResourceSchedules: vi.fn(() => ({ view: null, phase: 'loading' })) }));
 import { act, createElement, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
@@ -7,8 +8,10 @@ import { OwnerAgendaCalendar } from '@/components/owner-agenda-calendar';
 import { OwnerAgendaAppointments } from '@/components/owner-agenda-appointments';
 import { ClientPolicyControls } from '@/components/client-policy-controls';
 import type { Appointment, Business } from '@/types/firestore';
+import { OwnerRescheduleWorkspace } from '@/components/owner-reschedule-workspace';
+import { ApiError } from '@/lib/client/api';
 const state = vi.hoisted(() => ({ api: vi.fn(), user: { uid: 'owner' }, business: null as Business | null }));
-vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user }) }));
+vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user, authEpoch: 0, isCurrentSession: (uid: string, epoch: number) => uid === state.user.uid && epoch === 0, invalidateSession: vi.fn() }) }));
 vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null }) }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: true }) }));
 vi.mock('@/components/client-policy-controls', () => ({ ClientPolicyControls: () => null }));
@@ -28,6 +31,33 @@ const writes = () => state.api.mock.calls.filter(call => call[1]?.method);
 const saved = (requestId: string) => ({ appointment: { ...row, status: 'completed', attendance: { revision: 1, lastEventId: 'a'.repeat(64) } }, applied: { eventId: 'a'.repeat(64), requestId, revision: 1, status: 'completed', recordedAt: row.reservedUntilAt }, replayed: false });
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(row.reservedUntilAt); state.user = { uid: 'owner' }; state.business = { id: 'business', ownerUid: 'owner', name: 'Negocio demo', slug: 'demo', resources: [{ id: 'chair', name: 'Recurso demo', active: true }], services: [], weeklySchedule: {}, sarinConfig: { onboardingCompleted: true }, subscription: { status: 'active', trialEndsAt: 0, currentPeriodEndsAt: 2200000000000 } } as unknown as Business; state.api.mockReset().mockResolvedValue({ appointments: [row] }); });
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); });
+function futureRow(): Appointment {
+  const { beneficiary: _beneficiary, representationReview: _review, ...legacy } = row;
+  return { ...legacy, id: 'future', serviceId: 'demo-service', startTimeStr: '11:00', endTimeStr: '11:30', startAt: 1894032000000, endAt: 1894033800000, reservedUntilAt: 1894034700000 };
+}
+it('uncertain attendance survives feature protection and owner recheck while only its own retry stays available', async () => {
+  const future = futureRow(); state.business = { ...state.business!, services: [{ id: 'demo-service', name: 'Servicio', durationMinutes: 30, bufferMinutes: 15, price: 0, resourceIds: ['chair'] }] };
+  state.api.mockResolvedValue({ appointments: [row, future] }); await mount();
+  const staleMove = button('Cambiar horario').props.onClick;
+  state.api.mockRejectedValueOnce(new Error('lost reply')); await click('Atendida'); await click('Confirmar resultado');
+  const first = writes()[0]; expect(button('Semana').props.disabled).toBe(true); expect(button('Reintentar comprobación').props.disabled).toBe(false);
+  await act(async () => staleMove()); expect(tree!.root.findAllByType(OwnerRescheduleWorkspace)).toHaveLength(0);
+  state.api.mockRejectedValueOnce(new ApiError('Feature restriction', 403, 'FEATURE_CLOSED')); await click('Reintentar comprobación');
+  expect(button('Comprobar acceso')).toBeTruthy();
+  state.api.mockImplementation(async (path, init) => path === '/api/businesses' ? { business: state.business } : init?.method ? saved(JSON.parse(init.body as string).requestId) : { appointments: [row, future] });
+  await click('Comprobar acceso'); expect(button('Semana').props.disabled).toBe(true); expect(button('Cambiar horario').props.disabled).toBe(true);
+  await click('Reintentar comprobación');
+  expect(writes().filter(call => call[1]?.method === 'PATCH').map(call => call[1].body)).toEqual([first[1].body, first[1].body, first[1].body]);
+  expect(button('Semana').props.disabled).toBe(false);
+});
+it('opening an owner move rejects a stale attendance confirmation handler by ref', async () => {
+  const future = futureRow(); state.business = { ...state.business!, services: [{ id: 'demo-service', name: 'Servicio', durationMinutes: 30, bufferMinutes: 15, price: 0, resourceIds: ['chair'] }] };
+  state.api.mockResolvedValue({ appointments: [row, future] }); await mount(); await click('Atendida');
+  const stale = button('Confirmar resultado').props.onClick;
+  state.api.mockResolvedValue({ appointment: future, expectation: { sourceRevision: 0, sourceFingerprint: 'a'.repeat(64) }, eligible: true, reason: null });
+  await act(async () => { button('Cambiar horario').props.onClick(); stale(); });
+  expect(writes()).toHaveLength(0); expect(tree!.root.findAllByType(OwnerRescheduleWorkspace)).toHaveLength(1);
+});
 it('attendancePendingFreezesNavigationBlockAndCancel', async () => { const pending = deferred<unknown>(); await mount(); state.api.mockReturnValue(pending.promise); await click('Atendida'); await click('Confirmar resultado'); for (const label of ['Semana', 'Anterior', 'Siguiente', 'Hoy', 'Actualizar', 'Cancelar cita', 'Bloquear horario']) expect(button(label).props.disabled).toBe(true); expect(tree!.root.findByProps({ 'aria-label': 'Fecha de la agenda' }).props.disabled).toBe(true); const call = writes()[0]; expect(call[1].signal.aborted).toBe(false); await act(async () => pending.resolve(saved(JSON.parse(call[1].body).requestId))); expect(button('Semana').props.disabled).toBe(false); expect(content(tree!.root)).toContain('Atendida'); });
 it('closingDetailsDoesNotCancelPendingPatch', async () => { const pending = deferred<unknown>(); await mount(); state.api.mockReturnValue(pending.promise); await click('Atendida'); await click('Confirmar resultado'); const details = tree!.root.findAllByType('details').find(node => node.findAllByType('summary').some(item => content(item).includes('Servicio demo')))!; expect(details.props.open).not.toBe(true); await update(); const call = writes()[0]; expect(call[1].signal.aborted).toBe(false); expect(writes()).toHaveLength(1); await act(async () => pending.resolve(saved(JSON.parse(call[1].body).requestId))); expect(content(tree!.root)).toContain('Atendida'); });
 it('parentActionsCheckPendingRef', async () => { await mount(); const calendar = tree!.root.findByType(OwnerAgendaCalendar).props, list = tree!.root.findByType(OwnerAgendaAppointments).props, form = tree!.root.findByType('form').props; await act(async () => { list.onAttendanceBusyChange('one', true); calendar.onModeChange('week'); calendar.onDateChange('2030-01-08'); calendar.onResourceChange('foreign'); calendar.onRefresh(); list.onCancel('one'); form.onSubmit({ preventDefault() {} }); }); expect(writes()).toHaveLength(0); expect(state.api).toHaveBeenCalledTimes(1); expect(tree!.root.findByType(OwnerAgendaCalendar).props.selectedDate).toBe('2030-01-07'); });

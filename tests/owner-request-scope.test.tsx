@@ -24,6 +24,12 @@ it('feature denial protects without changing command identity or posting a probe
   expect(authority.requestScope).toBe(scope); expect(scope.canRead()).toBe(false); expect(scope.canStartAction()).toBe(false);
   expect(apiFetch).not.toHaveBeenCalled(); expect(auth.invalidateSession).not.toHaveBeenCalled();
 });
+it('a departed business candidate invalidates callbacks before effect cleanup', async () => {
+  let candidate = true;
+  function CandidateHarness() { authority = useOwnerAuthority({ ownerUid: 'demo-owner', authEpoch: 1, businessId: 'demo-business', isCurrentWorkspace: () => candidate }); return null; }
+  await act(async () => { renderer = create(createElement(CandidateHarness)); }); const scope = authority.requestScope;
+  expect(scope.isCurrent()).toBe(true); candidate = false; expect(scope.isCurrent()).toBe(false);
+});
 it('same owner probe renews read generation without resolving or resending a feature command', async () => {
   await mount(); const scope = authority.requestScope, initial = scope.readGeneration;
   await act(async () => scope.onAccessDenied({ status: 403, source: 'feature', code: 'FEATURE_CLOSED' }));

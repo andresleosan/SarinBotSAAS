@@ -79,3 +79,9 @@ it('applied proof and a later current position remain distinct and navigation is
   expect(content).not.toContain('Salir sin cambiar');
   expect(onViewCurrentDay).not.toHaveBeenCalled(); await click('Ver día actualizado'); expect(onViewCurrentDay).toHaveBeenCalledWith('2030-01-07'); expect(mutations()).toHaveLength(0);
 });
+it('a later current resource and price remain visible beside the original reviewed result', async () => {
+  const current = { ...original, resourceId: 'demo-second', serviceName: 'Corte posterior', price: 30000, rescheduleRevision: 2 };
+  vi.mocked(apiFetch).mockResolvedValueOnce({ proposal: view, state: 'applied', result: proof, appointment: current });
+  await mount({ entry: { proposalId: view.id } }); const content = text(renderer.root);
+  expect(content).toContain('Profesional dos'); expect(content).toContain('30.000'); expect(content).toContain('Corte posterior'); expect(content).toContain('25.000');
+});

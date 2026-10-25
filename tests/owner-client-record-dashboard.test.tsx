@@ -1,3 +1,4 @@
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/dashboard', useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock('@/hooks/use-resource-schedules', () => ({ useResourceSchedules: vi.fn(() => ({ view: null, phase: 'loading' })) }));
 import { act, createElement, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
@@ -12,7 +13,7 @@ import type { OwnerClientRecordPage } from '@/lib/owner-client-record';
 import { makeOwnerClientRecordAppointment } from './owner-client-record-fixture';
 
 const state = vi.hoisted(() => ({ api: vi.fn(), user: { uid: 'demo-owner' }, epoch: 1, business: null as Business | null }));
-vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user, authEpoch: state.epoch, isCurrentSession: (uid: string, epoch: number) => uid === state.user.uid && epoch === state.epoch }) }));
+vi.mock('@/components/auth-provider', () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user, authEpoch: state.epoch, invalidateSession: vi.fn(), isCurrentSession: (uid: string, epoch: number) => uid === state.user.uid && epoch === state.epoch }) }));
 vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null }) }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: true }) }));
 vi.mock('@/components/client-policy-controls', () => ({ ClientPolicyControls: () => null }));
@@ -111,8 +112,13 @@ it('recordDoesNotChangeQuotaOrSubjectReview', async () => {
   state.business!.subscription.currentPeriodEndsAt = 0; const snapshot = structuredClone(row); await mount(); await open(); await click('Cerrar');
   expect(writes()).toHaveLength(0); expect(daily()).toHaveLength(1); expect(list().day.appointments[0]).toEqual(snapshot); expect(tree!.root.findByType(ClientPolicyControls).props.clients).toEqual([{ uid: row.client!.uid, name: row.client!.name }]);
 });
-it.each([401, 403])('accessLossClosesDashboardSelection %s', async status => {
-  await mount(); state.api.mockImplementation((_path, _init, _uid, _owns, onStatus) => { onStatus(status); return new Promise(() => {}); }); await open(); expect(tree!.root.findAllByType(OwnerClientRecordPanel)).toHaveLength(0);
+it.each([401, 403])('session401PurgesButFeature403ProtectsMountedSelection %s', async status => {
+  await mount(); state.api.mockImplementation((_path, _init, _uid, _owns, onStatus) => { onStatus(status); return new Promise(() => {}); }); await open();
+  expect(tree!.root.findAllByType(OwnerClientRecordPanel)).toHaveLength(status === 401 ? 0 : 1);
+  if (status === 403) {
+    expect(buttons('Comprobar acceso')).toHaveLength(1);
+    expect(tree!.root.findAll(node => node.type === 'div' && node.props.hidden === true && node.findAllByType(OwnerClientRecordPanel).length > 0)).toHaveLength(1);
+  }
 });
 it.each(['', 'x'.repeat(129), 'bad\n', 'bad\u007f'])('invalidUidOffersNoRecordButton %j', async uid => {
   state.api.mockResolvedValue({ appointments: [makeOwnerClientRecordAppointment({ client: { ...row.client!, uid } })] }); await mount(); expect(buttons('Reservas de esta cuenta')).toHaveLength(0); await act(async () => list().onOpenClientRecord(row)); expect(records()).toHaveLength(0);

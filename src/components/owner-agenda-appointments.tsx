@@ -5,15 +5,18 @@ import type { OwnerAgendaDay } from '@/lib/owner-agenda';
 import { getOwnerAgendaDayLayout, getOwnerAgendaResources } from '@/lib/owner-agenda';
 import { RepresentationReviewControls } from '@/components/representation-review';
 import { AppointmentAttendanceControls } from '@/components/appointment-attendance-controls';
+import type { OwnerRequestScope } from '@/lib/client/owner-request-scope';
 
 export type OwnerAgendaAppointmentsProps = {
   business: Business; dateKey: string; day: OwnerAgendaDay | null; resourceId: string | null; saving: boolean;
   onAttendanceBusyChange: (appointmentId: string, busy: boolean) => void;
   onCancel: (appointmentId: string) => void; onSaved: (saved: Appointment) => void;
   onOpenClientRecord: (appointment: Appointment) => void;
+  onReschedule?: (appointmentId: string) => void; requestScope?: OwnerRequestScope;
+  canManageAttendance?: (appointmentId: string) => boolean;
 };
 
-export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, saving, onCancel, onSaved, onAttendanceBusyChange, onOpenClientRecord }: OwnerAgendaAppointmentsProps) {
+export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, saving, onCancel, onSaved, onAttendanceBusyChange, onOpenClientRecord, onReschedule, requestScope, canManageAttendance }: OwnerAgendaAppointmentsProps) {
   const appointments = day?.state === 'ready' ? day.appointments : [];
   const resources = getOwnerAgendaResources(business.resources, day ? [day] : []);
   const warnings = getOwnerAgendaDayLayout(dateKey, appointments).warnings;
@@ -57,7 +60,8 @@ export function OwnerAgendaAppointments({ business, dateKey, day, resourceId, sa
                       <RepresentationReviewControls businessId={business.id} appointment={appointment} onSaved={saved => {
                         if (saved.id === cardContext.appointmentId && saved.dateKey === cardContext.dateKey && saved.tenantId === cardContext.businessId) onSaved(saved);
                       }} />
-                      {!blocked && <AppointmentAttendanceControls businessId={business.id} ownerUid={business.ownerUid} appointment={appointment} disabled={saving} onBusyChange={busy => onAttendanceBusyChange(appointment.id, busy)} onSaved={saved => {
+                      {!blocked && onReschedule && appointment.status === 'confirmed' && <div className="space-y-2 border-t border-sarin-line pt-3">{appointment.startAt <= Date.now() || appointment.beneficiary?.kind === 'represented_minor' || Object.hasOwn(appointment, 'subjectAuthorization') || Object.hasOwn(appointment, 'representationReview') ? <p className="text-xs text-sarin-muted">El cambio de horario está disponible para citas futuras de alcance general, sin autorizaciones sensibles.</p> : <button type="button" disabled={saving} onClick={() => { if (!saving) onReschedule(appointment.id); }} className="min-h-11 rounded-xl border border-sarin-line px-4 py-2 text-sm font-medium text-sarin-blue disabled:opacity-50">Cambiar horario</button>}</div>}
+                      {!blocked && <AppointmentAttendanceControls businessId={business.id} ownerUid={business.ownerUid} appointment={appointment} requestScope={requestScope} disabled={canManageAttendance ? !canManageAttendance(appointment.id) : saving} canStart={canManageAttendance ? () => canManageAttendance(appointment.id) : undefined} onBusyChange={busy => onAttendanceBusyChange(appointment.id, busy)} onSaved={saved => {
                         if (saved.id === cardContext.appointmentId && saved.dateKey === cardContext.dateKey && saved.tenantId === cardContext.businessId) onSaved(saved);
                       }} />}
                       {appointment.status === 'confirmed' && <div className="flex justify-end border-t border-sarin-line pt-3"><button type="button" disabled={saving} onClick={() => { if (!saving) onCancel(appointment.id); }} className="min-h-11 rounded-xl border border-sarin-line px-4 py-2 text-xs font-medium text-sarin-muted transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sarin-blue disabled:opacity-50">Cancelar {blocked ? 'bloqueo' : 'cita'}</button></div>}

@@ -13,6 +13,7 @@ describe('owner rescheduling transport validation', () => {
     expect(ownerRescheduleCommandSchema.safeParse(command).success).toBe(true);
     for (const field of ['actorUid', 'clientPhone', 'serviceId', 'beneficiary', 'extra']) expect(ownerRescheduleCommandSchema.safeParse({ ...command, [field]: 'demo' }).success).toBe(false);
     expect(ownerRescheduleCommandSchema.safeParse({ ...command, selection: { ...command.selection, serviceId: 'demo-cut' } }).success).toBe(false);
+    for (const patch of [{ startTimeStr: '10:00\n' }, { resourceId: 'demo-chair\n' }]) expect(ownerRescheduleCommandSchema.safeParse({ ...command, selection: { ...command.selection, ...patch } }).success).toBe(false);
     expect(ownerRescheduleAvailabilitySchema.safeParse({ sourceRevision: 0, sourceFingerprint: 'a'.repeat(64), dateKey: '2030-01-07' }).success).toBe(true);
   });
   it('revisionZeroAndOverflowAreExplicit', () => {

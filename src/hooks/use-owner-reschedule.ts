@@ -49,7 +49,8 @@ export function useOwnerReschedule(input: Input): OwnerRescheduleController {
   const canRead = () => current() && latest.current.input.enabled && latest.current.requestScope.canRead();
   const publish = () => { if (current()) render(); };
   const resourceOptions = () => {
-    const catalog = latest.current.input.business, service = catalog?.services.find(item => item.id === session.source?.appointment.serviceId);
+    const catalog = latest.current.input.business, serviceId = session.recovery?.appointment.serviceId ?? session.source?.appointment.serviceId ?? session.proposal?.target.serviceId;
+    const service = catalog?.services.find(item => item.id === serviceId);
     return catalog?.resources.filter(resource => resource.active && service?.resourceIds.includes(resource.id)) ?? [];
   };
   const cancelRead = () => { session.readGeneration++; session.reading?.cancel(); session.reading = null; };

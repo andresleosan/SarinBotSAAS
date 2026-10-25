@@ -185,5 +185,5 @@ export function useAppointmentAttendance({ scope, appointment, enabled, requestS
       if (current.read === controller) { current.read = null; current.historyLoading = false; publish(); }
     }
   }
-  return { busy: current.busy, hasPending: current.pending !== null, error: current.error, result: current.result, history: current.history, historyLoading: current.historyLoading, historyError: current.historyError, submit, retryPending: send, loadHistory };
+  return { busy: current.busy, get hasPending() { return current.pending !== null; }, error: current.error, result: current.result, history: current.history, historyLoading: current.historyLoading, historyError: current.historyError, submit, retryPending: send, loadHistory };
 }
