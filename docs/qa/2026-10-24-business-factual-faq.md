@@ -13,7 +13,7 @@ Tres temas fijos (`parking`, `accessibility`, `onsite_payment_methods`), respues
 | Modelo/dominio/rutas/hooks/panel/integración y respaldo D1/R2 | 86 aprobadas en8archivos antes de las correcciones finales. |
 | D1 real ampliado | 5/5: concurrencia, respuesta perdida/journal, replay posterior, política y Worker anterior sin medias escrituras. |
 | Correcciones de revisión | Dos Important reproducidos RED→GREEN; 40/40 en editor, autoridad y rebooking; denegación conocida también cubierta. |
-| Suite completa final estable | 4200aprobadas,0fallos,36omitidas;271archivos aprobados,0fallidos; exit0 sobre código establedb9158e. |
+| Suite completa final estable | 4200aprobadas,0fallos,36omitidas;267archivos aprobados+4solo omitidos=271total,0fallidos; exit0 sobre código establedb9158e. |
 | Firestore real, reglas+Admin | 34/34 aprobadas:14 reglas y20 Admin; exit0 en emulador oficial con Java21. |
 | TypeScript / build Next | Exit0; build final compilación/tipos/generación. |
 | Worker | 160pruebas, tipos y dry-run exit0. |
@@ -53,3 +53,9 @@ Firestore inicial33/1: el fixture nuevo simuló Date.now y rompió los deadlines
 Recibos externos: `../work/faq-*-result.json`, `faq-first-*`, `faq-second-*`, logs originales y `.superpowers/sdd/2026-10-22-business-factual-faq/`. Demo/fixtures: `../work/faq-qa-runs/`; fuente auxiliar, manifiestos y recibos preservados fuera de Git. Decisiones: mantener Next16.4.1 publicado y lock en vez del16.4.0 histórico; conservar workspace/evidencia según el titular.
 
 Siguiente incremento funcional tras integrar este trabajo: resumen operativoS17, orden10. No adelantar Task7S05 hasta S12 ni habilitar S08/S11/S12/salud/menores en este incremento. La preparación de publicación exige Worker compatible y rollback con enforcementS09; no elimina FAQ/recibos ni restaura datos para revertir UI.
+
+## Actualización de publicación — 25 de octubre de 2026
+
+El estado «sin push/merge/despliegue» de los apartados anteriores corresponde al corte local del24. Por petición posterior del titular se hizo fast-forward de main y push de `6f523a7a3be38f2f69d97094c1a561824fd6c231`; main/origin/main y remoto confirmados. [CI49/run40162327351](https://github.com/andresleosan/SarinBotSAAS/actions/runs/40162327351): cuatro jobs SUCCESS, incluidos4200pruebas, Firestore34+journey1, Worker160 y publicación app/landing/Pages. Release verificado2026-10-25T04:41:11.8029913Z: Worker `57559dcc-ba36-498e-bd3b-ce16787b69aa`, Container39, Pages `12809153-a07c-46c8-9be1-ce6ded87341e`; runtime SHA exacto y escritorS09 ausente/defaultfalse. Tres GET privados anónimos401/no-store y página200/control de sesión, sin mutaciones productivas. Evidencias `../work/faq-publish-20261024/`. Se corrigió aquí el cómputo de archivos:267aprobados+4omitidos=271total; no cambian los4200tests aprobados.
+
+La continuación ejecutó S17 en rama nueva sobre FAQ publicado; véase [QA S17](2026-10-25-owner-operation-summary.md). No hay ninguna publicación FAQ pendiente y S07 no se repitió. El MinorFAQ y el MinorCRM conservan su estado diferido.

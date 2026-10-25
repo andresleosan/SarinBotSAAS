@@ -1,12 +1,12 @@
 # Composición acumulativa de la administración de Sarin
 
-## Corte de ejecución vigente — 24 de octubre de 2026, Colombia
+## Corte de ejecución vigente — 25 de octubre de 2026, Colombia
 
-La fuente activa es `C:/Users/Drean Skate/AppData/Local/SarinBot/fresha-p2-20261023/source`. Main y producción conservan `4999faa`: S07 integrado/publicado y CI48 verificados según el handoff vigente, sin operaciones S07 pendientes. E: mixto permanece protegido.
+La fuente activa es `C:/Users/Drean Skate/AppData/Local/SarinBot/fresha-p2-20261023/source`. Main/origin/main y producción están en `6f523a7`: FAQ factual (orden9) integrado, pusheado y publicado por petición del titular; [CI49/run40162327351](https://github.com/andresleosan/SarinBotSAAS/actions/runs/40162327351) y release/runtime verificados. S07 conserva su cierre previo CI48, sin operaciones pendientes ni repetición de sus gates. E: mixto permanece protegido.
 
-El siguiente pendiente real, **FAQ factual (orden9)**, se implementó localmente sobre esa base en `codex/business-factual-faq-20261024`, código final `db9158e`. Diseño/plan aprobados trasladados desde la entrega documental sin cambios; revisión independiente y correcciones TDD registradas en [QA factual](../qa/2026-10-24-business-factual-faq.md). La rama no se ha integrado ni publicado. Worker debe admitir `factualFaq`/`factualFaqOperations` antes de publicar la app; no hay migración SQL ni borrado de recibos. MinorCRM y Task7S05 siguen diferidos, este último hasta después de S12.
+El siguiente pendiente real, **resumen operativoS17 (orden10)**, se ejecutó sobre6f523a7 en `codex/owner-operation-summary-20261024`, código `8beae02`: conteos por fecha/estado, lectura dueña acotada999/1000, cobertura visible y entrada secundaria desde Mi agenda. Diseño/plan aprobados trasladados sin cambios; revisión y reparaciones TDD/QA en [QA S17](../qa/2026-10-25-owner-operation-summary.md). S17 permanece local para su etapa de integración/publicación; no hay cambios de Worker, índices o persistencia. FAQ ya tiene Worker compatible y no requiere otra publicación pendiente. MinorCRM, MinorFAQ y dos MinorsS17 siguen diferidos. Task7S05 continúa después de S12.
 
-Tras integrar/verificar FAQ, el siguiente incremento funcional del orden elegido es **resumen operativoS17 (orden10)**. Los estados de preparación de la tabla y la fuente antigua que siguen son históricos; no reabren P1–P5/S06/S09/S07 ya integrados ni sustituyen los recibos actuales.
+Tras integrar/verificar S17, el siguiente incremento funcional es **bandeja/revisión de espera S10 (orden11)**. Los estados de preparación de la tabla y la fuente antigua que siguen son históricos; no reabren P1–P5/S06/S09/S07/FAQ ya integrados ni sustituyen los recibos actuales.
 
 Actualizado el 23 de octubre de 2026, Colombia. Anexo de integración documental del [handoff](sarin-admin-implementation-handoff.md): fija contratos comunes para ejecutar los pares preparados sin sobrescribir dashboard, shell, protocolo o reservas. No es evidencia de código, tests, CI, migraciones, proveedor o publicación. La [matriz Fresha](fresha-admin-coverage-matrix.md) mide captura por función; estos planes no prueban captura administrativa completa.
 

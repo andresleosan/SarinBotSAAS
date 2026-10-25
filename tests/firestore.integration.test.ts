@@ -483,4 +483,3 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     await appointments.doc('capacity-thousand').set({ tenantId: summaryBusinessId, dateKey: today, type: 'manual_block' });
     await expect(readOwnerOperationSummary(f.owner, summaryBusinessId, range, db)).rejects.toMatchObject({ status: 413, code: 'OPERATION_SUMMARY_RANGE_TOO_LARGE' });
   }, 60000);});
-
