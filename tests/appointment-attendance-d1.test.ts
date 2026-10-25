@@ -80,7 +80,7 @@ it('d1AttendanceAgainstRepresentation', async () => {
   await invariant(f, 1, 1);
 }, 60000);
 
-it('d1AttendanceAgainstDelayedReschedule', async () => {
+it.each(['confirmation-first', 'attendance-first'] as const)('d1AttendanceAgainstDelayedReschedule: %s', async order => {
   const business = { ...rescheduleBusiness, services: [{ ...rescheduleBusiness.services[0], durationMinutes: 5, bufferMinutes: 0 }] };
   const source = { ...rescheduleSource, endTimeStr: '09:05', endAt: rescheduleSource.startAt + 300000, reservedUntilAt: rescheduleSource.startAt + 300000 };
   // A still-live ten-minute proposal crosses the saved source start and end.
@@ -93,11 +93,20 @@ it('d1AttendanceAgainstDelayedReschedule', async () => {
   vi.mocked(Date.now).mockReturnValue(source.reservedUntilAt);
   expect(proposal.expiresAt).toBeGreaterThan(Date.now());
   const command = { requestId: 'demo-delayed-attendance', expectedRevision: 0, expectedRescheduleRevision: 0, expectedStatus: 'confirmed' as const, status: 'completed' as const };
+  // Launch order alone does not order D1 reads. Exercise both serializations:
+  // confirmed-but-started source, then already-completed source.
+  let release!: () => void;
+  const firstFinished = new Promise<void>(resolve => { release = resolve; });
+  before = async command => {
+    if (order === 'confirmation-first' && attendanceCommit(command)) await firstFinished;
+    if (order === 'attendance-first' && command.action === 'read' && command.read.kind === 'document' && command.read.path === `bookingProposals/${proposal.id}`) await firstFinished;
+  };
   const results = await Promise.allSettled([
-    confirmBookingProposalDetailed(rescheduleActor, rescheduleBusiness.id, proposal.id, rescheduleContact, secondDb),
-    updateAppointmentAttendance({ uid: rescheduleBusiness.ownerUid }, rescheduleBusiness.id, rescheduleSource.id, command, db),
+    confirmBookingProposalDetailed(rescheduleActor, rescheduleBusiness.id, proposal.id, rescheduleContact, secondDb).finally(() => { if (order === 'confirmation-first') release(); }),
+    updateAppointmentAttendance({ uid: rescheduleBusiness.ownerUid }, rescheduleBusiness.id, rescheduleSource.id, command, db).finally(() => { if (order === 'attendance-first') release(); }),
   ]);
-  expect(results[0]).toMatchObject({ status: 'rejected', reason: { code: 'RESCHEDULE_SOURCE_STARTED' } });
+  if (order === 'confirmation-first') expect(results[0]).toMatchObject({ status: 'rejected', reason: { code: 'RESCHEDULE_SOURCE_STARTED' } });
+  else expect(results[0]).toMatchObject({ status: 'rejected', reason: { code: 'RESCHEDULE_SOURCE_CHANGED' } });
   expect(results[1]).toMatchObject({ status: 'fulfilled', value: { appointment: { status: 'completed', startAt: rescheduleSource.startAt } } });
   expect((await businessRef.collection('appointments').get()).size).toBe(1);
   expect((await businessRef.collection('attendanceEvents').get()).size).toBe(1);

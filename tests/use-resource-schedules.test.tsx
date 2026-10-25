@@ -56,7 +56,26 @@ it('missingReceiptNeverUnlocksDifferentCommand and retryUsesIdenticalIdRevisionB
 it('oldReceiptWithNewPolicyExplainsBoth', async () => { await mount(); await edit(); fetchMock.mockRejectedValue(new Error('Lost')); await act(async () => result.save()); const command = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as ResourceScheduleCommand; fetchMock.mockResolvedValue(reply({ ...scheduleView(2), operation: { requestId: command.requestId, operationHash: resourceScheduleOperationHash(command), resultRevision: 1, appliedAt: 1 } })); await act(async () => result.inspectPending()); expect(result.phase).toBe('ready'); expect(result.view?.policy.revision).toBe(2); expect(result.message).toMatch(/después hubo otra modificación/i); expect(result.dirty).toBe(false); });
 it('readonlyCannotSendPut', async () => { input.mode = 'read'; await mount(); await act(async () => { result.setRules(rules); result.review(); }); await act(async () => { await result.save(); await result.retryPending(); }); expect(result.draft).toBeNull(); expect(fetchMock).toHaveBeenCalledTimes(1); });
 it('onePolicyReadServesSevenDates with visible15s refresh and no overlap', async () => { vi.stubGlobal('document', { visibilityState: 'visible' }); input.mode = 'read'; await mount(); expect(fetchMock).toHaveBeenCalledTimes(1); const wait = deferred<Response>(); fetchMock.mockReturnValue(wait.promise); await act(async () => vi.advanceTimersByTimeAsync(15_000)); expect(fetchMock).toHaveBeenCalledTimes(2); await act(async () => vi.advanceTimersByTimeAsync(5000)); expect(fetchMock).toHaveBeenCalledTimes(2); await act(async () => wait.resolve(reply(scheduleView()))); document.visibilityState; await act(async () => vi.advanceTimersByTimeAsync(10_000)); expect(fetchMock).toHaveBeenCalledTimes(3); expect(fetchMock.mock.calls.every(([path]) => String(path).endsWith('/resource-schedules'))).toBe(true); });
-it('sameUid403ShowsAccessLossAndMasksLatePut', async () => { await mount(); await edit(); const wait = deferred<Response>(); fetchMock.mockReturnValueOnce(wait.promise); let sending!: Promise<void>; await act(async () => { sending = result.save(); await Promise.resolve(); }); fetchMock.mockResolvedValue(reply({ error: 'Denied' }, 403)); await act(async () => result.refresh()); expect(result.error).toMatch(/acceso/i); expect(result.draft).toBeNull(); await act(async () => { wait.resolve(reply(scheduleView(1))); await sending; }); expect(result.view).toBeNull(); });
+it('sameUid403ShowsAccessLossAndMasksLatePut', async () => {
+  await mount(); await edit();
+  const wait = deferred<Response>(), releaseDigest = deferred<void>(), started = deferred<void>();
+  const nativeDigest = crypto.subtle.digest.bind(crypto.subtle);
+  vi.spyOn(crypto.subtle, 'digest').mockImplementationOnce(async (...args) => {
+    const digest = await nativeDigest(...args);
+    await releaseDigest.promise;
+    return digest;
+  });
+  fetchMock.mockImplementationOnce(() => { started.resolve(); return wait.promise; });
+  let sending!: Promise<void>;
+  await act(async () => { sending = result.save(); await Promise.resolve(); });
+  expect(fetchMock).toHaveBeenCalledTimes(1); expect(result.phase).toBe('saving');
+  // Native WebCrypto can finish after act's microtasks; wait for the PUT before starting the GET.
+  await act(async () => { releaseDigest.resolve(); await started.promise; });
+  expect(fetchMock).toHaveBeenCalledTimes(2); expect(fetchMock.mock.calls[1][1]?.method).toBe('PUT');
+  fetchMock.mockResolvedValue(reply({ error: 'Denied' }, 403));
+  await act(async () => result.refresh()); expect(result.error).toMatch(/acceso/i); expect(result.draft).toBeNull();
+  await act(async () => { wait.resolve(reply(scheduleView(1))); await sending; }); expect(result.view).toBeNull();
+});
 it.each(['revision', 'basis'] as const)('dirtyConflictSurvivesRepeatedReadsAndReadFailure %s', async changed => {
   await mount(); await edit(); const current = scheduleView(changed === 'revision' ? 1 : 0); if (changed === 'basis') current.basisFingerprint = 'b'.repeat(64);
   fetchMock.mockResolvedValue(reply(current)); await act(async () => result.refresh()); expect(result.phase).toBe('conflict');
