@@ -1,4 +1,4 @@
-import { PAYMENT_UUID } from './admin-payment-actions.ts';
+﻿import { PAYMENT_UUID } from './admin-payment-actions.ts';
 /** Private Container -> Worker storage protocol; never exposed as a public API. */
 export type DataRecord = Record<string, unknown>;
 export type DataFilter = { field: string; op: '==' | '<' | '<=' | '>' | '>='; value: string | number | boolean | null };
@@ -13,7 +13,7 @@ export type DataReadResult = { revision: number; documents: { path: string; data
 export type DataCommitResult = { revision: number };
 
 export const DATA_COLLECTIONS = ['platformWhatsAppSpending', 'platformSupportConversations', 'platformSupportMessages', 'adminPaymentActions', 'users', 'businesses', 'businessSlugs', 'publicBusinesses', 'paymentReceipts', 'paymentImages', 'platformSettings', 'serverSettings', 'invitations', 'businessLogos', 'chatStates', 'bookingProposals', 'responseQuotaScopes', 'responseQuotaTurns', 'aiBudgetCalls', 'aiBudgetPeriods', 'aiUsageCalls', 'aiUsageMonths', 'aiUsageMeta', 'whatsappNumbers', 'whatsappBusinesses', 'whatsappInbox', 'whatsappOutbox', 'whatsappConversations', 'whatsappMessageIds', 'whatsappUsage', 'platformWhatsAppEvents', 'platformWhatsAppConversations', 'platformWhatsAppLinks', 'platformWhatsAppLinkChallenges', 'platformWhatsAppJobs', 'platformWhatsAppOutbox', 'platformWhatsAppBudgetCalls', 'platformWhatsAppBudgetPeriods'] as const;
-export const DATA_CHILDREN: Record<string, readonly string[]> = { businesses: ['appointments', 'attendanceEvents', 'ownerRescheduleProposals', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests', 'resourceSchedulePolicies', 'resourceScheduleOperations'], responseQuotaScopes: ['periods'], aiUsageMonths: ['businesses'], whatsappUsage: ['businesses'] };
+export const DATA_CHILDREN: Record<string, readonly string[]> = { businesses: ['appointments', 'attendanceEvents', 'ownerRescheduleProposals', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests', 'resourceSchedulePolicies', 'resourceScheduleOperations', 'factualFaq', 'factualFaqOperations'], responseQuotaScopes: ['periods'], aiUsageMonths: ['businesses'], whatsappUsage: ['businesses'] };
 export function isDataPath(value: unknown, document: boolean): value is string {
   if (typeof value !== 'string' || value.length > 1024) return false;
   const parts = value.split('/');
@@ -45,3 +45,4 @@ function wellFormed(value: string): boolean {
   }
   return true;
 }
+
