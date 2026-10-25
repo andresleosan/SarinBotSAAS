@@ -54,7 +54,16 @@ export async function createAppointment(user: ChatActor, businessId: string, inp
     return createAppointmentInTransaction(transaction, user, document.data() as Business, input, requestId, db, Date.now());
   });
 }
+type PreparedAppointment = { kind: 'existing'; appointment: Appointment } | { kind: 'new'; appointment: Appointment; apply: () => void };
+
 export async function createAppointmentInTransaction(transaction: Transaction, user: ChatActor, business: Business, input: BookingInput, requestId: string, db: Firestore, now: number, subject?: ValidatedBookingSubject): Promise<Appointment> {
+  const prepared = await prepareAppointmentInTransaction(transaction, user, business, input, requestId, db, now, subject);
+  if (prepared.kind === 'new') prepared.apply();
+  return prepared.appointment;
+}
+
+/** Read-only preparation. The synchronous apply belongs only to this transaction callback. */
+export async function prepareAppointmentInTransaction(transaction: Transaction, user: ChatActor, business: Business, input: BookingInput, requestId: string, db: Firestore, now: number, subject?: ValidatedBookingSubject): Promise<PreparedAppointment> {
   const businessId = business.id, businessReference = db.collection('businesses').doc(businessId);
   const id = stableDocumentId(user.uid, requestId, 'appointment');
   const appointmentReference = businessReference.collection('appointments').doc(id);
@@ -64,7 +73,7 @@ export async function createAppointmentInTransaction(transaction: Transaction, u
     if (existing.exists) {
       const appointment = existing.data() as Appointment;
       if (appointment.client?.uid !== user.uid || appointment.startTimeStr !== input.startTimeStr || appointment.dateKey !== input.dateKey || appointment.resourceId !== input.resourceId || appointment.serviceId !== input.serviceId) throw new HttpError(409, 'Este identificador ya se utilizó para otra reserva.');
-      return appointment;
+      return { kind: 'existing', appointment };
     }
     await assertConsent(user.uid, 'account', undefined, db, transaction);
     await assertConsent(user.uid, 'business_client', business, db, transaction);
@@ -98,20 +107,31 @@ export async function createAppointmentInTransaction(transaction: Transaction, u
       status: 'confirmed', createdBy: business.ownerUid === user.uid ? 'sarin_owner' : 'sarin_client', createdAt: now,
       ...(subject ? { beneficiary: subject.beneficiary, ...(subject.authorization ? { subjectAuthorization: { receiptId: subject.authorization.receiptId, bookingRequestId: subject.case.bookingRequestId, policyRevision: subject.authorization.policyRevision } } : {}), ...(subject.beneficiary.kind === 'represented_minor' ? { representationReview: { revision: 0, status: 'declared' as const, reviewedBy: null, reviewedAt: null } } : {}) } : {}),
     };
-    // The shared per-resource/day document prevents empty-query phantom races.
-    // Every mutation of that resource/date must participate in the same lock.
-    transaction.set(lockReference, { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: now });
-    transaction.set(clientLockReference, { version: Number(clientLock.data()?.version ?? 0) + 1, updatedAt: now });
+    const resourceLock = { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: now };
+    const nextClientLock = { version: Number(clientLock.data()?.version ?? 0) + 1, updatedAt: now };
+    let trialUpdate: { business: Business; public: ReturnType<typeof publicBusiness> } | undefined;
     if (getBusinessAccess(business) === 'paid_trial') {
       const trial = business.subscription.paidTrial!;
       const updated: Business = { ...business, subscription: { ...business.subscription, paidTrial: { ...trial, appointmentsUsed: trial.appointmentsUsed + 1 } } };
-      // A business-wide write serializes the final unit across every resource
-      // and date, beyond the resource/day lock used for slot conflicts.
-      transaction.set(businessReference, updated);
-      transaction.set(db.collection('publicBusinesses').doc(business.slug), publicBusiness(updated));
+      trialUpdate = { business: updated, public: publicBusiness(updated) };
     }
-    transaction.create(appointmentReference, appointment);
-    return appointment;
+    const publicReference = trialUpdate ? db.collection('publicBusinesses').doc(business.slug) : undefined;
+    let applied = false;
+    return { kind: 'new', appointment, apply: () => {
+      if (applied) return;
+      applied = true;
+      // The shared per-resource/day document prevents empty-query phantom races.
+      // Every mutation of that resource/date must participate in the same lock.
+      transaction.set(lockReference, resourceLock);
+      transaction.set(clientLockReference, nextClientLock);
+      if (trialUpdate) {
+        // A business-wide write serializes the final unit across every resource
+        // and date, beyond the resource/day lock used for slot conflicts.
+        transaction.set(businessReference, trialUpdate.business);
+        transaction.set(publicReference!, trialUpdate.public);
+      }
+      transaction.create(appointmentReference, appointment);
+    } };
 }
 
 export async function createManualBlock(user: ChatActor, businessId: string, input: BlockInput, db: Firestore = getAdminDb()): Promise<Appointment> {
