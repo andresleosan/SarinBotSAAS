@@ -2,7 +2,7 @@ import { act, createElement } from 'react';
 import { create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useResourceSchedules } from '@/hooks/use-resource-schedules';
-import { emptyResourceSchedulePolicy, type ResourceScheduleView, type ResourceScheduleRules, type ResourceScheduleCommand } from '@/lib/resource-schedules';
+import { emptyResourceSchedulePolicy, resourceScheduleRulesSchema, type ResourceScheduleView, type ResourceScheduleRules, type ResourceScheduleCommand } from '@/lib/resource-schedules';
 import { resourceScheduleOperationHash } from '@/lib/server/resource-schedules';
 const auth = vi.hoisted(() => ({ uid: 'demo-owner', epoch: 1, current: true }));
 vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { uid: auth.uid }, authEpoch: auth.epoch, isCurrentSession: (uid: string, epoch: number) => auth.current && uid === auth.uid && epoch === auth.epoch }) }));
@@ -32,3 +32,36 @@ it('oldReceiptWithNewPolicyExplainsBoth', async () => { await mount(); await edi
 it('readonlyCannotSendPut', async () => { input.mode = 'read'; await mount(); await act(async () => { result.setRules(rules); result.review(); }); await act(async () => { await result.save(); await result.retryPending(); }); expect(result.draft).toBeNull(); expect(fetchMock).toHaveBeenCalledTimes(1); });
 it('onePolicyReadServesSevenDates with visible15s refresh and no overlap', async () => { vi.stubGlobal('document', { visibilityState: 'visible' }); input.mode = 'read'; await mount(); expect(fetchMock).toHaveBeenCalledTimes(1); const wait = deferred<Response>(); fetchMock.mockReturnValue(wait.promise); await act(async () => vi.advanceTimersByTimeAsync(15_000)); expect(fetchMock).toHaveBeenCalledTimes(2); await act(async () => vi.advanceTimersByTimeAsync(5000)); expect(fetchMock).toHaveBeenCalledTimes(2); await act(async () => wait.resolve(reply(scheduleView()))); document.visibilityState; await act(async () => vi.advanceTimersByTimeAsync(10_000)); expect(fetchMock).toHaveBeenCalledTimes(3); expect(fetchMock.mock.calls.every(([path]) => String(path).endsWith('/resource-schedules'))).toBe(true); });
 it('sameUid403ShowsAccessLossAndMasksLatePut', async () => { await mount(); await edit(); const wait = deferred<Response>(); fetchMock.mockReturnValueOnce(wait.promise); let sending!: Promise<void>; await act(async () => { sending = result.save(); await Promise.resolve(); }); fetchMock.mockResolvedValue(reply({ error: 'Denied' }, 403)); await act(async () => result.refresh()); expect(result.error).toMatch(/acceso/i); expect(result.draft).toBeNull(); await act(async () => { wait.resolve(reply(scheduleView(1))); await sending; }); expect(result.view).toBeNull(); });
+it.each(['revision', 'basis'] as const)('dirtyConflictSurvivesRepeatedReadsAndReadFailure %s', async changed => {
+  await mount(); await edit(); const current = scheduleView(changed === 'revision' ? 1 : 0); if (changed === 'basis') current.basisFingerprint = 'b'.repeat(64);
+  fetchMock.mockResolvedValue(reply(current)); await act(async () => result.refresh()); expect(result.phase).toBe('conflict');
+  await act(async () => result.refresh()); expect(result.phase).toBe('conflict');
+  fetchMock.mockRejectedValue(new Error('Read lost')); await act(async () => result.refresh());
+  fetchMock.mockResolvedValue(reply(current)); await act(async () => result.refresh()); expect(result.phase).toBe('conflict');
+  await act(async () => { result.review(); await result.save(); }); expect(fetchMock.mock.calls.every(([, init]) => init?.method !== 'PUT')).toBe(true); expect(result.draft).toEqual(rules);
+  await act(async () => result.discard()); expect(result.dirty).toBe(false); expect(result.draft).toEqual(current.policy.rules);
+});
+it.each([402, 409, 503])('rejectedRetryCannotResolveEarlierAmbiguity %i', async status => {
+  await mount(); await edit(); fetchMock.mockRejectedValue(new Error('Original response lost while commit is held')); await act(async () => result.save());
+  const command = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as ResourceScheduleCommand;
+  fetchMock.mockResolvedValue(reply({ error: 'Latest attempt rejected', ...(status === 503 ? { code: 'SCHEDULE_WRITES_DISABLED' } : {}) }, status)); await act(async () => result.retryPending());
+  expect(result.phase).toBe('uncertain'); await act(async () => { result.discard(); result.setRules({ weekly: [], exceptions: [], closures: [] }); result.review(); await result.save(); }); expect(result.draft).toEqual(rules); expect(fetchMock).toHaveBeenCalledTimes(3);
+  fetchMock.mockResolvedValue(reply(scheduleView())); await act(async () => result.inspectPending()); expect(result.phase).toBe('uncertain');
+  fetchMock.mockResolvedValue(reply({ ...scheduleView(1), policy: { ...scheduleView(1).policy, rules }, operation: { requestId: command.requestId, operationHash: resourceScheduleOperationHash(command), resultRevision: 1, appliedAt: 1 } })); await act(async () => result.inspectPending()); expect(result.phase).toBe('ready'); expect(result.dirty).toBe(false);
+});
+it('oversizedValidUtf8CommandStaysEditableAndCanBeReducedAndSaved', async () => {
+  const intervals = [{ start: '00:00', end: '01:00' }, { start: '02:00', end: '03:00' }, { start: '04:00', end: '05:00' }, { start: '06:00', end: '07:00' }, { start: '08:00', end: '09:00' }];
+  const resources = Array.from({ length: 30 }, (_, i) => ({ id: `resource-${i}-`.padEnd(128, 'r'), name: `Resource ${i}`, active: true }));
+  const week = Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: true, intervals }]));
+  const oversized: ResourceScheduleRules = { weekly: resources.map(item => ({ resourceId: item.id, weeklySchedule: week })), exceptions: Array.from({ length: 120 }, (_, i) => ({ resourceId: resources[i % 30].id, dateKey: `2030-01-${String(7 + Math.floor(i / 30)).padStart(2, '0')}`, day: { isOpen: true, intervals } })), closures: Array.from({ length: 120 }, (_, i) => ({ id: `closure-${i}-`.padEnd(128, 'c'), scope: 'resource', resourceId: resources[i % 30].id, fromDateKey: '2030-01-07', throughDateKey: '2030-01-07', interval: null, label: '😀'.repeat(60) })) };
+  expect(resourceScheduleRulesSchema.safeParse(oversized).success).toBe(true); expect(new TextEncoder().encode(JSON.stringify(oversized)).byteLength).toBeGreaterThan(128 * 1024);
+  const view = scheduleView(); view.basis.resources = resources; fetchMock.mockResolvedValue(reply(view)); await mount(); await act(async () => result.setRules(oversized)); await act(async () => result.review()); const reviewed = structuredClone(result.draft); await act(async () => result.save());
+  expect(fetchMock).toHaveBeenCalledTimes(1); expect(result.phase).toBe('ready'); expect(result.draft).toEqual(reviewed); expect(result.error).toMatch(/128|grande|reduce/i);
+  await act(async () => result.setRules(rules)); await act(async () => result.review());
+  fetchMock.mockImplementation(async (_path, init) => { const command = JSON.parse(String(init?.body)) as ResourceScheduleCommand; return reply({ ...view, policy: { ...view.policy, revision: 1, updatedAt: 1, rules }, replayed: false, operation: { requestId: command.requestId, operationHash: resourceScheduleOperationHash(command), resultRevision: 1, appliedAt: 1 } }); });
+  await act(async () => result.save()); expect(result.phase).toBe('ready'); expect(result.dirty).toBe(false); expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+it('initialDefinitive413KeepsDraftEditableWithoutPendingBarrier', async () => {
+  await mount(); await edit(); fetchMock.mockResolvedValue(reply({ error: 'Too large' }, 413)); await act(async () => result.save()); expect(result.phase).toBe('ready');
+  await act(async () => result.setRules({ weekly: [], exceptions: [], closures: [] })); expect(result.draft?.closures).toEqual([]); await act(async () => result.retryPending()); expect(fetchMock).toHaveBeenCalledTimes(2);
+});

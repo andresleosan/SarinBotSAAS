@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/server/auth';
 import { resourceScheduleCommandSchema, scheduleBusinessIdSchema, scheduleRequestIdSchema, readOwnerResourceSchedules, saveOwnerResourceSchedules } from '@/lib/server/resource-schedules';
 import { apiError, HttpError, readJson } from '@/lib/server/http';
+import { RESOURCE_SCHEDULE_MAX_COMMAND_BYTES } from '@/lib/resource-schedules';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 type Context = { params: Promise<{ id: string }> };
@@ -18,7 +19,7 @@ export async function PUT(request: Request, context: Context) {
   try {
     const user = await requireUser(request), businessId = scheduleBusinessIdSchema.parse((await context.params).id);
     if (new URL(request.url).search) throw new HttpError(400, 'Consulta inválida.');
-    const command = await readJson(request, resourceScheduleCommandSchema, 128 * 1024);
+    const command = await readJson(request, resourceScheduleCommandSchema, RESOURCE_SCHEDULE_MAX_COMMAND_BYTES);
     return NextResponse.json(await saveOwnerResourceSchedules(user, businessId, command), { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return apiError(error); }
 }

@@ -10,6 +10,7 @@ export type ResourceScheduleRules = { weekly: ResourceWeeklySchedule[]; exceptio
 export type ResourceSchedulePolicy = { version: 1; businessId: string; revision: number; rules: ResourceScheduleRules; updatedAt: number | null };
 export type ResourceScheduleBasis = { weeklySchedule: Business['weeklySchedule']; resources: TenantResource[] };
 export type ResourceScheduleCommand = { requestId: string; expectedRevision: number; expectedBasisFingerprint: string; rules: ResourceScheduleRules };
+export const RESOURCE_SCHEDULE_MAX_COMMAND_BYTES = 128 * 1024;
 export type ResourceScheduleReceipt = { requestId: string; operationHash: string; resultRevision: number; appliedAt: number };
 export type ResourceScheduleView = { businessId: string; ownerUid: string; policy: ResourceSchedulePolicy; basis: ResourceScheduleBasis; basisFingerprint: string; writesEnabled: boolean; serverNow: number; operation: ResourceScheduleReceipt | null };
 export type ResourceScheduleSaveResult = ResourceScheduleView & { operation: ResourceScheduleReceipt; replayed: boolean };

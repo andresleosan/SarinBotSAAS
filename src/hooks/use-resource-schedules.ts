@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { apiFetch, ApiError, errorMessage } from '@/lib/client/api';
-import { canonicalResourceScheduleRules, resourceScheduleCommandText, resourceScheduleRulesSchema, resourceScheduleViewSchema, resourceScheduleSaveResultSchema, type ResourceScheduleView, type ResourceScheduleRules, type ResourceScheduleCommand } from '@/lib/resource-schedules';
+import { canonicalResourceScheduleRules, resourceScheduleCommandText, resourceScheduleRulesSchema, resourceScheduleViewSchema, resourceScheduleSaveResultSchema, RESOURCE_SCHEDULE_MAX_COMMAND_BYTES, type ResourceScheduleView, type ResourceScheduleRules, type ResourceScheduleCommand } from '@/lib/resource-schedules';
 
 export type ResourceSchedulePhase = 'loading' | 'ready' | 'review' | 'saving' | 'uncertain' | 'conflict' | 'error';
 export type ResourceScheduleController = {
@@ -11,9 +11,9 @@ export type ResourceScheduleController = {
   setRules: (rules: ResourceScheduleRules) => void; review: () => void; save: () => Promise<void>;
   refresh: () => Promise<void>; inspectPending: () => Promise<void>; retryPending: () => Promise<void>; discard: () => void;
 };
-type State = Pick<ResourceScheduleController, 'view' | 'draft' | 'phase' | 'dirty' | 'error' | 'message'> & { key: string; reviewed: string | null };
-type Pending = { command: ResourceScheduleCommand; hash: string; active: boolean };
-const blank = (key: string): State => ({ key, view: null, draft: null, phase: 'loading', dirty: false, error: null, message: null, reviewed: null });
+type State = Pick<ResourceScheduleController, 'view' | 'draft' | 'phase' | 'dirty' | 'error' | 'message'> & { key: string; reviewed: string | null; conflicted: boolean };
+type Pending = { command: ResourceScheduleCommand; hash: string; active: boolean; ambiguous: boolean };
+const blank = (key: string): State => ({ key, view: null, draft: null, phase: 'loading', dirty: false, error: null, message: null, reviewed: null, conflicted: false });
 const fingerprint = (view: ResourceScheduleView, rules: ResourceScheduleRules) => JSON.stringify([view.policy.revision, view.basisFingerprint, canonicalResourceScheduleRules(rules)]);
 
 export function useResourceSchedules(input: { businessId: string | null; ownerUid: string | null; authEpoch: number; mode: 'read' | 'edit'; enabled: boolean }): ResourceScheduleController {
@@ -36,8 +36,8 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
     } else if (operation) {
       publish({ ...old, phase: operation.active ? 'saving' : 'uncertain', message: 'Aún no hay recibo. Espera o reintenta la misma petición después de un error.' });
     } else {
-      const conflict = old.key === expected && old.dirty && old.view && (old.view.policy.revision !== view.policy.revision || old.view.basisFingerprint !== view.basisFingerprint);
-      publish({ ...blank(expected), view, draft: current.current.input.mode === 'edit' ? old.key === expected && old.dirty ? old.draft : structuredClone(view.policy.rules) : null, dirty: old.key === expected && old.dirty, phase: conflict ? 'conflict' : old.dirty && old.phase === 'review' ? 'review' : 'ready', reviewed: conflict ? null : old.reviewed, error: conflict ? 'Los horarios o la apertura cambiaron. Conservamos tu borrador; carga la versión actual antes de editar de nuevo.' : null });
+      const conflict = Boolean(old.key === expected && old.dirty && old.view && (old.conflicted || old.view.policy.revision !== view.policy.revision || old.view.basisFingerprint !== view.basisFingerprint));
+      publish({ ...blank(expected), view, draft: current.current.input.mode === 'edit' ? old.key === expected && old.dirty ? old.draft : structuredClone(view.policy.rules) : null, dirty: old.key === expected && old.dirty, conflicted: conflict, phase: conflict ? 'conflict' : old.dirty && old.phase === 'review' ? 'review' : 'ready', reviewed: conflict ? null : old.reviewed, error: conflict ? 'Los horarios o la apertura cambiaron. Conservamos tu borrador; carga la versión actual antes de editar de nuevo.' : null });
     }
   }, [publish]);
   const read = useCallback(async () => {
@@ -70,7 +70,7 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
     const timer = setInterval(() => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') void read(); }, 15_000);
     return () => clearInterval(timer);
   }, [key, input.enabled, input.mode, read]);
-  const editable = () => authorized(key) && input.mode === 'edit' && state.current.key === key && state.current.view && !pending.current && !['conflict', 'loading', 'error'].includes(state.current.phase);
+  const editable = () => authorized(key) && input.mode === 'edit' && state.current.key === key && state.current.view && !pending.current && !state.current.conflicted && !['conflict', 'loading', 'error'].includes(state.current.phase);
   const setRules = (rules: ResourceScheduleRules) => { if (!editable()) return; publish({ ...state.current, draft: structuredClone(rules), dirty: true, reviewed: null, phase: 'ready', error: null, message: null }); };
   const review = () => {
     if (!editable() || !state.current.draft || !state.current.dirty) return;
@@ -92,15 +92,22 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
       adopt(result, expected, true);
     } catch (error) {
       if (!owns()) return;
-      const known = error instanceof ApiError && (error.status === 402 || error.status === 428 || error.status === 400 || error.status === 409 || error.code === 'SCHEDULE_WRITES_DISABLED');
-      if (known) pending.current = null;
-      publish({ ...state.current, phase: known ? error instanceof ApiError && error.status === 409 ? 'conflict' : 'ready' : 'uncertain', reviewed: null, error: errorMessage(error) });
+      const known = error instanceof ApiError && (error.status === 402 || error.status === 428 || error.status === 400 || error.status === 409 || error.status === 413 || error.code === 'SCHEDULE_WRITES_DISABLED');
+      const resolved = known && !operation.ambiguous;
+      if (resolved) pending.current = null;
+      else operation.ambiguous = true;
+      const conflict = resolved && error instanceof ApiError && error.status === 409;
+      publish({ ...state.current, conflicted: state.current.conflicted || conflict, phase: resolved ? conflict ? 'conflict' : 'ready' : 'uncertain', reviewed: null, error: errorMessage(error) });
     } finally { operation.active = false; clearTimeout(timer); timers.current.delete(timer); }
   };
   const save = async () => {
     const s = state.current;
     if (!editable() || s.phase !== 'review' || !s.view?.writesEnabled || !s.draft || s.reviewed !== fingerprint(s.view, s.draft)) return;
-    const operation: Pending = { command: { requestId: crypto.randomUUID(), expectedRevision: s.view.policy.revision, expectedBasisFingerprint: s.view.basisFingerprint, rules: canonicalResourceScheduleRules(s.draft) }, hash: '', active: false };
+    const operation: Pending = { command: { requestId: crypto.randomUUID(), expectedRevision: s.view.policy.revision, expectedBasisFingerprint: s.view.basisFingerprint, rules: canonicalResourceScheduleRules(s.draft) }, hash: '', active: false, ambiguous: false };
+    if (new TextEncoder().encode(JSON.stringify(operation.command)).byteLength > RESOURCE_SCHEDULE_MAX_COMMAND_BYTES) {
+      publish({ ...s, phase: 'ready', reviewed: null, error: 'El borrador es demasiado grande. Reduce intervalos, excepciones o etiquetas antes de guardar.' });
+      return;
+    }
     pending.current = operation; publish({ ...s, phase: 'saving' });
     try {
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(resourceScheduleCommandText(operation.command)));
@@ -114,5 +121,5 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
     const protect = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', protect); return () => window.removeEventListener('beforeunload', protect);
   }, [effective.dirty]);
-  return { ...effective, setRules, review, save, refresh: read, inspectPending: read, retryPending: async () => { if (input.mode === 'edit' && pending.current && !pending.current.active) await send(pending.current); }, discard: () => { if (!authorized(key) || input.mode !== 'edit' || pending.current || !state.current.view) return; publish({ ...state.current, draft: structuredClone(state.current.view.policy.rules), dirty: false, reviewed: null, phase: 'ready', error: null, message: null }); } };
+  return { ...effective, setRules, review, save, refresh: read, inspectPending: read, retryPending: async () => { if (input.mode === 'edit' && pending.current && !pending.current.active) await send(pending.current); }, discard: () => { if (!authorized(key) || input.mode !== 'edit' || pending.current || !state.current.view) return; publish({ ...state.current, draft: structuredClone(state.current.view.policy.rules), dirty: false, conflicted: false, reviewed: null, phase: 'ready', error: null, message: null }); } };
 }
