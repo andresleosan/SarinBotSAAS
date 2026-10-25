@@ -14,6 +14,14 @@ export function useOwnerWaitlistOffer(input: OwnerWaitlistOfferInput) {
   const current = useRef({input, auth, key}); current.current = {input, auth, key};
   const [snapshot, setSnapshot] = useState(() => blank(key)), state = useRef(snapshot), mounted = useRef(true), denied = useRef<string|null>(null);
   const reading = useRef<{ cancel: () => void }|null>(null), pending = useRef<Pending|null>(null), selectedRecord = useRef<string|null>(null);
+  const terminalObservations = useRef({key, offers:new Map<string,OwnerWaitlistOfferRecovery>()});
+  if (terminalObservations.current.key !== key) terminalObservations.current = {key, offers:new Map()};
+  function retainTerminal(recovery: OwnerWaitlistOfferRecovery) {
+    const offers = terminalObservations.current.offers, prior = offers.get(recovery.offer.id);
+    if (prior) return prior;
+    if (recovery.offer.persistedState !== 'offered') offers.set(recovery.offer.id,recovery);
+    return recovery;
+  }
   function valid(expected: string) { const c = current.current, s = c.input; return mounted.current && c.key === expected && s.enabled && denied.current !== expected && Boolean(s.businessId && s.ownerUid) && c.auth.user?.uid === s.ownerUid && c.auth.authEpoch === s.authEpoch && c.auth.isCurrentSession(s.ownerUid!, s.authEpoch); }
   const available = () => valid(current.current.key) && current.current.input.available !== false;
   function patch(value: Partial<State>) { if (!mounted.current) return; const expected = current.current.key; state.current = {...(state.current.key === expected ? state.current : blank(expected)), ...value, key: expected}; setSnapshot(state.current); }
@@ -46,7 +54,7 @@ export function useOwnerWaitlistOffer(input: OwnerWaitlistOfferInput) {
       if (p?.kind === 'create' && p.conflict && (context.headRevision > p.command.expectedHeadRevision || context.detail.row.waitlistRevision > p.command.expectedWaitlistRevision)) {
         pending.current = null; patch({command:null,busy:false,uncertain:false,notice:'Se comprobó el estado actual tras el conflicto. No es una constancia de la publicación anterior.'});
       }
-      patch({context, recovery:context.currentOffer, loading:false, ...(pending.current ? {} : {command:null})});
+      patch({context, recovery:context.currentOffer ? retainTerminal(context.currentOffer) : null, loading:false, ...(pending.current ? {} : {command:null})});
     });
   }
   function select(resourceId: string, startTimeStr: string) {
@@ -71,13 +79,19 @@ export function useOwnerWaitlistOffer(input: OwnerWaitlistOfferInput) {
       if (p.kind === 'create') {
         const value = ownerWaitlistOfferResultSchema.parse(raw), r = value.recovery, t = r.offer.target; scope(r,p.key);
         if (r.offer.waitlistRecordId !== p.recordId || r.offer.entryId !== p.command.entryId || t.resourceId !== p.command.selection.resourceId || t.startTimeStr !== p.command.selection.startTimeStr || value.appliedHeadRevision !== p.command.expectedHeadRevision+1) throw Error('No se pudo verificar el resultado de esta publicación.');
-        pending.current = null; cancelRead(); patch({recovery:r,context:null,command:null,busy:false,loading:false,uncertain:false,notice:'Oferta publicada en Sarin. No se envió un aviso externo ni se retuvo el horario.'});
+        const recovery = retainTerminal(r);
+        pending.current = null; cancelRead(); patch({recovery,context:null,command:null,busy:false,loading:false,uncertain:false,notice:recovery.offer.persistedState === 'offered' ? 'Oferta publicada en Sarin. No se envió un aviso externo ni se retuvo el horario.' : 'Se comprobó el resultado persistido de la oferta.'});
+      } else if (p.kind === 'withdraw') {
+        const value = ownerWaitlistOfferRecoverySchema.parse(raw); scope(value,p.key);
+        if (value.offer.id !== p.offerId || value.offer.persistedState === 'offered') throw Error('Falta comprobar el retiro de esta oferta.');
+        const recovery = retainTerminal(value);
+        pending.current = null; cancelRead(); patch({recovery,busy:false,loading:false,uncertain:false,notice:recovery.offer.persistedState === 'booked' ? 'Se comprobó una reserva vinculada. Este cierre no cancela la cita.' : 'Se comprobó el cierre de la oferta. La solicitud sigue su propio estado.'});
       } else {
         const value = waitlistOfferCloseResultSchema.parse(raw); scope(value,p.key);
         if (value.offerId !== p.offerId || value.persistedState === 'offered') throw Error('Falta comprobar el cierre de la oferta.');
         const r = state.current.recovery;
         if (!r || r.offer.id !== p.offerId || value.proof && value.proof.entryId !== r.offer.entryId) throw Error('El cierre no corresponde a esta oferta.');
-        const recovery = ownerWaitlistOfferRecoverySchema.parse({...r,serverNow:Math.max(r.serverNow,value.proof?.confirmedAt??0),offer:{...r.offer,persistedState:value.persistedState},proof:value.proof,usability:null});
+        const recovery = retainTerminal(ownerWaitlistOfferRecoverySchema.parse({...r,serverNow:Math.max(r.serverNow,value.proof?.confirmedAt??0),offer:{...r.offer,persistedState:value.persistedState},proof:value.proof,usability:null}));
         pending.current = null; cancelRead(); patch({recovery,busy:false,loading:false,uncertain:false,notice:value.persistedState === 'booked' ? 'Se comprobó una reserva vinculada. Este cierre no cancela la cita.' : 'Se comprobó el cierre de la oferta. La solicitud sigue su propio estado.'});
       }
     } catch(error) { if (owns()) { if (p.kind === 'create' && error instanceof ApiError && error.status === 409 && ['OFFER_CHANGED','OFFER_EXISTS','OFFER_REQUEST_REUSED'].includes(error.code??'')) p.conflict = true; patch({busy:false,uncertain:true,error:errorMessage(error)}); } }
@@ -89,6 +103,7 @@ export function useOwnerWaitlistOffer(input: OwnerWaitlistOfferInput) {
     if (pending.current && pending.current.kind !== 'create' && pending.current.offerId !== offerId) return;
     const expected=current.current.key;
     await read(base()+'/offers/'+encodeURIComponent(offerId),{},raw=>{const r=ownerWaitlistOfferRecoverySchema.parse(raw);scope(r,expected);if(r.offer.id!==offerId)throw Error('La oferta recibida no corresponde a la consulta.');return r;},recovery=>{
+      recovery = retainTerminal(recovery);
       const p=pending.current;
       if(p && p.kind!=='create' && p.offerId===offerId && recovery.offer.persistedState!=='offered') { p.cancel?.();pending.current=null;patch({busy:false,uncertain:false,notice:'Se comprobó el resultado persistido de la oferta.'}); }
       patch({recovery,loading:false});
