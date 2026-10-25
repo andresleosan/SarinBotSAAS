@@ -18,6 +18,7 @@ import {
   fieldClass,
 } from "@/components/app-shell";
 import { useBusiness } from "@/hooks/useBusiness";
+import { useResourceSchedules } from '@/hooks/use-resource-schedules';
 import { useOwnerAgenda } from '@/hooks/use-owner-agenda';
 import { preserveNewerAppointmentResults } from '@/hooks/use-appointment-attendance';
 import { OwnerAgendaCalendar } from '@/components/owner-agenda-calendar';
@@ -44,6 +45,7 @@ function Agenda() {
   const [now, setNow] = useState(Date.now());
   const range = getOwnerAgendaRange(date, mode, now);
   const enabled = !loading && !businessError && !!user && business?.ownerUid === user.uid && !!business?.sarinConfig.onboardingCompleted;
+  const schedules = useResourceSchedules({ businessId: business?.id ?? null, ownerUid: user?.uid ?? null, authEpoch, mode: 'read', enabled });
   const scope = JSON.stringify([user?.uid, business?.id, date, range?.dates, range?.queryDates, range?.outsideDates, enabled, authEpoch]);
   const scopeRef = useRef({ key: scope });
   if (scopeRef.current.key !== scope) scopeRef.current = { key: scope };
@@ -253,7 +255,7 @@ function Agenda() {
       <PaidTrialStatus subscription={sub} />
       {day?.state === 'ready' ? <ClientPolicyControls businessId={business.id} ownerUid={business.ownerUid} clients={[...new Map(appointments.filter(item => item.client?.uid).map(item => [item.client!.uid, { uid: item.client!.uid, name: item.client!.name }])).values()]} /> : <p className="text-sm text-sarin-muted">Las políticas de clientes estarán disponibles cuando cargue el día seleccionado.</p>}
       {actionError?.scope === actionScope && <Notice error>{actionError.message}</Notice>}
-      <OwnerAgendaCalendar business={business} mode={mode} selectedDate={date} resourceId={selectedResourceId} range={range} snapshot={agenda.snapshot} loading={agenda.loading} error={agenda.error} busy={combinedBusy}
+      <OwnerAgendaCalendar business={business} scheduleContext={schedules.view ? { state: 'ready', view: schedules.view } : { state: schedules.phase === 'loading' ? 'loading' : 'error' }} mode={mode} selectedDate={date} resourceId={selectedResourceId} range={range} snapshot={agenda.snapshot} loading={agenda.loading} error={agenda.error} busy={combinedBusy}
         onModeChange={value => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setMode(value); }}
         onDateChange={value => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setDate(value); }}
         onResourceChange={value => { if (scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setSelectedResourceId(value); }}

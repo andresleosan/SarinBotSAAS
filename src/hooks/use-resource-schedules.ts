@@ -65,6 +65,11 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
     generation.current++; pending.current = null; publish(blank(key)); void read();
     return () => { generation.current++; reading.current?.cancel(); reading.current = null; for (const timer of timers.current) clearTimeout(timer); timers.current.clear(); };
   }, [key, publish, read]);
+  useEffect(() => {
+    if (!input.enabled || input.mode !== 'read') return;
+    const timer = setInterval(() => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') void read(); }, 15_000);
+    return () => clearInterval(timer);
+  }, [key, input.enabled, input.mode, read]);
   const editable = () => authorized(key) && input.mode === 'edit' && state.current.key === key && state.current.view && !pending.current && !['conflict', 'loading', 'error'].includes(state.current.phase);
   const setRules = (rules: ResourceScheduleRules) => { if (!editable()) return; publish({ ...state.current, draft: structuredClone(rules), dirty: true, reviewed: null, phase: 'ready', error: null, message: null }); };
   const review = () => {

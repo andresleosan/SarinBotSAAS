@@ -1,7 +1,11 @@
+vi.mock('@/hooks/use-resource-schedules', () => ({ useResourceSchedules: vi.fn(() => ({ view: null, phase: 'loading' })) }));
 import { act, createElement, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardPage from '@/app/dashboard/page';
+import { useResourceSchedules } from '@/hooks/use-resource-schedules';
+import { OwnerAgendaCalendar } from '@/components/owner-agenda-calendar';
+import { emptyResourceSchedulePolicy } from '@/lib/resource-schedules';
 import { ClientPolicyControls } from '@/components/client-policy-controls';
 import type { Appointment, Business } from '@/types/firestore';
 
@@ -29,6 +33,7 @@ describe('owner agenda dashboard integration', () => {
   const writes = () => state.api.mock.calls.filter(call => call[1]?.method);
   const mount = async () => { await act(async () => { renderer = create(createElement(DashboardPage)); }); };
   const update = async () => { await act(async () => renderer.update(createElement(DashboardPage))); };
+  it('scheduleControllerIsReadonlyAndRefreshPreservesDateAndActions', async () => { await mount(); expect(vi.mocked(useResourceSchedules)).toHaveBeenLastCalledWith(expect.objectContaining({ mode: 'read', businessId: state.business!.id, ownerUid: state.user.uid, enabled: true })); const selectedDate = date().props.value, business = state.business!; vi.mocked(useResourceSchedules).mockReturnValueOnce({ view: { businessId: business.id, ownerUid: state.user.uid, basis: { weeklySchedule: business.weeklySchedule, resources: business.resources }, basisFingerprint: 'a'.repeat(64), policy: emptyResourceSchedulePolicy(business.id), writesEnabled: false, serverNow: 1, operation: null }, phase: 'ready' } as ReturnType<typeof useResourceSchedules>); await update(); expect(date().props.value).toBe(selectedDate); expect(renderer.root.findByType(OwnerAgendaCalendar).props.scheduleContext.state).toBe('ready'); });
   const click = async (label: string) => { await act(async () => { button(label).props.onClick(); }); };
   const changeDate = async (value: string) => { await act(async () => date().props.onChange({ target: { value } })); };
   const submitBlock = async () => { await act(async () => { const times = renderer.root.findAllByType('input').filter(node => node.props.type === 'time'); times[0].props.onChange({ target: { value: '10:00' } }); times[1].props.onChange({ target: { value: '10:30' } }); }); await act(async () => { renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }); }); };

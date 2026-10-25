@@ -1,3 +1,4 @@
+vi.mock('@/hooks/use-resource-schedules', () => ({ useResourceSchedules: vi.fn(() => ({ view: null, phase: 'loading' })) }));
 import { act, createElement, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

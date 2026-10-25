@@ -1,3 +1,4 @@
+import { emptyResourceSchedulePolicy } from '@/lib/resource-schedules';
 import { act, createElement } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -35,7 +36,7 @@ async function list(day: OwnerAgendaDay | null = ready(), extra: Partial<Paramet
 }
 beforeEach(() => {
   vi.clearAllMocks();
-  props = { business, mode: 'day', selectedDate: dates[0], resourceId: null, range: { selectedDate: dates[0], dates: [dates[0]], queryDates: [dates[0]], outsideDates: [] }, snapshot: { days: [ready()], checkedAt: 1 }, loading: false, error: null, busy: false, onModeChange: vi.fn(), onDateChange: vi.fn(), onResourceChange: vi.fn(), onRefresh: vi.fn() };
+  props = { business, scheduleContext: { state: 'ready', view: { businessId: business.id, ownerUid: business.ownerUid, policy: emptyResourceSchedulePolicy(business.id), basis: { weeklySchedule: business.weeklySchedule, resources: business.resources }, basisFingerprint: 'a'.repeat(64), writesEnabled: false, serverNow: 1, operation: null } }, mode: 'day', selectedDate: dates[0], resourceId: null, range: { selectedDate: dates[0], dates: [dates[0]], queryDates: [dates[0]], outsideDates: [] }, snapshot: { days: [ready()], checkedAt: 1 }, loading: false, error: null, busy: false, onModeChange: vi.fn(), onDateChange: vi.fn(), onResourceChange: vi.fn(), onRefresh: vi.fn() };
 });
 afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; vi.unstubAllGlobals(); });
 

@@ -4,8 +4,10 @@ import type { Business } from '@/types/firestore';
 import type { OwnerAgendaMode, OwnerAgendaRange, OwnerAgendaSnapshot } from '@/lib/owner-agenda';
 import { useEffect, useRef } from 'react';
 import { agendaToday, getOwnerAgendaDayLayout, getOwnerAgendaResources, getOwnerAgendaScale, OWNER_AGENDA_PIXELS_PER_HOUR, shiftAgendaDate } from '@/lib/owner-agenda';
+import { resolveResourceDaySchedule, type ResourceScheduleView } from '@/lib/resource-schedules';
 
 export type OwnerAgendaCalendarProps = {
+  scheduleContext: { state: 'ready'; view: ResourceScheduleView } | { state: 'loading' | 'error' };
   business: Business; mode: OwnerAgendaMode; selectedDate: string; resourceId: string | null;
   range: OwnerAgendaRange | null; snapshot: OwnerAgendaSnapshot | null; loading: boolean; error: string | null; busy: boolean;
   onModeChange: (mode: OwnerAgendaMode) => void; onDateChange: (dateKey: string) => void;
@@ -16,7 +18,7 @@ const controlClass = 'min-h-11 min-w-0 rounded-xl border border-sarin-line bg-wh
 const minuteLabel = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(Math.floor(minute % 60)).padStart(2, '0')}`;
 const dayLabel = (date: string) => new Intl.DateTimeFormat('es-CO', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${date}T12:00:00Z`));
 
-export function OwnerAgendaCalendar({ business, mode, selectedDate, resourceId, range, snapshot, loading, error, busy, onModeChange, onDateChange, onResourceChange, onRefresh }: OwnerAgendaCalendarProps) {
+export function OwnerAgendaCalendar({ business, scheduleContext, mode, selectedDate, resourceId, range, snapshot, loading, error, busy, onModeChange, onDateChange, onResourceChange, onRefresh }: OwnerAgendaCalendarProps) {
   const focusDate = useRef<string | null>(null);
   useEffect(() => {
     if (focusDate.current === selectedDate) {
@@ -32,7 +34,9 @@ export function OwnerAgendaCalendar({ business, mode, selectedDate, resourceId, 
   }
   const visibleResources = resources.filter(resource => resourceId === null || resource.id === resourceId);
   const layouts = days.map(day => day.state === 'ready' ? getOwnerAgendaDayLayout(day.dateKey, day.appointments) : { blocks: [], warnings: {} });
-  const scale = range ? getOwnerAgendaScale(business.weeklySchedule, range, layouts) : { startMinute: 480, endMinute: 1080 };
+  const scheduleView = scheduleContext.state === 'ready' && scheduleContext.view.businessId === business.id && scheduleContext.view.ownerUid === business.ownerUid ? scheduleContext.view : null;
+  const resourceSchedule = (id: string | undefined, dateKey: string) => scheduleView && id && scheduleView.basis.resources.some(item => item.id === id && item.active) ? resolveResourceDaySchedule({ business: scheduleView.basis, policy: scheduleView.policy, resourceId: id, dateKey }) : null;
+  const scale = range ? getOwnerAgendaScale(scheduleView?.basis.weeklySchedule ?? {}, range, layouts) : { startMinute: 480, endMinute: 1080 };
   const pixels = (minute: number) => minute * OWNER_AGENDA_PIXELS_PER_HOUR / 60;
   const height = pixels(scale.endMinute - scale.startMinute);
   const hours = Array.from({ length: (scale.endMinute - scale.startMinute) / 60 + 1 }, (_, index) => scale.startMinute + index * 60);
@@ -65,6 +69,13 @@ export function OwnerAgendaCalendar({ business, mode, selectedDate, resourceId, 
     <div className="min-w-0 space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-medium text-sarin-blue">2. Revisa la ocupación</p><a href="#owner-agenda-day-details" className="inline-flex min-h-11 items-center text-sm font-medium text-sarin-blue underline underline-offset-4">Ver citas del día</a></div>
       <p className="text-sm leading-6 text-sarin-muted">Los espacios sin bloques indican que no hay ocupación registrada en esta vista; no garantizan disponibilidad para reservar</p>
+      <p role="status" className="text-sm text-sarin-muted">{scheduleView ? 'Turnos y cierres vigentes: fondo suave como contexto. Las citas existentes se conservan.' : scheduleContext.state === 'loading' ? 'Verificando turnos y cierres…' : 'Horario no verificable'}</p>
+      {scheduleView && days.flatMap(day => day.state === 'ready' ? day.appointments.filter(item => item.type === 'appointment' && item.status === 'confirmed' && (resourceId === null || item.resourceId === resourceId)).map(item => {
+        const effective = resourceSchedule(item.resourceId, day.dateKey);
+        const start = Date.parse(`${day.dateKey}T00:00:00-05:00`), from = (item.startAt - start) / 60000, through = (item.reservedUntilAt - start) / 60000;
+        const fits = effective?.intervals.some(interval => from >= Number(interval.start.slice(0, 2)) * 60 + Number(interval.start.slice(3)) && through <= Number(interval.end.slice(0, 2)) * 60 + Number(interval.end.slice(3)));
+        return !effective || !fits ? <p key={`${day.dateKey}:${item.id}`} data-schedule-warning={item.id} className="text-sm text-amber-900">{day.dateKey} · {item.startTimeStr} · {business.resources.find(resource => resource.id === item.resourceId)?.name || 'Recurso histórico'}: {!effective ? 'Horario no verificable para este recurso histórico' : 'Cita fuera del horario vigente; se conserva. Revísala en las citas del día.'}</p> : null;
+      }) : [])}
       <p aria-live="polite" className={'text-sm ' + (partial || error ? 'text-rose-800' : 'text-sarin-muted')}>{error ?? (loading ? 'Actualizando agenda…' : partial ? mode === 'week' ? 'Semana incompleta · Actualiza para volver a consultar los días con error.' : 'No pudimos cargar este día · Actualiza para intentarlo de nuevo.' : range ? `${mode === 'week' ? 'Semana' : 'Día'} · ${dayLabel(selectedDate)}` : 'Elige una fecha válida para consultar la agenda.')}</p>
       <details className="rounded-xl border border-sarin-line bg-white px-4"><summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">Cómo leer la agenda</summary><ul className="space-y-2 pb-4 text-xs leading-6 text-sarin-muted"><li>Servicio: bloque azul con la duración registrada.</li><li>Preparación: margen guardado con trama, después del servicio.</li><li>Bloqueo: tiempo reservado por el negocio, en gris.</li><li>Horario del negocio: fondo suave como contexto, sin indicar disponibilidad.</li><li>Canceladas, completadas y ausencias: se conservan en las citas del día y no ocupan el gráfico.</li><li>Solo se consultan registros iniciados en la fecha de cada columna. Un error no significa que el día esté vacío.</li></ul></details>
       {range && !error && <>
@@ -86,13 +97,13 @@ export function OwnerAgendaCalendar({ business, mode, selectedDate, resourceId, 
                 const layout = day?.state === 'ready' ? getOwnerAgendaDayLayout(column.dateKey, day.appointments) : null;
                 const blocks = column.resource ? layout?.blocks.filter(block => block.resourceId === column.resource!.id) ?? [] : [];
                 const outside = range.outsideDates.includes(column.dateKey) || day?.state === 'outside';
-                const schedule = business.weeklySchedule[new Date(`${column.dateKey}T12:00:00Z`).getUTCDay()];
+                const schedule = resourceSchedule(column.resource?.id, column.dateKey);
                 return <div key={index} data-agenda-column={true} className="relative min-w-0 border-l border-sarin-line" style={{ height, backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent 63px, #233e7c12 63px, #233e7c12 64px)' }}>
-                  {day?.state === 'ready' && schedule?.isOpen && schedule.intervals.map((interval, intervalIndex) => {
+                  {!outside && schedule?.isOpen && schedule.intervals.map((interval, intervalIndex) => {
                     const start = Number(interval.start.slice(0, 2)) * 60 + Number(interval.start.slice(3));
                     const end = Number(interval.end.slice(0, 2)) * 60 + Number(interval.end.slice(3));
                     const clippedStart = Math.max(scale.startMinute, start), clippedEnd = Math.min(scale.endMinute, end);
-                    return Number.isFinite(start) && Number.isFinite(end) && clippedEnd > clippedStart ? <div key={intervalIndex} className="absolute inset-x-0 bg-sarin-soft/50" style={{ top: pixels(clippedStart - scale.startMinute), height: pixels(clippedEnd - clippedStart) }} /> : null;
+                    return Number.isFinite(start) && Number.isFinite(end) && clippedEnd > clippedStart ? <div key={intervalIndex} data-schedule-shading={true} className="absolute inset-x-0 bg-sarin-soft/50" style={{ top: pixels(clippedStart - scale.startMinute), height: pixels(clippedEnd - clippedStart) }} /> : null;
                   })}
                   {(outside || day?.state !== 'ready') && <p className="relative p-3 text-xs leading-6 text-sarin-muted">{outside ? 'Fuera del rango consultable' : day?.state === 'error' ? 'No pudimos cargar este día' : 'Cargando este día…'}</p>}
                   {blocks.map(block => {
