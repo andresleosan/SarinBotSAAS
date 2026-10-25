@@ -1,4 +1,4 @@
-import { act, createElement, Suspense, useEffect, type ReactNode } from 'react';
+﻿import { act, createElement, Suspense, useEffect, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import ClientPage from '@/app/b/[slug]/page';
@@ -9,7 +9,7 @@ import { bookingSubjectContent } from '@/lib/booking-subject-legal';
 import type { Appointment, PublicBusiness } from '@/types/firestore';
 import type { BookingSubjectCase } from '@/lib/booking-subject';
 const state = vi.hoisted(() => ({ uid: 'demo-client', account: true, consent: true, ready: true, nullPolicy: false, chatLock: false, mounts: 0 }));
-vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { uid: state.uid, displayName: 'Demo' }, signOut: vi.fn() }), AuthGate: ({ children }: { children: ReactNode }) => children }));
+vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { uid: state.uid, displayName: 'Demo' }, authEpoch: 0, isCurrentSession: (uid: string, epoch: number) => uid === state.uid && epoch === 0, signOut: vi.fn() }), AuthGate: ({ children }: { children: ReactNode }) => children }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: state.account }), ConsentPanel: () => null }));
 vi.mock('@/hooks/useConsent', () => ({ useConsent: () => ({ active: state.consent }) }));
 vi.mock('@/hooks/useBookingDataPolicy', () => ({ useBookingDataPolicy: () => ({ ready: state.ready, error: null, refresh: vi.fn(), capability: state.nullPolicy ? null : { configured: true, revision: 1, dataMode: 'general', representedMinorsEnabled: false } }) }));
@@ -85,3 +85,4 @@ it('keeps the same uncertain operation mounted when the booking policy becomes u
   expect(renderer!.root.findAllByType(AppointmentReschedule)).toHaveLength(1); expect(button('Recuperar cambio de horario')).toBeDefined(); expect(history().props.actionsLocked).toBe(true);
   await act(async () => button('Recuperar cambio de horario').props.onClick()); expect(vi.mocked(apiFetch).mock.calls.at(-1)![1]!.body).toBe(original[1]!.body);
 });
+

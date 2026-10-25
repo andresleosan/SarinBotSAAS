@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Send } from 'lucide-react';
 import { SarinMark } from '@/components/sarin-brand';
 import { BusinessContactLinks } from '@/components/business-contact-links';
+import { BusinessFactualFaqPanel } from '@/components/business-factual-faq-panel';
 import { AuthGate, useAuth } from '@/components/auth-provider';
 import { ConsentPanel, useAccountConsent } from '@/components/consent-panel';
 import { useConsent } from '@/hooks/useConsent';
@@ -26,7 +27,7 @@ import { BusinessLocation } from '@/components/business-location';
 import type { BookingCapability } from '@/lib/booking-subject';
 import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
 
-function GeneralBookingChat({ business, uid, permitted, now, onConfirmed, onLockedChange }: { business: PublicBusiness; uid: string; permitted: boolean; now: number; onConfirmed: () => void; onLockedChange: (locked: boolean) => void }) {
+function GeneralBookingChat({ business, uid, permitted, faqEnabled, now, onConfirmed, onLockedChange }: { business: PublicBusiness; uid: string; permitted: boolean; faqEnabled: boolean; now: number; onConfirmed: () => void; onLockedChange: (locked: boolean) => void }) {
   const [input, setInput] = useState(''), end = useRef<HTMLDivElement>(null), engine = useEngineHealth();
   const chat = useDebouncedChat({ mode: 'sarin_client', tenantId: business.id, actorUid: uid, enabled: permitted, onToolExecuted: name => { if (name === 'cita_confirmada') onConfirmed(); } });
   const locked = chat.isWaitingBatch || chat.isGenerating || chat.confirming || chat.confirmationUncertain;
@@ -38,6 +39,7 @@ function GeneralBookingChat({ business, uid, permitted, now, onConfirmed, onLock
     {!available && <Notice>La atención de IA está temporalmente en pausa. Puedes consultar y cancelar tus citas o contactar directamente al establecimiento.</Notice>}
     {engine.health?.status === 'offline' && <Notice>SarinBot no puede responder en este momento. <button className="min-h-11 text-sarin-blue underline" disabled={engine.checking} onClick={() => void engine.refresh()}>Comprobar conexión</button></Notice>}
     <p className="text-sm">Soy SarinBot, el asistente de {business.name}. Cuéntame qué servicio necesitas y cuándo te gustaría venir.</p>
+    <BusinessFactualFaqPanel businessId={business.id} uid={uid} enabled={faqEnabled} />
     <div aria-live="polite" className="space-y-4">
       {chat.messages.map(message => <div key={message.id} className={`whitespace-pre-wrap break-words rounded-2xl p-4 text-sm leading-relaxed ${message.role === 'user' ? 'ml-8 bg-sarin-blue text-white' : 'mr-5 border border-sarin-line bg-sarin-canvas text-sarin-ink'}`}>{message.content}</div>)}
       {(chat.isWaitingBatch || chat.isGenerating) && <p role="status" className="text-xs text-sarin-blue">{chat.isGenerating ? 'SarinBot está revisando tu solicitud…' : 'Preparando tu mensaje…'}</p>}
@@ -65,7 +67,7 @@ function BookingJourney({ business, capability, uid, permitted, policyReady, now
     {capability.dataMode === 'general' && capability.representedMinorsEnabled && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Para quién reservas?</legend><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" aria-pressed={!represented} disabled={switchLocked} onClick={() => { if (!switchLocked) { setMode('calendar'); setRepresented(false); } }}>Para mí</button><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" aria-pressed={represented} disabled={switchLocked} onClick={() => { if (!switchLocked) setRepresented(true); }}>Para un menor a quien represento</button></fieldset>}
     {capability.dataMode === 'general' && !represented && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Cómo prefieres reservar?</legend>{([['calendar', 'Reservar con calendario'], ['chat', 'Hablar con SarinBot']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} disabled={switchLocked} onClick={() => selectMode(value)} className={`min-h-11 max-w-full rounded-lg border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue disabled:opacity-50 ${mode === value ? 'border-sarin-blue bg-sarin-soft text-sarin-blue' : 'border-sarin-line'}`}>{label}</button>)}</fieldset>}
     {!enabled && <Notice>Revisa los permisos y las opciones del negocio antes de comenzar una nueva reserva. Puedes recuperar una confirmación pendiente y consultar Mis citas.</Notice>}
-    {structured ? (structuredStarted.current && <StructuredBooking business={business} capability={capability} initialSubjectKind={represented ? 'represented_minor' : 'self'} initialServiceId={initialServiceId} initialBookingHint={initialBookingHint} waitlist={waitlist} onInitialServiceHandled={onInitialServiceHandled} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} />) : <GeneralBookingChat business={business} uid={uid} permitted={enabled && capability.dataMode === 'general' && !represented} now={now} onConfirmed={onConfirmed} onLockedChange={setLocked} />}
+    {structured ? (structuredStarted.current && <StructuredBooking business={business} capability={capability} initialSubjectKind={represented ? 'represented_minor' : 'self'} initialServiceId={initialServiceId} initialBookingHint={initialBookingHint} waitlist={waitlist} onInitialServiceHandled={onInitialServiceHandled} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} />) : <GeneralBookingChat business={business} uid={uid} permitted={enabled && capability.dataMode === 'general' && !represented} faqEnabled={permitted && policyReady && capability.dataMode === 'general' && !capability.representedMinorsEnabled && !represented} now={now} onConfirmed={onConfirmed} onLockedChange={setLocked} />}
   </div>;
 }
 function BookingWorkspace({ business, capability, uid, permitted, policyReady, catalogReady, now, initialServiceId, onInitialServiceHandled }: { business: PublicBusiness; capability: BookingCapability | null; uid: string; permitted: boolean; policyReady: boolean; catalogReady: boolean; now: number; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
