@@ -146,8 +146,10 @@ it('dtoStateAndPageContractsDoNotInventTerminalResults', () => {
   const detail = { businessId: 'biz', ownerUid: 'demo-owner', serverNow: createdAt + 120_000,
     row: { recordId: 'record', entryId: 'entry', waitlistRevision: 1, dateKey: target.dateKey, createdAt, expiresAt: Date.parse('2030-01-08T05:00:00Z'), subjectKind: 'self', serviceLabel: 'Corte demo', resourceLabel: 'Uno', lifecycle: 'unchecked', review: { revision: 0, reviewed: false, updatedAt: null } },
     state: 'available', availability: [{ resourceId: 'one', resourceName: 'Uno', slots: ['09:00'] }] };
-  const context = { detail, headRevision: 1, currentOffer: dto, writesEnabled: true, eligible: true, reason: null };
+  const context = { detail, headRevision: 1, currentOffer: dto, service: { serviceId: 'cut', serviceName: 'Corte demo', durationMinutes: 30, bufferMinutes: 15, priceCOP: 25000 }, writesEnabled: true, eligible: true, reason: null };
   expect(ownerWaitlistOfferContextSchema.safeParse(context).success).toBe(true);
+  expect(ownerWaitlistOfferContextSchema.safeParse({ ...context, service: null }).success).toBe(false);
+  expect(ownerWaitlistOfferContextSchema.safeParse({ ...context, service: { ...context.service, clientUid: 'private' } }).success).toBe(false);
   expect(ownerWaitlistOfferContextSchema.safeParse({ ...context, reason: 'restricted_policy' }).success).toBe(false);
   expect(ownerWaitlistOfferResultSchema.safeParse({ recovery: dto, appliedHeadRevision: 1, headRevision: 2, replayed: true }).success).toBe(true);
   expect(ownerWaitlistOfferResultSchema.safeParse({ recovery: dto, appliedHeadRevision: 1, headRevision: 2, replayed: false }).success).toBe(false);

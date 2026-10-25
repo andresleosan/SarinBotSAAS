@@ -89,6 +89,7 @@ type OwnerWaitlistOfferRecovery = Omit<WaitlistOfferRecovery,'proposal'> & {prop
 type ClientWaitlistOfferRecovery = WaitlistOfferRecovery & {appointment:Appointment|null};
 type OwnerWaitlistOfferContext = {
   detail:OwnerWaitlistDetail;headRevision:number;currentOffer:OwnerWaitlistOfferRecovery|null;
+  service:{serviceId:string;serviceName:string;durationMinutes:number;bufferMinutes:number;priceCOP:number}|null;
   writesEnabled:boolean;eligible:boolean;reason:'restricted_policy'|'not_available'|'disabled'|null;
 };
 type OwnerWaitlistOfferResult = {recovery:OwnerWaitlistOfferRecovery;
@@ -148,6 +149,12 @@ El hook cliente vive en BookingWorkspace por UID/authEpoch/negocio, fuera del su
 Lecturas UI10s con cleanup; mutaciones no se abortan por cronómetro, a20s aviso de demora. Controllers separados para recuperar GET sin abortar POST pendiente. Solo prueba booked/terminal persistida libera una confirmación incierta; offered o usability no lo hacen. Un POST con error real puede repetirse con mismo body/ID; no paralelizar otro confirm mientras el anterior sigue en vuelo. Cierre probado invalida publicación tardía de ese POST, sin afirmar que se deshizo en servidor. Cambio de UID/época/negocio oculta/aborta local y descarta callbacks, sin deshacer efectos persistidos. No guardar contacto/cuerpos/selección/IDs en browser storage o URL. Tras recarga, Comprobar ofertas recupera head y propuesta sin POST automático; Mis citas sigue fuente de reservas propias.
 
 ## Errores, mantenimiento y rollout
+
+### Ajuste de implementación R12, 25 de octubre de 2026
+
+El contexto de oferta incorpora `service`, una proyección mínima del servicio identificado por `request.serviceId` y del catálogo vigente, leídos en la misma transacción. El detalle anterior solo expone etiquetas: dos servicios pueden compartir nombre, por lo que la UI no debe deducir identidad, precio o duración a partir de `serviceLabel`. La proyección contiene únicamente los cinco campos del contrato anterior; no incluye contacto, respuestas, intake ni huellas privadas. Es null si el servicio no se puede verificar y `eligible=true` exige una proyección no nula. El DTO y endpoint de detalle S10 anterior permanecen intactos.
+
+La revisión previa del dueño usa esta proyección y la disponibilidad del contexto. Son datos consultados: crear revalida el catálogo, y el target y expiresAt de la oferta publicada son definitivos. Antes de crear, la vigencia mostrada es orientativa, limitada por diez minutos, fin de solicitud y comienzo del horario; no se inventa un createdAt futuro. Este ajuste resuelve un dato faltante en el contrato aún no publicado; no agrega un endpoint ni modifica el comando de creación, la autoridad o el alcance general/self.
 
 Errores de rol401/403 y ámbito404; validación400/413/415; consentimiento428, plan402, admisión429;409 OFFER_CHANGED/OFFER_EXISTS/OFFER_REQUEST_REUSED/OFFER_PROPOSAL_EXISTS/OFFER_CLOSED/OFFER_NOT_EXPIRED/SLOT_UNAVAILABLE;503 WAITLIST_OFFER_UNVERIFIABLE. Gatefalse para nuevos create/prepare/freshconfirm:503 WAITLIST_OFFERS_DISABLED. Errores/storage no equivalen a oferta inexistente. Lecturas/replay/withdraw/decline/close-expired mantienen autoridad y sirven sin plan/consentimiento nuevo, aunque gatefalse.
 

@@ -81,8 +81,9 @@ export const clientWaitlistOfferRecoverySchema = z.object({ ...recoveryShape, ap
   && (value.offer.persistedState === 'booked' ? value.proof !== null && value.appointment !== null && value.appointment.id === value.proof.appointmentId
     && value.appointment.tenantId === value.businessId && value.appointment.client?.uid === value.viewerUid : value.appointment === null));
 export const ownerWaitlistOfferContextSchema = z.object({ detail: ownerWaitlistDetailSchema, headRevision: revision, currentOffer: ownerWaitlistOfferRecoverySchema.nullable(),
+  service: z.object({ serviceId: id, serviceName: label, durationMinutes: z.number().int().min(5).max(720), bufferMinutes: z.number().int().min(0).max(180), priceCOP: price }).strict().nullable(),
   writesEnabled: z.boolean(), eligible: z.boolean(), reason: z.enum(['restricted_policy', 'not_available', 'disabled']).nullable(),
-}).strict().refine(value => value.eligible === (value.reason === null) && (!value.eligible || value.writesEnabled && value.detail.state === 'available' && value.detail.row.subjectKind === 'self')
+}).strict().refine(value => value.eligible === (value.reason === null) && (!value.eligible || value.service !== null && value.writesEnabled && value.detail.state === 'available' && value.detail.row.subjectKind === 'self')
   && (value.reason !== 'disabled' || !value.writesEnabled) && (!value.currentOffer || value.currentOffer.businessId === value.detail.businessId
     && value.currentOffer.viewerUid === value.detail.ownerUid && value.currentOffer.serverNow === value.detail.serverNow && value.currentOffer.writesEnabled === value.writesEnabled));
 export const ownerWaitlistOfferResultSchema = z.object({ recovery: ownerWaitlistOfferRecoverySchema, appliedHeadRevision: revision.min(1), headRevision: revision.min(1), replayed: z.boolean() }).strict()

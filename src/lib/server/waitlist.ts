@@ -166,6 +166,11 @@ export async function readWaitlist(user: ChatActor, businessId: string, db: Data
   validateScope(user, businessId);
   return db.runTransaction(async tx => projection(tx, user, businessId, await context(tx, user, businessId, db), db));
 }
+/** Read-only projection for an authenticated or stored data principal; grants no mutation authority. */
+export async function readWaitlistProjectionInTransaction(tx: Transaction, user: ReadPrincipal, businessId: string, db: Database) {
+  const current = await context(tx, user, businessId, db);
+  return { record: current.record, ...await projectWaitlist(tx, user, businessId, current, db) };
+}
 export async function joinWaitlist(user: ChatActor, businessId: string, supplied: WaitlistJoinInput, db: Database = getAdminDb()): Promise<WaitlistState> {
   validateScope(user, businessId); const input = waitlistJoinInputSchema.parse(supplied), operationHash = bookingSubjectHash({ kind: 'join', ...input });
   return db.runTransaction(async tx => {

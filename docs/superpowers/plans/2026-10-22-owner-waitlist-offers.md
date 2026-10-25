@@ -56,6 +56,8 @@ prepareAppointmentInTransaction(transaction:Transaction,user:ChatActor,business:
 
 ### Task 3: Crear, leer y cerrar oferta privada
 
+Ajuste R12 de implementación: offer-context añade la proyección mínima `service` del contrato actualizado, identificada por la solicitud canónica y leída en la misma tx. Cubrir nombres duplicados y servicio ausente; no modificar el detalle S10 anterior ni deducir identidad desde su etiqueta.
+
 **Files:** servidor y domain tests. **Produces:**
 
 ```ts
@@ -110,6 +112,8 @@ confirmClientWaitlistOffer(client:ChatActor,businessId:string,offerId:string,con
 - [ ] Ejecutar `pnpm exec vitest run tests/waitlist-offers-model.test.ts tests/appointment-preparation.test.ts tests/waitlist-offers-domain.test.ts tests/waitlist-offers-routes.test.ts tests/waitlist-offers-d1.test.ts tests/waitlist-data-maintenance.test.ts tests/data-migration.test.ts`, emulador Java21+ y Worker check. Registrar omitidas como gates pendientes; commit futuro `test: verify waitlist offer races recovery and data maintenance`.
 
 ### Task 7: UI de dueño/cliente y recuperación estable
+
+Ajuste R12 de implementación: la revisión del dueño usa `context.service` para identidad/precio/duración/margen; antes de crear muestra vigencia orientativa y después el expiresAt definitivo de la oferta guardada.
 
 - [ ] Hook del dueño en página S10 fuera de filas/listas keyed: conserva createCommand y requestId al seleccionar recurso/hora→revisar→publicar, sin publicar automáticamente. Una intención en memoria; POST incierto impide cambiar cuerpo/ID hasta replay verificable o conflicto con estado actual. Cambiar pestaña bandeja/ofertas no monta otro controller ni reinicia el comando; UID/epoch/negocio sí purga.
 - [ ] Hook cliente en BookingWorkspace fuera de ClientAppointments keyversion. Slots ClientAppointments.waitlistOfferContent y ClientWaitlist.offerContent presentan un único controller. Comprobar ofertas hace GET explícito; Revisar hace POST proposal y BookingProposal usa validityText con plazo absoluto. Texto literal en React. Contactos quedan en formulario/comando de confirmación y Appointment estándar, nunca en offer/URL/log/storage.

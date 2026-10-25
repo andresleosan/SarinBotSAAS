@@ -110,18 +110,20 @@ export async function updateOwnerWaitlistReview(owner: ChatActor, businessId: st
 }
 export async function readOwnerWaitlistDetail(owner: ChatActor, businessId: string, recordId: string, db: Database = getAdminDb()): Promise<OwnerWaitlistDetail> {
   ownerWaitlistCursorSchema.shape.recordId.parse(businessId); ownerWaitlistCursorSchema.shape.recordId.parse(recordId);
-  return guarded(() => db.runTransaction(async tx => {
-    const current = await readOwnerWaitlistProjection(tx, owner, businessId, recordId, db);
-    const businessRef = db.collection('businesses').doc(businessId), business = (await tx.get(businessRef)).data() as Business;
-    const item = current.record.request!;
-    const marker = await tx.get(businessRef.collection('waitlistOwnerReviews').doc(item.id));
-    const review = readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId, entryId: item.id, waitlistRevision: current.record.revision });
-    const serverNow = current.state.serverNow, request = current.state.request!;
-    const row = projectOwnerWaitlistRow(recordId, current.record, business, review, serverNow);
-    const result = ownerWaitlistDetailSchema.safeParse({ businessId, ownerUid: owner.uid, serverNow, row, state: request.status, ...(request.reason ? { reason: request.reason } : {}), availability: current.availability });
-    if (!result.success) throw unverifiable();
-    return result.data;
-  }));
+  return guarded(() => db.runTransaction(tx => readOwnerWaitlistDetailInTransaction(tx, owner, businessId, recordId, db)));
+}
+/** Same authority/projection as the legacy detail, reusable without a nested transaction. */
+export async function readOwnerWaitlistDetailInTransaction(tx: Transaction, owner: ChatActor, businessId: string, recordId: string, db: Database): Promise<OwnerWaitlistDetail> {
+  const current = await readOwnerWaitlistProjection(tx, owner, businessId, recordId, db);
+  const businessRef = db.collection('businesses').doc(businessId), business = (await tx.get(businessRef)).data() as Business;
+  const item = current.record.request!;
+  const marker = await tx.get(businessRef.collection('waitlistOwnerReviews').doc(item.id));
+  const review = readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId, entryId: item.id, waitlistRevision: current.record.revision });
+  const serverNow = current.state.serverNow, request = current.state.request!;
+  const row = projectOwnerWaitlistRow(recordId, current.record, business, review, serverNow);
+  const result = ownerWaitlistDetailSchema.safeParse({ businessId, ownerUid: owner.uid, serverNow, row, state: request.status, ...(request.reason ? { reason: request.reason } : {}), availability: current.availability });
+  if (!result.success) throw unverifiable();
+  return result.data;
 }
 /** Minimal current-state fence, including canonical withdrawal tombstones. */
 export async function readOwnerWaitlistReviewState(owner: ChatActor, businessId: string, recordId: string, db: Database = getAdminDb()): Promise<OwnerWaitlistReviewState> {
