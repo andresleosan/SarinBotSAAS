@@ -1,6 +1,6 @@
 # S07: reprogramación del dueño y recuperación
 
-Verificación del 24 de octubre de 2026, hora de Colombia. Implementación revisable en `codex/owner-rescheduling-20261024`, base publicada `cbca4b580549231f9293978ad65602844eaca5e7`; código comprobado `5d82dea0895047afad1ef362dd8ef816b783aff7`. Este reporte y sus imágenes se añaden después de ese pin. No acredita publicación de S07.
+Verificación del 24 de octubre de 2026, hora de Colombia. Implementación revisable en `codex/owner-rescheduling-20261024`, base publicada `cbca4b580549231f9293978ad65602844eaca5e7`; código final comprobado `0340e4865fc4d03ea0f4e1531cf07ba76875a810`. Recorrido manual y capturas en `5d82dea0895047afad1ef362dd8ef816b783aff7`; correcciones posteriores verificadas mediante pruebas y build. Este reporte se añade después del pin final. No acredita publicación de S07.
 
 Fuente: worktree reconciliado `C:/Users/Drean Skate/AppData/Local/SarinBot/fresha-p2-20261023/source`. El checkout mixto E: se conserva. [Diseño](../superpowers/specs/2026-10-22-owner-rescheduling-design.md), [plan](../superpowers/plans/2026-10-22-owner-rescheduling.md), [composición](../product/sarin-admin-extension-composition.md) y [protocolo reproducible](../../qa/tests/owner-rescheduling.md).
 
@@ -10,17 +10,17 @@ Node 24.22.0, pnpm 11.23.0; herramientas instaladas según lock: Next 16.4.1, Ty
 
 | Gate | Resultado observado |
 | --- | --- |
-| Suite completa de aplicación, equivalente a `pnpm test` | **4.120 pasan, 0 fallan, 34 omitidas**, 4.154 casos en 263 archivos; exit 0, 347.449 ms |
+| Suite completa de aplicación, equivalente a `pnpm test` | **4.131 pasan, 0 fallan, 34 omitidas**, 4.165 casos en 263 archivos; exit 0, 353.540 ms, después de las correcciones de revisión |
 | `pnpm run typecheck` | `tsc --noEmit`, exit 0 |
-| `pnpm run build` | Build de producción, exit 0; compilación, TypeScript y generación de páginas completas; dashboard bajo Suspense |
-| `pnpm run test:rules` | **32/32**, exit 0, Firestore oficial y Admin SDK con proyecto `demo-sarin-bot` |
+| `pnpm run build` | Build de producción posterior a correcciones, exit 0, 37.221 ms; compilación, TypeScript y generación de páginas completas; dashboard bajo Suspense |
+| `pnpm run test:rules` | **32/32**, exit 0, 138,97 s en la repetición posterior a correcciones; Firestore oficial y Admin SDK con proyecto `demo-sarin-bot` |
 | Check de `sarin-cloudflare-host` | **159/159**, sin omitidas; TypeScript y Wrangler dry-run con `--containers-rollout=none`, todos exit 0 |
 | Almacenamiento S07, cliente y migración | 90/90 en la ejecución de Task4; incluye 14 casos D1 reales; incluidos también en la suite completa |
 | UI S07 y regresiones afectadas | 332/332 en 17 archivos de Task5; incluidos en la suite completa, no se suman otra vez |
 
-Se invocaron los entrypoints ya instalados con un runner externo de entorno estéril, sin credenciales de proveedor, para evitar que la política automática de pnpm alterase la instalación compartida. Los comandos exactos, versiones, duración y hash del lock están en recibos externos `work/s07-*-result.json`; logs `work/s07-*-final.log`. Reglas: `work/s07-rules-complete.log` y recibo de `s07-qa-runs/2026-10-25T01-25-13-316Z-a18233`.
+Se invocaron los entrypoints ya instalados con un runner externo de entorno estéril, sin credenciales de proveedor, para evitar que la política automática de pnpm alterase la instalación compartida. Los comandos exactos, versiones, duración y hash del lock están en recibos externos `work/s07-*-result.json`; logs `work/s07-*-final.log`. Primera verificación de reglas: `work/s07-rules-complete.log` y recibo de `s07-qa-runs/2026-10-25T01-25-13-316Z-a18233`. Repetición final: `work/s07-rules-post-review.log` y `s07-qa-runs/2026-10-25T03-01-18-198Z-4e0215/rules-result.json`. Worker/protocolo no cambiaron después de su check y se conserva ese recibo.
 
-La primera suite completa encontró tres mocks antiguos del dashboard en `chat-surfaces`: 4.117 pasan, 3 fallan, 34 omitidas. Se actualizaron únicamente sus dobles al contrato vigente de sesión/Next y callback de estado; el archivo pasó 27/27 y después se repitió la suite completa con el resultado verde de la tabla. Se conserva el primer resultado externo. La prueba Admin SDK inicial mezclaba un `Date.now` ficticio de 2030 con el reloj real de gRPC y agotaba su deadline; se ajustaron únicamente las fechas sintéticas, luego pasaron las 32 reglas. No se atribuyen esos fallos al producto ni se ocultan.
+La primera suite completa encontró tres mocks antiguos del dashboard en `chat-surfaces`: 4.117 pasan, 3 fallan, 34 omitidas. Se actualizaron únicamente sus dobles al contrato vigente de sesión/Next y callback de estado; el archivo pasó 27/27, luego la suite completa 4.120/0/34 y, tras once regresiones de revisión, el resultado de la tabla. Se conservan los resultados anteriores externos. Las 34 omitidas son 19 de integración Firestore y 13 de reglas ejecutadas aparte, una del proveedor en vivo y una del journey local automatizado; no se presentan estas dos últimas como ejecutadas. La prueba Admin SDK inicial mezclaba un `Date.now` ficticio de 2030 con el reloj real de gRPC y agotaba su deadline; se ajustaron únicamente las fechas sintéticas, luego pasaron las 32 reglas. No se atribuyen esos fallos al producto ni se ocultan.
 
 ## QA de navegador observada
 
@@ -66,4 +66,17 @@ El respaldo/reconciliación SQL/R2 sintético incluye recibos preparados/cerrado
 
 Orden de una futura entrega: **Worker compatible primero, aplicación después**; mantener una réplica y los recibos privados. Reversión de app conserva lector y enforcement S09, revisiones y comprobación de resultados; no volver al lector histórico que ignora políticas ni restaurar un respaldo sobre writes nuevos. Apagar el escritor S09 no apaga enforcement. Esta tarea no ejecuta despliegue, migración remota ni restauración de producción. Los procesos locales propios se detuvieron mediante su launcher; evidencia externa preservada.
 
-La revisión independiente del diff completo se registra en el ledger de ejecución y se incorporará antes de integrar. Los límites futuros siguen vigentes: salud/menores, clear-outcome de S05 tras S12, series, plazos configurables y mensajes externos no se habilitan aquí.
+## Revisión independiente y correcciones
+
+El revisor independiente `/root/s07_final_review`, contexto nuevo y checkout de solo lectura, revisó `cbca4b5..b8406df`. No encontró Critical y señaló cuatro Important. El autor los reprodujo y corrigió en una sola pasada TDD, sin solicitar otra revisión:
+
+1. POST aplicado seguido de GET preparado antiguo: la prueba terminal invalida lecturas y publicaciones anteriores; no puede volver visualmente a preparado. Incluye rechazo tardío de GET sin introducir un error sobre un resultado comprobado.
+2. Fallo inicial al recuperar por URL: incertidumbre desde la entrada, salida bloqueada y botón **Consultar de nuevo** que repite el GET del mismo recibo. Regresiones de error de red, deadline y recuperación después de 403/probe. No hay POST automático.
+3. Plan que vence durante la transacción: disponibilidad, preparación y confirmación reevalúan permiso comercial con el reloj final. Replay aplicado y cierre siguen independientes del permiso para una operación nueva. El test avanza el reloj durante una lectura real del adaptador, sin sustituir la función de negocio.
+4. Agenda parcialmente fallida después de probe válido: la autoridad comprobada permite presentar S07 y su recuperación; el calendario muestra sus lecturas/errores/reintento independientemente. Se conservan las tarjetas anteriores con aviso explícito para no perder comandos pendientes. Incluye semana con un día 503 o timeout y los otros días disponibles.
+
+Las cuatro suites focalizadas pasan 92/92; TypeScript, build, suite completa y las 32 pruebas de Firestore pasaron después de las correcciones. La tabla documenta los resultados finales; las capturas y el recorrido manual corresponden al pin anterior a estas correcciones, y los nuevos órdenes de fallo se acreditan mediante regresiones automatizadas. No quedan hallazgos Critical/Important conocidos pendientes; el veredicto original del revisor y la única pasada de fixes se conservan en el archivo de ejecución externo.
+
+**Minor diferido:** abrir S07 con CRM seleccionado conserva ese diálogo vacío y deshabilitado hasta aplicar; debería cerrarse/abortar al entrar. Se mantiene fuera de la pasada de fixes según el protocolo acordado. No se detectó un bypass de escritura o exposición de contacto por este caso.
+
+El revisor apartó explícitamente cuatro ámbitos; se ratifica cada límite: clear-outcome S05 tras S12 (las citas futuras con ese contrato seguirían indisponibles hasta coordinarlo); S08/S11/S12 y salud/menores (usan sus acciones actuales mientras llegan sus incrementos); refactorización de páginas dedicadas como S09 (UX menos unificada, autoridad del servidor vigente); y producción S07 (sin despliegue autorizado, comportamiento vivo aún no acreditado). Los límites futuros de series, plazos configurables y mensajes externos también permanecen.
