@@ -41,6 +41,9 @@ const base = {
   catalogFingerprint: fingerprint, resourceScheduleFingerprint: fingerprint, policyRevision: revision, proposal: waitlistOfferProposalSchema.nullable(),
 };
 const terminal = { closedAt: timestamp, closedByUid: uid };
+// Refinements also run after continuable child issues; derive without throwing
+// and leave identifier rejection to the field schemas above.
+const proposalIdFor = (businessId: string, offerId: string, clientUid: string, commandId: string) => stableDocumentId('waitlist-offer-proposal', businessId, offerId, clientUid, commandId);
 export const waitlistOfferRecordSchema = z.discriminatedUnion('state', [
   z.object({ ...base, state: z.literal('offered'), closedAt: z.null(), closedReason: z.null(), closedByUid: z.null(), booking: z.null() }).strict(),
   z.object({ ...base, state: z.literal('withdrawn'), ...terminal, closedReason: z.literal('withdrawn'), booking: z.null() }).strict(),
@@ -56,7 +59,7 @@ export const waitlistOfferRecordSchema = z.discriminatedUnion('state', [
   if (value.closedAt !== null && (value.closedAt < value.createdAt || proposal && value.closedAt < proposal.createdAt || value.state === 'expired' && value.closedAt < value.expiresAt)) return false;
   if (proposal && (proposal.createdAt < value.createdAt || proposal.expiresAt !== value.expiresAt || proposal.catalogFingerprint !== value.catalogFingerprint
     || proposal.resourceScheduleFingerprint !== value.resourceScheduleFingerprint || proposal.policyRevision !== value.policyRevision
-    || proposal.id !== waitlistOfferProposalId(value.businessId, value.id, value.clientUid, proposal.requestId))) return false;
+    || proposal.id !== proposalIdFor(value.businessId, value.id, value.clientUid, proposal.requestId))) return false;
   if (booking && (booking.entryId !== value.entryId || booking.proposalId !== proposal?.id || booking.previousWaitlistRevision !== value.waitlistRevision
     || booking.confirmedAt !== value.closedAt || booking.confirmedAt < proposal!.createdAt || booking.confirmedAt >= value.expiresAt
     || booking.source.dateKey !== target.dateKey || booking.source.startAt !== target.startAt || booking.source.endAt !== target.endAt
@@ -70,7 +73,7 @@ export function waitlistOfferId(businessId: string, entryId: string, ownerUid: s
 }
 export function waitlistOfferProposalId(businessId: string, offerId: string, clientUid: string, commandId: string): string {
   id.parse(businessId); id.parse(offerId); uid.parse(clientUid); requestId.parse(commandId);
-  return stableDocumentId('waitlist-offer-proposal', businessId, offerId, clientUid, commandId);
+  return proposalIdFor(businessId, offerId, clientUid, commandId);
 }
 export function waitlistOfferCommandFingerprint(businessId: string, ownerUid: string, command: OwnerWaitlistOfferCommand): string {
   id.parse(businessId); uid.parse(ownerUid);

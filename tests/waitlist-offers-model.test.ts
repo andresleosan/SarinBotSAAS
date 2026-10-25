@@ -11,6 +11,7 @@ import {
   ownerWaitlistOfferResultSchema, clientWaitlistOfferCurrentSchema, ownerWaitlistOfferQuerySchema,
   waitlistOfferProposalCommandSchema, waitlistOfferConfirmCommandSchema, waitlistOfferWithdrawCommandSchema,
   waitlistOfferDeclineCommandSchema, waitlistOfferCloseExpiredCommandSchema,
+  WaitlistOfferModelError,
 } from '@/lib/waitlist-offers';
 import {
   readWaitlistOfferHead, waitlistOfferId, waitlistOfferProposalId, waitlistOfferCommandFingerprint,
@@ -203,4 +204,25 @@ it('commandsAcceptOnlyTheirOwnIntentAndDeferFreshContactForReplay', () => {
     expect(schema.safeParse(input).success).toBe(true);
     expect(schema.safeParse({ ...input, clientUid: 'other-client' }).success).toBe(false);
   }
+});
+
+// Continuable nested validation failures must never escape record safeParse.
+it.each(['x', 'demo-proposal\n', 'a'.repeat(129)])('malformedProposalRequestIdRemainsAModelValidationFailure %j', malformed => {
+  const a = record(), p = proposal(a);
+  const corrupt = { ...a, proposal: { ...p, requestId: malformed, subjectCase: { ...p.subjectCase, bookingRequestId: malformed } } };
+  expect(() => waitlistOfferRecordSchema.safeParse(corrupt)).not.toThrow();
+  expect(waitlistOfferRecordSchema.safeParse(corrupt).success).toBe(false);
+  expect(() => parseCanonicalWaitlistOffer(a.id, corrupt, a.businessId)).toThrow(WaitlistOfferModelError);
+});
+it.each([
+  { field: 'businessId', value: 'biz\n' },
+  { field: 'id', value: '' },
+  { field: 'clientUid', value: 'demo-client\n' },
+  { field: 'ownerActorUid', value: 'demo-owner\n' },
+  { field: 'entryId', value: 'entry\n' },
+])('malformedIdentityWithProposalRemainsAModelValidationFailure $field', ({ field, value }) => {
+  const a = record(), corrupt = { ...a, [field]: value, proposal: proposal(a) };
+  expect(() => waitlistOfferRecordSchema.safeParse(corrupt)).not.toThrow();
+  expect(waitlistOfferRecordSchema.safeParse(corrupt).success).toBe(false);
+  expect(() => parseCanonicalWaitlistOffer(a.id, corrupt, a.businessId)).toThrow(WaitlistOfferModelError);
 });
