@@ -31,7 +31,7 @@ const unavailable = () => new HttpError(503, 'No se pudo validar la autorizació
 const required = () => new HttpError(428, 'Revisa y autoriza los datos de esta reserva antes de continuar.', 'BOOKING_SUBJECT_CONSENT_REQUIRED');
 const changed = () => new HttpError(409, 'Este caso cambió. Inicia una nueva reserva o actualiza sus permisos.', 'BOOKING_SUBJECT_CONFLICT');
 function parse<T>(schema: z.ZodType<T>, value: unknown): T { const result = schema.safeParse(value); if (!result.success) throw unavailable(); return result.data; }
-async function load(user: ChatActor, businessId: string, supplied: BookingSubjectCase, db: Database, tx?: Transaction) {
+async function load(user: Pick<ChatActor, 'uid'>, businessId: string, supplied: BookingSubjectCase, db: Database, tx?: Transaction) {
   documentIdSchema.parse(businessId); const subjectCase = bookingSubjectCaseSchema.parse(supplied);
   const businessRef = db.collection('businesses').doc(businessId), stateRef = db.collection('serverSettings').doc(bookingSubjectStateKey(user.uid, businessId, subjectCase.bookingRequestId));
   const [businessDoc, classification, stateDoc] = await Promise.all([tx ? tx.get(businessRef) : businessRef.get(), readBookingDataPolicy(businessId, db, tx), tx ? tx.get(stateRef) : stateRef.get()]);
@@ -57,7 +57,7 @@ export async function readBookingSubjectConsent(user: ChatActor, businessId: str
   return db.runTransaction(async transaction => (await load(user, businessId, subjectCase, db, transaction)).status);
 }
 /** Verified read-only evidence for optional features bound to this exact case. */
-export async function readVerifiedBookingSubjectAnchor(tx: Transaction, user: ChatActor, businessId: string, subjectCase: BookingSubjectCase, db: Database) {
+export async function readVerifiedBookingSubjectAnchor(tx: Transaction, user: Pick<ChatActor, 'uid'>, businessId: string, subjectCase: BookingSubjectCase, db: Database) {
   const current = await load(user, businessId, subjectCase, db, tx);
   return { status: current.status, anchor: current.state && current.status.receipt
     ? { revision: current.state.revision, fingerprint: current.state.fingerprint, receiptId: current.state.receiptId } : null };

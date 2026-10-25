@@ -9,7 +9,7 @@ import { bookingSubjectCaseSchema } from '@/lib/booking-subject';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { getAvailableSlots, toColombiaTimestamp } from '@/lib/sarin/availability';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
-import { stableDocumentId } from './businesses';
+import { stableDocumentId, assertOwner } from './businesses';
 import { documentIdSchema, requestIdSchema, dateKeySchema, businessConfigSchema, weeklyScheduleSchema } from './schemas';
 import { clientUidSchema, assertClientCanBook } from './client-policy';
 import { readVerifiedConsentAnchor } from './consent';
@@ -29,7 +29,8 @@ export const waitlistCancelInputSchema = z.object({ requestId: requestIdSchema, 
 const requestSchema = z.object({ id: documentIdSchema, case: bookingSubjectCaseSchema, serviceId: documentIdSchema, dateKey: dateKeySchema, resourceId: documentIdSchema.nullable(), createdAt: count, expiresAt: count, anchors: anchorsSchema }).strict();
 export const waitlistRecordSchema = z.object({ version: z.literal(1), ownerUid: clientUidSchema, businessId: documentIdSchema, revision: count.min(1), updatedAt: count, request: requestSchema.nullable(),
   lastOperation: z.object({ requestId: requestIdSchema, operationHash: fingerprint, appliedRevision: count.min(1) }).strict() }).strict();
-type WaitlistRecord = z.infer<typeof waitlistRecordSchema>;
+export type WaitlistRecord = z.infer<typeof waitlistRecordSchema>;
+type ReadPrincipal = Pick<ChatActor, 'uid'>;
 type SavedRequest = z.infer<typeof requestSchema>;
 type Anchor = z.infer<typeof anchorSchema>;
 const unavailable = () => new HttpError(503, 'No se pudo comprobar tu solicitud en la lista de espera.', 'WAITLIST_UNAVAILABLE');
@@ -41,9 +42,18 @@ const expiry = (dateKey: string) => toColombiaTimestamp(dateKey, '00:00') + DAY;
 const sameAnchor = (left: Anchor | null, right: Anchor | null) => left === null && right === null || Boolean(left && right && left.revision === right.revision && left.fingerprint === right.fingerprint && left.receiptId === right.receiptId);
 function stored<T>(schema: z.ZodType<T>, value: unknown): T { const result = schema.safeParse(value); if (!result.success) throw unavailable(); return result.data; }
 function validateScope(user: ChatActor, businessId: string) { clientUidSchema.parse(user.uid); documentIdSchema.parse(businessId); }
-async function context(tx: Transaction, user: ChatActor, businessId: string, db: Database) {
+export function parseCanonicalWaitlistRecord(recordId: string, value: unknown, businessId: string): WaitlistRecord {
+  const record = stored(waitlistRecordSchema, value);
+  if (/[^A-Za-z0-9_-]/.test(recordId) || /[\x00-\x1f\x7f]/.test(record.ownerUid) || record.businessId !== businessId || recordId !== waitlistDocumentId(record.ownerUid, businessId)
+    || record.revision !== record.lastOperation.appliedRevision || /[\x00-\x1f\x7f]/.test(record.lastOperation.requestId)
+    || record.request && (/[\x00-\x1f\x7f]/.test(record.request.id) || record.request.expiresAt !== expiry(record.request.dateKey)
+      || record.request.createdAt >= record.request.expiresAt || record.request.createdAt > record.updatedAt
+      || record.request.id !== waitlistEntryId(record.ownerUid, businessId, record.lastOperation.requestId))) throw unavailable();
+  return record;
+}
+async function context(tx: Transaction, user: ReadPrincipal, businessId: string, db: Database) {
   const businessRef = db.collection('businesses').doc(businessId), ref = businessRef.collection('waitlistRequests').doc(waitlistDocumentId(user.uid, businessId));
-  const doc = await tx.get(ref), record = doc.exists ? stored(waitlistRecordSchema, doc.data()) : null;
+  const doc = await tx.get(ref), record = doc.exists ? parseCanonicalWaitlistRecord(ref.id, doc.data(), businessId) : null;
   if (record && (record.ownerUid !== user.uid || record.businessId !== businessId || record.revision !== record.lastOperation.appliedRevision
     || record.request && (record.request.expiresAt !== expiry(record.request.dateKey) || record.request.createdAt >= record.request.expiresAt || record.request.createdAt > record.updatedAt
       || record.request.id !== waitlistEntryId(user.uid, businessId, record.lastOperation.requestId)))) throw unavailable();
@@ -58,7 +68,7 @@ function parseBusiness(value: unknown, businessId: string): Business {
   stored(schema, value);
   return value as Business;
 }
-async function permissions(tx: Transaction, user: ChatActor, business: Business, subjectCase: SavedRequest['case'], db: Database) {
+async function permissions(tx: Transaction, user: ReadPrincipal, business: Business, subjectCase: SavedRequest['case'], db: Database) {
   const [account, businessConsent, subject] = await Promise.all([
     readVerifiedConsentAnchor(user.uid, 'account', undefined, db, tx),
     readVerifiedConsentAnchor(user.uid, 'business_client', business, db, tx),
@@ -73,7 +83,7 @@ function selectedService(business: Business, item: Pick<SavedRequest, 'serviceId
   const service = business.services.find(candidate => candidate.id === item.serviceId);
   return Boolean(service && business.resources.some(resource => resource.active && service.resourceIds.includes(resource.id) && (!item.resourceId || resource.id === item.resourceId)));
 }
-async function policyIssue(tx: Transaction, user: ChatActor, business: Business, db: Database): Promise<WaitlistSuspensionReason | undefined> {
+async function policyIssue(tx: Transaction, user: ReadPrincipal, business: Business, db: Database): Promise<WaitlistSuspensionReason | undefined> {
   let reason: WaitlistSuspensionReason | undefined;
   try { await assertBookingIntakePolicy(tx, business.id, business.sarinConfig.intakeFields, db); }
   catch (error) { if (error instanceof HttpError && error.code === 'BOOKING_FREE_INTAKE_NOT_ALLOWED') reason = 'booking_policy_changed'; else throw error; }
@@ -96,13 +106,14 @@ function view(item: SavedRequest, status: WaitlistRequestView['status'], checked
   return { id: item.id, serviceId: item.serviceId, dateKey: item.dateKey, resourceId: item.resourceId, subjectKind: item.case.subjectKind,
     ...(item.case.subjectKind === 'represented_minor' ? { representativeRole: item.case.representativeRole } : {}), createdAt: item.createdAt, expiresAt: item.expiresAt, status, ...(reason ? { reason } : {}), checkedAt };
 }
-const response = (user: ChatActor, businessId: string, record: WaitlistRecord | null, request: WaitlistRequestView | null): WaitlistState => ({ businessId, ownerUid: user.uid, revision: record?.revision ?? 0, serverNow: Date.now(), request });
-async function projection(tx: Transaction, user: ChatActor, businessId: string, current: Awaited<ReturnType<typeof context>>, db: Database): Promise<WaitlistState> {
+const response = (user: ReadPrincipal, businessId: string, record: WaitlistRecord | null, request: WaitlistRequestView | null): WaitlistState => ({ businessId, ownerUid: user.uid, revision: record?.revision ?? 0, serverNow: Date.now(), request });
+async function projectWaitlist(tx: Transaction, user: ReadPrincipal, businessId: string, current: Awaited<ReturnType<typeof context>>, db: Database): Promise<{ state: WaitlistState; availability: { resourceId: string; resourceName: string; slots: string[] }[] }> {
+  const withoutSlots = (state: WaitlistState) => ({ state, availability: [] });
   const item = current.record?.request;
-  if (!item) return response(user, businessId, current.record, null);
-  if (item.expiresAt <= Date.now()) return response(user, businessId, current.record, view(item, 'expired', null));
+  if (!item) return withoutSlots(response(user, businessId, current.record, null));
+  if (item.expiresAt <= Date.now()) return withoutSlots(response(user, businessId, current.record, view(item, 'expired', null)));
   const businessDoc = await tx.get(current.businessRef);
-  if (!businessDoc.exists) return response(user, businessId, current.record, view(item, 'suspended', null, 'business_unavailable'));
+  if (!businessDoc.exists) return withoutSlots(response(user, businessId, current.record, view(item, 'suspended', null, 'business_unavailable')));
   const business = parseBusiness(businessDoc.data(), businessId);
   // Validate all evidence before classifying a legitimate suspension. Corruption
   // in one permission cannot hide behind another permission being inactive.
@@ -118,12 +129,29 @@ async function projection(tx: Transaction, user: ChatActor, businessId: string, 
   else if (!business.sarinConfig.onboardingCompleted || !business.slug || !isSubscriptionAllowed(business)) reason = 'business_unavailable';
   else if (!selectedService(business, item)) reason = 'service_unavailable';
   reason ??= issue;
-  if (reason) return response(user, businessId, current.record, view(item, item.expiresAt <= Date.now() ? 'expired' : 'suspended', null, item.expiresAt <= Date.now() ? undefined : reason));
-  const existingAppointments = await appointments(tx, current, item.dateKey), now = Date.now();
-  if (item.expiresAt <= now) return response(user, businessId, current.record, view(item, 'expired', null));
-  if (!isSubscriptionAllowed(business, now)) return response(user, businessId, current.record, view(item, 'suspended', null, 'business_unavailable'));
-  const slots = getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(tx, business.id, db), tenant: business, dateKey: item.dateKey, serviceId: item.serviceId, ...(item.resourceId ? { resourceId: item.resourceId } : {}), existingAppointments, now });
-  return response(user, businessId, current.record, view(item, slots.some(resource => resource.slots.length) ? 'available' : 'waiting', now));
+  if (reason) return withoutSlots(response(user, businessId, current.record, view(item, item.expiresAt <= Date.now() ? 'expired' : 'suspended', null, item.expiresAt <= Date.now() ? undefined : reason)));
+  const existingAppointments = await appointments(tx, current, item.dateKey);
+  const resourceSchedulePolicy = await readResourceSchedulePolicy(tx, business.id, db), now = Date.now();
+  if (item.expiresAt <= now) return withoutSlots(response(user, businessId, current.record, view(item, 'expired', null)));
+  if (!isSubscriptionAllowed(business, now)) return withoutSlots(response(user, businessId, current.record, view(item, 'suspended', null, 'business_unavailable')));
+  const slots = getAvailableSlots({ resourceSchedulePolicy, tenant: business, dateKey: item.dateKey, serviceId: item.serviceId, ...(item.resourceId ? { resourceId: item.resourceId } : {}), existingAppointments, now });
+  return { state: response(user, businessId, current.record, view(item, slots.some(resource => resource.slots.length) ? 'available' : 'waiting', now)), availability: slots };
+}
+async function projection(tx: Transaction, user: ReadPrincipal, businessId: string, current: Awaited<ReturnType<typeof context>>, db: Database): Promise<WaitlistState> {
+  return (await projectWaitlist(tx, user, businessId, current, db)).state;
+}
+/** Owner authority is checked here too; a stored data principal never authorizes a mutation. */
+export async function readOwnerWaitlistProjection(tx: Transaction, owner: ChatActor, businessId: string, recordId: string, db: Database) {
+  const businessRef = db.collection('businesses').doc(businessId), businessDoc = await tx.get(businessRef);
+  if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
+  assertOwner(businessDoc.data() as Business, owner.uid);
+  if (businessDoc.data()?.id !== businessId) throw unavailable();
+  const ref = businessRef.collection('waitlistRequests').doc(recordId), doc = await tx.get(ref);
+  if (!doc.exists) throw new HttpError(404, 'La entrada ya no está disponible.', 'OWNER_WAITLIST_ENTRY_GONE');
+  const record = parseCanonicalWaitlistRecord(recordId, doc.data(), businessId);
+  if (!record.request) throw new HttpError(404, 'La entrada ya no está disponible.', 'OWNER_WAITLIST_ENTRY_GONE');
+  const result = await projectWaitlist(tx, { uid: record.ownerUid }, businessId, { businessRef, ref, record }, db);
+  return { recordId, record, ...result };
 }
 function replay(record: WaitlistRecord | null, input: { requestId: string; expectedRevision: number }, operationHash: string): boolean {
   if (record?.lastOperation.requestId === input.requestId) {
