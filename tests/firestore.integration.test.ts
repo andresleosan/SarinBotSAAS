@@ -5,6 +5,8 @@ import { subjectAdmin, verifyStructuredCases, verifySubjectBindingAndWithdrawal,
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { ownerRescheduleActor, ownerRescheduleBusiness, ownerRescheduleSource, seedOwnerRescheduleScenario } from './owner-rescheduling-contract';
+import { readOwnerRescheduleSource, prepareOwnerReschedule, confirmOwnerReschedule } from '@/lib/server/owner-rescheduling';
 import { createBusiness, getOwnedBusiness, publicBusiness } from '@/lib/server/businesses';
 import { cancelAppointment, createAppointment } from '@/lib/server/bookings';
 import { reviewPayment, submitReceipt } from '@/lib/server/billing';
@@ -55,6 +57,38 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     return createBusiness(identity, chosenConfig, db);
   }
   afterAll(async () => { if (db) { await db.terminate(); const app = getApps().find(value => value.name === 'sarin-admin'); if (app) await deleteApp(app); } });
+  it('atomically moves owner appointment and receipt then serializes a destination competitor across Admin handles', async () => {
+    expect(process.env.FIRESTORE_EMULATOR_HOST).toMatch(/^(?:127\.0\.0\.1|localhost):\d+$/);
+    // gRPC deadlines combine Date.now() and new Date(); keep the SDK clock real.
+    const now = Date.now(), sourceDate = new Date(now + 2 * 86400000).toISOString().slice(0, 10), targetDate = new Date(now + 9 * 86400000).toISOString().slice(0, 10);
+    const business = { ...ownerRescheduleBusiness,
+      subscription: { ...ownerRescheduleBusiness.subscription, currentPeriodEndsAt: now + 30 * 86400000 },
+      weeklySchedule: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] }])),
+    };
+    const selection = { dateKey: sourceDate, startTimeStr: '10:00', resourceId: 'demo-chair' };
+    const app = initializeApp({ projectId: 'demo-sarin-bot' }, `demo-owner-reschedule-${crypto.randomUUID()}`), secondDb = getFirestore(app);
+    try {
+      await seedOwnerRescheduleScenario(db, business);
+      const ref = db.collection('businesses').doc(business.id), appointmentRef = ref.collection('appointments').doc(ownerRescheduleSource.id);
+      await appointmentRef.set({ ...ownerRescheduleSource, dateKey: sourceDate, startAt: toColombiaTimestamp(sourceDate, '09:00'), endAt: toColombiaTimestamp(sourceDate, '09:30'), reservedUntilAt: toColombiaTimestamp(sourceDate, '09:45'), createdAt: now - 86400000 });
+      const fresh = await readOwnerRescheduleSource(ownerRescheduleActor, business.id, ownerRescheduleSource.id, db);
+      const first = await prepareOwnerReschedule(ownerRescheduleActor, business.id, ownerRescheduleSource.id, { ...fresh.expectation, requestId: 'demo-admin-first', selection: { ...selection, dateKey: targetDate, resourceId: 'demo-second' } }, db);
+      const applied = await confirmOwnerReschedule(ownerRescheduleActor, business.id, first.proposal.id, secondDb);
+      expect(applied.appointment).toMatchObject({ id: 'demo-source', dateKey: targetDate, resourceId: 'demo-second', rescheduleRevision: 1, client: ownerRescheduleSource.client, historicalMetadata: { imported: true } });
+      expect((await ref.collection('bookingLocks').get()).size).toBe(3);
+      expect((await ref.collection('ownerRescheduleProposals').doc(first.proposal.id).get()).data()).toMatchObject({ state: 'applied', result: applied.rescheduleResult });
+      expect((await ref.get()).data()).toEqual(business);
+      const source = await readOwnerRescheduleSource(ownerRescheduleActor, ownerRescheduleBusiness.id, ownerRescheduleSource.id, db);
+      const { proposal } = await prepareOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, ownerRescheduleSource.id, { ...source.expectation, requestId: 'demo-admin-competitor', selection }, db);
+      const outcomes = await Promise.allSettled([
+        confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, proposal.id, db),
+        createAppointment({ uid: 'demo-other-client' }, ownerRescheduleBusiness.id, { ...selection, serviceId: 'demo-cut', clientPhone: '573001111111', intakeAnswers: {} }, 'demo-admin-booking', secondDb),
+      ]);
+      expect(outcomes.filter(value => value.status === 'fulfilled')).toHaveLength(1);
+      const rows = await db.collection('businesses').doc(ownerRescheduleBusiness.id).collection('appointments').get();
+      expect(rows.docs.map(row => row.data()).filter(row => row.status === 'confirmed' && row.dateKey === sourceDate && row.resourceId === 'demo-chair' && row.startAt < toColombiaTimestamp(sourceDate, '10:30') && row.reservedUntilAt > toColombiaTimestamp(sourceDate, '10:00'))).toHaveLength(1);
+    } finally { await secondDb.terminate(); await deleteApp(app); }
+  }, 60000);
   it('reads owner account records with 45 reservations, 25 ties, status filters, private minor DTO and changed anchors on real Admin SDK', async () => {
     expect(process.env.FIRESTORE_EMULATOR_HOST).toMatch(/^(?:127\.0\.0\.1|localhost):\d+$/);
     const app = initializeApp({ projectId: 'demo-sarin-bot' }, `demo-owner-record-${crypto.randomUUID()}`), secondDb = getFirestore(app);

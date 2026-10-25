@@ -2,6 +2,10 @@ import type { Appointment, Business } from '@/types/firestore';
 import type { Database } from '@/lib/storage/types';
 import { privateBusinessDraft, publicBusiness } from '@/lib/server/businesses';
 import { acceptSyntheticConsent } from './consent-fixtures';
+import { expect } from 'vitest';
+import { readOwnerRescheduleSource, prepareOwnerReschedule, confirmOwnerReschedule, readOwnerRescheduleProposal } from '@/lib/server/owner-rescheduling';
+import { cancelAppointment } from '@/lib/server/bookings';
+import { clientPolicyKey } from '@/lib/server/client-policy';
 
 export const ownerRescheduleNow = Date.parse('2030-01-01T12:00:00Z');
 export const ownerRescheduleActor = { uid: 'demo-owner' };
@@ -41,3 +45,45 @@ export const ownerRescheduleView = {
   target: { ...ownerRescheduleSelection, serviceId: 'demo-cut', serviceName: 'Corte actual', resourceName: 'Profesional uno', endTimeStr: '10:30', startAt: 1894028400000, endAt: 1894030200000, reservedUntilAt: 1894031100000, durationMinutes: 30, bufferMinutes: 15, priceCOP: 25000 },
 };
 export const ownerRescheduleResult = { proposalId: 'demo-proposal', appointmentId: 'demo-source', revision: 1, ...ownerRescheduleSelection, startAt: 1894028400000, endAt: 1894030200000, confirmedAt: ownerRescheduleNow };
+
+async function prepareFixture(db: Database, requestId: string, selection = ownerRescheduleSelection) {
+  const source = await readOwnerRescheduleSource(ownerRescheduleActor, ownerRescheduleBusiness.id, ownerRescheduleSource.id, db);
+  return (await prepareOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, ownerRescheduleSource.id, { ...source.expectation, requestId, selection }, db)).proposal;
+}
+
+export async function verifyOwnerRescheduleMove(db: Database, secondDb = db) {
+  await seedOwnerRescheduleScenario(db);
+  const businessRef = db.collection('businesses').doc(ownerRescheduleBusiness.id), target = { ...ownerRescheduleSelection, dateKey: '2030-01-14', resourceId: 'demo-second' };
+  const before = [(await businessRef.get()).data(), (await db.collection('publicBusinesses').doc(ownerRescheduleBusiness.slug).get()).data()];
+  const proposal = await prepareFixture(db, 'demo-cross-resource', target);
+  expect((await businessRef.collection('appointments').doc(ownerRescheduleSource.id).get()).data()).toEqual(ownerRescheduleSource);
+  const result = await confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, proposal.id, secondDb);
+  expect(result.appointment).toMatchObject({ id: 'demo-source', dateKey: '2030-01-14', resourceId: 'demo-second', rescheduleRevision: 1, client: ownerRescheduleSource.client, historicalMetadata: { imported: true } });
+  const locks = await businessRef.collection('bookingLocks').get();
+  expect(locks.docs.map(row => row.id).sort()).toEqual(['2030-01-07_demo-chair', '2030-01-14_demo-second', `client_${clientPolicyKey('demo-client')}`].sort());
+  for (const lock of locks.docs) expect(lock.data().version).toBe(1);
+  expect((await businessRef.collection('appointments').get()).size).toBe(1);
+  expect([(await businessRef.get()).data(), (await db.collection('publicBusinesses').doc(ownerRescheduleBusiness.slug).get()).data()]).toEqual(before);
+  expect(await confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, proposal.id, db)).toEqual({ ...result, replayed: true });
+}
+export async function verifyOwnerRescheduleRaces(db: Database, secondDb = db) {
+  await seedOwnerRescheduleScenario(db);
+  const first = await prepareFixture(db, 'demo-first-race'), second = await prepareFixture(secondDb, 'demo-second-race', { ...ownerRescheduleSelection, startTimeStr: '11:00' });
+  const results = await Promise.allSettled([confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, first.id, db), confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, second.id, secondDb)]);
+  expect(results.filter(value => value.status === 'fulfilled')).toHaveLength(1);
+  expect(results.find(value => value.status === 'rejected')).toMatchObject({ reason: { status: 409 } });
+  const source = (await db.collection('businesses').doc(ownerRescheduleBusiness.id).collection('appointments').doc(ownerRescheduleSource.id).get()).data()!;
+  expect(source.rescheduleRevision).toBe(1); expect(source.client).toEqual(ownerRescheduleSource.client);
+  const receipts = await db.collection('businesses').doc(ownerRescheduleBusiness.id).collection('ownerRescheduleProposals').get();
+  expect(receipts.docs.filter(row => row.data().state === 'applied')).toHaveLength(1);
+}
+export async function verifyOwnerRescheduleReplay(db: Database, secondDb = db) {
+  await seedOwnerRescheduleScenario(db);
+  const first = await prepareFixture(db, 'demo-first-move'), applied = await confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, first.id, db);
+  const second = await prepareFixture(secondDb, 'demo-second-move', { ...ownerRescheduleSelection, startTimeStr: '11:00' });
+  await confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, second.id, secondDb);
+  expect(await readOwnerRescheduleProposal(ownerRescheduleActor, ownerRescheduleBusiness.id, first.id, db)).toMatchObject({ state: 'applied', result: applied.rescheduleResult, appointment: { startTimeStr: '11:00', rescheduleRevision: 2 } });
+  await cancelAppointment(ownerRescheduleActor, ownerRescheduleBusiness.id, ownerRescheduleSource.id, secondDb);
+  const replay = await confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, first.id, db);
+  expect(replay.rescheduleResult).toEqual(applied.rescheduleResult); expect(replay.appointment).toMatchObject({ status: 'cancelled_by_owner', startTimeStr: '11:00', rescheduleRevision: 2 });
+}

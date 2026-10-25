@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /** Test-only Workerd + real local D1/R2, without network or account credentials. */
-export async function createDataTestRuntime({ previousBusinessChildren = false, captureSql = false } = {}) {
+export async function createDataTestRuntime({ previousBusinessChildren = false, previousOwnerRescheduleChildren = false, captureSql = false } = {}) {
   const require = createRequire(import.meta.url);
   const wranglerRequire = createRequire(require.resolve('wrangler/package.json'));
   const { build } = wranglerRequire('esbuild');
@@ -19,11 +19,11 @@ export async function createDataTestRuntime({ previousBusinessChildren = false, 
     ` }, bundle: true, write: false, format: 'esm', platform: 'browser',
     // Compatibility fixture: b7e9a28's businesses allowlist. Execute the actual
     // Worker with only this literal changed; keep all other protocol validation.
-    plugins: [...(previousBusinessChildren ? [{ name: 'previous-business-children', setup(build) {
+    plugins: [...(previousBusinessChildren || previousOwnerRescheduleChildren ? [{ name: 'previous-business-children', setup(build) {
       build.onLoad({ filter: /[\\/]shared[\\/]data-protocol\.ts$/ }, ({ path }) => {
         const source = readFileSync(path, 'utf8');
-        const current = "businesses: ['appointments', 'attendanceEvents', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests', 'resourceSchedulePolicies', 'resourceScheduleOperations']";
-        const previous = "businesses: ['appointments', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests']";
+        const current = "businesses: ['appointments', 'attendanceEvents', 'ownerRescheduleProposals', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests', 'resourceSchedulePolicies', 'resourceScheduleOperations']";
+        const previous = previousBusinessChildren ? "businesses: ['appointments', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests']" : current.replace("'ownerRescheduleProposals', ", '');
         if (source.split(current).length !== 2) throw new Error('Previous businesses allowlist fixture must replace exactly one literal');
         return { contents: source.replace(current, previous), loader: 'ts' };
       });

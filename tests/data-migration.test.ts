@@ -14,6 +14,8 @@ import { verifyD1Backup } from '../scripts/verify-d1-backup.mjs';
 import { attendanceCorrectionCommand, attendanceFixture, attendanceNow } from './appointment-attendance-contract';
 import { updateAppointmentAttendance } from '@/lib/server/appointment-attendance';
 import { memoryFirestore } from './memoryFirestore';
+import { seedOwnerRescheduleScenario, ownerRescheduleActor, ownerRescheduleBusiness, ownerRescheduleSource, ownerRescheduleSelection, ownerRescheduleNow } from './owner-rescheduling-contract';
+import { readOwnerRescheduleSource, prepareOwnerReschedule, confirmOwnerReschedule } from '@/lib/server/owner-rescheduling';
 
 const prefix = 'projects/sarinbotsaas/databases/(default)/documents/';
 const stamp = '2026-10-16T12:00:00.123456Z';
@@ -37,7 +39,7 @@ function snapshot() {
 }
 
 describe('Firestore migration artifacts', () => {
-  it('preserves attendance IDs fingerprints sequence and private actors through snapshot reverse reconciliation and actual SQL R2 backup recovery', async () => {
+  it('preserves attendance and prepared closed applied owner reschedule proofs through snapshot reverse reconciliation and actual SQL R2 backup recovery', async () => {
     const memory = memoryFirestore(), f = await attendanceFixture(memory.db);
     // Use real domain-produced audit documents; keep all data synthetic.
     const { vi } = await import('vitest');
@@ -47,6 +49,19 @@ describe('Firestore migration artifacts', () => {
     const directory = await mkdtemp(join(tmpdir(), 'sarin-migration-fixture-'));
     try {
       await updateAppointmentAttendance(f.owner, f.business.id, f.appointment.id, f.command, memory.db);
+      clock.mockReturnValue(ownerRescheduleNow);
+      await seedOwnerRescheduleScenario(memory.db);
+      const prepareOwner = async (requestId: string, startTimeStr: string) => {
+        const source = await readOwnerRescheduleSource(ownerRescheduleActor, ownerRescheduleBusiness.id, ownerRescheduleSource.id, memory.db);
+        return (await prepareOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, ownerRescheduleSource.id, { ...source.expectation, requestId, selection: { ...ownerRescheduleSelection, startTimeStr } }, memory.db)).proposal;
+      };
+      const applied = await prepareOwner('demo-backup-applied', '10:00');
+      await confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, applied.id, memory.db);
+      await prepareOwner('demo-backup-prepared', '11:00');
+      const closed = await prepareOwner('demo-backup-closed', '12:00');
+      clock.mockReturnValue(ownerRescheduleNow + 600001);
+      await expect(confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, closed.id, memory.db)).rejects.toMatchObject({ code: 'OWNER_RESCHEDULE_PROPOSAL_CLOSED' });
+      clock.mockReturnValue(attendanceNow);
       const baseline = { ...snapshot(), documents: [...snapshot().documents, ...[...memory.rows].map(encodeRow)] };
       await updateAppointmentAttendance(f.owner, f.business.id, f.appointment.id, attendanceCorrectionCommand, memory.db);
       const current = { ...snapshot(), documents: [...snapshot().documents, ...[...memory.rows].map(encodeRow)] };
@@ -63,6 +78,14 @@ describe('Firestore migration artifacts', () => {
       expect(eventWrites.map((write: { currentDocument: unknown }) => write.currentDocument)).toContainEqual({ exists: false });
       const roundtrip = prepareMigration({ ...current, documents: plan.upserts.map((write: { update: { name: string; fields: Record<string, unknown> } }) => ({ ...write.update, createTime: stamp, updateTime: stamp })) }, { updatedAt: attendanceNow });
       expect(roundtrip.rows).toEqual(bundle.rows);
+      const ownerProofs = bundle.rows.filter((row: { path: string }) => row.path.includes('/ownerRescheduleProposals/'));
+      expect(ownerProofs.map((row: { data: { state: string } }) => row.data.state).sort()).toEqual(['applied', 'closed', 'prepared']);
+      for (const row of ownerProofs) {
+        expect(row.data.commandFingerprint).toMatch(/^[a-f0-9]{64}$/); expect(row.data.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+        expect(row.data.catalogFingerprint).toMatch(/^[a-f0-9]{64}$/); expect(row.data.resourceScheduleFingerprint).toMatch(/^[a-f0-9]{64}$/);
+        expect(row.data.actorUid).toBe(ownerRescheduleActor.uid); expect(row.data).not.toHaveProperty('client');
+      }
+      expect(bundle.rows.find((row: { path: string }) => row.path === `businesses/${ownerRescheduleBusiness.id}/appointments/${ownerRescheduleSource.id}`).data).toMatchObject({ rescheduleRevision: 1, lastRescheduleProposalId: applied.id });
       const events = bundle.rows.filter((row: { path: string }) => row.path.includes('/attendanceEvents/')).sort((a: { data: { sequence: number } }, b: { data: { sequence: number } }) => a.data.sequence - b.data.sequence);
       expect(events.map((row: { data: { sequence: number } }) => row.data.sequence)).toEqual([1, 2]);
       for (const event of events) {

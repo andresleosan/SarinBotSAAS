@@ -37,6 +37,24 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
     });
   });
   afterAll(async () => { await environment?.cleanup(); });
+  it('denies all owner reschedule proofs to browser SDKs while moved appointment reads remain authorized', async () => {
+    const appointment = { client: { uid: 'customer' }, dateKey: '2030-01-07', status: 'confirmed', rescheduleRevision: 1, lastRescheduleProposalId: 'synthetic-proof', rescheduledAt: 1 };
+    await environment.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'businesses/one/appointments/mine'), appointment);
+      await setDoc(doc(context.firestore(), 'businesses/one/ownerRescheduleProposals/synthetic-proof'), { actorUid: 'owner-one', commandFingerprint: 'a'.repeat(64), state: 'applied' });
+    });
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('owner-one'), environment.authenticatedContext('customer'), environment.authenticatedContext('other-account'), environment.authenticatedContext('stale-admin', { isSuperadmin: true })]) {
+      const db = context.firestore(), ref = doc(db, 'businesses/one/ownerRescheduleProposals/synthetic-proof');
+      await assertFails(getDoc(ref)); await assertFails(getDocs(collection(db, 'businesses/one/ownerRescheduleProposals')));
+      await assertFails(setDoc(doc(db, 'businesses/one/ownerRescheduleProposals/forged'), { actorUid: 'owner-one' }));
+      await assertFails(updateDoc(ref, { state: 'applied' })); await assertFails(deleteDoc(ref));
+    }
+    for (const uid of ['owner-one', 'customer']) {
+      const ref = doc(environment.authenticatedContext(uid).firestore(), 'businesses/one/appointments/mine');
+      expect((await assertSucceeds(getDoc(ref))).data()).toEqual(appointment);
+      await assertFails(updateDoc(ref, { rescheduleRevision: 2 }));
+    }
+  });
   it('denies private attendance audit to every browser SDK while authorized appointment reads preserve only metadata', async () => {
     const appointment = { client: { uid: 'customer' }, dateKey: '2026-10-14', status: 'completed', attendance: { revision: 1, lastEventId: 'synthetic-event' } };
     await environment.withSecurityRulesDisabled(async context => {
