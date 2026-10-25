@@ -143,3 +143,27 @@ it('feature403 and same-owner probe preserve an in-flight confirmation and block
   expect(call[3]()).toBe(true); expect(writes()).toHaveLength(2); expect(button('Cancelar cita').props.disabled).toBe(true);
   await act(async () => pending.resolve({ appointment: moved, rescheduleResult: proof, replayed: false })); expect(text(renderer.root, true)).toContain('Cambio comprobado');
 });
+it.each(['503', 'timeout'] as const)('sameOwnerProbeKeepsRecoveryVisibleWithFailedAgenda (%s)', async failure => {
+  await mount(true); await click('Cambiar horario'); await review(); await click('Semana'); ui.api.mockRejectedValueOnce(new Error('Lost response')); await click('Confirmar cambio');
+  const base = ui.api.getMockImplementation()!;
+  ui.api.mockImplementation((path, init) => String(path).endsWith('/resource-schedules') ? Promise.reject(new ApiError('Feature restricted', 403)) : base(path, init));
+  await act(async () => vi.advanceTimersByTimeAsync(15000)); expect(button('Comprobar acceso')).toBeTruthy();
+  ui.api.mockImplementation((path, init) => String(path).includes('/appointments?date=2030-01-07') ? failure === '503' ? Promise.reject(new ApiError('Agenda unavailable', 503)) : new Promise(() => {}) : base(path, init));
+  await click('Comprobar acceso');
+  if (failure === 'timeout') await act(async () => vi.advanceTimersByTimeAsync(10000));
+  expect(text(renderer.root, true)).toContain('Resultado por comprobar'); expect(text(renderer.root, true)).toContain('Consultar resultado');
+  expect(text(renderer.root, true)).toContain(failure === '503' ? 'No pudimos cargar este día' : 'La consulta de este día tardó demasiado'); expect(button('Actualizar')).toBeTruthy();
+  ui.api.mockResolvedValueOnce({ proposal, state: 'applied', result: proof, appointment: moved }); await click('Consultar resultado');
+  expect(text(renderer.root, true)).toContain('Cambio comprobado'); expect(writes()).toHaveLength(2);
+});
+it('initialUrlRecoveryRetriesAfterFeatureProtectionAndProbe', async () => {
+  ui.search = '?ownerReschedule=demo-proposal'; const base = ui.api.getMockImplementation()!; let denied = false;
+  ui.api.mockImplementation((path, init) => {
+    if (String(path).includes('/owner-reschedule-proposals/') && !denied) { denied = true; return Promise.reject(new ApiError('Feature restricted', 403)); }
+    return base(path, init);
+  });
+  await mount(true); await click('Comprobar acceso'); expect(text(renderer.root, true)).toContain('Consultar de nuevo');
+  expect(button('Cerrar cambio').props.disabled).toBe(true);
+  ui.api.mockResolvedValueOnce({ proposal: view, state: 'applied', result: proof, appointment: moved }); await click('Consultar de nuevo');
+  expect(text(renderer.root, true)).toContain('Cambio comprobado'); expect(writes()).toHaveLength(0);
+});

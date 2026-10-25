@@ -118,6 +118,22 @@ it('proofInvalidatesLatePostPublication', async () => {
   expect(controller.stage).toBe('result'); expect(controller.busy).toBe(false);
   await act(async () => pending.reject(new Error('Respuesta tardía'))); await request; expect(controller.stage).toBe('result'); expect(controller.error).toBe(null);
 });
+it.each(['prepared', 'error'] as const)('appliedPostInvalidatesOlderRecovery (%s)', async outcome => {
+  await mount(); await prepare(); const post = deferred<unknown>(), reading = deferred<unknown>();
+  vi.mocked(apiFetch).mockReturnValueOnce(post.promise); let writing!: Promise<void>;
+  await act(async () => { writing = controller.confirm(); });
+  vi.mocked(apiFetch).mockReturnValueOnce(reading.promise); let checking!: Promise<void>;
+  await act(async () => { checking = controller.recover(); });
+  await act(async () => post.resolve({ appointment: moved, rescheduleResult: proof, replayed: false })); await writing;
+  expect(controller.stage).toBe('result');
+  await act(async () => outcome === 'prepared' ? reading.resolve({ proposal, state: 'prepared', appointment: original, result: null }) : reading.reject(new Error('Old GET failed'))); await checking;
+  expect(controller.stage).toBe('result'); expect(controller.recovery?.state).toBe('applied'); expect(controller.error).toBe(null); expect(controller.busy).toBe(false);
+});
+it('unknownUrlRecoveryRetainsItsBarrierBeforeAnyResponse', async () => {
+  const reading = deferred<unknown>(); vi.mocked(apiFetch).mockReturnValueOnce(reading.promise);
+  await mount({ entry: { proposalId: view.id } }); expect(controller.canClose).toBe(false); expect(controller.uncertain).toBe(true);
+  await act(async () => reading.reject(new Error('Network failed'))); expect(controller.canClose).toBe(false); expect(writes()).toHaveLength(0);
+});
 it('a first definite rejection can restart while an uncertain confirmation retains its tuple', async () => {
   await mount(); await prepare(); vi.mocked(apiFetch).mockRejectedValueOnce(new ApiError('Origen cambió', 409, 'OWNER_RESCHEDULE_SOURCE_CHANGED')); await act(async () => controller.confirm());
   expect(controller.uncertain).toBe(false); expect(controller.canRestart).toBe(true); await act(async () => controller.loadSource()); expect(controller.frozen).toBe(false); expect(controller.proposal).toBe(null);

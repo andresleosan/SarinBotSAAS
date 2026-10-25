@@ -40,6 +40,17 @@ it('threeStepsDoNotMutateOnSelection', async () => {
   await change('Nueva fecha', '2030-01-14'); await change('Profesional', 'demo-second'); expect(mutations()).toHaveLength(0);
   expect(controller.selection.startTimeStr).toBe('');
 });
+it.each(['network', 'timeout'] as const)('failedInitialUrlRecoveryCanRetrySameRead (%s)', async failure => {
+  if (failure === 'network') vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Network unavailable'));
+  else vi.mocked(apiFetch).mockReturnValueOnce(new Promise(() => {}));
+  await mount({ entry: { proposalId: view.id } });
+  if (failure === 'timeout') await act(async () => vi.advanceTimersByTimeAsync(10000));
+  expect(controller.canClose).toBe(false);
+  vi.mocked(apiFetch).mockResolvedValueOnce({ proposal: view, state: 'applied', result: proof, appointment: { ...original, startTimeStr: '10:00', endTimeStr: '10:30', startAt: proof.startAt, endAt: proof.endAt, reservedUntilAt: view.target.reservedUntilAt, rescheduleRevision: 1, lastRescheduleProposalId: view.id, rescheduledAt: now } });
+  await click('Consultar de nuevo');
+  expect(vi.mocked(apiFetch).mock.calls.map(call => call[0])).toEqual(Array(2).fill(`/api/businesses/${business.id}/owner-reschedule-proposals/${view.id}`));
+  expect(text(renderer.root)).toContain('Cambio comprobado'); expect(button('Cerrar cambio').props.disabled).toBe(false); expect(mutations()).toHaveLength(0);
+});
 it('beforeAfterShowsPriceAndBuffer', async () => {
   await mount(); await review(); const content = text(renderer.root);
   expect(content).toContain('Antes'); expect(content).toContain('Propuesto'); expect(content).toContain('20.000'); expect(content).toContain('25.000');

@@ -18,7 +18,7 @@ export type OwnerRescheduleController = {
   stage: 'source' | 'selection' | 'review' | 'result'; availabilityStatus: 'idle' | 'loading' | 'success' | 'error';
   frozen: boolean; busy: boolean; uncertain: boolean; error: string | null;
   resources: TenantResource[]; readBusy: boolean; canClose: boolean; canRestart: boolean; message: string | null;
-  loadSource: () => Promise<void>; setSelection: (target: OwnerRescheduleTarget) => void;
+  loadSource: () => Promise<void>; retryInitialRead: () => Promise<void>; setSelection: (target: OwnerRescheduleTarget) => void;
   loadAvailability: () => Promise<void>; prepare: () => Promise<void>; confirm: () => Promise<void>; recover: () => Promise<void>;
 };
 type Input = { ownerUid: string; authEpoch: number; businessId: string; entry: OwnerRescheduleEntry; enabled: boolean; business?: Pick<Business, 'resources' | 'services'>; requestScope?: OwnerRequestScope };
@@ -42,7 +42,7 @@ export function useOwnerReschedule(input: Input): OwnerRescheduleController {
   const latest = useRef({ input, requestScope }); latest.current = { input, requestScope };
   const key = JSON.stringify([input.ownerUid, input.authEpoch, input.businessId]);
   const state = useRef<Session | null>(null), [, render] = useReducer(value => value + 1, 0);
-  if (!state.current || state.current.key !== key) state.current = { key, live: true, entry: { ...input.entry }, initialRequested: false, source: null, selection: blankSelection(), availability: [], availabilityStatus: 'idle', availableFor: null, proposal: null, recovery: null, stage: 'source', frozen: false, uncertain: false, error: null, message: null, canRestart: false, reading: null, readGeneration: 0, postVersion: 0, preparation: null, confirmation: null, timers: new Set() };
+  if (!state.current || state.current.key !== key) state.current = { key, live: true, entry: { ...input.entry }, initialRequested: false, source: null, selection: blankSelection(), availability: [], availabilityStatus: 'idle', availableFor: null, proposal: null, recovery: null, stage: 'source', frozen: false, uncertain: 'proposalId' in input.entry, error: null, message: null, canRestart: false, reading: null, readGeneration: 0, postVersion: 0, preparation: null, confirmation: null, timers: new Set() };
   const session = state.current;
   const current = () => state.current === session && session.live && latest.current.requestScope.isCurrent()
     && latest.current.requestScope.ownerUid === input.ownerUid && latest.current.requestScope.authEpoch === input.authEpoch && latest.current.requestScope.businessId === input.businessId;
@@ -119,8 +119,10 @@ export function useOwnerReschedule(input: Input): OwnerRescheduleController {
   function acceptRecovery(value: OwnerRescheduleRecovery) {
     if (value.proposal.businessId !== input.businessId || value.appointment.tenantId !== input.businessId
       || (session.proposal && JSON.stringify(value.proposal) !== JSON.stringify(session.proposal))) throw invalid();
+    if (session.recovery && session.recovery.state !== 'prepared' && value.state === 'prepared') return;
     session.proposal = value.proposal; session.recovery = value; session.frozen = true; session.error = null; session.canRestart = false;
     if (value.state === 'applied' || value.state === 'closed') {
+      cancelRead();
       session.postVersion++; session.preparation = null; session.confirmation = null;
       session.uncertain = false; session.stage = 'result'; session.message = null;
     } else {
@@ -134,12 +136,13 @@ export function useOwnerReschedule(input: Input): OwnerRescheduleController {
     const id = session.proposal?.id ?? ('proposalId' in session.entry ? session.entry.proposalId : null);
     if (!id || !canRead()) return;
     session.initialRequested = true;
+    const version = session.postVersion;
     const result = await read(proposalPath(id), {}, raw => {
       const value = ownerRescheduleRecoverySchema.parse(raw);
       if (value.proposal.id !== id) throw invalid();
       return value;
     });
-    if (!current() || !result) return;
+    if (!current() || !result || version !== session.postVersion) return;
     try { acceptRecovery(result); } catch { session.error = invalid().message; }
     publish();
   }
@@ -210,6 +213,6 @@ export function useOwnerReschedule(input: Input): OwnerRescheduleController {
     busy: !!session.reading || !!session.preparation?.active || !!session.confirmation?.active, readBusy: !!session.reading,
     uncertain: session.uncertain, canClose: !session.uncertain && !session.confirmation?.active, canRestart: session.canRestart,
     error: visible ? session.error : null, message: visible ? session.message : null, resources: visible ? resourceOptions() : [],
-    loadSource, setSelection, loadAvailability, prepare, confirm, recover,
+    loadSource, retryInitialRead: 'proposalId' in session.entry ? recover : loadSource, setSelection, loadAvailability, prepare, confirm, recover,
   };
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Appointment, Business } from '@/types/firestore';
-import type { Database } from '@/lib/storage/types';
+import type { Database, DocumentReference, Transaction } from '@/lib/storage/types';
 import { readOwnerRescheduleSource, readOwnerRescheduleAvailability, prepareOwnerReschedule, readOwnerRescheduleProposal, confirmOwnerReschedule } from '@/lib/server/owner-rescheduling';
 import { clientPolicyKey } from '@/lib/server/client-policy';
 import { bookingDataPolicyKey } from '@/lib/server/booking-data-policy';
@@ -71,6 +71,26 @@ describe('owner authority and source scope', () => {
     const status = await readConsent(owner.uid, 'account', undefined, db);
     await updateConsent(owner, { scope: 'account', action: 'revoke', requestId: 'demo-revoke', expectedRevision: status.revision }, db);
     await expect(prepare()).rejects.toMatchObject({ status: 428 });
+  });
+  it.each(['availability', 'prepare', 'confirm'] as const)('subscriptionExpiryDuringReadsRejectsNewWork (%s)', async phase => {
+    await setBusiness({ subscription: { ...business.subscription, currentPeriodEndsAt: now + 1000 } });
+    const supplied = await command(), prepared = phase === 'confirm' ? await prepare() : null;
+    const delayed: Database = { collection: name => db.collection(name), runTransaction: (handler, options) => db.runTransaction(tx => handler({
+      ...tx,
+      get: (async target => {
+        const snapshot = await tx.get(target as DocumentReference);
+        if ((target as DocumentReference).path.includes(phase === 'confirm' ? '/bookingLocks/' : '/resourceSchedulePolicies/')) vi.setSystemTime(now + 1001);
+        return snapshot;
+      }) as Transaction['get'],
+    }), options) };
+    const work = phase === 'confirm' ? confirmOwnerReschedule(owner, business.id, prepared!.proposal.id, delayed)
+      : phase === 'prepare' ? prepareOwnerReschedule(owner, business.id, original.id, supplied, delayed)
+        : readOwnerRescheduleAvailability(owner, business.id, original.id, { sourceRevision: supplied.sourceRevision, sourceFingerprint: supplied.sourceFingerprint, dateKey: selection.dateKey, resourceId: selection.resourceId }, delayed);
+    await expect(work).rejects.toMatchObject({ status: 402 });
+    expect((await sourceRef().get()).data()).toEqual(original);
+    const proposals = await businessRef().collection('ownerRescheduleProposals').get();
+    expect(proposals.size).toBe(phase === 'confirm' ? 1 : 0);
+    if (prepared) expect(proposals.docs[0].data()?.state).toBe('prepared');
   });
   it.each([0, 10])('paidTrialAndExhaustedTrialRemainEligible (%i used)', async appointmentsUsed => {
     await setBusiness({ subscription: { ...business.subscription, status: 'trial', currentPeriodEndsAt: 0, paidTrial: { ...business.subscription.paidTrial!, appointmentsUsed } } });

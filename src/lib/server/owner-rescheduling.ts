@@ -98,7 +98,7 @@ async function sourceState(tx: Transaction, db: Database, business: Business, so
     : !canRescheduleSubscription(business, now) ? 'subscription_unavailable' : null;
   return { appointment: source, expectation: { sourceRevision: revision, sourceFingerprint: appointmentRescheduleFingerprint(source) }, eligible: reason === null, reason };
 }
-function assertWritable(state: OwnerRescheduleSource, expectation: OwnerRescheduleExpectation, now: number) {
+function assertWritable(state: OwnerRescheduleSource, expectation: OwnerRescheduleExpectation, now: number, business: Business) {
   if (state.expectation.sourceRevision !== expectation.sourceRevision || state.expectation.sourceFingerprint !== expectation.sourceFingerprint) throw changed();
   if (state.appointment.startAt <= now || state.reason === 'source_started') throw conflict('SOURCE_STARTED', 'La cita ya comenzó; no se puede cambiar su horario.');
   if (!state.eligible) {
@@ -106,6 +106,7 @@ function assertWritable(state: OwnerRescheduleSource, expectation: OwnerReschedu
     if (state.reason === 'business_unconfigured') throw new HttpError(403, 'El negocio todavía no está configurado.');
     throw conflict('UNSUPPORTED', state.reason === 'service_unavailable' ? 'El servicio ya no está disponible.' : 'Este cambio está disponible para citas futuras de negocios generales, sin autorizaciones sensibles.');
   }
+  if (!canRescheduleSubscription(business, now)) throw new HttpError(402, 'La suscripción no permite cambiar esta cita.');
 }
 function assertHorizon(dateKey: string, now: number) {
   if (toColombiaTimestamp(dateKey, '00:00') > now + 366 * 86400000) throw new HttpError(400, 'Puedes elegir una fecha hasta un año por adelantado.');
@@ -141,11 +142,11 @@ export async function readOwnerRescheduleAvailability(owner: ChatActor, business
   documentIdSchema.parse(businessId); documentIdSchema.parse(appointmentId); const input = ownerRescheduleAvailabilitySchema.parse(supplied);
   return db.runTransaction(async tx => {
     const business = await readBusiness(tx, db, businessId, owner), source = await readAppointment(tx, db, businessId, appointmentId);
-    const state = await sourceState(tx, db, business, source, Date.now()); assertWritable(state, input, Date.now());
+    const state = await sourceState(tx, db, business, source, Date.now()); assertWritable(state, input, Date.now(), business);
     await assertConsent(owner.uid, 'account', undefined, db, tx);
     if (input.resourceId) targetCatalog(business, source, input.resourceId);
     const context = await destinationContext(tx, db, business, source, input.dateKey, input.resourceId), now = Date.now();
-    assertWritable(state, input, now); assertHorizon(input.dateKey, now);
+    assertWritable(state, input, now, business); assertHorizon(input.dateKey, now);
     return getAvailableSlots({ tenant: business, resourceSchedulePolicy: context.policy, dateKey: input.dateKey, serviceId: source.serviceId!, resourceId: input.resourceId, existingAppointments: context.appointments, now });
   });
 }
@@ -160,13 +161,13 @@ export async function prepareOwnerReschedule(owner: ChatActor, businessId: strin
       recovery(record, source);
       return { proposal: view(record), replayed: true };
     }
-    const state = await sourceState(tx, db, business, source, Date.now()); assertWritable(state, input, Date.now());
+    const state = await sourceState(tx, db, business, source, Date.now()); assertWritable(state, input, Date.now(), business);
     await assertConsent(owner.uid, 'account', undefined, db, tx);
     const { selection } = input, catalog = targetCatalog(business, source, selection.resourceId);
     if (source.dateKey === selection.dateKey && source.startTimeStr === selection.startTimeStr && source.resourceId === selection.resourceId) throw conflict('NO_CHANGE', 'Selecciona un horario o profesional diferente.');
     const context = await destinationContext(tx, db, business, source, selection.dateKey, selection.resourceId);
     const admit = await prepareBookingActionAdmission(tx, db, owner.uid, businessId, 'proposal', `owner-reschedule:${input.requestId}`);
-    const now = Date.now(); assertWritable(state, input, now); assertHorizon(selection.dateKey, now);
+    const now = Date.now(); assertWritable(state, input, now, business); assertHorizon(selection.dateKey, now);
     if (!getAvailableSlots({ tenant: business, resourceSchedulePolicy: context.policy, ...selection, serviceId: catalog.service.id, existingAppointments: context.appointments, now }).some(item => item.resourceId === selection.resourceId && item.slots.includes(selection.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible. Consulta otra hora.');
     const startAt = toColombiaTimestamp(selection.dateKey, selection.startTimeStr), endAt = startAt + catalog.service.durationMinutes * 60000;
     const record: ProposalRecord = recordSchema.parse({
@@ -203,7 +204,7 @@ export async function confirmOwnerReschedule(owner: ChatActor, businessId: strin
     if (record.state === 'closed') return null;
     const close = (now: number) => { tx.set(ref, { ...record, state: 'closed', closedAt: now, closedReason: 'expired' }); return null; };
     if (record.expiresAt <= Date.now()) return close(Date.now());
-    const state = await sourceState(tx, db, business, source, Date.now()); assertWritable(state, record, Date.now());
+    const state = await sourceState(tx, db, business, source, Date.now()); assertWritable(state, record, Date.now(), business);
     await assertConsent(owner.uid, 'account', undefined, db, tx);
     const target = record.target, catalog = targetCatalog(business, source, target.resourceId);
     if (bookingSubjectHash(catalog) !== record.catalogFingerprint) throw conflict('CATALOG_CHANGED', 'El servicio o profesional cambió. Revisa una propuesta nueva.');
@@ -213,7 +214,7 @@ export async function confirmOwnerReschedule(owner: ChatActor, businessId: strin
     const lockRefs = keys.map(key => db.collection('businesses').doc(businessId).collection('bookingLocks').doc(key));
     const locks = await Promise.all(lockRefs.map(lock => tx.get(lock))), now = Date.now();
     if (record.expiresAt <= now) return close(now);
-    assertWritable(state, record, now); assertHorizon(target.dateKey, now);
+    assertWritable(state, record, now, business); assertHorizon(target.dateKey, now);
     if (!getAvailableSlots({ tenant: business, resourceSchedulePolicy: context.policy, dateKey: target.dateKey, resourceId: target.resourceId, serviceId: catalog.service.id, existingAppointments: context.appointments, now }).some(item => item.resourceId === target.resourceId && item.slots.includes(target.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible. Consulta otra hora.');
     const versions = locks.map(lock => {
       if (!lock.exists) return 0;

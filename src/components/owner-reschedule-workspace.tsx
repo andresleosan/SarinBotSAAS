@@ -50,7 +50,7 @@ export function OwnerRescheduleWorkspace({ controller, onClose, onViewCurrentDay
     {stage === 'source' && <div className="space-y-3">
       {controller.busy && <p role="status">Consultando la cita…</p>}
       {source?.reason && <p role="status" className="rounded-xl bg-sarin-canvas p-4 text-sm leading-6">{reasons[source.reason]}</p>}
-      {!controller.busy && <button type="button" className={secondary} onClick={() => void controller.loadSource()}>Consultar origen de nuevo</button>}
+      {!controller.busy && <button type="button" className={secondary} onClick={() => void controller.retryInitialRead()}>Consultar de nuevo</button>}
     </div>}
     {stage === 'selection' && source && <div className="space-y-5">
       <div className="rounded-xl bg-sarin-canvas p-4 text-sm"><p className="font-semibold">Horario actual</p><p className="mt-1 [overflow-wrap:anywhere]">{source.appointment.serviceName || 'Servicio original'} · {day(source.appointment.dateKey)} · {source.appointment.startTimeStr}–{source.appointment.endTimeStr}</p><p className="mt-1 text-xs text-sarin-muted">{price(source.appointment.price)}. Conserva el mismo servicio y los datos registrados.</p></div>

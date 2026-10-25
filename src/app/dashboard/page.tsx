@@ -274,7 +274,7 @@ function OwnerDashboardWorkspace({ business, businessError, isCurrentWorkspace }
         <PaidTrialStatus subscription={sub} />
         {day?.state === 'ready' ? <ClientPolicyControls businessId={business.id} ownerUid={business.ownerUid} clients={[...new Map(appointments.filter(item => item.client?.uid).map(item => [item.client!.uid, { uid: item.client!.uid, name: item.client!.name }])).values()]} /> : <p className="text-sm text-sarin-muted">Las políticas de clientes estarán disponibles cuando cargue el día seleccionado.</p>}
         {actionError?.scope === actionScope && <Notice error>{actionError.message}</Notice>}
-        <OwnerAgendaCalendar business={business} scheduleContext={schedules.view ? { state: 'ready', view: schedules.view } : { state: schedules.phase === 'loading' ? 'loading' : 'error' }} mode={mode} selectedDate={date} resourceId={selectedResourceId} range={range} snapshot={snapshot} loading={agenda.loading} error={agenda.error} busy={combinedBusy}
+        <OwnerAgendaCalendar business={business} scheduleContext={schedules.view ? { state: 'ready', view: schedules.view } : { state: schedules.phase === 'loading' ? 'loading' : 'error' }} mode={mode} selectedDate={date} resourceId={selectedResourceId} range={range} snapshot={agenda.snapshot} loading={agenda.loading} error={agenda.error} busy={combinedBusy}
           onModeChange={value => { if (requestScope.canRead() && scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setMode(value); }}
           onDateChange={value => { if (requestScope.canRead() && scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setDate(value); }}
           onResourceChange={value => { if (requestScope.canRead() && scopeRef.current === actionScope && !actionRequest.current && !pendingAttendance()) setSelectedResourceId(value); }}
@@ -393,11 +393,11 @@ function OwnerDashboardWorkspace({ business, businessError, isCurrentWorkspace }
     );
   };
   if (authority.revoked || !requestScope.isCurrent()) return <Notice error>No tienes acceso a la agenda de este negocio.</Notice>;
-  const protectedView = authority.protected || heldAgenda.current.holding;
+  const protectedView = authority.protected;
   return <div className="space-y-6">
     {businessError && <Notice error>{businessError}</Notice>}
     {authority.protected && <section role="status" className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><p>Necesitamos comprobar el acceso a este negocio. Los cambios pendientes se conservan.</p>{authority.error && <p>{authority.error}</p>}<button type="button" className={buttonClass} disabled={authority.checking} onClick={() => void authority.checkAccess()}>{authority.checking ? 'Comprobando acceso…' : 'Comprobar acceso'}</button></section>}
-    {!authority.protected && heldAgenda.current.holding && <p role="status" className="text-sm text-sarin-muted">Actualizando la agenda después de comprobar el acceso…</p>}
+    {!authority.protected && heldAgenda.current.holding && <p role="status" className="text-sm text-sarin-muted">Conservamos las citas anteriores mientras se actualiza la agenda. Puedes comprobar el resultado de tu cambio; consulta los errores del calendario y actualiza para revisar la ocupación vigente.</p>}
     {!authority.protected && authority.featureCode && <p role="status" className="text-sm text-sarin-muted">El acceso al negocio está comprobado. La función anterior puede seguir restringida; su petición no se reenvió.</p>}
     <div hidden={protectedView} inert={protectedView || undefined}>
       <OwnerRescheduleBoundary businessId={business.id} ownerUid={business.ownerUid} authEpoch={authEpoch} business={business} requestScope={requestScope} entry={rescheduleEntry}
