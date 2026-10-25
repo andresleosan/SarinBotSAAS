@@ -2,12 +2,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { buttonClass, fieldClass } from '@/components/app-shell';
 import type { OwnerWaitlistController } from '@/hooks/use-owner-waitlist';
+import type { OwnerWaitlistOfferController } from '@/hooks/use-owner-waitlist-offer';
+import { OwnerWaitlistOfferWorkspace } from '@/components/owner-waitlist-offer-workspace';
 
-type Props = { controller: OwnerWaitlistController; onViewAgenda: () => void; disabled?: boolean };
+type Props = { controller: OwnerWaitlistController; onViewAgenda: () => void; disabled?: boolean; offerController?: OwnerWaitlistOfferController };
 const stamp = (value: number) => new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }).format(value);
 const day = (value: string) => new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', dateStyle: 'long' }).format(Date.parse(value + 'T12:00:00-05:00'));
 const reasons = { consent_changed: 'Los permisos actuales del cliente requieren revisión.', booking_policy_changed: 'Cambió la política de reservas.', business_unavailable: 'Las nuevas reservas no están disponibles.', client_blocked: 'La solicitud no tiene acceso vigente a nuevas reservas.', client_limit: 'La solicitud alcanzó su límite de reservas.', service_unavailable: 'El servicio o profesional anterior ya no está disponible.' };
-export function OwnerWaitlistWorkspace({ controller: c, onViewAgenda, disabled = false }: Props) {
+export function OwnerWaitlistWorkspace({ controller: c, onViewAgenda, disabled = false, offerController }: Props) {
   const [draft, setDraft] = useState(c.dateKey), [activeId, setActiveId] = useState<string | null>(null), [confirming, setConfirming] = useState(false);
   const focusPending = useRef(false), resultRef = useRef<HTMLElement>(null), errorRef = useRef<HTMLDivElement>(null);
   useEffect(() => { setDraft(c.dateKey); setActiveId(null); setConfirming(false); }, [c.dateKey]);
@@ -20,6 +22,7 @@ export function OwnerWaitlistWorkspace({ controller: c, onViewAgenda, disabled =
   }, [activeId, c.page, c.detail, c.error, c.loading, c.busy]);
   function run(action: () => void) { focusPending.current = true; action(); }
   const locked = disabled || c.busy;
+  const offerPending = Boolean(offerController?.busy || offerController?.uncertain);
   return <div className="max-w-4xl min-w-0 space-y-5">
     <div><h1 className="text-3xl font-bold">Solicitudes en espera</h1><p className="mt-2 text-sm text-sarin-muted">Consulta las solicitudes actuales y registra su revisión manual.</p></div>
     <fieldset disabled={locked} className="min-w-0 space-y-3 rounded-xl border border-sarin-line p-4">
@@ -48,7 +51,7 @@ export function OwnerWaitlistWorkspace({ controller: c, onViewAgenda, disabled =
           <p>{row.lifecycle === 'expired' ? 'Solicitud caducada' : 'Solicitud actual; disponibilidad pendiente de comprobar'}</p>
           <p>{row.review.reviewed ? 'Revisada' : 'Pendiente de revisión'}{row.review.updatedAt !== null ? ` · ${stamp(row.review.updatedAt)}, Colombia` : ''}</p>
           <p className="text-sm text-sarin-muted">Caduca al terminar su fecha en Colombia. Actualiza para comprobar su estado.</p>
-          <button type="button" className={buttonClass} disabled={locked || c.loading} onClick={() => run(() => { void c.open(row.recordId); })}>Ver disponibilidad</button>
+          <button type="button" className={buttonClass} disabled={locked || c.loading} onClick={() => run(() => { void c.open(row.recordId); if (!c.uncertain) void offerController?.open(row.recordId); })}>Ver disponibilidad</button>
         </div>
         {detail && <div className="space-y-3 rounded-xl border border-sarin-line p-4">
           <h3 className="font-semibold">Estado consultado</h3><p className="text-sm text-sarin-muted">{stamp(detail.serverNow)}, Colombia. Esta consulta no es tiempo real.</p>
@@ -56,9 +59,10 @@ export function OwnerWaitlistWorkspace({ controller: c, onViewAgenda, disabled =
           {detail.availability.map(resource => <div key={resource.resourceId}><p className="font-semibold">{resource.resourceName}</p><p className="break-words text-sm">{resource.slots.length ? resource.slots.join(' · ') : 'Sin horarios en esta consulta'}</p></div>)}
           <p>Esta consulta no retiene el horario. El cliente debe elegir y confirmar su reserva.</p>
           <p>El cliente debe entrar en su solicitud: Comprobar horarios → Elegir horario → revisar y confirmar. Consultar o marcar la revisión no le envía un aviso.</p>
-          {confirming ? <div className="space-y-3 border-t border-sarin-line pt-3"><p>No avisa al cliente ni retira su solicitud. Solo cambia la marca privada de revisión.</p><div className="flex flex-wrap gap-3"><button type="button" className={buttonClass} disabled={locked || c.uncertain} onClick={() => run(() => { setConfirming(false); void c.setReviewed(!row.review.reviewed); })}>Confirmar revisión</button><button type="button" className={buttonClass} disabled={locked} onClick={() => setConfirming(false)}>Cancelar</button></div></div>
-            : <button type="button" className={buttonClass} disabled={locked || c.loading || c.uncertain} onClick={() => setConfirming(true)}>{row.review.reviewed ? 'Volver a pendiente de revisión' : 'Marcar como revisada'}</button>}
+          {confirming ? <div className="space-y-3 border-t border-sarin-line pt-3"><p>No avisa al cliente ni retira su solicitud. Solo cambia la marca privada de revisión.</p><div className="flex flex-wrap gap-3"><button type="button" className={buttonClass} disabled={locked || c.uncertain || offerPending} onClick={() => run(() => { if (offerPending) return; setConfirming(false); void c.setReviewed(!row.review.reviewed); })}>Confirmar revisión</button><button type="button" className={buttonClass} disabled={locked} onClick={() => setConfirming(false)}>Cancelar</button></div></div>
+            : <button type="button" className={buttonClass} disabled={locked || c.loading || c.uncertain || offerPending} onClick={() => { if (!offerPending) setConfirming(true); }}>{row.review.reviewed ? 'Volver a pendiente de revisión' : 'Marcar como revisada'}</button>}
         </div>}
+        {offerController && (offerController.context?.detail.row.recordId === row.recordId || offerController.recovery?.offer.waitlistRecordId === row.recordId) && <OwnerWaitlistOfferWorkspace controller={offerController} mode="create" disabled={disabled || c.busy || c.uncertain} />}
         <div className="space-y-2"><p className="text-sm">En la agenda, selecciona {day(row.dateKey)}. La fecha no queda preseleccionada al abrir.</p><button type="button" className={buttonClass} disabled={locked || c.uncertain} onClick={onViewAgenda}>Abrir Mi agenda</button></div>
       </> : c.page && <>
         <div><h2 className="text-xl font-semibold">Solicitudes consultadas: {day(c.page.dateKey)}</h2><p className="mt-1 text-sm text-sarin-muted">Consultado: {stamp(c.page.serverNow)}, Colombia. Usa Actualizar para volver a comprobar.</p></div>
