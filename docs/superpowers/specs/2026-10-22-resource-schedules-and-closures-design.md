@@ -1,6 +1,6 @@
 # Horarios por recurso, excepciones y cierres — diseño S09
 
-Preparado el 22 de octubre de 2026. Estado: diseño para revisión; no implementado, probado ni publicado. El titular delegó decisiones y pidió conservar la administración de Fresha y dejar los incrementos listos para implementar. Esta entrega documental no inicia ejecución.
+Preparado el 22 de octubre de 2026. Estado al24 de octubre: implementado y revisado en la rama `codex/resource-schedules-20261024`; integración y publicación S09 pendientes. [Validación y límites observados](../../qa/2026-10-24-resource-schedules.md). El titular delegó decisiones y pidió conservar la administración de Fresha y dejar los incrementos listos para implementar. La entrega documental inicial no inició ejecución; el titular autorizó la implementación posterior el24 de octubre.
 
 ## Propósito y base efectiva
 

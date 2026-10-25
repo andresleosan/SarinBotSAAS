@@ -1,12 +1,12 @@
 # Horarios por recurso y cierres — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Este encargo solo prepara documentos: no ejecutar estas instrucciones todavía.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. La captura documental inicial fue seguida por autorización del titular el24 de octubre. Las cinco tareas se ejecutaron con executing-plans; [QA, revisión y límites](../../qa/2026-10-24-resource-schedules.md). Integración/publicación S09 pendientes.
 
 **Goal:** Permitir al dueño definir jornada semanal de recursos, excepciones de fecha y cierres, aplicados uniformemente a nueva disponibilidad sin cambiar citas existentes.
 
 **Architecture:** Política JSON independiente con revisión, recibos de operación durables y CAS. Resolver puro intersecta apertura común y jornada individual, aplica excepción y resta cierres; todos los caminos de disponibilidad la leen, con confirmaciones transaccionales. UI por pasos independiente del guardado agregado del negocio.
 
-**Tech Stack:** Node 24, pnpm 11.23.0, Next 16.4.0, React 19.3.0, TypeScript estricto, Zod, Vitest y adaptador D1/Workerd existentes; sin dependencias nuevas.
+**Tech Stack:** Node 24, pnpm 11.23.0, Next 16.4.1, React 19.3.0, TypeScript estricto, Zod, Vitest y adaptador D1/Workerd existentes; sin dependencias nuevas.
 
 **Spec:** [2026-10-22-resource-schedules-and-closures-design.md](../specs/2026-10-22-resource-schedules-and-closures-design.md). Leer también agenda, configuración guiada y resultados operativos enlazados allí.
 

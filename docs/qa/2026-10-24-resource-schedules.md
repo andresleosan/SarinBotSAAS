@@ -30,7 +30,10 @@ Node24.22.0, pnpm11.23.0, dependencias instaladas y lock sin cambios; entorno sa
 | Worker tests | 158 pruebas, exit0 |
 | Worker TypeScript y deploy dry-run, sin rollout | exit0 |
 | Suite completa inicial | 3978 passed, 1 failed, 32 skipped; ver detalle abajo |
-| Suite completa final | 3979 passed, 32 skipped; 251 archivos passed y4 skipped, exit0 |
+| Suite completa previa a revisión | 3979 passed, 32 skipped; 251 archivos passed y4 skipped, exit0 |
+| Regresiones de revisión | 30 pruebas en2 archivos, incluyendo9 casos nuevos RED/GREEN |
+| Corrida monolítica después de correcciones | 3987 passed, 1 failed, 32 skipped: mismo RPC de preparación D1 anterior |
+| Cobertura completa después de correcciones, por grupos | 3988 passed, 32 skipped, 0 failed; unión exacta255 archivos/4020 casos, exit0 |
 
 La suite inicial falló en `d1HistoryUsesIndexedBoundedAppointmentPagesAmong1001UnrelatedEvents`, `tests/appointment-attendance-d1.test.ts:201`, durante el batch de preparación local, antes de sus aserciones: Miniflare `fetch failed`, causa `read ECONNRESET`. Es el mismo límite de transporte observado al integrar S06. La suite D1 completa aislada pasó12/12, sin cambiar código ni timeouts. Se preservaron log y resultado iniciales fuera de Git; la repetición general pasó3979/32skip, incluyendo esta prueba, sin modificar el producto ni los timeouts.
 
@@ -50,11 +53,28 @@ Chrome, Next dev en127.0.0.1:3046 y Firebase `demo-sarin-bot`, red de procesos l
 
 No se observó zoom nativo200% ni lector de pantalla audible. Se comprobó semántica accesible y teclado; no se presentan como prueba de esos dos criterios. Los fallos de permisos, GET10s, pérdida de respuesta y PUT20s se probaron además en suites, no todos como fallos de transporte de navegador.
 
+## Revisión independiente y correcciones
+
+Revisor nuevo `s09_final_review` (gpt-6-astra/high), rango `a1772eb..f4d6e26`, solo lectura, sin servicios ni subagentes adicionales. Encontró cero Critical, cuatro Important y un Minor. La revisión no se atribuye al commit posterior como si hubiera una segunda aprobación independiente.
+
+Una sola pasada de correcciones, commit `3bfac8b`, con nueve regresiones observadas fallar antes de corregir y30/30 verdes después:
+
+1. Conflicto dirty tras dos GET iguales o fallo de lectura intermedio: un bit de conflicto independiente de la vista actual permanece hasta descarte explícito. Casos de revisión y basis.
+2. PUT incierto seguido de retry402/409/gate503: se conserva la ambigüedad de intentos anteriores y el mismo comando. Descartar/editar/crear otro comando sigue bloqueado; solo un recibo válido resuelve el resultado.
+3. Borrador válido mayor que128KiB: límite UTF-8 compartido entre ruta y controlador, comprobado antes del envío. Un413 inicial conserva el borrador editable; un rechazo posterior a ambigüedad no libera la barrera. La prueba reduce el borrador y guarda con recibo válido.
+4. Vaciar inicio o fin de una jornada: el preview valida las reglas antes del resolver. El borrador incompleto permanece editable, la vista indica que debe corregirse y recupera preview válido al completar la hora.
+
+TypeScript y build después de esta pasada terminaron con exit0. La corrida general posterior reprodujo el mismo `ECONNRESET` de preparación de `appointment-attendance-d1.test.ts:201`, con3987 casos aprobados y uno fallido antes de sus aserciones. La causa última del transporte no está establecida. La cobertura completa pasó con12 casos en la suite intensiva y3976 en el resto, con reportes JSON que comprueban la unión exacta de archivos/casos; la corrida monolítica queda registrada como fallida. El verificador de unión terminó con exit0 (`work/s09-complete-verification-result.json`, código3bfac8b). Las capturas/navegador anteriores corresponden a la integración previa a revisión; los nuevos casos se verificaron mediante pruebas de estado y render, no se inventa una nueva observación manual.
+
+Minor diferido: la ayuda genérica explica que la apertura común limita la jornada, pero no enumera explícitamente los tramos solicitados que quedan recortados en semana/excepción/revisión. El motor sí aplica la intersección; se difiere esa mejora informativa, no un permiso para abrir fuera de horario.
+
 ## Decisiones y operación
 
 1. Normalizar solo espacios de encabezados `Task1`→`Task 1` para el extractor de briefs; requisitos sin cambios. Riesgo: deriva de números de línea.
 2. Días comunes realmente ausentes se expanden a cerrados y se permite que días comunes cerrados antiguos conserven intervalos. Días propios siguen estrictos. Mantiene compatibilidad con la configuración existente; riesgo de equivocación: rechazar o interpretar mal un horario legado.
 3. Actualizar solo la allowlist actual del fixture Worker previo; literal histórico b7e9a28 permanece exacto. Riesgo: una selección de fixture incorrecta invalidaría la prueba de compatibilidad, por eso se conserva el literal histórico.
+4. Interpretar la huella conservadora de propuestas junto con la sección explícita de integración futura S07: S09 conserva los contratos de propuestas cliente actuales y revalida su destino con política transaccional. La persistencia/comparación de `resourceScheduleFingerprint` se deja para las propuestas futuras del dueño S07. Riesgo de interpretación: un cambio de política ajeno al destino no invalida por sí solo una propuesta cliente que sigue siendo válida; un destino que acaba de quedar cerrado sí se rechaza.
+5. Ejecutar la cobertura final completa en dos procesos disjuntos: suite D1 de asistencia intensiva y todos los demás archivos. Se conserva código y timeouts de pruebas, con inventario JSON para verificar cobertura. Reduce su ejecución concurrente con otros sidecars de Miniflare. Riesgo: el fallo local de la corrida monolítica sigue siendo una limitación del entorno/CI que requiere seguimiento; la partición no demuestra que ese RPC sea estable bajo concurrencia.
 
 El lector aplica las políticas aunque el escritor se apague. Rollback seguro: conservar un lector compatible y poner el gate enfalse; no regresar a una versión que ignore políticas existentes ni borrarlas para deshacer cambios. Revertir reglas requiere un nuevo comando CAS revisado. No hay activación de producción en este incremento.
 
