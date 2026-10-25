@@ -40,7 +40,8 @@ export const ownerRescheduleSourceSchema = z.object({
   appointment: ownerRescheduleAppointmentSchema, expectation: expectationSchema,
   eligible: z.boolean(), reason: z.enum(['restricted_policy', 'source_started', 'unsupported_source', 'service_unavailable', 'subscription_unavailable', 'business_unconfigured']).nullable(),
 }).strict().refine(value => value.expectation.sourceRevision === (value.appointment.rescheduleRevision ?? 0)
-  && value.eligible === (value.reason === null), 'No se pudo verificar el origen.');
+  && value.eligible === (value.reason === null)
+  && (!value.eligible || (value.appointment.type === 'appointment' && value.appointment.status === 'confirmed')), 'No se pudo verificar el origen.');
 
 export const ownerRescheduleProposalViewSchema = z.object({
   id, businessId: id, appointmentId: id, requestId, sourceRevision, sourceFingerprint: hash, expiresAt: timestamp,
@@ -67,6 +68,8 @@ export const ownerRescheduleRecoverySchema = z.object({
   if (value.state !== 'applied') return value.result === null;
   const result = value.result, target = value.proposal.target;
   return result !== null && result.proposalId === value.proposal.id && result.revision === value.proposal.sourceRevision + 1
+    && result.confirmedAt >= value.proposal.expiresAt - 600000 && result.confirmedAt < value.proposal.expiresAt
+    && result.confirmedAt > 0 && result.confirmedAt < value.proposal.source.startAt && result.confirmedAt < target.startAt
     && result.dateKey === target.dateKey && result.resourceId === target.resourceId && result.startTimeStr === target.startTimeStr
     && result.startAt === target.startAt && result.endAt === target.endAt && currentMatchesProof(value.appointment, result);
 }, 'No se pudo verificar la prueba del cambio.');

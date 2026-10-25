@@ -38,6 +38,12 @@ describe('owner rescheduling transport validation', () => {
     const current = { ...appointment, status: 'cancelled_by_owner', rescheduleRevision: 2 };
     expect(ownerRescheduleRecoverySchema.parse({ proposal, state: 'applied', appointment: current, result }).appointment.startTimeStr).toBe('09:00');
   });
+  it('an applied proof must have been confirmed inside its proposal window and before both starts', () => {
+    for (const confirmedAt of [0, proposal.expiresAt, proposal.expiresAt - 600001, proposal.target.startAt]) {
+      expect(ownerRescheduleRecoverySchema.safeParse({ proposal, state: 'applied', appointment: moved, result: { ...result, confirmedAt } }).success).toBe(false);
+    }
+    expect(ownerRescheduleSourceSchema.safeParse({ appointment: { ...appointment, status: 'cancelled_by_owner' }, expectation: { sourceRevision: 0, sourceFingerprint: 'a'.repeat(64) }, eligible: true, reason: null }).success).toBe(false);
+  });
   it('validatesMidnightAndCrossDaySourceWithoutInventingHistoricalPrice', () => {
     const source = { ...proposal.source, startTimeStr: '23:30', endTimeStr: '24:00', startAt: 1894077000000, endAt: 1894078800000, reservedUntilAt: 1894079700000, priceCOP: null };
     expect(ownerRescheduleProposalViewSchema.safeParse({ ...proposal, source }).success).toBe(true);
