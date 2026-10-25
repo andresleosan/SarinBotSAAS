@@ -1,8 +1,16 @@
 # Composición acumulativa de la administración de Sarin
 
+## Corte de ejecución vigente — 24 de octubre de 2026, Colombia
+
+La fuente activa es `C:/Users/Drean Skate/AppData/Local/SarinBot/fresha-p2-20261023/source`. Main y producción conservan `4999faa`: S07 integrado/publicado y CI48 verificados según el handoff vigente, sin operaciones S07 pendientes. E: mixto permanece protegido.
+
+El siguiente pendiente real, **FAQ factual (orden9)**, se implementó localmente sobre esa base en `codex/business-factual-faq-20261024`, código final `db9158e`. Diseño/plan aprobados trasladados desde la entrega documental sin cambios; revisión independiente y correcciones TDD registradas en [QA factual](../qa/2026-10-24-business-factual-faq.md). La rama no se ha integrado ni publicado. Worker debe admitir `factualFaq`/`factualFaqOperations` antes de publicar la app; no hay migración SQL ni borrado de recibos. MinorCRM y Task7S05 siguen diferidos, este último hasta después de S12.
+
+Tras integrar/verificar FAQ, el siguiente incremento funcional del orden elegido es **resumen operativoS17 (orden10)**. Los estados de preparación de la tabla y la fuente antigua que siguen son históricos; no reabren P1–P5/S06/S09/S07 ya integrados ni sustituyen los recibos actuales.
+
 Actualizado el 23 de octubre de 2026, Colombia. Anexo de integración documental del [handoff](sarin-admin-implementation-handoff.md): fija contratos comunes para ejecutar los pares preparados sin sobrescribir dashboard, shell, protocolo o reservas. No es evidencia de código, tests, CI, migraciones, proveedor o publicación. La [matriz Fresha](fresha-admin-coverage-matrix.md) mide captura por función; estos planes no prueban captura administrativa completa.
 
-**Prioridad vigente del usuario:** continuar la captura y documentación administrativa de Fresha antes de implementar Sarin. P1–P5 y los 18 pares permanecen preparados para una ejecución posterior; esta continuación no inicia implementación. La reconciliación técnica futura no condiciona la captura.
+**Prioridad histórica de la preparación:** continuar la captura y documentación administrativa de Fresha antes de implementar Sarin. P1–P5 y los 18 pares permanecían preparados para una ejecución posterior; aquella continuación no inició implementación. La reconciliación técnica futura no condicionaba la captura.
 
 Fuente de implementación: `C:/Users/Drean Skate/AppData/Local/SarinBot/whatsapp-adaptation-20261020/source-restoration`, pin `463ae55f8c873468980746185fb3e91f55cb8681`; runtime documentado `c8bb0a99d9ac2bb20acaef2e5a157b0ff83b05f2`. Reconciliar fuente/runtime/CI efectivos antes de ejecutar y crear rama aislada; repetir la reconciliación antes de publicar. La [lista de arranque](sarin-admin-implementation-start-checklist.md) organiza esos gates sin añadir un par. E: es entrega documental mixta. Node 24, pnpm 11.23.0, lockfile conservado, sin dependencias nuevas y una réplica. No editar o desplegar la fuente recuperada durante esta preparación.
 
