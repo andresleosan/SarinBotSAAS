@@ -2,7 +2,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import type { Database } from '@/lib/storage/types';
 import { POST } from '@/app/api/businesses/[id]/owner-waitlist/query/route';
 import { GET } from '@/app/api/businesses/[id]/owner-waitlist/[recordId]/route';
-import { PATCH } from '@/app/api/businesses/[id]/owner-waitlist/[recordId]/review/route';
+import { PATCH, GET as GET_REVIEW } from '@/app/api/businesses/[id]/owner-waitlist/[recordId]/review/route';
 import { HttpError } from '@/lib/server/http';
 import { ownerWaitlistFixture, ownerWaitlistNow } from './owner-waitlist-contract';
 import { subjectAdmin } from './represented-booking-contract';
@@ -28,4 +28,10 @@ it('readOnlyPostAndGetSuccessAndReview428ThenSuccess409And503',async()=>{
   expect((await patch({requestId:'review-route-002',entryId:f.entryId,expectedWaitlistRevision:1,expectedReviewRevision:0,reviewed:false})).status).toBe(409);
   await f.db.collection('businesses').doc(f.business.id).collection('waitlistOwnerReviews').doc(f.entryId).set({broken:true});expect((await post()).status).toBe(503);
   const missing=await GET(new Request(url()+'/missing'),{params:Promise.resolve({id:f.business.id,recordId:'missing'})});expect(missing.status).toBe(404);expect(missing.headers.get('Cache-Control')).toBe('no-store');
+});
+it('reviewStateGetAuthorizesOwnerAndReturnsCanonicalTombstoneNoStore',async()=>{
+  const {cancelWaitlist}=await import('@/lib/server/waitlist');await cancelWaitlist(f.actor,f.business.id,{requestId:'cancel-route-proof',expectedRevision:1,entryId:f.entryId},f.db);
+  const response=await GET_REVIEW(new Request(url()+'/'+f.recordId+'/review'),ctx());expect(response.status).toBe(200);expect(response.headers.get('Cache-Control')).toBe('no-store');expect(await response.json()).toEqual({businessId:f.business.id,ownerUid:f.owner.uid,recordId:f.recordId,waitlistRevision:2,entryId:null,review:null,serverNow:ownerWaitlistNow});
+  for(const uid of [null,f.actor.uid,subjectAdmin.uid]){state.uid=uid;const denied=await GET_REVIEW(new Request(url()),ctx());expect(denied.status).toBe(uid?403:401);expect(denied.headers.get('Cache-Control')).toBe('no-store');}
+  state.uid=f.owner.uid;expect((await GET_REVIEW(new Request(url()+'?x=1'),ctx())).status).toBe(400);expect((await GET_REVIEW(new Request(url(),{method:'POST',body:'x'}),ctx())).status).toBe(400);
 });

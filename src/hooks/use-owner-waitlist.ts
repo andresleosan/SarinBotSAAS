@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { apiFetch, errorMessage } from '@/lib/client/api';
-import { ownerWaitlistPageSchema, ownerWaitlistDetailSchema, ownerWaitlistReviewResultSchema, parseOwnerWaitlistDate, compareOwnerWaitlistRows, type OwnerWaitlistPage, type OwnerWaitlistDetail, type OwnerWaitlistReviewCommand, type OwnerWaitlistReviewResult, type OwnerWaitlistCursor } from '@/lib/owner-waitlist';
+import { ownerWaitlistPageSchema, ownerWaitlistDetailSchema, ownerWaitlistReviewResultSchema, ownerWaitlistReviewStateSchema, parseOwnerWaitlistDate, compareOwnerWaitlistRows, type OwnerWaitlistPage, type OwnerWaitlistDetail, type OwnerWaitlistReviewCommand, type OwnerWaitlistReviewResult, type OwnerWaitlistCursor } from '@/lib/owner-waitlist';
 
 type Input = { businessId: string | null; ownerUid: string | null; authEpoch: number; enabled: boolean; available?: boolean };
 type State = { key: string; dateKey: string; page: OwnerWaitlistPage | null; detail: OwnerWaitlistDetail | null; loading: boolean; busy: boolean; uncertain: boolean; error: string | null; notice: string | null };
@@ -79,7 +79,7 @@ export function useOwnerWaitlist(input: Input) {
       const prior = state.current.detail?.row;
       if (prior?.entryId === result.row.entryId && result.row.review.revision < prior.review.revision) throw new Error('El detalle recibido es anterior a la revisión comprobada.');
       const p = pending.current, matching = p && p === unknown && p.key === expected && p.recordId === recordId;
-      const replacement = matching && result.row.waitlistRevision > p.command.expectedWaitlistRevision && result.row.entryId !== p.command.entryId;
+      const replacement = matching && result.row.waitlistRevision > p.command.expectedWaitlistRevision;
       const newer = matching && result.row.entryId === p.command.entryId && result.row.waitlistRevision === p.command.expectedWaitlistRevision && result.row.review.revision > p.command.expectedReviewRevision;
       if (result.row.dateKey !== dateKey && !replacement && !(matching && p.dateKey === result.row.dateKey)) throw new Error('La solicitud no corresponde a la fecha seleccionada.');
       if (replacement || newer) {
@@ -132,7 +132,32 @@ export function useOwnerWaitlist(input: Input) {
     cancelRead(); pending.current?.cancel?.(); selected.current = null; view.current = { key: expected, dateKey };
     publish({ ...blank(expected, dateKey), uncertain: Boolean(pending.current) }); void readPage();
   }
-  async function refresh() { const p = pending.current; if (p?.key === current.current.key) await open(p.recordId); else if (selected.current) await open(selected.current); else await readPage(); }
+  async function reconcilePending(p: Pending) {
+    await read(base() + '/' + encodeURIComponent(p.recordId) + '/review', {}, raw => {
+      const parsed = ownerWaitlistReviewStateSchema.safeParse(raw), scope = current.current.input;
+      if (!parsed.success) throw new Error('No se pudo verificar el estado actual de la revisión.');
+      const value = parsed.data;
+      if (value.businessId !== scope.businessId || value.ownerUid !== scope.ownerUid || value.recordId !== p.recordId) throw new Error('La comprobación no corresponde a esta solicitud.');
+      if (value.waitlistRevision < p.command.expectedWaitlistRevision) throw new Error('La comprobación recibida es anterior a la solicitud.');
+      return value;
+    }, value => {
+      if (pending.current !== p) { patch({ loading: false }); return; }
+      const incarnationChanged = value.waitlistRevision > p.command.expectedWaitlistRevision;
+      const markerAdvanced = value.waitlistRevision === p.command.expectedWaitlistRevision && value.entryId === p.command.entryId && value.review !== null && value.review.revision > p.command.expectedReviewRevision;
+      if (!incarnationChanged && !markerAdvanced) { patch({ loading: false, uncertain: true, notice: 'La operación sigue por comprobar. La misma revisión no descarta una escritura pendiente.' }); return; }
+      p.cancel?.(); pending.current = null;
+      if (incarnationChanged) {
+        selected.current = null;
+        patch({ page: null, detail: null, loading: false, busy: false, uncertain: false, error: null, notice: 'Se comprobó el estado actual: la solicitud cambió o fue retirada. No es una constancia de la operación pendiente. Actualiza la bandeja para continuar.' });
+      } else {
+        const review = value.review!;
+        const page = state.current.page ? { ...state.current.page, rows: state.current.page.rows.map(row => row.entryId === value.entryId ? { ...row, review } : row) } : null;
+        const detail = state.current.detail?.row.entryId === value.entryId ? { ...state.current.detail, row: { ...state.current.detail.row, review } } : state.current.detail;
+        patch({ page, detail, loading: false, busy: false, uncertain: false, error: null, notice: 'Se comprobó el estado actual. No es una constancia de la operación pendiente.' });
+      }
+    });
+  }
+  async function refresh() { const p = pending.current; if (p?.key === current.current.key) await reconcilePending(p); else if (selected.current) await open(selected.current); else await readPage(); }
   async function retryPending() { if (pending.current) await send(pending.current); }
   function close() { cancelRead(); selected.current = null; patch({ detail: null, loading: false }); }
   async function loadOlder() { const cursor = state.current.page?.nextCursor; if (cursor && !state.current.loading) await readPage(cursor); }

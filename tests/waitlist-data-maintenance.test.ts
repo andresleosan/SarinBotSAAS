@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { memoryFirestore } from './memoryFirestore';
 import type { Database } from '@/lib/storage/types';
-import { deleteExportedWaitlistData, exportWaitlistData } from '@/lib/server/waitlist-data-maintenance';
+import { deleteExportedWaitlistData, exportWaitlistData, deleteExportedWaitlistDataBatch, reconcileWaitlistDataErasure } from '@/lib/server/waitlist-data-maintenance';
 import { stableDocumentId } from '@/lib/server/businesses';
 import { createDataTestRuntime } from '../cloudflare/tests/data-runtime.mjs';
 import { createCloudflareDatabase, StorageError } from '@/lib/storage/database';
@@ -19,6 +19,26 @@ function seed() {
   }).db as unknown as Database;
 }
 describe('private waitlist export and guarded deletion', () => {
+  it('one account with more than1000 markers erases in verified batches and resumes lost progress',async()=>{
+    const db=seed(),scope={businessId:'demo-business',ownerUid:'demo-alice'},collection=db.collection('businesses').doc(scope.businessId).collection('waitlistOwnerReviews');
+    for(let i=0;i<1005;i++){const id='entry-'+String(i).padStart(4,'0');await collection.doc(id).set(ownerReview(id));}
+    const exported=await exportWaitlistData(db,scope);expect(exported.documents).toHaveLength(1006);
+    await expect(deleteExportedWaitlistDataBatch(db,exported,{writersStopped:false} as never)).rejects.toMatchObject({status:409});
+    await deleteExportedWaitlistDataBatch(db,exported,{writersStopped:true});
+    let progress=await reconcileWaitlistDataErasure(db,exported,{writersStopped:true});expect(progress.deletedCount).toBe(100);expect(progress.complete).toBe(false);
+    let previous=100;
+    while(!progress.complete){progress=await deleteExportedWaitlistDataBatch(db,exported,{writersStopped:true,previous:progress});expect(progress.deletedCount-previous).toBeLessThanOrEqual(100);previous=progress.deletedCount;}
+    expect(progress.deletedCount).toBe(1006);expect((await exportWaitlistData(db,scope)).documents).toEqual([]);expect((await db.collection('businesses').doc(scope.businessId).collection('appointments').get()).size).toBe(1);
+    expect((await exportWaitlistData(db,{businessId:'demo-other'})).documents).toHaveLength(1);
+  });
+  it('batch erasure rejects changed rows and never claims complete with a new residual marker',async()=>{
+    const db=seed(),scope={businessId:'demo-business',ownerUid:'demo-alice'},collection=db.collection('businesses').doc(scope.businessId).collection('waitlistOwnerReviews');await collection.doc('one').set(ownerReview('one'));
+    const exported=await exportWaitlistData(db,scope);await collection.doc('one').set({...ownerReview('one'),reviewed:false});
+    await expect(deleteExportedWaitlistDataBatch(db,exported,{writersStopped:true})).rejects.toMatchObject({status:409});
+    await collection.doc('one').set(ownerReview('one'));await collection.doc('new').set(ownerReview('new'));
+    await expect(deleteExportedWaitlistDataBatch(db,exported,{writersStopped:true})).rejects.toMatchObject({status:409});
+    expect((await collection.get()).size).toBe(2);
+  });
   it.each([true,false])('owner review inventory follows canonical record even when singleton missing=%s', async missing => {
     const db=seed(),ref=db.collection('businesses').doc('demo-business'),id=stableDocumentId('waitlist','demo-business','demo-alice');
     if(!missing)await ref.collection('waitlistRequests').doc(id).set(entry('demo-alice'));

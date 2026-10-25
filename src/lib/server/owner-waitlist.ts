@@ -5,7 +5,7 @@ import type { Database, Transaction, Query, QueryDocumentSnapshot } from '@/lib/
 import { z } from 'zod';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { StorageError } from '@/lib/storage/database';
-import { OwnerWaitlistModelError, ownerWaitlistCursorSchema, ownerWaitlistDetailSchema, ownerWaitlistQuerySchema, ownerWaitlistPageSchema, ownerWaitlistReviewCommandSchema, ownerWaitlistMarkerSchema, readOwnerWaitlistReview, projectOwnerWaitlistRow, parseOwnerWaitlistDate, compareOwnerWaitlistRows, type OwnerWaitlistDetail, type OwnerWaitlistPage, type OwnerWaitlistQuery, type OwnerWaitlistReviewCommand, type OwnerWaitlistReviewResult } from '@/lib/owner-waitlist';
+import { OwnerWaitlistModelError, ownerWaitlistCursorSchema, ownerWaitlistDetailSchema, ownerWaitlistQuerySchema, ownerWaitlistPageSchema, ownerWaitlistReviewCommandSchema, ownerWaitlistMarkerSchema, markerMatchesWaitlistRevision, readOwnerWaitlistReview, projectOwnerWaitlistRow, parseOwnerWaitlistDate, compareOwnerWaitlistRows, type OwnerWaitlistDetail, type OwnerWaitlistPage, type OwnerWaitlistQuery, type OwnerWaitlistReviewCommand, type OwnerWaitlistReviewResult, type OwnerWaitlistReviewState } from '@/lib/owner-waitlist';
 import { readOwnerWaitlistProjection, parseCanonicalWaitlistRecord, type WaitlistRecord } from './waitlist';
 import { assertOwner } from './businesses';
 import { assertConsent } from './consent';
@@ -68,7 +68,7 @@ export async function readOwnerWaitlistPage(owner: ChatActor, businessId: string
     for (let start = 0; start < returned.length; start += 4) {
       reviews.push(...await Promise.all(returned.slice(start, start + 4).map(async item => {
         const entryId = item.record.request!.id, marker = await tx.get(ref.collection('waitlistOwnerReviews').doc(entryId));
-        return readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId: item.recordId, entryId });
+        return readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId: item.recordId, entryId, waitlistRevision: item.record.revision });
       })));
     }
     const serverNow = Date.now(), rows = returned.map((item, i) => projectOwnerWaitlistRow(item.recordId, item.record, business, reviews[i], serverNow)), last = rows.at(-1);
@@ -88,9 +88,10 @@ export async function updateOwnerWaitlistReview(owner: ChatActor, businessId: st
     const record = parseCanonicalWaitlistRecord(recordId, doc.data(), businessId);
     if (!record.request || record.request.id !== input.entryId || record.revision !== input.expectedWaitlistRevision) throw changed();
     const markerRef = ref.collection('waitlistOwnerReviews').doc(input.entryId), marker = await tx.get(markerRef);
-    const review = readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId, entryId: input.entryId });
+    const review = readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId, entryId: input.entryId, waitlistRevision: record.revision });
     await assertConsent(owner.uid, 'account', undefined, db, tx);
-    const previous = marker.exists ? ownerWaitlistMarkerSchema.parse(marker.data()) : null;
+    const storedMarker = marker.exists ? ownerWaitlistMarkerSchema.parse(marker.data()) : null;
+    const previous = storedMarker && markerMatchesWaitlistRevision(storedMarker, record.revision) ? storedMarker : null;
     const result = (current: typeof review, replayed: boolean): OwnerWaitlistReviewResult => ({ businessId, ownerUid: owner.uid, recordId, entryId: input.entryId, waitlistRevision: record.revision, review: current, replayed });
     if (previous?.lastOperation.requestId === input.requestId) {
       if (previous.lastOperation.operationHash !== operationHash) throw new HttpError(409, 'Ese identificador corresponde a otra revisión.', 'OWNER_WAITLIST_REQUEST_REUSED');
@@ -100,7 +101,7 @@ export async function updateOwnerWaitlistReview(owner: ChatActor, businessId: st
     if (review.reviewed === input.reviewed) throw new HttpError(409, 'La revisión ya tiene ese valor.', 'OWNER_WAITLIST_NO_CHANGE');
     if (review.revision >= Number.MAX_SAFE_INTEGER - 1) throw unverifiable();
     const next = { revision: review.revision + 1, reviewed: input.reviewed, updatedAt: Date.now() };
-    const value = ownerWaitlistMarkerSchema.safeParse({ version: 1, businessId, waitlistRecordId: recordId, entryId: input.entryId, ...next, actorUid: owner.uid,
+    const value = ownerWaitlistMarkerSchema.safeParse({ version: 2, businessId, waitlistRecordId: recordId, entryId: input.entryId, waitlistRevision: record.revision, ...next, actorUid: owner.uid,
       lastOperation: { requestId: input.requestId, operationHash, appliedRevision: next.revision } });
     if (!value.success) throw unverifiable();
     tx.set(markerRef, value.data);
@@ -114,11 +115,27 @@ export async function readOwnerWaitlistDetail(owner: ChatActor, businessId: stri
     const businessRef = db.collection('businesses').doc(businessId), business = (await tx.get(businessRef)).data() as Business;
     const item = current.record.request!;
     const marker = await tx.get(businessRef.collection('waitlistOwnerReviews').doc(item.id));
-    const review = readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId, entryId: item.id });
+    const review = readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId, entryId: item.id, waitlistRevision: current.record.revision });
     const serverNow = current.state.serverNow, request = current.state.request!;
     const row = projectOwnerWaitlistRow(recordId, current.record, business, review, serverNow);
     const result = ownerWaitlistDetailSchema.safeParse({ businessId, ownerUid: owner.uid, serverNow, row, state: request.status, ...(request.reason ? { reason: request.reason } : {}), availability: current.availability });
     if (!result.success) throw unverifiable();
     return result.data;
+  }));
+}
+/** Minimal current-state fence, including canonical withdrawal tombstones. */
+export async function readOwnerWaitlistReviewState(owner: ChatActor, businessId: string, recordId: string, db: Database = getAdminDb()): Promise<OwnerWaitlistReviewState> {
+  exactId.parse(businessId); exactId.parse(recordId);
+  return guarded(() => db.runTransaction(async tx => {
+    await ownerBusiness(tx, owner, businessId, db);
+    const ref = db.collection('businesses').doc(businessId), doc = await tx.get(ref.collection('waitlistRequests').doc(recordId));
+    if (!doc.exists) throw new HttpError(404, 'No se pudo recuperar la entrada.', 'OWNER_WAITLIST_ENTRY_GONE');
+    const record = parseCanonicalWaitlistRecord(recordId, doc.data(), businessId), entryId = record.request?.id ?? null;
+    let review: OwnerWaitlistReviewState['review'] = null;
+    if (entryId) {
+      const marker = await tx.get(ref.collection('waitlistOwnerReviews').doc(entryId));
+      review = readOwnerWaitlistReview(marker.exists ? marker.data() : undefined, { businessId, recordId, entryId, waitlistRevision: record.revision });
+    }
+    return { businessId, ownerUid: owner.uid, recordId, waitlistRevision: record.revision, entryId, review, serverNow: Date.now() };
   }));
 }

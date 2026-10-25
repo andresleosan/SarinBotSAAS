@@ -46,6 +46,14 @@ test('owner waitlist review child and four query fields are private and strictly
     await assert.rejects(executeDataCommand(command, noAccess), isError('DATA_INVALID'));
   }
 });
+test('owner waitlist review child document IDs paginate without trusting JSON id', async context => {
+  const env=await fixture(context),parent='businesses/demo-wait/waitlistOwnerReviews';
+  await executeDataCommand(commit(0,[set(parent+'/a',{waitlistRecordId:'record'}),set(parent+'/b',{waitlistRecordId:'record',id:'forged'})]),env);
+  const result=await executeDataCommand(query(parent,[{field:'waitlistRecordId',op:'==',value:'record'},{field:'__name__',op:'>',value:'a'}],[{field:'__name__',direction:'asc'}],100),env);
+  assert.deepEqual(result.documents.map(d=>d.path),[parent+'/b']);
+  const noAccess=new Proxy({},{get(){assert.fail('Invalid document id accessed storage');}});
+  for(const value of [null,100,'a/b','bad\n'])await assert.rejects(executeDataCommand(query(parent,[{field:'__name__',op:'>',value}]),noAccess),isError('DATA_INVALID'));
+});
 
 test('owner reschedule proofs use only the private business child', async context => {
   assert.equal(isDataPath('businesses/demo/ownerRescheduleProposals/proof', true), true);

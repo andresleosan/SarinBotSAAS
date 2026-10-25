@@ -35,7 +35,7 @@ it('listLifecycleNeverClaimsLiveAvailabilityAndNullRequestIsNotActiveHistory', (
   expect(projectOwnerWaitlistRow('record', source, business, { revision: 0, reviewed: false, updatedAt: null }, source.request.expiresAt).lifecycle).toBe('expired');
 });
 it('reviewDefaultOnlyOnRealAbsence', () => {
-  const scope = { businessId: 'biz', recordId: 'record', entryId: 'entry' };
+  const scope = { businessId: 'biz', recordId: 'record', entryId: 'entry', waitlistRevision: 1 };
   expect(readOwnerWaitlistReview(undefined,scope)).toEqual({ revision: 0, reviewed: false, updatedAt: null });
   for (const value of [null, {}, { revision: 0, reviewed: false, updatedAt: null }]) expect(()=>readOwnerWaitlistReview(value,scope)).toThrow();
   const marker = { version: 1, businessId: 'biz', waitlistRecordId: 'record', entryId: 'entry', revision: 1, reviewed: true, updatedAt: now, actorUid: 'owner', lastOperation: { requestId: 'review-001', operationHash: 'a'.repeat(64), appliedRevision: 1 } };
@@ -50,4 +50,11 @@ it('dtoOwnerIsBusinessOwnerNotStoredWaitlistOwnerAndDetailIsStrict', () => {
   expect(ownerWaitlistDetailSchema.safeParse(detail).success).toBe(true);
   expect(ownerWaitlistDetailSchema.safeParse({ ...detail, state: 'expired' }).success).toBe(false);
   expect(ownerWaitlistDetailSchema.safeParse({ ...detail, clientUid: 'private' }).success).toBe(false);
+});
+it('legacyAndVersionTwoMarkersCannotCrossIncarnationsOrHideFutureRevisionCorruption',()=>{
+  const scope={businessId:'biz',recordId:'record',entryId:'entry',waitlistRevision:3};
+  const legacy={version:1,businessId:'biz',waitlistRecordId:'record',entryId:'entry',revision:1,reviewed:true,updatedAt:now,actorUid:'owner',lastOperation:{requestId:'review-001',operationHash:'a'.repeat(64),appliedRevision:1}};
+  expect(readOwnerWaitlistReview(legacy,scope)).toEqual({revision:0,reviewed:false,updatedAt:null});
+  expect(readOwnerWaitlistReview({...legacy,version:2,waitlistRevision:3},scope).reviewed).toBe(true);
+  expect(()=>readOwnerWaitlistReview({...legacy,version:2,waitlistRevision:5},scope)).toThrow();
 });

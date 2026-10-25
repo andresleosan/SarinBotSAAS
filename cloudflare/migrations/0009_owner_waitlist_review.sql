@@ -9,5 +9,6 @@ CREATE INDEX IF NOT EXISTS app_waitlist_owner_fifo ON app_documents (
 CREATE INDEX IF NOT EXISTS app_waitlist_owner_review_record ON app_documents (
   parent,
   json_extract(data, '$.waitlistRecordId'),
+  document_id,
   path
 );

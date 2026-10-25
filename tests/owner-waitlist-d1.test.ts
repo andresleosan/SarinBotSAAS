@@ -8,7 +8,7 @@ import { subjectAdmin } from './represented-booking-contract';
 import { acceptSyntheticConsent } from './consent-fixtures';
 import { readOwnerWaitlistPage, updateOwnerWaitlistReview } from '@/lib/server/owner-waitlist';
 import { cancelWaitlist, parseCanonicalWaitlistRecord } from '@/lib/server/waitlist';
-import { exportWaitlistData, deleteExportedWaitlistData } from '@/lib/server/waitlist-data-maintenance';
+import { exportWaitlistData, deleteExportedWaitlistData, deleteExportedWaitlistDataBatch, reconcileWaitlistDataErasure } from '@/lib/server/waitlist-data-maintenance';
 import { buildImportSql, prepareMigration, encodeFirestoreValue, buildReversePlan, canonicalJson } from '../scripts/lib/data-migration.mjs';
 let runtime:Awaited<ReturnType<typeof createDataTestRuntime>>,db:Database,second:Database;
 const calls:{label:string;command:DataCommand;bytes:number;durationMs:number}[]=[];
@@ -78,3 +78,14 @@ it('previousWorkerWithoutReviewChildRejectsBeforeWritesAndKeepsExistingWaitlist'
   await expect(updateOwnerWaitlistReview(f.owner,f.business.id,f.recordId,{requestId:'previous-worker-review',entryId:f.entryId,expectedWaitlistRevision:1,expectedReviewRevision:0,reviewed:true},db)).rejects.toMatchObject({status:503});
   expect((await runtime.db.prepare('SELECT * FROM app_documents ORDER BY path').all()).results).toEqual(before);expect((await f.ref.get()).data()?.request.id).toBe(f.entryId);
 },60000);
+it('privateAccountExportBeyond1000UsesDocumentIdIndexAndVerifiedResumable100WriteBatches',async()=>{
+  const f=await ownerWaitlistFixture(db),collection=db.collection('businesses').doc(f.business.id).collection('waitlistOwnerReviews');
+  for(let start=0;start<1005;start+=90)await db.runTransaction(async tx=>{for(let i=start;i<Math.min(start+90,1005);i++){const id='batch-'+String(i).padStart(4,'0');tx.set(collection.doc(id),{version:2,businessId:f.business.id,waitlistRecordId:f.recordId,entryId:id,waitlistRevision:1,revision:1,reviewed:true,updatedAt:ownerWaitlistNow,actorUid:f.owner.uid,lastOperation:{requestId:'batch-review-'+i,operationHash:'a'.repeat(64),appliedRevision:1}});}});
+  calls.length=0;const exported=await exportWaitlistData(db,{businessId:f.business.id,ownerUid:f.actor.uid});expect(exported.documents).toHaveLength(1006);
+  const command=calls.find(c=>c.command.action==='read'&&c.command.read.kind==='query'&&c.command.read.path.endsWith('/waitlistOwnerReviews'))!.command;
+  if(command.action!=='read'||command.read.kind!=='query')throw Error('Expected query');const explanation=await runtime.explain!(command.read);expect(explanation.plan.some((row:{detail:string})=>row.detail.includes('app_waitlist_owner_review_record'))).toBe(true);expect(explanation.plan.some((row:{detail:string})=>/SCAN app_documents|USE TEMP B-TREE/.test(row.detail))).toBe(false);
+  calls.length=0;await deleteExportedWaitlistDataBatch(db,exported,{writersStopped:true});let progress=await reconcileWaitlistDataErasure(second,exported,{writersStopped:true});expect(progress.deletedCount).toBe(100);
+  while(!progress.complete)progress=await deleteExportedWaitlistDataBatch(db,exported,{writersStopped:true,previous:progress});
+  expect(progress.deletedCount).toBe(1006);expect((await exportWaitlistData(second,exported.scope)).documents).toEqual([]);expect(calls.filter(c=>c.command.action==='commit').every(c=>c.command.action==='commit'&&c.command.writes.length<=100)).toBe(true);
+  expect((await db.collection('businesses').doc(f.business.id).collection('appointments').get()).size).toBe(2);
+},90000);

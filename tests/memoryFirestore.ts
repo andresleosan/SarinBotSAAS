@@ -33,7 +33,7 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
     async get(source = rows) {
       const paths = [...source.keys()].filter((path) => path.startsWith(`${this.path}/`) && path.slice(this.path.length + 1).split('/').length === 1).filter((path) => this.filters.every(([field, operator, value]) => {
         const data = source.get(path)!.data;
-        const nested = nestedValue(data, field);
+        const nested = field === '__name__' ? path.split('/').at(-1) : nestedValue(data, field);
         if (nested === undefined) return false;
         if (operator === '==') return nested === value;
         const comparison = typeof nested === 'number' && typeof value === 'number' ? nested - value : typeof nested === 'string' && typeof value === 'string' ? ordinal(nested, value) : null;
@@ -44,11 +44,11 @@ export function memoryFirestore(initial: Record<string, Data> = {}) {
         if (operator === '>=') return comparison >= 0;
         throw new Error('Unsupported fixture operator');
       }));
-      const orderedPaths = paths.filter(path => this.ordering.every(([field]) => nestedValue(source.get(path)!.data, field) !== undefined));
+      const orderedPaths = paths.filter(path => this.ordering.every(([field]) => field === '__name__' || nestedValue(source.get(path)!.data, field) !== undefined));
       if (this.ordering.length) {
         orderedPaths.sort((a, b) => {
           for (const [field, direction] of this.ordering) {
-            const first = nestedValue(source.get(a)!.data, field), second = nestedValue(source.get(b)!.data, field);
+            const first = field === '__name__' ? a.split('/').at(-1) : nestedValue(source.get(a)!.data, field), second = field === '__name__' ? b.split('/').at(-1) : nestedValue(source.get(b)!.data, field);
             const comparison = typeof first === 'number' && typeof second === 'number' ? first - second : ordinal(String(first), String(second));
             if (comparison !== 0) return direction === 'desc' ? -comparison : comparison;
           }

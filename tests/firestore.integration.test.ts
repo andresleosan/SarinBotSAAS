@@ -2,6 +2,7 @@
 import { readOwnerOperationSummary } from '@/lib/server/owner-operation-summary';
 import { ownerWaitlistFixture, seedOwnerWaitlistRows } from './owner-waitlist-contract';
 import { readOwnerWaitlistPage, updateOwnerWaitlistReview } from '@/lib/server/owner-waitlist';
+import { exportWaitlistData, deleteExportedWaitlistDataBatch, reconcileWaitlistDataErasure } from '@/lib/server/waitlist-data-maintenance';
 import { seedFactualFaqScenario, factualFaqNow, syntheticFaqItems } from './business-factual-faq-contract';
 import { saveOwnerFactualFaq, readOwnerFactualFaq } from '@/lib/server/business-factual-faq';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -76,6 +77,11 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
       const results=await Promise.allSettled([updateOwnerWaitlistReview(f.owner,f.business.id,row.recordId,command,db),updateOwnerWaitlistReview(f.owner,f.business.id,row.recordId,{...command,requestId:'firestore-review-b'},db)]);
       expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect(results.find(r=>r.status==='rejected')).toMatchObject({reason:{status:409}});
       expect((await db.doc(`businesses/${f.business.id}/waitlistOwnerReviews/${row.entryId}`).get()).data()?.revision).toBe(1);
+      const source=(await db.doc(`businesses/${f.business.id}/waitlistRequests/${row.recordId}`).get()).data()!;
+      const batch=db.batch();for(let i=0;i<201;i++){const id='erase-'+String(i).padStart(4,'0');batch.create(db.doc(`businesses/${f.business.id}/waitlistOwnerReviews/${id}`),{version:2,businessId:f.business.id,waitlistRecordId:row.recordId,entryId:id,waitlistRevision:1,revision:1,reviewed:true,updatedAt:Date.now(),actorUid:f.owner.uid,lastOperation:{requestId:'erase-review-'+i,operationHash:'a'.repeat(64),appliedRevision:1}});}await batch.commit();
+      const exported=await exportWaitlistData(db,{businessId:f.business.id,ownerUid:source.ownerUid});expect(exported.documents).toHaveLength(203);
+      await deleteExportedWaitlistDataBatch(db,exported,{writersStopped:true});let progress=await reconcileWaitlistDataErasure(db,exported,{writersStopped:true});expect(progress.deletedCount).toBe(100);
+      while(!progress.complete)progress=await deleteExportedWaitlistDataBatch(db,exported,{writersStopped:true,previous:progress});expect(progress.deletedCount).toBe(203);expect((await exportWaitlistData(db,exported.scope)).documents).toEqual([]);
     } finally { if(prior===undefined)delete process.env.SUPERADMIN_UID;else process.env.SUPERADMIN_UID=prior; }
   },60000);
   it('atomically moves owner appointment and receipt then serializes a destination competitor across Admin handles', async () => {

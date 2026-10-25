@@ -14,6 +14,7 @@ const fields: Record<string, 'string' | 'number' | 'boolean'> = {
   ownerUid: 'string', 'client.uid': 'string', dateKey: 'string', resourceId: 'string', status: 'string', type: 'string', tenantId: 'string', businessId: 'string', phoneNumberId: 'string', state: 'string', bodyState: 'string', id: 'string', appointmentId: 'string',
   createdAt: 'number', updatedAt: 'number', submittedAt: 'number', startsAt: 'number', startAt: 'number', nextAttemptAt: 'number', bodyExpiresAt: 'number', expiresAt: 'number', enabled: 'boolean',
   'request.dateKey': 'string', 'request.createdAt': 'number', 'request.id': 'string', waitlistRecordId: 'string',
+  __name__: 'string',
 };
 type DataEnvironment = Pick<CloudflareBindings, 'SARIN_DB' | 'SARIN_FILES'>;
 type BlobReference = { key: string; contentType: string; byteLength: number; sha256: string };
@@ -56,6 +57,7 @@ function validateCommand(command: unknown): asserts command is DataCommand {
       if (!object(filter)) throw invalid();
       keys(filter, ['field', 'op', 'value']);
       if (typeof filter.field !== 'string' || !Object.hasOwn(fields, filter.field) || typeof filter.op !== 'string' || !['==', '<', '<=', '>', '>='].includes(filter.op) || !isDataJson(filter.value)) throw invalid();
+      if (filter.field === '__name__' && (typeof filter.value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(filter.value) || /[\x00-\x1f\x7f]/.test(filter.value))) throw invalid();
       if (filter.value === null) { if (filter.op !== '==') throw invalid(); }
       else if (typeof filter.value !== fields[filter.field]) throw invalid();
       if (typeof filter.value === 'boolean' && filter.op !== '==') throw invalid();
@@ -143,14 +145,15 @@ function sqlRead(read: DataRead, db: D1Database): D1PreparedStatement {
   const values: (string | number)[] = [read.path];
   const sqlType = (field: string) => fields[field] === 'number' ? "IN ('integer','real')" : fields[field] === 'boolean' ? "IN ('true','false')" : "= 'text'";
   for (const filter of read.filters) {
+    if (filter.field === '__name__') { clauses.push(`document_id ${filter.op === '==' ? '=' : filter.op} ?`); values.push(filter.value as string); continue; }
     const location = `$.${filter.field}`;
     if (filter.value === null) { clauses.push(`json_type(data,'${location}') = 'null'`); continue; }
     clauses.push(`json_type(data,'${location}') ${sqlType(filter.field)}`);
     clauses.push(`json_extract(data,'${location}') ${filter.op === '==' ? '=' : filter.op} ?`);
     values.push(typeof filter.value === 'boolean' ? Number(filter.value) : filter.value);
   }
-  for (const item of read.order) clauses.push(`json_type(data,'$.${item.field}') ${sqlType(item.field)}`);
-  const order = [...read.order.map(item => `json_extract(data,'$.${item.field}') ${item.direction.toUpperCase()}`), 'path ASC'];
+  for (const item of read.order) if (item.field !== '__name__') clauses.push(`json_type(data,'$.${item.field}') ${sqlType(item.field)}`);
+  const order = [...read.order.map(item => `${item.field === '__name__' ? 'document_id' : `json_extract(data,'$.${item.field}')`} ${item.direction.toUpperCase()}`), 'path ASC'];
   values.push(read.limit ?? MAX_READ + 1);
   return db.prepare(`SELECT path,data,blob FROM app_documents WHERE ${clauses.join(' AND ')} ORDER BY ${order.join(',')} LIMIT ?`).bind(...values);
 }

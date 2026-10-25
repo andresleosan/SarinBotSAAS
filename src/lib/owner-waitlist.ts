@@ -22,10 +22,21 @@ export const ownerWaitlistQuerySchema = z.object({ dateKey: date, cursor: ownerW
 export const ownerWaitlistReviewCommandSchema = z.object({ requestId, entryId: id, expectedWaitlistRevision: integer.min(1), expectedReviewRevision: revision, reviewed: z.boolean() }).strict();
 export const ownerWaitlistReviewSchema = z.object({ revision, reviewed: z.boolean(), updatedAt: time.nullable() }).strict()
   .refine(value => value.revision === 0 ? !value.reviewed && value.updatedAt === null : value.updatedAt !== null);
-export const ownerWaitlistMarkerSchema = z.object({
-  version: z.literal(1), businessId: id, waitlistRecordId: id, entryId: id, revision: revision.min(1), reviewed: z.boolean(), updatedAt: time, actorUid: uid,
+const markerFields = {
+  businessId: id, waitlistRecordId: id, entryId: id, revision: revision.min(1), reviewed: z.boolean(), updatedAt: time, actorUid: uid,
   lastOperation: z.object({ requestId, operationHash: z.string().regex(/^[a-f0-9]{64}$/).refine(value => value.length === 64), appliedRevision: revision.min(1) }).strict(),
-}).strict().refine(value => value.revision === value.lastOperation.appliedRevision);
+};
+export const ownerWaitlistMarkerSchema = z.union([
+  z.object({ version: z.literal(2), ...markerFields, waitlistRevision: integer.min(1) }).strict(),
+  z.object({ version: z.literal(1), ...markerFields }).strict(),
+]).refine(value => value.revision === value.lastOperation.appliedRevision);
+export function markerMatchesWaitlistRevision(marker: z.infer<typeof ownerWaitlistMarkerSchema>, waitlistRevision: number): boolean {
+  // Legacy markers can prove only the first incarnation. Rejoining with the
+  // same client requestId retains its entryId but advances waitlist revision.
+  const incarnation = marker.version === 2 ? marker.waitlistRevision : 1;
+  if (incarnation > waitlistRevision) throw new OwnerWaitlistModelError();
+  return incarnation === waitlistRevision;
+}
 export const ownerWaitlistRowSchema = z.object({
   recordId: id, entryId: id, waitlistRevision: integer.min(1), dateKey: date, createdAt: time, expiresAt: time,
   subjectKind: z.enum(['self', 'represented_minor']), serviceLabel: label, resourceLabel: label,
@@ -71,14 +82,18 @@ export const ownerWaitlistDetailSchema = z.object({
   return (value.state === 'available') === value.availability.some(resource => resource.slots.length > 0);
 });
 export const ownerWaitlistReviewResultSchema = z.object({ businessId: id, ownerUid: uid, recordId: id, entryId: id, waitlistRevision: integer.min(1), review: ownerWaitlistReviewSchema, replayed: z.boolean() }).strict();
+export const ownerWaitlistReviewStateSchema = z.object({ businessId: id, ownerUid: uid, recordId: id, waitlistRevision: integer.min(1), entryId: id.nullable(), review: ownerWaitlistReviewSchema.nullable(), serverNow: time }).strict()
+  .refine(value => (value.entryId === null) === (value.review === null));
 export type OwnerWaitlistPage = z.infer<typeof ownerWaitlistPageSchema>;
 export type OwnerWaitlistDetail = z.infer<typeof ownerWaitlistDetailSchema>;
 export type OwnerWaitlistReviewResult = z.infer<typeof ownerWaitlistReviewResultSchema>;
+export type OwnerWaitlistReviewState = z.infer<typeof ownerWaitlistReviewStateSchema>;
 
-export function readOwnerWaitlistReview(value: unknown, scope: { businessId: string; recordId: string; entryId: string }): OwnerWaitlistReview {
+export function readOwnerWaitlistReview(value: unknown, scope: { businessId: string; recordId: string; entryId: string; waitlistRevision: number }): OwnerWaitlistReview {
   if (value === undefined) return { revision: 0, reviewed: false, updatedAt: null };
   const parsed = ownerWaitlistMarkerSchema.safeParse(value);
   if (!parsed.success || parsed.data.businessId !== scope.businessId || parsed.data.waitlistRecordId !== scope.recordId || parsed.data.entryId !== scope.entryId) throw new OwnerWaitlistModelError();
+  if (!markerMatchesWaitlistRevision(parsed.data, scope.waitlistRevision)) return { revision: 0, reviewed: false, updatedAt: null };
   return { revision: parsed.data.revision, reviewed: parsed.data.reviewed, updatedAt: parsed.data.updatedAt };
 }
 type ProjectionRecord = { revision: number; request: { id: string; dateKey: string; createdAt: number; expiresAt: number; serviceId: string; resourceId: string | null; case: { subjectKind: 'self' | 'represented_minor' } } | null };

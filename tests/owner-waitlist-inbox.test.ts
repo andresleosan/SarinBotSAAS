@@ -4,8 +4,8 @@ import { ownerWaitlistFixture, ownerWaitlistNow, seedOwnerWaitlistRows } from '.
 import { subjectAdmin } from './represented-booking-contract';
 import { memoryFirestore } from './memoryFirestore';
 import { acceptSyntheticConsent } from './consent-fixtures';
-import { readOwnerWaitlistPage, updateOwnerWaitlistReview } from '@/lib/server/owner-waitlist';
-import { cancelWaitlist } from '@/lib/server/waitlist';
+import { readOwnerWaitlistPage, updateOwnerWaitlistReview, readOwnerWaitlistReviewState } from '@/lib/server/owner-waitlist';
+import { cancelWaitlist, joinWaitlist } from '@/lib/server/waitlist';
 beforeEach(()=>{vi.spyOn(Date,'now').mockReturnValue(ownerWaitlistNow);vi.stubEnv('SUPERADMIN_UID',subjectAdmin.uid);});
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllEnvs();});
 const command=(f:Awaited<ReturnType<typeof ownerWaitlistFixture>>,expectedReviewRevision=0,reviewed=true,requestId='review-command-001')=>({requestId,entryId:f.entryId,expectedWaitlistRevision:1,expectedReviewRevision,reviewed});
@@ -74,4 +74,20 @@ it('clientCancelOrReplaceWinsAgainstReview',async()=>{
   await cancelWaitlist(f.actor,f.business.id,{requestId:'client-cancel-before-review',expectedRevision:1,entryId:f.entryId},f.db);
   await expect(updateOwnerWaitlistReview(f.owner,f.business.id,f.recordId,command(f),f.db)).rejects.toMatchObject({status:409,code:'OWNER_WAITLIST_CHANGED'});
   expect((await f.db.collection('businesses').doc(f.business.id).collection('waitlistOwnerReviews').get()).size).toBe(0);
+});
+it('cancelledCanonicalTombstoneProvidesMinimalOwnerFenceWithoutHistoricalClaim',async()=>{
+  const f=await ownerWaitlistFixture();await cancelWaitlist(f.actor,f.business.id,{requestId:'cancel-unknown-review',expectedRevision:1,entryId:f.entryId},f.db);
+  const proof=await readOwnerWaitlistReviewState(f.owner,f.business.id,f.recordId,f.db);
+  expect(proof).toEqual({businessId:f.business.id,ownerUid:f.owner.uid,recordId:f.recordId,waitlistRevision:2,entryId:null,review:null,serverNow:ownerWaitlistNow});
+  expect(JSON.stringify(proof)).not.toMatch(/clientUid|receipt|actorUid|requestId|operationHash/);
+  await expect(readOwnerWaitlistReviewState(f.actor,f.business.id,f.recordId,f.db)).rejects.toMatchObject({status:403});
+});
+it('supportedJoinRequestIdReuseStartsAReviewIncarnationWithoutInheritingPreviousMarker',async()=>{
+  const f=await ownerWaitlistFixture();await acceptSyntheticConsent(f.db,f.owner.uid);await updateOwnerWaitlistReview(f.owner,f.business.id,f.recordId,command(f),f.db);
+  await cancelWaitlist(f.actor,f.business.id,{requestId:'cancel-reused-join',expectedRevision:1,entryId:f.entryId},f.db);
+  const joined=await joinWaitlist(f.actor,f.business.id,{...f.input,expectedRevision:2},f.db);expect(joined.request!.id).toBe(f.entryId);
+  const page=await readOwnerWaitlistPage(f.owner,f.business.id,{dateKey:f.input.dateKey},f.db);expect(page.rows[0].waitlistRevision).toBe(3);expect(page.rows[0].review).toEqual({revision:0,reviewed:false,updatedAt:null});
+  await expect(updateOwnerWaitlistReview(f.owner,f.business.id,f.recordId,command(f),f.db)).rejects.toMatchObject({code:'OWNER_WAITLIST_CHANGED'});
+  const fresh=await updateOwnerWaitlistReview(f.owner,f.business.id,f.recordId,{...command(f),expectedWaitlistRevision:3,requestId:'review-rejoined-incarnation'},f.db);expect(fresh.review.revision).toBe(1);
+  expect((await f.db.collection('businesses').doc(f.business.id).collection('waitlistOwnerReviews').doc(f.entryId).get()).data()).toMatchObject({version:2,waitlistRevision:3});
 });
