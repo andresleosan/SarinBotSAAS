@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useOwnerClientRecord, type OwnerClientRecordScope } from '@/hooks/use-owner-client-record';
 import { ownerClientRecordBeneficiaryLabel, ownerClientRecordEndLabel, ownerClientRecordStatusLabel } from '@/lib/owner-client-record';
+import type { OwnerRequestScope } from '@/lib/client/owner-request-scope';
 
 export type OwnerClientRecordPanelProps = {
   scope: OwnerClientRecordScope; contextName?: string; disabled: boolean; invalidation: number;
   onClose: () => void; onOpenAppointment: (target: { appointmentId: string; dateKey: string }) => void;
+  requestScope?: OwnerRequestScope;
 };
 const dateFormat = new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: 'short', day: 'numeric' });
 const timeFormat = new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' });
@@ -21,7 +23,7 @@ export function OwnerClientRecordPanel(props: OwnerClientRecordPanelProps) {
   const callbacks = useRef(props);
   callbacks.current = props;
   const close = useCallback(() => { setClosed(key); callbacks.current.onClose(); }, [key]);
-  const record = useOwnerClientRecord({ scope: props.scope, enabled: !props.disabled && !hidden, invalidation: props.invalidation, onAccessLost: close });
+  const record = useOwnerClientRecord({ scope: props.scope, enabled: !props.disabled && !hidden, invalidation: props.invalidation, onAccessLost: close, requestScope: props.requestScope });
   const closeButton = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const live = useRef({ key, disabled: props.disabled, loading: record.loading, hidden });

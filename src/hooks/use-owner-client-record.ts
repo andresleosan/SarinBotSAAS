@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { apiFetch, ApiError } from '@/lib/client/api';
+import { ownerApiFetch, type OwnerRequestScope } from '@/lib/client/owner-request-scope';
 import { compareOwnerClientRecordRows, ownerClientRecordInputSchema, ownerClientRecordPageSchema, type OwnerClientRecordFilter, type OwnerClientRecordPage } from '@/lib/owner-client-record';
 
 export type OwnerClientRecordScope = {
@@ -13,7 +14,7 @@ type Pending = { cancel: () => void };
 const changedMessage = 'Los registros cambiaron. Usa Actualizar para volver al inicio.';
 
 export function useOwnerClientRecord(input: {
-  scope: OwnerClientRecordScope | null; enabled: boolean; invalidation: number; onAccessLost?: () => void;
+  scope: OwnerClientRecordScope | null; enabled: boolean; invalidation: number; onAccessLost?: () => void; requestScope?: OwnerRequestScope;
 }): {
   page: OwnerClientRecordPage | null; loading: boolean; error: string | null;
   filter: OwnerClientRecordFilter; setFilter: (value: OwnerClientRecordFilter) => void;
@@ -24,7 +25,7 @@ export function useOwnerClientRecord(input: {
   const baseKey = JSON.stringify([scope?.businessId, scope?.ownerUid, scope?.dateKey, scope?.sourceAppointmentId, scope?.clientUid, user?.uid, authEpoch]);
   const [selection, setSelection] = useState({ key: baseKey, filter: 'all' as OwnerClientRecordFilter });
   const filter = selection.key === baseKey ? selection.filter : 'all';
-  const key = JSON.stringify([baseKey, filter, input.enabled, input.invalidation]);
+  const key = JSON.stringify([baseKey, filter, input.enabled, input.invalidation, input.requestScope?.readGeneration]);
   const [snapshot, setSnapshot] = useState<Snapshot>({ key: '', page: null, loading: false, error: null, restart: false });
   const saved = useRef(snapshot);
   const pending = useRef<Pending | null>(null);
@@ -32,18 +33,19 @@ export function useOwnerClientRecord(input: {
   const accessLost = useRef(input.onAccessLost);
   accessLost.current = input.onAccessLost;
   // Updated during render: no prior page or async callback can survive until the next effect.
-  const current = useRef({ key, scope: input.scope, enabled: input.enabled, uid: user?.uid, epoch: authEpoch, isCurrentSession });
-  current.current = { key, scope: input.scope, enabled: input.enabled, uid: user?.uid, epoch: authEpoch, isCurrentSession };
+  const current = useRef({ key, scope: input.scope, enabled: input.enabled, uid: user?.uid, epoch: authEpoch, isCurrentSession, requestScope: input.requestScope });
+  current.current = { key, scope: input.scope, enabled: input.enabled, uid: user?.uid, epoch: authEpoch, isCurrentSession, requestScope: input.requestScope };
   const publish = useCallback((value: Snapshot) => { saved.current = value; setSnapshot(value); }, []);
   const authorized = useCallback(() => {
     const value = current.current;
     return value.enabled && value.scope !== null && value.uid === value.scope.ownerUid
-      && value.isCurrentSession(value.scope.ownerUid, value.epoch) && blocked.current !== value.key;
+      && value.isCurrentSession(value.scope.ownerUid, value.epoch) && blocked.current !== value.key
+      && (!value.requestScope || (value.requestScope.ownerUid === value.scope.ownerUid && value.requestScope.businessId === value.scope.businessId && value.requestScope.isCurrent()));
   }, []);
 
   const read = useCallback((older: boolean): Promise<void> => {
     const active = current.current;
-    if (active.key !== key || !authorized() || pending.current || !active.scope) return Promise.resolve();
+    if (active.key !== key || !authorized() || pending.current || !active.scope || (active.requestScope && !active.requestScope.canRead())) return Promise.resolve();
     const scope = active.scope;
     const previous = saved.current.key === key ? saved.current : null;
     const cursor = older ? previous?.page?.nextCursor : undefined;
@@ -83,14 +85,15 @@ export function useOwnerClientRecord(input: {
       }, 10_000);
       const path = `/api/businesses/${encodeURIComponent(scope.businessId)}/appointments/${encodeURIComponent(scope.sourceAppointmentId)}/client-record`;
       // Both handlers stay attached after cancellation: late token/body failures are consumed.
-      void apiFetch<unknown>(path, { method: 'POST', body: JSON.stringify(body.data), signal: controller.signal }, scope.ownerUid, owns,
+      const response = active.requestScope ? ownerApiFetch<unknown>(active.requestScope, 'read', path, { method: 'POST', body: JSON.stringify(body.data), signal: controller.signal }, owns) : apiFetch<unknown>(path, { method: 'POST', body: JSON.stringify(body.data), signal: controller.signal }, scope.ownerUid, owns,
         status => {
           if (status === 401 || status === 403) loseAccess();
           if (status === 409 && owns()) {
             publish({ key, page: previous?.page ?? null, loading: false, error: changedMessage, restart: true });
             finish(true);
           }
-        })
+        });
+      void response
         .then(raw => {
           if (!owns()) return;
           const parsed = ownerClientRecordPageSchema.safeParse(raw);
@@ -108,7 +111,11 @@ export function useOwnerClientRecord(input: {
         })
         .catch((cause: unknown) => {
           if (!owns()) return;
-          if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { loseAccess(); return; }
+          if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
+            if (active.requestScope) { publish({ key, page: null, loading: false, error: 'Comprueba el acceso antes de continuar.', restart: false }); finish(true); }
+            else loseAccess();
+            return;
+          }
           const restart = previous?.restart || (cause instanceof ApiError && cause.status === 409);
           publish({ key, page: previous?.page ?? null, loading: false, error: restart ? changedMessage : 'No se pudo verificar la consulta. Inténtalo de nuevo.', restart });
         })
@@ -131,7 +138,7 @@ export function useOwnerClientRecord(input: {
   }, [key, baseKey, filter, publish, authorized]);
   const refresh = useCallback(() => read(false), [read]);
   const loadOlder = useCallback(() => read(true), [read]);
-  const visible = snapshot.key === key && authorized();
+  const visible = snapshot.key === key && authorized() && (!input.requestScope || input.requestScope.canRead());
   return { page: visible ? snapshot.page : null, loading: visible && snapshot.loading,
     error: snapshot.key === key ? snapshot.error : null, filter, setFilter, loadOlder, refresh };
 }

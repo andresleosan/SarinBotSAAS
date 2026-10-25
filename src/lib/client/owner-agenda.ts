@@ -3,6 +3,7 @@
 import { apiFetch, ApiError } from '@/lib/client/api';
 import { rejectDuplicateAgendaIds, type OwnerAgendaDay, type OwnerAgendaRange, type OwnerAgendaSnapshot } from '@/lib/owner-agenda';
 import type { Appointment } from '@/types/firestore';
+import { ownerApiFetch, type OwnerRequestScope } from '@/lib/client/owner-request-scope';
 
 const DAY_ERROR = 'No pudimos cargar este día';
 const DAY_TIMEOUT = 'La consulta de este día tardó demasiado. Actualiza para intentarlo de nuevo';
@@ -17,7 +18,7 @@ function appointmentsFromEnvelope(value: unknown, businessId: string, dateKey: s
   return value.appointments as Appointment[];
 }
 
-export async function readOwnerAgendaRange(input: { businessId: string; ownerUid: string; range: OwnerAgendaRange; signal: AbortSignal; isCurrentScope: () => boolean }): Promise<OwnerAgendaSnapshot> {
+export async function readOwnerAgendaRange(input: { businessId: string; ownerUid: string; range: OwnerAgendaRange; signal: AbortSignal; isCurrentScope: () => boolean; requestScope?: OwnerRequestScope }): Promise<OwnerAgendaSnapshot> {
   const { businessId, ownerUid, range, signal, isCurrentScope } = input;
   if (range.queryDates.length > 7) throw new RangeError('El rango de la agenda supera siete días');
   const cycle = new AbortController();
@@ -47,7 +48,7 @@ export async function readOwnerAgendaRange(input: { businessId: string; ownerUid
       });
       // The race observes late rejection as well as resolution even when a token provider ignores abort.
       const response = await Promise.race([
-        apiFetch<unknown>(`/api/businesses/${encodeURIComponent(businessId)}/appointments?date=${dateKey}`, { signal: child.signal }, ownerUid, () => !cycle.signal.aborted && !child.signal.aborted && isCurrentScope(), status => {
+        input.requestScope ? ownerApiFetch<unknown>(input.requestScope, 'read', `/api/businesses/${encodeURIComponent(businessId)}/appointments?date=${dateKey}`, { signal: child.signal }, () => !cycle.signal.aborted && !child.signal.aborted && isCurrentScope()) : apiFetch<unknown>(`/api/businesses/${encodeURIComponent(businessId)}/appointments?date=${dateKey}`, { signal: child.signal }, ownerUid, () => !cycle.signal.aborted && !child.signal.aborted && isCurrentScope(), status => {
           if (status === 401 || status === 403) cycle.abort(new ApiError(`No se pudo completar la solicitud (${status}).`, status));
         }),
         interrupted,

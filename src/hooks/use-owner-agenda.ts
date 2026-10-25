@@ -5,11 +5,12 @@ import { readOwnerAgendaRange } from '@/lib/client/owner-agenda';
 import { useApiPoll } from '@/lib/client/use-api-poll';
 import type { Appointment } from '@/types/firestore';
 import type { OwnerAgendaRange, OwnerAgendaSnapshot } from '@/lib/owner-agenda';
+import type { OwnerRequestScope } from '@/lib/client/owner-request-scope';
 
-export function useOwnerAgenda(input: { businessId: string | null; ownerUid: string | null; range: OwnerAgendaRange | null; enabled: boolean }): { snapshot: OwnerAgendaSnapshot | null; loading: boolean; error: string | null; refresh: () => void; replaceAppointment: (saved: Appointment) => void } {
-  const { businessId, ownerUid, range, enabled } = input;
-  const scope = enabled && businessId && ownerUid && range
-    ? JSON.stringify([ownerUid, businessId, range.dates, range.queryDates, range.outsideDates]) : null;
+export function useOwnerAgenda(input: { businessId: string | null; ownerUid: string | null; range: OwnerAgendaRange | null; enabled: boolean; requestScope?: OwnerRequestScope }): { snapshot: OwnerAgendaSnapshot | null; loading: boolean; error: string | null; refresh: () => void; invalidateAndRefresh: () => void; replaceAppointment: (saved: Appointment) => void } {
+  const { businessId, ownerUid, range, enabled, requestScope } = input;
+  const scope = enabled && businessId && ownerUid && range && (!requestScope || (requestScope.ownerUid === ownerUid && requestScope.businessId === businessId && requestScope.canRead()))
+    ? JSON.stringify([ownerUid, businessId, requestScope?.authEpoch, requestScope?.readGeneration, range.dates, range.queryDates, range.outsideDates]) : null;
   const identity = useRef({ scope });
   if (identity.current.scope !== scope) identity.current = { scope };
   const generation = identity.current;
@@ -23,7 +24,7 @@ export function useOwnerAgenda(input: { businessId: string | null; ownerUid: str
       // useApiPoll waits within a scope; this also closes the old cycle across an effect/scope change.
       if (previous) await previous;
       if (signal.aborted || identity.current !== generation || !businessId || !ownerUid || !range) throw new DOMException('Lectura de agenda cancelada', 'AbortError');
-      return await readOwnerAgendaRange({ businessId, ownerUid, range, signal, isCurrentScope: () => identity.current === generation && !signal.aborted });
+      return await readOwnerAgendaRange({ businessId, ownerUid, range, signal, requestScope, isCurrentScope: () => identity.current === generation && !signal.aborted });
     } finally {
       finish();
       if (pending.current === completion) pending.current = null;
@@ -41,5 +42,5 @@ export function useOwnerAgenda(input: { businessId: string | null; ownerUid: str
       }),
     });
   };
-  return { snapshot: poll.value, loading: poll.loading, error: poll.error, refresh: poll.refresh, replaceAppointment };
+  return { snapshot: poll.value, loading: poll.loading, error: poll.error, refresh: poll.refresh, invalidateAndRefresh: () => { if (identity.current !== generation || scope === null) return; poll.setValue(null); poll.refresh(); }, replaceAppointment };
 }

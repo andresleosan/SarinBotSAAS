@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { apiFetch, ApiError, errorMessage } from '@/lib/client/api';
+import { ownerApiFetch, type OwnerRequestScope } from '@/lib/client/owner-request-scope';
 import { canonicalResourceScheduleRules, resourceScheduleCommandText, resourceScheduleRulesSchema, resourceScheduleViewSchema, resourceScheduleSaveResultSchema, RESOURCE_SCHEDULE_MAX_COMMAND_BYTES, type ResourceScheduleView, type ResourceScheduleRules, type ResourceScheduleCommand } from '@/lib/resource-schedules';
 
 export type ResourceSchedulePhase = 'loading' | 'ready' | 'review' | 'saving' | 'uncertain' | 'conflict' | 'error';
@@ -16,7 +17,7 @@ type Pending = { command: ResourceScheduleCommand; hash: string; active: boolean
 const blank = (key: string): State => ({ key, view: null, draft: null, phase: 'loading', dirty: false, error: null, message: null, reviewed: null, conflicted: false });
 const fingerprint = (view: ResourceScheduleView, rules: ResourceScheduleRules) => JSON.stringify([view.policy.revision, view.basisFingerprint, canonicalResourceScheduleRules(rules)]);
 
-export function useResourceSchedules(input: { businessId: string | null; ownerUid: string | null; authEpoch: number; mode: 'read' | 'edit'; enabled: boolean }): ResourceScheduleController {
+export function useResourceSchedules(input: { businessId: string | null; ownerUid: string | null; authEpoch: number; mode: 'read' | 'edit'; enabled: boolean; requestScope?: OwnerRequestScope }): ResourceScheduleController {
   const auth = useAuth();
   const key = JSON.stringify([input.businessId, input.ownerUid, input.authEpoch, input.mode, input.enabled, auth.user?.uid, auth.authEpoch]);
   const current = useRef({ input, auth, key }); current.current = { input, auth, key };
@@ -25,7 +26,7 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
   const pending = useRef<Pending | null>(null), reading = useRef<{ cancel: () => void } | null>(null);
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const publish = useCallback((value: State) => { state.current = value; setSnapshot(value); }, []);
-  const authorized = useCallback((expected: string) => { const c = current.current; return c.key === expected && c.input.enabled && Boolean(c.input.businessId && c.input.ownerUid) && c.input.authEpoch === c.auth.authEpoch && c.auth.user?.uid === c.input.ownerUid && c.auth.isCurrentSession(c.input.ownerUid!, c.input.authEpoch) && blocked.current !== expected; }, []);
+  const authorized = useCallback((expected: string) => { const c = current.current; return c.key === expected && c.input.enabled && Boolean(c.input.businessId && c.input.ownerUid) && c.input.authEpoch === c.auth.authEpoch && c.auth.user?.uid === c.input.ownerUid && c.auth.isCurrentSession(c.input.ownerUid!, c.input.authEpoch) && blocked.current !== expected && (!c.input.requestScope || (c.input.requestScope.ownerUid === c.input.ownerUid && c.input.requestScope.businessId === c.input.businessId && c.input.requestScope.isCurrent())); }, []);
   const purge = useCallback((expected: string) => { if (current.current.key !== expected) return; blocked.current = expected; generation.current++; pending.current = null; publish({ ...blank(expected), phase: 'error', error: 'Ya no tienes acceso a estos horarios.' }); }, [publish]);
   const adopt = useCallback((view: ResourceScheduleView, expected: string, receipt: boolean) => {
     const old = state.current, operation = pending.current;
@@ -42,7 +43,7 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
   }, [publish]);
   const read = useCallback(async () => {
     const c = current.current, expected = c.key, epoch = generation.current;
-    if (!authorized(expected) || reading.current) return;
+    if (!authorized(expected) || reading.current || (c.input.requestScope && !c.input.requestScope.canRead())) return;
     const abort = new AbortController(); let finished = false, timer: ReturnType<typeof setTimeout> | undefined;
     let cancel!: () => void;
     const canceled = new Promise<never>((_, reject) => { cancel = () => { abort.abort(); reject(new Error('La consulta superó el tiempo de espera. Inténtalo de nuevo.')); }; });
@@ -52,7 +53,7 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
     try {
       const operation = pending.current;
       const path = `/api/businesses/${encodeURIComponent(c.input.businessId!)}/resource-schedules${operation ? `?requestId=${encodeURIComponent(operation.command.requestId)}` : ''}`;
-      const raw = await Promise.race([apiFetch<unknown>(path, { signal: abort.signal }, c.input.ownerUid!, owns, status => { if ((status === 401 || status === 403) && owns()) purge(expected); }), canceled]);
+      const raw = await Promise.race([c.input.requestScope ? ownerApiFetch<unknown>(c.input.requestScope, 'read', path, { signal: abort.signal }, owns) : apiFetch<unknown>(path, { signal: abort.signal }, c.input.ownerUid!, owns, status => { if ((status === 401 || status === 403) && owns()) purge(expected); }), canceled]);
       if (!owns()) return;
       const parsed = resourceScheduleViewSchema.parse(raw);
       if (parsed.ownerUid !== c.input.ownerUid || parsed.businessId !== c.input.businessId) { purge(expected); return; }
@@ -65,12 +66,19 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
     generation.current++; pending.current = null; publish(blank(key)); void read();
     return () => { generation.current++; reading.current?.cancel(); reading.current = null; for (const timer of timers.current) clearTimeout(timer); timers.current.clear(); };
   }, [key, publish, read]);
+  const sharedGeneration = useRef(input.requestScope?.readGeneration);
+  useEffect(() => {
+    if (sharedGeneration.current === input.requestScope?.readGeneration) return;
+    sharedGeneration.current = input.requestScope?.readGeneration;
+    reading.current?.cancel(); reading.current = null;
+    if (input.requestScope?.canRead()) void read();
+  }, [input.requestScope?.readGeneration, read]);
   useEffect(() => {
     if (!input.enabled || input.mode !== 'read') return;
     const timer = setInterval(() => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') void read(); }, 15_000);
     return () => clearInterval(timer);
   }, [key, input.enabled, input.mode, read]);
-  const editable = () => authorized(key) && input.mode === 'edit' && state.current.key === key && state.current.view && !pending.current && !state.current.conflicted && !['conflict', 'loading', 'error'].includes(state.current.phase);
+  const editable = () => authorized(key) && (!current.current.input.requestScope || current.current.input.requestScope.canStartAction()) && input.mode === 'edit' && state.current.key === key && state.current.view && !pending.current && !state.current.conflicted && !['conflict', 'loading', 'error'].includes(state.current.phase);
   const setRules = (rules: ResourceScheduleRules) => { if (!editable()) return; publish({ ...state.current, draft: structuredClone(rules), dirty: true, reviewed: null, phase: 'ready', error: null, message: null }); };
   const review = () => {
     if (!editable() || !state.current.draft || !state.current.dirty) return;
@@ -80,12 +88,13 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
   };
   const send = async (operation: Pending) => {
     const c = current.current, expected = c.key, epoch = generation.current;
-    if (!authorized(expected) || c.input.mode !== 'edit' || operation.active || pending.current !== operation) return;
+    if (!authorized(expected) || c.input.mode !== 'edit' || operation.active || pending.current !== operation || (c.input.requestScope && !c.input.requestScope.canStartAction())) return;
     operation.active = true; publish({ ...state.current, phase: 'saving', error: null, message: null });
     const owns = () => authorized(expected) && generation.current === epoch && pending.current === operation;
     const timer = setTimeout(() => { if (owns()) publish({ ...state.current, message: 'El guardado está demorando. La petición sigue en curso; espera o consulta su recibo.' }); }, 20_000); timers.current.add(timer);
     try {
-      const raw = await apiFetch<unknown>(`/api/businesses/${encodeURIComponent(c.input.businessId!)}/resource-schedules`, { method: 'PUT', body: JSON.stringify(operation.command) }, c.input.ownerUid!, owns, status => { if ((status === 401 || status === 403) && owns()) purge(expected); });
+      const path = `/api/businesses/${encodeURIComponent(c.input.businessId!)}/resource-schedules`;
+      const raw = c.input.requestScope ? await ownerApiFetch<unknown>(c.input.requestScope, 'write', path, { method: 'PUT', body: JSON.stringify(operation.command) }, owns) : await apiFetch<unknown>(path, { method: 'PUT', body: JSON.stringify(operation.command) }, c.input.ownerUid!, owns, status => { if ((status === 401 || status === 403) && owns()) purge(expected); });
       if (!owns()) return;
       const result = resourceScheduleSaveResultSchema.parse(raw);
       if (result.businessId !== c.input.businessId || result.ownerUid !== c.input.ownerUid) { purge(expected); return; }
@@ -115,7 +124,7 @@ export function useResourceSchedules(input: { businessId: string | null; ownerUi
       operation.hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join(''); await send(operation);
     } catch (error) { if (authorized(key) && pending.current === operation) { pending.current = null; publish({ ...state.current, phase: 'ready', error: errorMessage(error) }); } }
   };
-  const effective = snapshot.key === key && (authorized(key) || blocked.current === key) ? snapshot : blank(key);
+  const effective = snapshot.key === key && (authorized(key) || blocked.current === key) && (!input.requestScope || input.requestScope.canRead()) ? snapshot : blank(key);
   useEffect(() => {
     if (!effective.dirty || typeof window === 'undefined') return;
     const protect = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };

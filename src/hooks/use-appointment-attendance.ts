@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { apiFetch, ApiError, errorMessage } from '@/lib/client/api';
 import { appointmentAttendanceCommandSchema, appointmentAttendanceEventSchema, assertAttendanceTransition, type AttendanceCommand, type AttendanceHistoryPage, type AttendanceStatus, type AttendanceUpdateResult } from '@/lib/appointment-attendance';
 import type { Appointment } from '@/types/firestore';
+import { ownerApiFetch, type OwnerRequestScope } from '@/lib/client/owner-request-scope';
 
 export type AttendanceScope = { businessId: string; ownerUid: string; appointmentId: string; dateKey: string };
 const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 1);
@@ -92,17 +93,18 @@ async function bounded<T>(controller: AbortController, milliseconds: number, req
 function generation(key: string | null, appointment: Appointment) {
   return { key, live: true, source: appointment, appointment, busy: false, error: null as string | null, result: null as AttendanceUpdateResult | null,
     history: null as AttendanceHistoryPage | null, historyLoading: false, historyError: null as string | null,
-    pending: null as { command: AttendanceCommand; body: string } | null, blocked: false, historyVersion: 0,
+    pending: null as { command: AttendanceCommand; body: string; ambiguous?: boolean } | null, blocked: false, historyVersion: 0,
     write: null as AbortController | null, read: null as AbortController | null };
 }
-export function useAppointmentAttendance({ scope, appointment, enabled }: { scope: AttendanceScope; appointment: Appointment; enabled: boolean }) {
+export function useAppointmentAttendance({ scope, appointment, enabled, requestScope }: { scope: AttendanceScope; appointment: Appointment; enabled: boolean; requestScope?: OwnerRequestScope }) {
   const key = enabled && appointment.type === 'appointment' && matches(appointment, scope) && scope.ownerUid && scope.businessId && scope.appointmentId ? JSON.stringify([scope.ownerUid, scope.businessId, scope.dateKey, scope.appointmentId]) : null;
   const ref = useRef(generation(key, appointment));
   if (ref.current.key !== key) ref.current = generation(key, appointment);
   const current = ref.current;
+  const requestContext = useRef(requestScope); requestContext.current = requestScope;
   if (current.source !== appointment) { current.source = appointment; current.appointment = appointment; }
   const [, render] = useReducer(value => value + 1, 0);
-  const active = () => ref.current === current && current.key !== null && current.live;
+  const active = () => ref.current === current && current.key !== null && current.live && (!requestContext.current || (requestContext.current.ownerUid === scope.ownerUid && requestContext.current.businessId === scope.businessId && requestContext.current.isCurrent()));
   const publish = () => { if (active()) render(); };
   useEffect(() => {
     current.live = true;
@@ -111,6 +113,7 @@ export function useAppointmentAttendance({ scope, appointment, enabled }: { scop
       current.write?.abort(); current.read?.abort();
     };
   }, [current]);
+  useEffect(() => { current.historyVersion++; current.read?.abort(); current.read = null; current.historyLoading = false; }, [requestScope?.readGeneration]);
   const path = `/api/businesses/${encodeURIComponent(scope.businessId)}/appointments/${encodeURIComponent(scope.appointmentId)}/attendance`;
   const denied = (status: number, controller: AbortController) => {
     if (!active() || controller.signal.aborted || (status !== 401 && status !== 403)) return;
@@ -118,13 +121,14 @@ export function useAppointmentAttendance({ scope, appointment, enabled }: { scop
     publish(); controller.abort(new ApiError(current.historyError, status));
   };
   async function send(): Promise<AttendanceUpdateResult | null> {
-    if (!active() || current.busy || !current.pending) return null;
+    if (!active() || current.busy || !current.pending || (requestContext.current && !requestContext.current.canStartAction())) return null;
     const pending = current.pending;
     const controller = current.write = new AbortController();
     current.busy = true; current.error = null; current.result = null; publish();
     try {
-      const response = await bounded(controller, 20_000, () => apiFetch<unknown>(path, { method: 'PATCH', body: pending.body, signal: controller.signal }, scope.ownerUid,
-        () => active() && !controller.signal.aborted, status => denied(status, controller)));
+      const response = await bounded(controller, 20_000, () => requestContext.current
+        ? ownerApiFetch<unknown>(requestContext.current, 'write', path, { method: 'PATCH', body: pending.body, signal: controller.signal }, () => active() && !controller.signal.aborted)
+        : apiFetch<unknown>(path, { method: 'PATCH', body: pending.body, signal: controller.signal }, scope.ownerUid, () => active() && !controller.signal.aborted, status => denied(status, controller)));
       if (!active() || controller.signal.aborted) return null;
       const result = parseUpdate(response, scope, pending.command);
       // Keep independently newer decisions already observed while this response was delayed.
@@ -137,17 +141,17 @@ export function useAppointmentAttendance({ scope, appointment, enabled }: { scop
       publish(); return result;
     } catch (cause) {
       if (!active()) return null;
-      if (cause instanceof ApiError && cause.status < 500) {
+      if (cause instanceof ApiError && cause.status < 500 && !pending.ambiguous && !(requestContext.current && cause.status === 403)) {
         current.pending = null; current.blocked = true;
         current.error = cause.status === 409 ? 'La cita cambió. Actualiza el historial y revisa de nuevo antes de confirmar.' : cause.status === 428 ? 'Revisa y acepta el consentimiento de tu cuenta para registrar el resultado.' : errorMessage(cause);
-      } else current.error = UNKNOWN;
+      } else { pending.ambiguous = true; current.error = UNKNOWN; }
       publish(); return null;
     } finally {
       if (current.write === controller) { current.write = null; current.busy = false; publish(); }
     }
   }
   async function submit(status: AttendanceStatus, correctionReason?: 'recording_error') {
-    if (!active() || current.busy || current.pending || current.blocked) return null;
+    if (!active() || current.busy || current.pending || current.blocked || (requestContext.current && !requestContext.current.canStartAction())) return null;
     const command = appointmentAttendanceCommandSchema.safeParse({ requestId: crypto.randomUUID(), expectedRevision: current.appointment.attendance?.revision ?? 0,
       expectedRescheduleRevision: current.appointment.rescheduleRevision ?? 0, expectedStatus: current.appointment.status, status, ...(correctionReason ? { correctionReason } : {}) });
     if (!command.success) return null;
@@ -157,14 +161,15 @@ export function useAppointmentAttendance({ scope, appointment, enabled }: { scop
     return send();
   }
   async function loadHistory(beforeRevision?: number): Promise<void> {
-    if (!active() || current.busy || current.historyLoading) return;
+    if (!active() || current.busy || current.historyLoading || (requestContext.current && !requestContext.current.canRead())) return;
     if (beforeRevision !== undefined && (!Number.isSafeInteger(beforeRevision) || beforeRevision <= 0 || beforeRevision !== current.history?.nextBeforeRevision)) return;
     const controller = current.read = new AbortController(), version = ++current.historyVersion;
     const previous = current.history;
     current.historyLoading = true; current.historyError = null; publish();
     try {
-      const response = await bounded(controller, 10_000, () => apiFetch<unknown>(path + (beforeRevision === undefined ? '' : `?beforeRevision=${beforeRevision}`), { signal: controller.signal }, scope.ownerUid,
-        () => active() && current.historyVersion === version && !controller.signal.aborted, status => denied(status, controller)));
+      const response = await bounded(controller, 10_000, () => requestContext.current
+        ? ownerApiFetch<unknown>(requestContext.current, 'read', path + (beforeRevision === undefined ? '' : `?beforeRevision=${beforeRevision}`), { signal: controller.signal }, () => active() && current.historyVersion === version && !controller.signal.aborted)
+        : apiFetch<unknown>(path + (beforeRevision === undefined ? '' : `?beforeRevision=${beforeRevision}`), { signal: controller.signal }, scope.ownerUid, () => active() && current.historyVersion === version && !controller.signal.aborted, status => denied(status, controller)));
       if (!active() || current.historyVersion !== version || controller.signal.aborted) return;
       const page = parseHistory(response, scope, beforeRevision);
       if (beforeRevision !== undefined && previous?.events.length && page.events.length
@@ -180,5 +185,5 @@ export function useAppointmentAttendance({ scope, appointment, enabled }: { scop
       if (current.read === controller) { current.read = null; current.historyLoading = false; publish(); }
     }
   }
-  return { busy: current.busy, error: current.error, result: current.result, history: current.history, historyLoading: current.historyLoading, historyError: current.historyError, submit, retryPending: send, loadHistory };
+  return { busy: current.busy, hasPending: current.pending !== null, error: current.error, result: current.result, history: current.history, historyLoading: current.historyLoading, historyError: current.historyError, submit, retryPending: send, loadHistory };
 }

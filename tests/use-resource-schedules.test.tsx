@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useResourceSchedules } from '@/hooks/use-resource-schedules';
 import { emptyResourceSchedulePolicy, resourceScheduleRulesSchema, type ResourceScheduleView, type ResourceScheduleRules, type ResourceScheduleCommand } from '@/lib/resource-schedules';
 import { resourceScheduleOperationHash } from '@/lib/server/resource-schedules';
+import type { OwnerRequestScope } from '@/lib/client/owner-request-scope';
 const auth = vi.hoisted(() => ({ uid: 'demo-owner', epoch: 1, current: true }));
 vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { uid: auth.uid }, authEpoch: auth.epoch, isCurrentSession: (uid: string, epoch: number) => auth.current && uid === auth.uid && epoch === auth.epoch }) }));
 vi.mock('@/lib/firebase/client', () => ({ getFirebaseClient: () => ({ auth: { currentUser: { uid: auth.uid, getIdToken: async () => 'demo-token' } } }) }));
@@ -20,6 +21,15 @@ const update = async () => { await act(async () => tree!.update(createElement(Ha
 const edit = async () => { await act(async () => result.setRules(rules)); await act(async () => result.review()); };
 beforeEach(() => { vi.useFakeTimers(); auth.uid = 'demo-owner'; auth.epoch = 1; auth.current = true; fetchMock.mockReset().mockResolvedValue(reply(scheduleView())); vi.stubGlobal('fetch', fetchMock); input = { businessId: 'demo-business', ownerUid: 'demo-owner', authEpoch: 1, mode: 'edit', enabled: true }; });
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
+it('shared dashboard scope reports feature403 and same-owner recovery renews its reader', async () => {
+  let allowed = true, generation = 0; const failures: unknown[] = [];
+  const requestScope: OwnerRequestScope = { ownerUid: 'demo-owner', authEpoch: 1, businessId: 'demo-business', isCurrent: () => true, get readGeneration() { return generation; }, canRead: () => allowed, canStartAction: () => allowed, onAccessDenied: failure => { failures.push(failure); allowed = false; generation++; } };
+  input = { ...input, mode: 'read', requestScope }; await mount();
+  fetchMock.mockResolvedValueOnce(reply({ error: 'Denied', code: 'FEATURE_CLOSED' }, 403)); await act(async () => result.refresh());
+  expect(failures.some(value => (value as { status: number }).status === 403)).toBe(true); expect(result.view).toBeNull();
+  allowed = true; generation++; fetchMock.mockResolvedValue(reply(scheduleView(1))); await update();
+  expect(result.view?.policy.revision).toBe(1);
+});
 it('freshReadBeforeShowingEditorOnReentry', async () => { await mount(); expect(result.view).not.toBeNull(); input = { ...input, enabled: false }; await update(); expect(result.view).toBeNull(); const wait = deferred<Response>(); fetchMock.mockReturnValue(wait.promise); input = { ...input, enabled: true }; await update(); expect(result.view).toBeNull(); expect(fetchMock).toHaveBeenCalledTimes(2); });
 it('sameUid403PurgesAndDiscardsLateResponse', async () => { await mount(); await edit(); fetchMock.mockResolvedValue(reply({ error: 'Denied' }, 403)); await act(async () => result.refresh()); expect(result.view).toBeNull(); expect(result.draft).toBeNull(); fetchMock.mockResolvedValue(reply(scheduleView())); await act(async () => result.refresh()); expect(result.view).toBeNull(); });
 it('readFailureNeverShowsInheritedHours and bounded10s', async () => { const wait = deferred<Response>(); fetchMock.mockReturnValue(wait.promise); await mount(); await act(async () => vi.advanceTimersByTimeAsync(10_000)); expect(result.phase).toBe('error'); expect(result.view).toBeNull(); expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true); await act(async () => wait.resolve(reply(scheduleView()))); expect(result.view).toBeNull(); });

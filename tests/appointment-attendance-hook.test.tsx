@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppointmentAttendance, type AttendanceScope } from '@/hooks/use-appointment-attendance';
 import { apiFetch, ApiError } from '@/lib/client/api';
 import type { Appointment } from '@/types/firestore';
+import type { OwnerRequestScope } from '@/lib/client/owner-request-scope';
 
 vi.mock('@/lib/client/api', async original => ({ ...await original<typeof import('@/lib/client/api')>(), apiFetch: vi.fn() }));
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -25,6 +26,19 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(appointment.reservedUnti
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); });
 
 describe('attendance commands and private reads', () => {
+  it('shared feature protection and owner recheck retain the exact uncertain attendance command', async () => {
+    let allowed = true, generation = 0; const denied: unknown[] = [];
+    const requestScope: OwnerRequestScope = { ownerUid: 'owner', authEpoch: 1, businessId: 'business', isCurrent: () => true, get readGeneration() { return generation; }, canRead: () => allowed, canStartAction: () => allowed, onAccessDenied: failure => { denied.push(failure); allowed = false; generation++; } };
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error('lost response')); await mount({ ...input, requestScope }); await submit();
+    const first = vi.mocked(apiFetch).mock.calls[0], command = JSON.parse(first[1]!.body as string);
+    vi.mocked(apiFetch).mockRejectedValueOnce(new ApiError('Feature restricted', 403, 'FEATURE_CLOSED')); await act(async () => { await state.retryPending(); });
+    expect(denied).toEqual([{ status: 403, source: 'feature', code: 'FEATURE_CLOSED' }]);
+    allowed = true; generation++; await update({ ...input, requestScope });
+    vi.mocked(apiFetch).mockResolvedValueOnce(receipt(command.requestId)); let result: unknown;
+    await act(async () => { result = await state.retryPending(); });
+    expect(vi.mocked(apiFetch).mock.calls).toHaveLength(3); expect(vi.mocked(apiFetch).mock.calls[2][1]?.body).toBe(first[1]?.body);
+    expect(result).toMatchObject({ applied: { requestId: command.requestId } });
+  });
   it.each([
     ['explicit', false], ['explicit', true], ['inflight', false], ['inflight', true],
   ] as const)('successful %s history keeps the exact unknown command (newer=%s)', async (timing, newer) => {

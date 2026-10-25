@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ownerApiFetch, type OwnerRequestScope } from '@/lib/client/owner-request-scope';
 import { useOwnerAuthority } from '@/hooks/use-owner-authority';
 import { apiFetch, ApiError } from '@/lib/client/api';
+import { useBusiness } from '@/hooks/useBusiness';
 
 const auth = vi.hoisted(() => ({ user: { uid: 'demo-owner' } as { uid: string } | null, authEpoch: 1, invalidateSession: vi.fn(), isCurrentSession: (uid: string, epoch: number) => auth.user?.uid === uid && auth.authEpoch === epoch }));
 vi.mock('@/components/auth-provider', () => ({ useAuth: () => auth }));
@@ -76,4 +77,14 @@ it('request wrapper separates read generations from in-flight writes and reports
   await expect(ownerApiFetch(scope, 'read', '/api/businesses/demo-business/feature')).rejects.toMatchObject({ status: 403 });
   expect(failures).toEqual([{ status: 403, source: 'feature', code: undefined }, { status: 403, source: 'feature', code: 'FEATURE_CLOSED' }]);
   expect(call[2]).toBe('demo-owner');
+});
+it('the dashboard business reader reports authoritative denial before an uncooperative body settles', async () => {
+  const failures: unknown[] = [], body = deferred<unknown>();
+  function BusinessHarness() { useBusiness({ onAccessDenied: failure => failures.push(failure) }); return null; }
+  vi.mocked(apiFetch).mockImplementationOnce(async (_path, _init, _uid, _current, status) => { status?.(403); return body.promise; });
+  await act(async () => { renderer = create(createElement(BusinessHarness)); });
+  expect(failures).toContainEqual({ status: 403, source: 'owner_authority' });
+  const call = vi.mocked(apiFetch).mock.calls[0]; expect(call[2]).toBe('demo-owner'); expect(call[3]?.()).toBe(true);
+  auth.authEpoch = 2; expect(call[3]?.()).toBe(false);
+  await act(async () => body.resolve({ business: null }));
 });

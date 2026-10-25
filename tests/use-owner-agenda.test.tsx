@@ -35,6 +35,27 @@ beforeEach(() => {
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('owner agenda scoped hook', () => {
+  it('appliedMoveClearsOldRangeBeforeRead', async () => {
+    await mount(); expect(state.snapshot?.days[0]).toMatchObject({ state: 'ready' });
+    let resolve!: (value: unknown) => void; vi.mocked(apiFetch).mockReturnValueOnce(new Promise(yes => { resolve = yes; }));
+    await act(async () => state.invalidateAndRefresh()); expect(state.snapshot).toBeNull();
+    await act(async () => resolve({ appointments: [] })); expect(state.snapshot?.days[0]).toMatchObject({ state: 'ready', appointments: [] });
+  });
+  it('lateOldRangeCannotRestoreSource', async () => {
+    await mount(); let old!: (value: unknown) => void;
+    vi.mocked(apiFetch).mockReturnValueOnce(new Promise(yes => { old = yes; })); await act(async () => state.refresh());
+    const request = vi.mocked(apiFetch).mock.calls.at(-1)!;
+    let fresh!: (value: unknown) => void; vi.mocked(apiFetch).mockReturnValueOnce(new Promise(yes => { fresh = yes; })); await act(async () => state.invalidateAndRefresh());
+    expect(state.snapshot).toBeNull(); expect(request[1]?.signal?.aborted).toBe(true);
+    await act(async () => fresh({ appointments: [] }));
+    await act(async () => old({ appointments: [appointment] }));
+    expect(state.snapshot?.days[0]).toMatchObject({ state: 'ready', appointments: [] });
+  });
+  it('failedReloadIsNotEmptyDay', async () => {
+    await mount(); vi.mocked(apiFetch).mockRejectedValue(new Error('network failure')); await act(async () => state.invalidateAndRefresh());
+    expect(state.snapshot?.days[0]).toMatchObject({ state: 'error' });
+    expect(state.snapshot?.days[0]).not.toHaveProperty('appointments');
+  });
   it('doesNotRefetchForResourceSelection', async () => {
     await mount(); expect(state.snapshot?.days[0]).toMatchObject({ state: 'ready' });
     await update({ ...input, resource: 'another-resource', range: { ...range } });

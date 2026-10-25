@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useOwnerClientRecord, type OwnerClientRecordScope } from '@/hooks/use-owner-client-record';
 import { ownerClientRecordAppointment as appointment } from './owner-client-record-fixture';
 import type { OwnerClientRecordPage } from '@/lib/owner-client-record';
+import type { OwnerRequestScope } from '@/lib/client/owner-request-scope';
 
 const auth = vi.hoisted(() => ({ uid: 'demo-owner', epoch: 1, token: vi.fn(), current: true }));
 vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { uid: auth.uid }, authEpoch: auth.epoch, isCurrentSession: (uid: string, epoch: number) => auth.current && uid === auth.uid && epoch === auth.epoch }) }));
@@ -22,6 +23,14 @@ let input: Parameters<typeof useOwnerClientRecord>[0];
 let renders: (ReturnType<typeof useOwnerClientRecord>)[];
 const fetchMock = vi.fn<typeof fetch>();
 function Harness() { result = useOwnerClientRecord(input); renders.push(result); return null; }
+it('shared feature protection does not close CRM and same-owner read generation can recover', async () => {
+  let allowed = true, generation = 0; const failures: unknown[] = [], closed = vi.fn();
+  const requestScope: OwnerRequestScope = { ownerUid: 'demo-owner', authEpoch: 1, businessId: scope.businessId, isCurrent: () => true, get readGeneration() { return generation; }, canRead: () => allowed, canStartAction: () => allowed, onAccessDenied: failure => { failures.push(failure); allowed = false; generation++; } };
+  input = { ...input, requestScope, onAccessLost: closed }; await mount();
+  fetchMock.mockResolvedValueOnce(response({ error: 'Feature denied' }, 403)); await act(async () => result.refresh());
+  expect(failures.some(value => (value as { status: number }).status === 403)).toBe(true); expect(closed).not.toHaveBeenCalled(); expect(result.page).toBeNull();
+  allowed = true; generation++; fetchMock.mockResolvedValue(response(page())); await update(); expect(result.page?.rows).toHaveLength(1);
+});
 const mount = async () => { await act(async () => { tree = create(createElement(Harness)); }); };
 const update = async () => { await act(async () => tree!.update(createElement(Harness))); };
 const flush = async () => { await act(async () => { await Promise.resolve(); }); };
