@@ -322,3 +322,15 @@ test('a valid outbound request uses private bindings and errors never expose the
   assert.equal(invalid.status, 400);
   assert.doesNotMatch(await invalid.text(), /private-payload/);
 });
+
+test('factual FAQ admits exactly private state and receipt children', async context => {
+  const env = await fixture(context);
+  for (const [index, child] of ['factualFaq', 'factualFaqOperations'].entries()) {
+    const path = `businesses/demo/${child}/current`;
+    assert.equal(isDataPath(path, true), true);
+    assert.equal(isDataPath(`publicBusinesses/demo/${child}/current`, true), false);
+    await executeDataCommand(commit(index, [set(path, { version: 1, revision: 1 })]), env);
+    assert.deepEqual((await executeDataCommand(read(path), env)).documents[0].data, { version: 1, revision: 1 });
+  }
+  assert.equal(isDataPath('businesses/demo/factualFaqHistory/current', true), false);
+});

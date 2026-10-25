@@ -13,7 +13,7 @@ export type OwnerFactualFaqController = {
 type State = Pick<OwnerFactualFaqController, 'view' | 'draft' | 'dirty' | 'busy' | 'uncertain' | 'error' | 'message' | 'reviewed' | 'publicationChecked'> & { key: string };
 type Pending = { command: FactualFaqCommand; hash: string; active: boolean; ambiguous: boolean };
 const blank = (key: string): State => ({ key, view: null, draft: [], dirty: false, busy: false, uncertain: false, error: null, message: null, reviewed: false, publicationChecked: false });
-export function useOwnerFactualFaq(input: { businessId: string; ownerUid: string; authEpoch: number; enabled: boolean }): OwnerFactualFaqController {
+export function useOwnerFactualFaq(input: { businessId: string; ownerUid: string; authEpoch: number; enabled: boolean; available?: boolean }): OwnerFactualFaqController {
   const auth = useAuth(), key = JSON.stringify([input.businessId, input.ownerUid, input.authEpoch, input.enabled]);
   const current = useRef({ input, auth, key }); current.current = { input, auth, key };
   const [snapshot, setSnapshot] = useState(() => blank(key)), state = useRef(snapshot);
@@ -27,6 +27,8 @@ export function useOwnerFactualFaq(input: { businessId: string; ownerUid: string
     const operation = pending.current;
     if (operation && view.applied) {
       if (!operation.hash || view.applied.requestId !== operation.command.requestId || view.applied.commandFingerprint !== operation.hash || view.applied.revision !== operation.command.expectedRevision + 1) throw new Error('No se pudo verificar el recibo de estas respuestas.');
+      // Any earlier reader may have observed the state before this verified write.
+      generation.current++; reading.current?.cancel(); reading.current = null;
       pending.current = null;
       publish({ ...blank(expected), view, draft: structuredClone(view.state.items), message: view.applied.revision < view.state.revision ? 'Las respuestas se guardaron; después hubo otra modificación. Se cargó la versión actual.' : 'Respuestas guardadas.' });
     } else if (operation) {
@@ -55,7 +57,7 @@ export function useOwnerFactualFaq(input: { businessId: string; ownerUid: string
     mounted.current = true; pending.current = null; publish(blank(key)); void load();
     return () => { mounted.current = false; generation.current++; reading.current?.cancel(); reading.current = null; for (const timer of timers.current) clearTimeout(timer); timers.current.clear(); };
   }, [key, publish, load]);
-  const editable = () => valid(key) && state.current.key === key && state.current.view?.eligible && !pending.current && !state.current.busy;
+  const editable = () => valid(key) && current.current.input.available !== false && state.current.key === key && state.current.view?.eligible && !pending.current && !state.current.busy;
   const setDraft = (draft: FactualFaqItem[]) => { if (editable()) publish({ ...state.current, draft: structuredClone(draft), dirty: true, reviewed: false, publicationChecked: false, error: null, message: null }); };
   const review = () => {
     if (!editable() || !state.current.dirty) return;

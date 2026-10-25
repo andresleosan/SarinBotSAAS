@@ -196,4 +196,16 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
       await assertFails(getDocs(collection(db, 'whatsappNumbers')));
     }
   });
-});
+  it('keeps factual FAQ state and receipts private from every browser identity', async () => {
+    await environment.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'businesses/one/factualFaq/current'), { revision: 1, items: [{ topic: 'parking', answer: 'Synthetic' }] });
+      await setDoc(doc(context.firestore(), 'businesses/one/factualFaqOperations/synthetic'), { actorUid: 'owner-one', commandFingerprint: 'a'.repeat(64) });
+    });
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('owner-one'), environment.authenticatedContext('customer'), environment.authenticatedContext('other-account'), environment.authenticatedContext('stale-admin', { role: 'superadmin' })]) {
+      for (const child of ['factualFaq', 'factualFaqOperations']) {
+        const db = context.firestore(), ref = doc(db, `businesses/one/${child}/${child === 'factualFaq' ? 'current' : 'synthetic'}`);
+        await assertFails(getDoc(ref)); await assertFails(setDoc(ref, { revision: 2 })); await assertFails(deleteDoc(ref));
+        await assertFails(getDocs(collection(db, `businesses/one/${child}`)));
+      }
+    }
+  });});

@@ -1,3 +1,5 @@
+import { seedFactualFaqScenario, factualFaqNow, syntheticFaqItems } from './business-factual-faq-contract';
+import { saveOwnerFactualFaq, readOwnerFactualFaq } from '@/lib/server/business-factual-faq';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { deleteApp, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -447,5 +449,19 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     expect(first.business.subscription.currentPeriodEndsAt).toBe(endsAt);
     expect(duplicate.business.subscription.currentPeriodEndsAt).toBe(endsAt);
     expect(await getResponseQuota(business.id, db)).toMatchObject({ currentPeriod: { includedResponses: 3000, extraResponses: 1000, endsAt } });
+  }, 60000);
+  it('atomically saves factual FAQ and one receipt under owner CAS', async () => {
+    // Keep gRPC deadlines on the real SDK clock.
+    {
+      const f = await seedFactualFaqScenario(db, Date.now()), command = { requestId: 'demo-firestore-faq-one', expectedRevision: 0, expectedPolicyRevision: 1, items: syntheticFaqItems };
+      const results = await Promise.allSettled([saveOwnerFactualFaq(f.owner, f.business.id, command, db), saveOwnerFactualFaq(f.owner, f.business.id, { ...command, requestId: 'demo-firestore-faq-two' }, db)]);
+      expect(results.filter(row => row.status === 'fulfilled')).toHaveLength(1);
+      expect(results.find(row => row.status === 'rejected')).toMatchObject({ reason: { code: 'FACTUAL_FAQ_CHANGED' } });
+      expect((await f.stateRef.get()).data()?.revision).toBe(1);
+      expect((await f.operations.get()).docs).toHaveLength(1);
+      const winner = results.find(row => row.status === 'fulfilled');
+      if (winner?.status !== 'fulfilled') throw new Error('Missing winner');
+      expect((await readOwnerFactualFaq(f.owner, f.business.id, winner.value.applied!.requestId, db)).applied).toEqual(winner.value.applied);
+    }
   }, 60000);
 });

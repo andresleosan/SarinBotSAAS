@@ -11,7 +11,7 @@ import type { BookingSubjectCase } from '@/lib/booking-subject';
 import type { WaitlistState } from '@/types/waitlist';
 
 const state = vi.hoisted(() => ({ user: { uid: 'demo-client', displayName: 'Cliente sintético' } as { uid: string; displayName: string } | null, account: true, business: true, ready: true, health: false, minors: false, chatLock: '' }));
-vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: state.user, signOut: vi.fn() }), AuthGate: ({ children }: { children: ReactNode }) => state.user ? children : null }));
+vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: state.user, authEpoch: 0, isCurrentSession: (uid: string, epoch: number) => uid === state.user?.uid && epoch === 0, signOut: vi.fn() }), AuthGate: ({ children }: { children: ReactNode }) => state.user ? children : null }));
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: state.account }), ConsentPanel: () => null }));
 vi.mock('@/hooks/useConsent', () => ({ useConsent: () => ({ active: state.business }) }));
 vi.mock('@/hooks/useBookingDataPolicy', () => ({ useBookingDataPolicy: () => ({ ready: state.ready, error: null, refresh: vi.fn(), capability: { configured: true, revision: 1, dataMode: state.health ? 'health' : 'general', representedMinorsEnabled: state.minors } }) }));

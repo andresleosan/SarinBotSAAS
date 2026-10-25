@@ -34,3 +34,12 @@ it('hashFailureDoesNotSend and authorityRecheckedAfterHash', async () => { await
 it('nativeCryptoFailureKeepsDraftAndDoesNotSend', async () => { await mount(); await edit(); vi.mocked(crypto.subtle.digest).mockRejectedValue(new Error('Hash unavailable')); await act(async () => controller.save()); expect(controller.error).toBeTruthy(); expect(controller.busy).toBe(false); expect(fetchMock).toHaveBeenCalledTimes(1); });
 it('externalChangeKeepsDirtyButInvalidatesReview', async () => { await mount(); await edit(); fetchMock.mockResolvedValue(reply(view(1))); await act(async () => controller.load()); expect(controller.draft).toEqual(items); expect(controller.reviewed).toBe(false); expect(controller.error).toBeTruthy(); });
 it('noticeDoesNotAdvertiseFaqInRestrictedPolicy and opensExplicitNewTab', async () => { await act(async () => { tree = create(createElement(BusinessAssistantScopeNotice, { configured: true, dataMode: 'general', representedMinorsEnabled: false, faqHref: '/dashboard/faq' })); }); const anchor = tree!.root.findByType('a'); expect(anchor.props.target).toBe('_blank'); expect(anchor.props.rel).toBe('noopener noreferrer'); for (const props of [{ configured: false, dataMode: 'general' as const, representedMinorsEnabled: false }, { configured: true, dataMode: 'health' as const, representedMinorsEnabled: false }, { configured: true, dataMode: 'general' as const, representedMinorsEnabled: true }]) { await act(async () => tree!.update(createElement(BusinessAssistantScopeNotice, { ...props, faqHref: '/dashboard/faq' }))); expect(tree!.root.findAllByType('a')).toHaveLength(0); } });
+it('lateGetCannotOverwriteVerifiedSaveOrLaterCurrentState', async () => {
+  await mount(); await edit(); const wait = deferred<Response>();
+  fetchMock.mockReturnValueOnce(wait.promise); let refresh!: Promise<void>;
+  await act(async () => { refresh = controller.load(); });
+  fetchMock.mockImplementation(async (_path, init) => reply(applied(JSON.parse(String(init?.body)), 2)));
+  await act(async () => controller.save()); expect(controller.view?.state.revision).toBe(2);
+  await act(async () => { wait.resolve(reply(view())); await refresh; });
+  expect(controller.view?.state.revision).toBe(2); expect(controller.message).toContain('otra modificación');
+});

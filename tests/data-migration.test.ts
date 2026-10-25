@@ -1,3 +1,5 @@
+import { seedFactualFaqScenario, factualFaqNow, syntheticFaqItems } from './business-factual-faq-contract';
+import { saveOwnerFactualFaq } from '@/lib/server/business-factual-faq';
 import { describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
@@ -61,6 +63,9 @@ describe('Firestore migration artifacts', () => {
       const closed = await prepareOwner('demo-backup-closed', '12:00');
       clock.mockReturnValue(ownerRescheduleNow + 600001);
       await expect(confirmOwnerReschedule(ownerRescheduleActor, ownerRescheduleBusiness.id, closed.id, memory.db)).rejects.toMatchObject({ code: 'OWNER_RESCHEDULE_PROPOSAL_CLOSED' });
+      clock.mockReturnValue(factualFaqNow);
+      const faq = await seedFactualFaqScenario(memory.db);
+      await saveOwnerFactualFaq(faq.owner, faq.business.id, { requestId: 'demo-backup-faq', expectedRevision: 0, expectedPolicyRevision: 1, items: syntheticFaqItems }, memory.db);
       clock.mockReturnValue(attendanceNow);
       const baseline = { ...snapshot(), documents: [...snapshot().documents, ...[...memory.rows].map(encodeRow)] };
       await updateAppointmentAttendance(f.owner, f.business.id, f.appointment.id, attendanceCorrectionCommand, memory.db);
@@ -78,6 +83,10 @@ describe('Firestore migration artifacts', () => {
       expect(eventWrites.map((write: { currentDocument: unknown }) => write.currentDocument)).toContainEqual({ exists: false });
       const roundtrip = prepareMigration({ ...current, documents: plan.upserts.map((write: { update: { name: string; fields: Record<string, unknown> } }) => ({ ...write.update, createTime: stamp, updateTime: stamp })) }, { updatedAt: attendanceNow });
       expect(roundtrip.rows).toEqual(bundle.rows);
+      const faqRows = bundle.rows.filter((row: { path: string }) => /\/factualFaq(?:Operations)?\//.test(row.path));
+      expect(faqRows).toHaveLength(2);
+      expect(faqRows.find((row: { path: string }) => row.path.includes('/factualFaq/')).data.items).toEqual(syntheticFaqItems);
+      expect(faqRows.find((row: { path: string }) => row.path.includes('/factualFaqOperations/')).data.applied.commandFingerprint).toMatch(/^[a-f0-9]{64}$/);
       const ownerProofs = bundle.rows.filter((row: { path: string }) => row.path.includes('/ownerRescheduleProposals/'));
       expect(ownerProofs.map((row: { data: { state: string } }) => row.data.state).sort()).toEqual(['applied', 'closed', 'prepared']);
       for (const row of ownerProofs) {
