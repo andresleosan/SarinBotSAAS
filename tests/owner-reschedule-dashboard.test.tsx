@@ -1,4 +1,4 @@
-import { act, createElement, useState, type ReactNode } from 'react';
+﻿import { act, createElement, useState, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import DashboardPage from '@/app/dashboard/page';
@@ -18,7 +18,7 @@ vi.mock('@/hooks/useBusiness', () => ({ useBusiness: () => ({ business: ui.busin
 vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ active: true }) }));
 vi.mock('@/components/client-policy-controls', () => ({ ClientPolicyControls: () => null }));
 vi.mock('@/components/app-shell', () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => createElement('aside', null, children), buttonClass: 'min-h-11', fieldClass: 'field' }));
-vi.mock('next/link', () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement('a', { href }, children) }));
+vi.mock('next/link', () => ({ default: ({ children, ...props }: { children: ReactNode; [key: string]: unknown }) => createElement('a', props, children) }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(ui.search), usePathname: () => '/dashboard', useRouter: () => ({ replace: ui.replace }) }));
 vi.mock('@/lib/client/api', async original => ({ ...await original<typeof import('@/lib/client/api')>(), apiFetch: ui.api }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -166,4 +166,15 @@ it('initialUrlRecoveryRetriesAfterFeatureProtectionAndProbe', async () => {
   expect(button('Cerrar cambio').props.disabled).toBe(true);
   ui.api.mockResolvedValueOnce({ proposal: view, state: 'applied', result: proof, appointment: moved }); await click('Consultar de nuevo');
   expect(text(renderer.root, true)).toContain('Cambio comprobado'); expect(writes()).toHaveLength(0);
+});
+
+it('summarySecondaryNavigationHonorsCurrentDashboardActionGuards', async () => {
+  await mount(true);
+  const link = renderer.root.findAllByType('a').find(node => node.props.href === '/dashboard/reports')!;
+  const preventDefault = vi.fn(), retained = link.props.onClick;
+  await act(async () => retained({ preventDefault })); expect(preventDefault).not.toHaveBeenCalled();
+  await click('Cambiar horario');
+  expect(renderer.root.findAllByType('a').find(node => node.props.href === '/dashboard/reports')!.props['aria-disabled']).toBe(true);
+  await act(async () => retained({ preventDefault })); expect(preventDefault).toHaveBeenCalledTimes(1);
+  expect(writes()).toHaveLength(0);
 });

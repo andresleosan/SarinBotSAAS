@@ -1,0 +1,22 @@
+﻿import { act, createElement } from 'react';
+import { create, type ReactTestRenderer, type ReactTestInstance } from 'react-test-renderer';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { OwnerOperationSummaryPanel, type OwnerOperationSummaryPanelProps } from '@/components/owner-operation-summary';
+import { summarizeOwnerOperation } from '@/lib/owner-operation-summary';
+import { summaryNow, summaryRange } from './owner-operation-summary-contract';
+vi.mock('next/link',()=>({default:({children,href,...props}:{children:import('react').ReactNode;href:string})=>createElement('a',{href,...props},children)}));
+Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
+const text=(node:ReactTestInstance|string):string=>typeof node==='string'?node:node.children.map(text).join('');
+let tree:ReactTestRenderer|undefined,props:OwnerOperationSummaryPanelProps;
+const button=(label:string)=>tree!.root.findAllByType('button').find(node=>text(node)===label)!;
+const empty=()=>summarizeOwnerOperation({businessId:'demo-summary',ownerUid:'demo-owner',range:summaryRange,serverNow:summaryNow,records:[]});
+const mount=async()=>{await act(async()=>{tree=create(createElement(OwnerOperationSummaryPanel,props));});};
+beforeEach(()=>{props={summary:empty(),appliedRange:summaryRange,loading:false,error:null,capacityError:false,onQuery:vi.fn(),onRefresh:vi.fn(),onPreset:vi.fn()};});afterEach(async()=>{await act(async()=>tree?.unmount());tree=undefined;});
+it('coverageNoticeAlwaysVisibleEvenZero and currentStateAndNoPaymentCopy',async()=>{await mount();expect(text(tree!.root)).toContain('Cuenta los registros consultables por fecha de cita. Los registros antiguos sin fecha válida pueden no aparecer. Muestra el estado actual, no un historial de cambios');expect(text(tree!.root)).toContain('No hay citas clasificables en los registros consultados para este periodo');expect(text(tree!.root)).not.toMatch(/COP|USD|%|Ingresos|Ocupación/);});
+it('customDatesDoNotFetchEachKeystroke and editedRangeNeverRelabelsPreviousCounts',async()=>{await mount();const field=tree!.root.findByProps({'aria-label':'Desde'});await act(async()=>field.props.onChange({target:{value:'2030-01-07'}}));expect(props.onQuery).not.toHaveBeenCalled();expect(text(tree!.root)).toContain('2030-01-01');await act(async()=>button('Consultar').props.onClick());expect(props.onQuery).toHaveBeenCalledWith({from:'2030-01-07',through:'2030-01-07'});});
+it('dailyTableAndCancellationBreakdownInitiallyClosed',async()=>{await mount();expect(tree!.root.findAllByType('details').every(node=>!node.props.open)).toBe(true);expect(tree!.root.findAllByType('table')).toHaveLength(1);expect(tree!.root.findAllByType('th').length).toBeGreaterThan(3);});
+it('allInvalidNotClaimedNoAppointments and unknownEndShowsCoverageWarning',async()=>{props.summary={...empty(),coverage:{basis:'stored_date_key',invalidRecords:2,excludedManualBlocks:0}};await mount();expect(text(tree!.root)).toContain('Hay 2 registros que no pudimos clasificar; los recuentos son parciales');expect(text(tree!.root)).not.toContain('No hay citas clasificables');});
+it('capacityFailureHidesPreviousCardsAndAsksToReducePeriod',async()=>{props.error='Too many';props.capacityError=true;await mount();expect(text(tree!.root)).toContain('Reduce el periodo');expect(tree!.root.findAllByProps({'aria-label':'Resultado del resumen operativo'})).toHaveLength(0);});
+it('presetsDelegateToServerClockController',async()=>{await mount();await act(async()=>button('Hoy').props.onClick());await act(async()=>button('7 días').props.onClick());await act(async()=>button('30 días').props.onClick());expect(vi.mocked(props.onPreset).mock.calls).toEqual([['today'],['7days'],['30days']]);});
+it('explicitQueryFocusesResultOrErrorButInitialLoadDoesNotStealFocus',async()=>{const focus=vi.fn();await act(async()=>{tree=create(createElement(OwnerOperationSummaryPanel,props),{createNodeMock:()=>({focus})});});expect(focus).not.toHaveBeenCalled();await act(async()=>button('Consultar').props.onClick());props={...props,summary:{...empty(),serverNow:summaryNow+1}};await act(async()=>tree!.update(createElement(OwnerOperationSummaryPanel,props)));expect(focus).toHaveBeenCalledTimes(1);await act(async()=>button('Actualizar').props.onClick());props={...props,summary:null,error:'Unavailable'};await act(async()=>tree!.update(createElement(OwnerOperationSummaryPanel,props)));expect(focus).toHaveBeenCalledTimes(2);});
+
