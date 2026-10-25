@@ -7,6 +7,7 @@ import { documentIdSchema } from './schemas';
 import { HttpError } from './http';
 import { stableDocumentId } from './businesses';
 import { ownerWaitlistMarkerSchema } from '@/lib/owner-waitlist';
+import { parseCanonicalWaitlistOffer, readWaitlistOfferHead } from './waitlist-offers';
 
 // Private operational helpers, with no route, credentials or implicit database.
 const scopeSchema = z.object({ businessId: documentIdSchema.refine(value => !/[\x00-\x1f\x7f]/.test(value)), ownerUid: z.string().min(1).max(128).refine(value => !/[\x00-\x1f\x7f]/.test(value)).optional() }).strict();
@@ -21,6 +22,33 @@ function canonical(value: unknown): unknown {
   return value;
 }
 function digest(scope: Scope, documents: Row[]) { return createHash('sha256').update(JSON.stringify(canonical({ version: 1, scope, documents }))).digest('hex'); }
+const privateChildren = ['waitlistOwnerReviews', 'waitlistOfferHeads', 'waitlistOffers'] as const;
+function validatePrivateRow(child: typeof privateChildren[number], id: string, data: DocumentData | undefined, scope: Scope, recordId: string | null): Row {
+  const path = `businesses/${scope.businessId}/${child}/${id}`;
+  try {
+    if (!data || !isDataPath(path, true) || !isDataJson(data)) throw Error();
+    if (child === 'waitlistOwnerReviews') {
+      const parsed = ownerWaitlistMarkerSchema.parse(data);
+      if (parsed.businessId !== scope.businessId || parsed.entryId !== id || recordId && parsed.waitlistRecordId !== recordId) throw Error();
+    } else if (child === 'waitlistOfferHeads') {
+      readWaitlistOfferHead(data, { businessId: scope.businessId, waitlistRecordId: id });
+      if (recordId && id !== recordId) throw Error();
+    } else {
+      const offer = parseCanonicalWaitlistOffer(id, data, scope.businessId);
+      if (recordId && offer.waitlistRecordId !== recordId) throw Error();
+    }
+    return { path, data };
+  } catch {
+    throw new HttpError(503, 'No se pudo validar el inventario privado de espera.');
+  }
+}
+function assertHeadLinks(documents: Row[]) {
+  const offers = new Map(documents.filter(row => row.path.split('/')[2] === 'waitlistOffers').map(row => [row.data.id, row.data]));
+  for (const { data: head } of documents.filter(row => row.path.split('/')[2] === 'waitlistOfferHeads')) {
+    const offer = offers.get(head.currentOfferId);
+    if (!offer || head.waitlistRecordId !== offer.waitlistRecordId || head.entryId !== offer.entryId || head.revision !== offer.headRevisionAtCreation) throw new HttpError(503, 'No se pudo validar el inventario privado de espera.');
+  }
+}
 async function collect(db: Database, tx: Transaction, scope: Scope): Promise<Row[]> {
   const collection = db.collection('businesses').doc(scope.businessId).collection('waitlistRequests');
   const validate = (id: string, data: DocumentData | undefined): Row => {
@@ -38,18 +66,22 @@ async function collect(db: Database, tx: Transaction, scope: Scope): Promise<Row
   const requestDocs = scope.ownerUid ? await pagedDocuments(tx, collection.where('ownerUid', '==', scope.ownerUid)) : (await tx.get(collection)).docs;
   if (!scope.ownerUid && requestDocs.length > 1000) throw new HttpError(413, 'Divide la exportación privada por cuentas.');
   const documents = requestDocs.map(document => validate(document.id, document.data()));
-  // Canonical record identity survives singleton deletion or replacement. Review
-  // markers remain private inventory even when no current request can join them.
-  const markers = db.collection('businesses').doc(scope.businessId).collection('waitlistOwnerReviews');
+  // Canonical record identity survives singleton deletion or replacement.
+  // Reviews, heads and offers remain inventory without a current request.
+  const ref = db.collection('businesses').doc(scope.businessId);
   const recordId = scope.ownerUid ? stableDocumentId('waitlist', scope.businessId, scope.ownerUid) : null;
-  const markerDocs = recordId ? await pagedDocuments(tx, markers.where('waitlistRecordId', '==', recordId)) : (await tx.get(markers)).docs;
-  if (!scope.ownerUid && documents.length + markerDocs.length > 1000) throw new HttpError(413, 'Divide la exportación privada por cuentas.');
-  for (const document of markerDocs) {
-    const data = document.data(), parsed = ownerWaitlistMarkerSchema.safeParse(data), path = `businesses/${scope.businessId}/waitlistOwnerReviews/${document.id}`;
-    if (!parsed.success || !isDataPath(path, true) || !isDataJson(data) || parsed.data.businessId !== scope.businessId || parsed.data.entryId !== document.id
-      || recordId && parsed.data.waitlistRecordId !== recordId) throw new HttpError(503, 'No se pudo validar el inventario privado de espera.');
-    documents.push({ path, data });
+  if (recordId) {
+    // A corrupt field must not hide the canonical head from its filtered query.
+    const head = await tx.get(ref.collection('waitlistOfferHeads').doc(recordId));
+    if (head.exists) validatePrivateRow('waitlistOfferHeads', head.id, head.data(), scope, recordId);
   }
+  for (const child of privateChildren) {
+    const collection = ref.collection(child);
+    const docs = recordId ? await pagedDocuments(tx, collection.where('waitlistRecordId', '==', recordId)) : (await tx.get(collection)).docs;
+    if (!scope.ownerUid && documents.length + docs.length > 1000) throw new HttpError(413, 'Divide la exportación privada por cuentas.');
+    documents.push(...docs.map(doc => validatePrivateRow(child, doc.id, doc.data(), scope, recordId)));
+  }
+  assertHeadLinks(documents);
   return documents.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 }
 async function pagedDocuments(tx: Transaction, base: Query): Promise<QueryDocumentSnapshot[]> {
@@ -103,12 +135,14 @@ function batchInput(supplied: WaitlistDataExport, options: BatchOptions) {
     if (!isDataPath(row.path, true) || parts.length !== 4 || parts[0] !== 'businesses' || parts[1] !== exported.scope.businessId || row.path <= lastPath) throw new HttpError(400, 'La exportación privada no es válida.');
     if (parts[2] === 'waitlistRequests') {
       if (row.data.businessId !== exported.scope.businessId || row.data.ownerUid !== exported.scope.ownerUid) throw new HttpError(400, 'La exportación privada no es válida.');
-    } else if (parts[2] === 'waitlistOwnerReviews') {
-      const marker = ownerWaitlistMarkerSchema.safeParse(row.data);
-      if (!marker.success || marker.data.businessId !== exported.scope.businessId || marker.data.waitlistRecordId !== expectedRecordId || marker.data.entryId !== parts[3]) throw new HttpError(400, 'La exportación privada no es válida.');
+    } else if ((privateChildren as readonly string[]).includes(parts[2])) {
+      try { validatePrivateRow(parts[2] as typeof privateChildren[number], parts[3], row.data, exported.scope, expectedRecordId); }
+      catch { throw new HttpError(400, 'La exportación privada no es válida.'); }
     } else throw new HttpError(400, 'La exportación privada no es válida.');
     lastPath = row.path;
   }
+  try { assertHeadLinks(exported.documents); }
+  catch { throw new HttpError(400, 'La exportación privada no es válida.'); }
   let deletedCount = 0;
   if (options.previous) {
     const previous = progressSchema.safeParse(options.previous);
@@ -138,14 +172,26 @@ async function assertLastInventory(db: Database, tx: Transaction, scope: Scope, 
   const canonicalDoc = await tx.get(ref.collection('waitlistRequests').doc(recordId));
   if (canonicalDoc.exists && (canonicalDoc.data()?.ownerUid !== scope.ownerUid || canonicalDoc.data()?.businessId !== scope.businessId)) throw inventoryChanged();
   const requests = await tx.get(ref.collection('waitlistRequests').where('ownerUid', '==', scope.ownerUid!).limit(101));
-  const markers = await tx.get(ref.collection('waitlistOwnerReviews').where('waitlistRecordId', '==', recordId).limit(101));
-  const actual = [...requests.docs.map(doc => ({ path: `${ref.path}/waitlistRequests/${doc.id}`, data: doc.data() })), ...markers.docs.map(doc => ({ path: `${ref.path}/waitlistOwnerReviews/${doc.id}`, data: doc.data() }))].sort((a,b)=>a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-  if (digest(scope, actual) !== digest(scope, expected)) throw inventoryChanged();
+  const head = await tx.get(ref.collection('waitlistOfferHeads').doc(recordId));
+  if (head.exists && (head.data()?.waitlistRecordId !== recordId || head.data()?.businessId !== scope.businessId)) throw inventoryChanged();
+  const actual = requests.docs.map(doc => ({ path: `${ref.path}/waitlistRequests/${doc.id}`, data: doc.data() }));
+  for (const child of privateChildren) {
+    const snapshot = await tx.get(ref.collection(child).where('waitlistRecordId', '==', recordId).limit(101));
+    actual.push(...snapshot.docs.map(doc => ({ path: `${ref.path}/${child}/${doc.id}`, data: doc.data() })));
+  }
+  actual.sort((a,b)=>a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  const orderedExpected = [...expected].sort((a,b)=>a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  if (digest(scope, actual) !== digest(scope, orderedExpected)) throw inventoryChanged();
+}
+// Preserve the path-sorted export/hash and all legacy receipt ordering, while
+// keeping heads until their offers and anti-replay records have been erased.
+function erasureOrder(documents: Row[]) {
+  return [...documents.filter(row => row.path.split('/')[2] !== 'waitlistOfferHeads'), ...documents.filter(row => row.path.split('/')[2] === 'waitlistOfferHeads')];
 }
 /** Private case-file workflow: each transaction verifies and deletes at most100
  * exported rows. Keep the full export and each receipt until final completion. */
 export async function deleteExportedWaitlistDataBatch(db: Database, supplied: WaitlistDataExport, options: BatchOptions): Promise<WaitlistErasureProgress> {
-  const { exported, deletedCount } = batchInput(supplied, options), rows = exported.documents.slice(deletedCount, deletedCount + 100);
+  const { exported, deletedCount } = batchInput(supplied, options), rows = erasureOrder(exported.documents).slice(deletedCount, deletedCount + 100);
   return db.runTransaction(async tx => {
     const actual = await batchRows(db, tx, rows);
     if (actual.some(row => row === null)) throw inventoryChanged();
@@ -158,7 +204,7 @@ export async function deleteExportedWaitlistDataBatch(db: Database, supplied: Wa
 /** Lost response recovery proves the next exported batch is wholly present or
  * absent. A partial/changed inventory never becomes a guessed success. */
 export async function reconcileWaitlistDataErasure(db: Database, supplied: WaitlistDataExport, options: BatchOptions): Promise<WaitlistErasureProgress> {
-  const { exported, deletedCount } = batchInput(supplied, options), rows = exported.documents.slice(deletedCount, deletedCount + 100);
+  const { exported, deletedCount } = batchInput(supplied, options), rows = erasureOrder(exported.documents).slice(deletedCount, deletedCount + 100);
   return db.runTransaction(async tx => {
     const actual = await batchRows(db, tx, rows), missing = actual.filter(row => row === null).length;
     if (missing !== 0 && missing !== rows.length) throw inventoryChanged();
