@@ -30,9 +30,9 @@ Node24.22.0, pnpm11.23.0, dependencias instaladas y lock sin cambios; entorno sa
 | Worker tests | 158 pruebas, exit0 |
 | Worker TypeScript y deploy dry-run, sin rollout | exit0 |
 | Suite completa inicial | 3978 passed, 1 failed, 32 skipped; ver detalle abajo |
-| Suite completa final | Pendiente de repetición antes de cerrar la rama |
+| Suite completa final | 3979 passed, 32 skipped; 251 archivos passed y4 skipped, exit0 |
 
-La suite inicial falló en `d1HistoryUsesIndexedBoundedAppointmentPagesAmong1001UnrelatedEvents`, `tests/appointment-attendance-d1.test.ts:201`, durante el batch de preparación local, antes de sus aserciones: Miniflare `fetch failed`, causa `read ECONNRESET`. Es el mismo límite de transporte observado al integrar S06. La suite D1 completa aislada pasó12/12, sin cambiar código ni timeouts. Se preservaron log y resultado iniciales fuera de Git; la repetición general sigue pendiente en esta versión del informe.
+La suite inicial falló en `d1HistoryUsesIndexedBoundedAppointmentPagesAmong1001UnrelatedEvents`, `tests/appointment-attendance-d1.test.ts:201`, durante el batch de preparación local, antes de sus aserciones: Miniflare `fetch failed`, causa `read ECONNRESET`. Es el mismo límite de transporte observado al integrar S06. La suite D1 completa aislada pasó12/12, sin cambiar código ni timeouts. Se preservaron log y resultado iniciales fuera de Git; la repetición general pasó3979/32skip, incluyendo esta prueba, sin modificar el producto ni los timeouts.
 
 ## Navegador real, localhost y datos sintéticos
 
@@ -52,7 +52,7 @@ No se observó zoom nativo200% ni lector de pantalla audible. Se comprobó semá
 
 ## Decisiones y operación
 
-1. Normalizar solo espacios de encabezados Task1→Task1 separado para el extractor de briefs; requisitos sin cambios. Riesgo: deriva de números de línea.
+1. Normalizar solo espacios de encabezados `Task1`→`Task 1` para el extractor de briefs; requisitos sin cambios. Riesgo: deriva de números de línea.
 2. Días comunes realmente ausentes se expanden a cerrados y se permite que días comunes cerrados antiguos conserven intervalos. Días propios siguen estrictos. Mantiene compatibilidad con la configuración existente; riesgo de equivocación: rechazar o interpretar mal un horario legado.
 3. Actualizar solo la allowlist actual del fixture Worker previo; literal histórico b7e9a28 permanece exacto. Riesgo: una selección de fixture incorrecta invalidaría la prueba de compatibilidad, por eso se conserva el literal histórico.
 
