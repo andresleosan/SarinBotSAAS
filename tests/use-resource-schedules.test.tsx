@@ -20,7 +20,7 @@ const mount = async () => { await act(async () => { tree = create(createElement(
 const update = async () => { await act(async () => tree!.update(createElement(Harness))); };
 const edit = async () => { await act(async () => result.setRules(rules)); await act(async () => result.review()); };
 beforeEach(() => { vi.useFakeTimers(); auth.uid = 'demo-owner'; auth.epoch = 1; auth.current = true; fetchMock.mockReset().mockResolvedValue(reply(scheduleView())); vi.stubGlobal('fetch', fetchMock); input = { businessId: 'demo-business', ownerUid: 'demo-owner', authEpoch: 1, mode: 'edit', enabled: true }; });
-afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 it('shared dashboard scope reports feature403 and same-owner recovery renews its reader', async () => {
   let allowed = true, generation = 0; const failures: unknown[] = [];
   const requestScope: OwnerRequestScope = { ownerUid: 'demo-owner', authEpoch: 1, businessId: 'demo-business', isCurrent: () => true, get readGeneration() { return generation; }, canRead: () => allowed, canStartAction: () => allowed, onAccessDenied: failure => { failures.push(failure); allowed = false; generation++; } };
@@ -36,7 +36,22 @@ it('readFailureNeverShowsInheritedHours and bounded10s', async () => { const wai
 it('externalUpdateKeepsDirtyAndRequiresReload', async () => { await mount(); await edit(); fetchMock.mockResolvedValue(reply(scheduleView(1))); await act(async () => result.refresh()); expect(result.phase).toBe('conflict'); expect(result.draft).toEqual(rules); await act(async () => result.review()); expect(result.phase).toBe('conflict'); await act(async () => result.discard()); expect(result.dirty).toBe(false); expect(result.draft).toEqual(scheduleView(1).policy.rules); });
 it('reviewBecomesInvalidWhenDraftChanges', async () => { await mount(); await edit(); expect(result.phase).toBe('review'); await act(async () => result.setRules({ ...rules, closures: [] })); await act(async () => result.save()); expect(fetchMock).toHaveBeenCalledTimes(1); });
 it.each([402, 428, 503])('gateAndCommercialFailuresDoNotEraseDraft %i', async status => { await mount(); await edit(); fetchMock.mockResolvedValue(reply({ error: 'Unavailable', code: 'SCHEDULE_WRITES_DISABLED' }, status)); await act(async () => result.save()); expect(result.draft).toEqual(rules); expect(result.dirty).toBe(true); });
-it('soft20SecondsDoesNotAbortPut', async () => { await mount(); await edit(); const wait = deferred<Response>(); fetchMock.mockReturnValue(wait.promise); let saving!: Promise<void>; await act(async () => { saving = result.save(); await Promise.resolve(); }); await act(async () => vi.advanceTimersByTimeAsync(20_000)); expect(result.phase).toBe('saving'); expect(result.message).toMatch(/demorando/i); expect(fetchMock.mock.calls[1][1]?.signal?.aborted ?? false).toBe(false); await act(async () => { wait.reject(new Error('Lost')); await saving; }); expect(result.phase).toBe('uncertain'); });
+it('soft20SecondsDoesNotAbortPut', async () => {
+  await mount(); await edit();
+  const wait = deferred<Response>(), digest = deferred<ArrayBuffer>(), started = deferred<void>();
+  vi.spyOn(crypto.subtle, 'digest').mockReturnValueOnce(digest.promise);
+  fetchMock.mockImplementationOnce(() => { started.resolve(); return wait.promise; }); let saving!: Promise<void>;
+  await act(async () => { saving = result.save(); await Promise.resolve(); });
+  await act(async () => vi.advanceTimersByTimeAsync(20_000));
+  expect(fetchMock).toHaveBeenCalledTimes(1); expect(result.message).toBeNull();
+  await act(async () => { digest.resolve(new ArrayBuffer(32)); await started.promise; });
+  expect(fetchMock).toHaveBeenCalledTimes(2); expect(fetchMock.mock.calls[1][1]?.method).toBe('PUT');
+  await act(async () => vi.advanceTimersByTimeAsync(19_999)); expect(result.message).toBeNull();
+  await act(async () => vi.advanceTimersByTimeAsync(1));
+  expect(result.phase).toBe('saving'); expect(result.message).toMatch(/demorando/i);
+  expect(fetchMock.mock.calls[1][1]?.signal?.aborted ?? false).toBe(false);
+  await act(async () => { wait.reject(new Error('Lost')); await saving; }); expect(result.phase).toBe('uncertain');
+});
 it('missingReceiptNeverUnlocksDifferentCommand and retryUsesIdenticalIdRevisionBasisAndPayload', async () => { await mount(); await edit(); fetchMock.mockRejectedValue(new Error('Lost')); await act(async () => result.save()); const sent = String(fetchMock.mock.calls[1][1]?.body); fetchMock.mockResolvedValue(reply({ ...scheduleView(1), policy: { ...scheduleView(1).policy, rules } })); await act(async () => result.inspectPending()); expect(result.phase).toBe('uncertain'); await act(async () => { result.discard(); result.setRules({ weekly: [], exceptions: [], closures: [] }); }); expect(result.draft).toEqual(rules); fetchMock.mockRejectedValue(new Error('Lost again')); await act(async () => result.retryPending()); expect(String(fetchMock.mock.calls[3][1]?.body)).toBe(sent); expect(String(fetchMock.mock.calls[2][0])).toContain('?requestId='); });
 it('oldReceiptWithNewPolicyExplainsBoth', async () => { await mount(); await edit(); fetchMock.mockRejectedValue(new Error('Lost')); await act(async () => result.save()); const command = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as ResourceScheduleCommand; fetchMock.mockResolvedValue(reply({ ...scheduleView(2), operation: { requestId: command.requestId, operationHash: resourceScheduleOperationHash(command), resultRevision: 1, appliedAt: 1 } })); await act(async () => result.inspectPending()); expect(result.phase).toBe('ready'); expect(result.view?.policy.revision).toBe(2); expect(result.message).toMatch(/después hubo otra modificación/i); expect(result.dirty).toBe(false); });
 it('readonlyCannotSendPut', async () => { input.mode = 'read'; await mount(); await act(async () => { result.setRules(rules); result.review(); }); await act(async () => { await result.save(); await result.retryPending(); }); expect(result.draft).toBeNull(); expect(fetchMock).toHaveBeenCalledTimes(1); });
