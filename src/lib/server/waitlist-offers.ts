@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { ChatActor } from '@/types/chat';
 import type { Business, Appointment } from '@/types/firestore';
 import type { Database, Transaction, Query, QueryDocumentSnapshot } from '@/lib/storage/types';
+import { StorageError } from '@/lib/storage/database';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { getAvailableSlots, toColombiaTimestamp, toMinutes, toTimeStr } from '@/lib/sarin/availability';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
@@ -18,9 +19,11 @@ import {
   type OwnerWaitlistOfferCommand, type WaitlistOfferSummary, type WaitlistOfferProposalView,
   ownerWaitlistOfferQuerySchema, ownerWaitlistOfferPageSchema, ownerWaitlistOfferRecoverySchema, clientWaitlistOfferRecoverySchema,
   ownerWaitlistOfferContextSchema, ownerWaitlistOfferResultSchema, clientWaitlistOfferCurrentSchema, waitlistOfferCloseResultSchema,
+  waitlistOfferProposalCommandSchema, waitlistOfferConfirmationSchema,
   waitlistOfferEligible, waitlistOfferExpiry, compareOwnerWaitlistOffers,
   type OwnerWaitlistOfferQuery, type OwnerWaitlistOfferPage, type OwnerWaitlistOfferRecovery, type ClientWaitlistOfferRecovery,
   type OwnerWaitlistOfferContext, type OwnerWaitlistOfferResult, type ClientWaitlistOfferCurrent, type WaitlistOfferCloseResult, type WaitlistOfferUsability,
+  type WaitlistOfferConfirmation,
 } from '@/lib/waitlist-offers';
 import { stableDocumentId, assertOwner } from './businesses';
 import { bookingSubjectHash } from './booking-subject-consent';
@@ -30,6 +33,9 @@ import { readBookingDataPolicy } from './booking-data-policy';
 import { readResourceSchedulePolicy, resourceDayScheduleFingerprint } from './resource-schedules';
 import { assertConsent } from './consent';
 import { prepareBookingActionAdmission } from './booking-action-admission';
+import { prepareAppointmentInTransaction } from './bookings';
+import { assertClientCanBook } from './client-policy';
+import { bookingSchema } from './schemas';
 
 export const waitlistOfferHeadSchema = z.object({ version: z.literal(1), businessId: id, waitlistRecordId: id, revision: revision.min(1), entryId: id, currentOfferId: id }).strict();
 export type WaitlistOfferHead = z.infer<typeof waitlistOfferHeadSchema>;
@@ -412,4 +418,121 @@ export async function closeExpiredWaitlistOffer(actor: ChatActor, businessId: st
   if (access !== 'owner' && access !== 'client') throw new HttpError(400, 'Acceso inválido.');
   const { offer } = await closeOffer(actor, businessId, offerId, access, 'expired', db);
   return verified(waitlistOfferCloseResultSchema, { businessId, viewerUid: actor.uid, offerId, persistedState: offer.state, proof: offer.booking });
+}
+const assertOfferWrites = () => {
+  if (!writesEnabled()) throw new HttpError(503, 'Las nuevas ofertas están en pausa.', 'WAITLIST_OFFERS_DISABLED');
+};
+function offerExpired(offer: WaitlistOfferRecord, now: number, record?: WaitlistRecord): boolean {
+  return now >= offer.expiresAt || now >= offer.target.startAt || Boolean(offer.proposal && now >= offer.proposal.expiresAt) || Boolean(record?.request && now >= record.request.expiresAt);
+}
+/** Reuses read-only evidence; the real client and exact current incarnation are mandatory. */
+async function freshClientOffer(tx: Transaction, client: ChatActor, business: Business, offer: WaitlistOfferRecord, db: Database, allowOccupied: boolean) {
+  const record = await readRequest(tx, business.id, offer.waitlistRecordId, db), head = await readHead(tx, business.id, offer.waitlistRecordId, db);
+  if (!record?.request || record.ownerUid !== client.uid || matchingCurrent(head, record)?.id !== offer.id) throw conflict();
+  const status = await usability(tx, business, offer, db);
+  if (status === 'expired_pending_close') return { record, expired: true };
+  if (business.ownerUid !== offer.ownerActorUid) throw conflict();
+  if (status === 'consent_changed') throw new HttpError(428, 'Revisa los permisos actuales de la solicitud.', 'CONSENT_REQUIRED');
+  if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
+  if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Las nuevas reservas están en pausa.');
+  if (status === 'policy_changed') {
+    await assertClientCanBook(tx, business, client.uid, Date.now(), db);
+    throw conflict();
+  }
+  if (status === 'disabled') assertOfferWrites();
+  // Confirmation delegates the occupied-target decision to the real helper.
+  // Its existing discriminator must expose an inconsistent already-created ID.
+  if (status !== 'ready' && !(allowOccupied && status === 'slot_unavailable')) throw conflict(status === 'slot_unavailable' ? 'SLOT_UNAVAILABLE' : 'OFFER_CHANGED');
+  return { record, expired: offerExpired(offer, Date.now(), record) };
+}
+export async function prepareClientWaitlistOffer(client: ChatActor, businessId: string, offerId: string, supplied: { requestId: string }, db: Database = getAdminDb()): Promise<ClientWaitlistOfferRecovery> {
+  scope(client, businessId); id.parse(offerId); const input = waitlistOfferProposalCommandSchema.parse(supplied);
+  return guarded(() => db.runTransaction(async tx => {
+    const business = await readBusiness(tx, client, businessId, 'client', db), offer = await readOffer(tx, businessId, offerId, db);
+    if (offer.clientUid !== client.uid) throw notFound();
+    if (offer.state !== 'offered') return clientRecovery(tx, client, business, offer, db);
+    if (offer.proposal) {
+      if (offer.proposal.requestId !== input.requestId) throw conflict('OFFER_PROPOSAL_EXISTS');
+      return clientRecovery(tx, client, business, offer, db);
+    }
+    // Preparation does not turn a clock into durable closure or create a proposal.
+    if (offerExpired(offer, Date.now())) return clientRecovery(tx, client, business, offer, db);
+    assertOfferWrites();
+    const current = await freshClientOffer(tx, client, business, offer, db, false);
+    if (current.expired) return clientRecovery(tx, client, business, offer, db);
+    const admit = await prepareBookingActionAdmission(tx, db, client.uid, businessId, 'proposal', `waitlist-offer-client:${offerId}:${input.requestId}`);
+    const now = Date.now();
+    if (offerExpired(offer, now, current.record)) return clientRecovery(tx, client, business, offer, db);
+    if (!isSubscriptionAllowed(business, now)) throw new HttpError(402, 'Las nuevas reservas están en pausa.');
+    const proposal = verified(waitlistOfferProposalSchema, { id: waitlistOfferProposalId(businessId, offerId, client.uid, input.requestId), requestId: input.requestId,
+      createdAt: now, expiresAt: offer.expiresAt, subjectCase: { bookingRequestId: input.requestId, subjectKind: 'self' },
+      catalogFingerprint: offer.catalogFingerprint, resourceScheduleFingerprint: offer.resourceScheduleFingerprint, policyRevision: offer.policyRevision });
+    const next = parseCanonicalWaitlistOffer(offerId, { ...offer, proposal }, businessId);
+    // Build recovery before admission/write; no read can follow either apply.
+    const recovery = verified(clientWaitlistOfferRecoverySchema, { businessId, viewerUid: client.uid, serverNow: now, writesEnabled: writesEnabled(),
+      offer: projectWaitlistOfferSummary(next), usability: 'ready', proposal: projectWaitlistOfferProposal(next), proof: null, appointment: null });
+    admit(); tx.set(offersRef(db, businessId).doc(offerId), next);
+    return recovery;
+  }));
+}
+export async function confirmClientWaitlistOffer(client: ChatActor, businessId: string, offerId: string, contact: { clientPhone: unknown; intakeAnswers: unknown }, db: Database = getAdminDb()): Promise<WaitlistOfferConfirmation> {
+  scope(client, businessId); id.parse(offerId);
+  const result = await guarded(() => db.runTransaction(async tx => {
+    const business = await readBusiness(tx, client, businessId, 'client', db), offer = await readOffer(tx, businessId, offerId, db);
+    if (offer.clientUid !== client.uid) throw notFound();
+    if (offer.state === 'booked') {
+      const recovery = await clientRecovery(tx, client, business, offer, db);
+      return verified(waitlistOfferConfirmationSchema, { proof: recovery.proof, appointment: recovery.appointment, replayed: true });
+    }
+    if (offer.state !== 'offered') return null;
+    const expire = (now: number) => {
+      tx.set(offersRef(db, businessId).doc(offerId), closedOffer(offer, 'expired', client.uid, now));
+      return null;
+    };
+    if (offerExpired(offer, Date.now())) return expire(Date.now());
+    assertOfferWrites();
+    if (!offer.proposal) throw conflict();
+    const current = await freshClientOffer(tx, client, business, offer, db, true);
+    if (current.expired) return expire(Date.now());
+    const proposal = offer.proposal;
+    const input = bookingSchema.safeParse({ serviceId: offer.target.serviceId, resourceId: offer.target.resourceId, dateKey: offer.dateKey,
+      startTimeStr: offer.target.startTimeStr, clientPhone: contact.clientPhone, intakeAnswers: contact.intakeAnswers });
+    if (!input.success || Object.keys(input.data.intakeAnswers).some(key => !offer.target.intakeFields.some(field => field.key === key))) throw new HttpError(400, 'Revisa el contacto y las respuestas de esta propuesta.');
+    const appointmentRequestId = `waitlist-offer-${proposal.id}`;
+    const existing = await tx.get(businessRef(db, businessId).collection('appointments').doc(stableDocumentId(client.uid, appointmentRequestId, 'appointment')));
+    if (existing.exists) throw unverifiable();
+    const prepared = await prepareAppointmentInTransaction(tx, client, business, input.data, appointmentRequestId, db, Date.now(), newWaitlistOfferSubject(proposal)).catch(error => {
+      // The helper can itself notice a started slot after its final read. A
+      // legitimate validation denial at that boundary still needs durable expiry.
+      // Storage/corrupt evidence errors must reach the adapter/outer safe guard.
+      if (error instanceof StorageError) throw error;
+      if (error instanceof HttpError && error.status < 500 && offerExpired(offer, Date.now(), current.record)) return null;
+      if (error instanceof HttpError && error.status === 409 && !error.code) throw conflict('SLOT_UNAVAILABLE');
+      throw error;
+    });
+    if (prepared?.kind === 'existing') throw unverifiable();
+    const now = Date.now();
+    if (!prepared || offerExpired(offer, now, current.record)) return expire(now);
+    if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
+    if (!isSubscriptionAllowed(business, now)) throw new HttpError(402, 'Las nuevas reservas están en pausa.');
+    const record = current.record;
+    if (record.revision >= Number.MAX_SAFE_INTEGER - 1) throw unverifiable();
+    const appointment = verified(ownerRescheduleAppointmentSchema, prepared.appointment);
+    if (appointment.tenantId !== businessId || appointment.client?.uid !== client.uid) throw unverifiable();
+    const { dateKey, startAt, endAt, reservedUntilAt, resourceId, serviceId } = offer.target;
+    const proof = verified(waitlistOfferBookingProofSchema, { appointmentId: appointment.id, proposalId: proposal.id, entryId: offer.entryId,
+      previousWaitlistRevision: record.revision, resolvedWaitlistRevision: record.revision + 1, confirmedAt: now, source: { dateKey, startAt, endAt, reservedUntilAt, resourceId, serviceId } });
+    const tombstone = parseCanonicalWaitlistRecord(offer.waitlistRecordId, { ...record, request: null, revision: proof.resolvedWaitlistRevision, updatedAt: now,
+      lastOperation: { requestId: `offer-${offerId}`, appliedRevision: proof.resolvedWaitlistRevision,
+        operationHash: bookingSubjectHash({ kind: 'resolve_offer', offerId, proposalId: proposal.id, entryId: offer.entryId, appointmentId: appointment.id }) } }, businessId);
+    const booked = parseCanonicalWaitlistOffer(offerId, { ...offer, state: 'booked', booking: proof, closedAt: now, closedReason: 'booked', closedByUid: client.uid }, businessId);
+    const confirmation = verified(waitlistOfferConfirmationSchema, { proof, appointment, replayed: false });
+    // All evidence/DTOs are prepared before the first write. No await/read follows.
+    prepared.apply();
+    tx.set(businessRef(db, businessId).collection('waitlistRequests').doc(offer.waitlistRecordId), tombstone);
+    tx.set(offersRef(db, businessId).doc(offerId), booked);
+    return confirmation;
+  }));
+  if (!result) throw conflict('OFFER_CLOSED');
+  return result;
 }

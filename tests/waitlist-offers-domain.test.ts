@@ -5,7 +5,7 @@ import type { OwnerWaitlistOfferCommand } from '@/lib/waitlist-offers';
 import { ownerWaitlistOfferRecoverySchema, clientWaitlistOfferRecoverySchema, ownerWaitlistOfferContextSchema } from '@/lib/waitlist-offers';
 import { waitlistOffersFixture } from './waitlist-offers-contract';
 import { memoryFirestore } from './memoryFirestore';
-import { subjectAdmin } from './represented-booking-contract';
+import { subjectAdmin, contact } from './represented-booking-contract';
 import { waitlistNow } from './waitlist-contract';
 import { readConsent, updateConsent } from '@/lib/server/consent';
 import { bookingDataPolicyKey, saveBookingDataPolicy } from '@/lib/server/booking-data-policy';
@@ -17,7 +17,15 @@ import {
   readCurrentClientWaitlistOffer, readClientWaitlistOffer, withdrawOwnerWaitlistOffer, declineClientWaitlistOffer,
   closeExpiredWaitlistOffer, waitlistOfferId, waitlistOfferCommandFingerprint, waitlistOfferRequestFingerprint,
   parseCanonicalWaitlistOffer, waitlistOfferProposalId,
+  prepareClientWaitlistOffer, confirmClientWaitlistOffer, waitlistOfferRecordSchema,
 } from '@/lib/server/waitlist-offers';
+import { createAppointment, cancelAppointment } from '@/lib/server/bookings';
+import { stableDocumentId } from '@/lib/server/businesses';
+import { updateClientPolicy } from '@/lib/server/client-policy';
+import { waitlistRecordSchema, parseCanonicalWaitlistRecord } from '@/lib/server/waitlist';
+import { createAppointmentRescheduleProposal } from '@/lib/server/appointment-rescheduling';
+import { confirmBookingProposal } from '@/lib/server/booking-proposals';
+import { StorageError } from '@/lib/storage/database';
 
 type Fixture = Awaited<ReturnType<typeof waitlistOffersFixture>>;
 const command = (f: Fixture, patch: Partial<OwnerWaitlistOfferCommand> = {}): OwnerWaitlistOfferCommand => ({ requestId: 'demo-owner-offer-command', entryId: f.first.request!.id,
@@ -399,4 +407,321 @@ it('bookedCannotBeWithdrawnOrReopened', async () => {
   expect((await readCurrentClientWaitlistOffer(f.actor, f.business.id, monitor.db)).current?.proof).toEqual(booking);
   await expect(closeExpiredWaitlistOffer(f.secondOwner, f.business.id, offer.id, 'owner', monitor.db)).resolves.toMatchObject({ persistedState: 'booked', proof: booking });
   expect(monitor.writes).toEqual([]);
+});
+
+async function seedPrepared(f: Fixture) {
+  const offer = await seedOffer(f), requestId = 'demo-client-offer-proposal';
+  const proposal = { id: waitlistOfferProposalId(f.business.id, offer.id, f.actor.uid, requestId), requestId,
+    subjectCase: { bookingRequestId: requestId, subjectKind: 'self' as const }, createdAt: Date.now(), expiresAt: offer.expiresAt,
+    catalogFingerprint: offer.catalogFingerprint, resourceScheduleFingerprint: offer.resourceScheduleFingerprint, policyRevision: offer.policyRevision };
+  const prepared = parseCanonicalWaitlistOffer(offer.id, { ...offer, proposal }, f.business.id);
+  await offerRef(f, offer.id).set(prepared);
+  return { ...prepared, proposal };
+}
+const savedOffer = async (f: Fixture, offerId: string) => parseCanonicalWaitlistOffer(offerId, (await offerRef(f, offerId).get()).data(), f.business.id);
+const appointmentCount = async (f: Fixture) => (await businessRef(f).collection('appointments').where('type', '==', 'appointment').get()).size;
+function pauseFinalStagingRead(db: Database) {
+  let signal!: () => void, release!: () => void, paused = false;
+  const reached = new Promise<void>(resolve => { signal = resolve; }), released = new Promise<void>(resolve => { release = resolve; });
+  const blocked: Database = { collection: name => db.collection(name), runTransaction: handler => db.runTransaction(tx => {
+    let staging = false;
+    return handler(new Proxy(tx, { get(target, key: keyof Transaction) {
+      if (key !== 'get') return target[key].bind(target);
+      return async (ref: DocumentReference | Query) => {
+        if ('path' in ref && ref.path.includes('/bookingLocks/')) staging = true;
+        const result = await target.get(ref as DocumentReference);
+        if (!paused && staging && 'path' in ref && ref.path.endsWith('/resourceSchedulePolicies/current')) { paused = true; signal(); await released; }
+        return result;
+      };
+    } }));
+  }) };
+  return { db: blocked, reached, release };
+}
+
+it('realClientOnlyNotOwnerOrBodyUid', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  for (const actor of [f.owner, f.secondClient, subjectAdmin]) {
+    await expect(prepareClientWaitlistOffer(actor, f.business.id, offer.id, { requestId: offer.proposal.requestId }, f.db)).rejects.toMatchObject({ status: 404 });
+    await expect(confirmClientWaitlistOffer(actor, f.business.id, offer.id, contact, f.db)).rejects.toMatchObject({ status: 404 });
+  }
+  await expect(prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, { requestId: offer.proposal.requestId, clientUid: f.actor.uid } as never, f.db)).rejects.toThrow();
+});
+it('prepareRequiresCurrentRequestAnchorsGeneralSelfAndGate', async () => {
+  for (const change of ['gate', 'anchor', 'request', 'policy'] as const) {
+    const f = await waitlistOffersFixture(), offer = await seedOffer(f), monitor = observe(f.db);
+    if (change === 'gate') vi.stubEnv('SARIN_WAITLIST_OFFERS_ENABLED', 'false');
+    if (change === 'anchor') { const current = await readConsent(f.actor.uid, 'account', undefined, f.db); await updateConsent(f.actor, { scope: 'account', action: 'revoke', requestId: 'demo-prepare-revoke', expectedRevision: current.revision }, f.db); }
+    if (change === 'request') await waitlistRef(f).set({ ...f.record, request: { ...f.record.request!, resourceId: 'two' } });
+    if (change === 'policy') await saveBookingDataPolicy(subjectAdmin, { businessId: f.business.id, expectedRevision: 1, dataMode: 'general', representedMinorsEnabled: true, reason: 'Synthetic minors change' }, f.db);
+    await expect(prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, { requestId: 'demo-prepare-request' }, monitor.db)).rejects.toMatchObject({ status: change === 'gate' ? 503 : change === 'anchor' ? 428 : 409 });
+    expect(monitor.writes).toEqual([]); vi.stubEnv('SARIN_WAITLIST_OFFERS_ENABLED', 'true');
+  }
+});
+it('sameProposalRequestKeepsIdAndExpiry', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedOffer(f), input = { requestId: 'demo-prepare-request' };
+  const first = await prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, input, f.db);
+  expect(first.proposal?.proposal.id).toBe(waitlistOfferProposalId(f.business.id, offer.id, f.actor.uid, input.requestId));
+  expect(first.proposal?.proposal.expiresAt).toBe(offer.expiresAt);
+  expect(first.proposal?.proposal.subjectCase).toEqual({ bookingRequestId: input.requestId, subjectKind: 'self' });
+  vi.setSystemTime(Date.now() + 1000); vi.stubEnv('SARIN_WAITLIST_OFFERS_ENABLED', 'false');
+  const account = await readConsent(f.actor.uid, 'account', undefined, f.db);
+  await updateConsent(f.actor, { scope: 'account', action: 'revoke', requestId: 'demo-prepare-replay-revoke', expectedRevision: account.revision }, f.db);
+  const monitor = observe(f.db), replay = await prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, input, monitor.db);
+  expect(replay.proposal).toEqual(first.proposal); expect(replay.usability).toBe('consent_changed'); expect(monitor.writes).toEqual([]);
+});
+it('anotherRequestIdDoesNotOverwritePreparedProposal', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await expect(prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, { requestId: 'demo-different-proposal' }, f.db)).rejects.toMatchObject({ code: 'OFFER_PROPOSAL_EXISTS' });
+  expect((await savedOffer(f, offer.id)).proposal).toEqual(offer.proposal);
+});
+it.each(['catalog', 'schedule', 'policy', 'owner'] as const)('catalogSchedulePolicyOrOwnerChangedRequireNewOffer:%s', async change => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  if (change === 'catalog') await businessRef(f).set({ ...f.business, services: [{ ...f.business.services[0], price: 30000 }] });
+  if (change === 'owner') await businessRef(f).set({ ...f.business, ownerUid: f.secondOwner.uid });
+  if (change === 'schedule') await businessRef(f).collection('resourceSchedulePolicies').doc('current').set({ version: 1, businessId: f.business.id, revision: 1, updatedAt: Date.now(), rules: { weekly: [], exceptions: [], closures: [] } });
+  if (change === 'policy') await saveBookingDataPolicy(subjectAdmin, { businessId: f.business.id, expectedRevision: 1, dataMode: 'general', representedMinorsEnabled: false, reason: 'Synthetic policy revision' }, f.db);
+  const monitor = observe(f.db);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ code: 'OFFER_CHANGED' });
+  expect(monitor.writes).toEqual([]); expect(await appointmentCount(f)).toBe(0);
+});
+it('preparationConsumesAdmissionButNotBookingQuota', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedOffer(f), monitor = observe(f.db), input = { requestId: 'demo-prepare-admission' };
+  await prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, input, monitor.db);
+  const events = (await f.db.collection('serverSettings').doc(`booking_action_uid_${hash(f.actor.uid)}`).get()).data()?.events;
+  const event = hash([f.actor.uid, f.business.id, 'proposal', `waitlist-offer-client:${offer.id}:${input.requestId}`]);
+  expect(events.filter((e: { request: string }) => e.request === event)).toHaveLength(1);
+  const count = monitor.writes.length;
+  await prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, input, monitor.db);
+  expect(monitor.writes).toHaveLength(count);
+  expect(monitor.writes.every(path => path.includes('/waitlistOffers/') || path.startsWith('serverSettings/booking_action_'))).toBe(true);
+  expect(await appointmentCount(f)).toBe(0); expect((await businessRef(f).get()).data()?.subscription).toEqual(f.business.subscription);
+});
+it('proposalUsesCurrentAllowedIntakeDefinitionsWithoutAnswers', async () => {
+  const f = await waitlistOffersFixture();
+  f.business = { ...f.business, sarinConfig: { ...f.business.sarinConfig, intakeFields: [{ key: 'preference', label: 'Preferencia', required: true }] } };
+  await businessRef(f).set(f.business);
+  const offer = await seedOffer(f), recovery = await prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, { requestId: 'demo-prepare-intake' }, f.db);
+  expect(recovery.proposal?.proposal.intakeFields).toEqual(f.business.sarinConfig.intakeFields);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db)).rejects.toMatchObject({ status: 400 });
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, { ...contact, intakeAnswers: { preference: 'Synthetic answer', unknown: 'forbidden' } }, f.db)).rejects.toMatchObject({ status: 400 });
+  const result = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, { ...contact, intakeAnswers: { preference: 'Synthetic answer' } }, f.db);
+  expect(result.appointment.client?.intakeAnswers).toEqual({ preference: 'Synthetic answer' });
+  expect(JSON.stringify((await offerRef(f, offer.id).get()).data())).not.toContain('Synthetic answer');
+  expect(JSON.stringify((await offerRef(f, offer.id).get()).data())).not.toContain(contact.clientPhone);
+});
+it('expiredPreparationDoesNotCreateCloseOrSpendAdmission', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedOffer(f); vi.setSystemTime(offer.expiresAt); vi.stubEnv('SARIN_WAITLIST_OFFERS_ENABLED', 'false');
+  const monitor = observe(f.db);
+  await expect(prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, { requestId: 'demo-prepare-expired' }, monitor.db)).resolves.toMatchObject({ usability: 'expired_pending_close', proposal: null, offer: { persistedState: 'offered' } });
+  expect(monitor.writes).toEqual([]);
+});
+it('expiryDuringLastPreparationReadClosesWithoutAppointmentOrQuota', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f); let staging = false, finalRead = false;
+  const monitor = observe(f.db, target => {
+    if ('path' in target && target.path.includes('/bookingLocks/')) staging = true;
+    if (staging && 'path' in target && target.path.endsWith('/resourceSchedulePolicies/current')) { finalRead = true; vi.setSystemTime(offer.expiresAt); }
+  });
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ code: 'OFFER_CLOSED' });
+  expect(finalRead).toBe(true); expect(monitor.writes).toEqual([offerRef(f, offer.id).path]);
+  expect((await savedOffer(f, offer.id)).state).toBe('expired'); expect((await waitlistRef(f).get()).data()).toEqual(f.record);
+  expect(await appointmentCount(f)).toBe(0); expect((await businessRef(f).get()).data()?.subscription).toEqual(f.business.subscription);
+});
+it('expiryEqualsNowRejectsBeforeContactPermissionsOrGate', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f); vi.setSystemTime(offer.expiresAt); vi.stubEnv('SARIN_WAITLIST_OFFERS_ENABLED', 'false');
+  const account = await readConsent(f.actor.uid, 'account', undefined, f.db);
+  await updateConsent(f.actor, { scope: 'account', action: 'revoke', requestId: 'demo-expired-revoke', expectedRevision: account.revision }, f.db);
+  const monitor = observe(f.db);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, { clientPhone: null, intakeAnswers: null }, monitor.db)).rejects.toMatchObject({ code: 'OFFER_CLOSED' });
+  expect((await savedOffer(f, offer.id)).state).toBe('expired'); expect(monitor.writes).toEqual([offerRef(f, offer.id).path]);
+  expect(monitor.reads.some(path => path.includes('bookingLocks'))).toBe(false);
+});
+it('targetStartedBeforeApplyCloses', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f); let staging = false;
+  const monitor = observe(f.db, target => {
+    if ('path' in target && target.path.includes('/bookingLocks/')) staging = true;
+    if (staging && 'path' in target && target.path.endsWith('/resourceSchedulePolicies/current')) vi.setSystemTime(offer.target.startAt);
+  });
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ code: 'OFFER_CLOSED' });
+  expect((await savedOffer(f, offer.id)).state).toBe('expired'); expect(monitor.writes).toEqual([offerRef(f, offer.id).path]); expect(await appointmentCount(f)).toBe(0);
+});
+it('sameOfferProducesOneAppointmentAndOneQuota', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  const results = await Promise.all([confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db), confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db)]);
+  expect(new Set(results.map(r => r.appointment.id)).size).toBe(1); expect(results.map(r => r.replayed).sort()).toEqual([false, true]);
+  expect(results[0].appointment.id).toBe(stableDocumentId(f.actor.uid, `waitlist-offer-${offer.proposal.id}`, 'appointment'));
+  expect(results[0].appointment.beneficiary).toEqual({ kind: 'self' }); expect(results[0].appointment.subjectAuthorization).toBeUndefined();
+  expect(await appointmentCount(f)).toBe(1); expect((await businessRef(f).get()).data()?.subscription.paidTrial.appointmentsUsed).toBe(2);
+});
+it('resolvedTombstoneMatchesExistingWaitlistSchema', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f), monitor = observe(f.db);
+  const result = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db), record = (await waitlistRef(f).get()).data();
+  expect(waitlistRecordSchema.safeParse(record).success).toBe(true); expect(parseCanonicalWaitlistRecord(f.recordId, record, f.business.id)).toMatchObject({ version: 1, request: null, revision: 2,
+    lastOperation: { requestId: `offer-${offer.id}`, appliedRevision: 2, operationHash: bookingSubjectHash({ kind: 'resolve_offer', offerId: offer.id, proposalId: offer.proposal.id, entryId: offer.entryId, appointmentId: result.appointment.id }) } });
+  expect(result.proof).toMatchObject({ previousWaitlistRevision: 1, resolvedWaitlistRevision: 2, confirmedAt: Date.now(), appointmentId: result.appointment.id });
+  expect(waitlistOfferRecordSchema.safeParse((await offerRef(f, offer.id).get()).data()).success).toBe(true);
+  expect(monitor.writes.slice(-2)).toEqual([waitlistRef(f).path, offerRef(f, offer.id).path]);
+});
+it('replayIgnoresNewContactAndReturnsCurrentAppointment', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f), first = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db);
+  vi.stubEnv('SARIN_WAITLIST_OFFERS_ENABLED', 'false'); vi.setSystemTime(offer.expiresAt + 1);
+  const account = await readConsent(f.actor.uid, 'account', undefined, f.db);
+  await updateConsent(f.actor, { scope: 'account', action: 'revoke', requestId: 'demo-confirm-replay-revoke', expectedRevision: account.revision }, f.db);
+  await businessRef(f).set({ ...f.business, subscription: { ...f.business.subscription, status: 'suspended' } });
+  const monitor = observe(f.db), replay = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, { clientPhone: Symbol(), intakeAnswers: undefined }, monitor.db);
+  expect(replay).toEqual({ ...first, replayed: true }); expect(monitor.writes).toEqual([]);
+});
+it('replayAfterS07OrCancellationDoesNotRestoreOriginalSlot', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f), first = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db);
+  const proposal = await createAppointmentRescheduleProposal(f.actor, f.business.id, { appointmentId: first.appointment.id, sourceRevision: 0, requestId: 'demo-offer-s07-move', case: { bookingRequestId: 'demo-offer-s07-move', subjectKind: 'self' }, selection: { dateKey: '2030-01-08', resourceId: 'one', startTimeStr: '09:00' } }, f.db);
+  const moved = await confirmBookingProposal(f.actor, f.business.id, proposal.id, { clientPhone: null, intakeAnswers: {}, beneficiary: { kind: 'self' } }, f.db);
+  const replay = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, { clientPhone: null, intakeAnswers: null }, f.db);
+  expect(replay.proof).toEqual(first.proof); expect(replay.appointment).toEqual(moved); expect(replay.appointment.dateKey).toBe('2030-01-08');
+  const cancelled = await cancelAppointment(f.actor, f.business.id, first.appointment.id, f.db);
+  expect((await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, { clientPhone: null, intakeAnswers: null }, f.db)).appointment).toEqual(cancelled);
+  expect((await waitlistRef(f).get()).data()?.request).toBeNull();
+});
+it('existingAppointmentWithUnbookedOfferIsUnverifiableNotAutoRepair', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await createAppointment(f.actor, f.business.id, { serviceId: offer.target.serviceId, resourceId: offer.target.resourceId, dateKey: offer.dateKey, startTimeStr: offer.target.startTimeStr, ...contact }, `waitlist-offer-${offer.proposal.id}`, f.db);
+  const monitor = observe(f.db);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ code: 'WAITLIST_OFFER_UNVERIFIABLE' });
+  expect((await savedOffer(f, offer.id)).state).toBe('offered'); expect((await waitlistRef(f).get()).data()).toEqual(f.record); expect(monitor.writes).toEqual([]);
+});
+it.each(['slot', 'client'] as const)('conflictingDeterministicAppointmentWhileUnbookedIsUnverifiable:%s', async mismatch => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  const existing = await createAppointment(f.actor, f.business.id, { serviceId: 'cut', resourceId: 'one', dateKey: mismatch === 'slot' ? '2030-01-08' : offer.dateKey, startTimeStr: '09:00', ...contact }, `waitlist-offer-${offer.proposal.id}`, f.db);
+  if (mismatch === 'client') await businessRef(f).collection('appointments').doc(existing.id).set({ ...existing, client: { ...existing.client!, uid: f.secondClient.uid } });
+  const beforeBusiness = (await businessRef(f).get()).data();
+  const monitor = observe(f.db);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ status: 503, code: 'WAITLIST_OFFER_UNVERIFIABLE' });
+  expect(monitor.writes).toEqual([]); expect((await waitlistRef(f).get()).data()).toEqual(f.record); expect((await savedOffer(f, offer.id)).state).toBe('offered');
+  expect((await businessRef(f).get()).data()).toEqual(beforeBusiness);
+});
+it('finalStagingStorageConflictAtExpiryCannotBeConvertedToClosure', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f); let staging = false;
+  const monitor = observe(f.db, target => {
+    if ('path' in target && target.path.includes('/bookingLocks/')) staging = true;
+    if (staging && 'path' in target && target.path.endsWith('/resourceSchedulePolicies/current')) { vi.setSystemTime(offer.expiresAt); throw new StorageError(409, 'DATA_CONFLICT'); }
+  });
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ code: 'DATA_CONFLICT' });
+  expect(monitor.writes).toEqual([]); expect((await savedOffer(f, offer.id)).state).toBe('offered'); expect((await waitlistRef(f).get()).data()).toEqual(f.record);
+});
+it('partialFailureLeavesRequestAndOfferUnresolved', async () => {
+  const memory = memoryFirestore(), f = await waitlistOffersFixture(memory.db), offer = await seedPrepared(f), before = structuredClone([...memory.rows]);
+  const db: Database = { collection: name => f.db.collection(name), runTransaction: handler => f.db.runTransaction(tx => handler(new Proxy(tx, { get(target, key: keyof Transaction) {
+    if (key === 'set') return (ref: DocumentReference, data: object) => { if (ref.path === offerRef(f, offer.id).path) throw new Error('synthetic apply failure'); return target.set(ref, data); };
+    return target[key].bind(target);
+  } }))) };
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, db)).rejects.toMatchObject({ code: 'WAITLIST_OFFER_UNVERIFIABLE' });
+  expect([...memory.rows]).toEqual(before);
+});
+it('independentBookingDoesNotResolveByUid', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await createAppointment(f.actor, f.business.id, { serviceId: offer.target.serviceId, resourceId: 'one', dateKey: '2030-01-08', startTimeStr: '09:00', ...contact }, 'demo-independent-booking', f.db);
+  expect((await waitlistRef(f).get()).data()).toEqual(f.record); expect((await savedOffer(f, offer.id)).state).toBe('offered');
+});
+it('convertedAppointmentCancelOrMoveDoesNotReopen', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f), result = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db);
+  await cancelAppointment(f.actor, f.business.id, result.appointment.id, f.db);
+  expect((await waitlistRef(f).get()).data()?.request).toBeNull(); expect((await savedOffer(f, offer.id)).booking).toEqual(result.proof);
+});
+it('slotTakenLeavesRequestAndQuotaIntact', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await businessRef(f).collection('appointments').doc('demo-taken-slot').set({ id: 'demo-taken-slot', tenantId: f.business.id, dateKey: offer.dateKey, resourceId: 'one', status: 'confirmed', type: 'manual_block', startTimeStr: '09:00', endTimeStr: '10:00' });
+  const monitor = observe(f.db);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ code: 'SLOT_UNAVAILABLE' });
+  expect(monitor.writes).toEqual([]); expect((await waitlistRef(f).get()).data()).toEqual(f.record); expect((await businessRef(f).get()).data()?.subscription).toEqual(f.business.subscription);
+});
+it('quotaLastUnitAndClientLimitStillApply', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await businessRef(f).set({ ...f.business, subscription: { ...f.business.subscription, paidTrial: { ...f.business.subscription.paidTrial!, appointmentsUsed: 9 } } });
+  const result = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db);
+  expect(result.replayed).toBe(false); expect((await businessRef(f).get()).data()?.subscription.paidTrial.appointmentsUsed).toBe(10);
+  expect((await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db)).replayed).toBe(true);
+  const limited = await waitlistOffersFixture(), second = await seedPrepared(limited);
+  await createAppointment(limited.actor, limited.business.id, { serviceId: 'cut', resourceId: 'one', dateKey: '2030-01-08', startTimeStr: '09:00', ...contact }, 'demo-client-limit-existing', limited.db);
+  await updateClientPolicy(limited.owner, limited.business.id, { clientUid: limited.actor.uid, futureAppointmentLimit: 1, reason: 'Synthetic future limit' }, limited.db);
+  await expect(confirmClientWaitlistOffer(limited.actor, limited.business.id, second.id, contact, limited.db)).rejects.toMatchObject({ code: 'CLIENT_BOOKING_LIMIT' });
+  expect((await waitlistRef(limited).get()).data()).toEqual(limited.record);
+});
+it('clientCancellationWinnerRejectsOffer', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await cancelWaitlist(f.actor, f.business.id, { requestId: 'demo-cancel-before-confirm', expectedRevision: 1, entryId: offer.entryId }, f.db);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db)).rejects.toMatchObject({ code: 'OFFER_CHANGED' });
+  expect(await appointmentCount(f)).toBe(0); expect((await savedOffer(f, offer.id)).state).toBe('offered');
+});
+it('offerWinnerMakesOldWaitlistCancelConflict', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db);
+  await expect(cancelWaitlist(f.actor, f.business.id, { requestId: 'demo-cancel-after-confirm', expectedRevision: 1, entryId: offer.entryId }, f.db)).rejects.toMatchObject({ code: 'WAITLIST_CHANGED' });
+  expect((await savedOffer(f, offer.id)).state).toBe('booked');
+});
+it.each(['revocation', 'policy'] as const)('revocationOrPolicyChangeWinsBeforeConfirm:%s', async change => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  if (change === 'revocation') { const consent = await readConsent(f.actor.uid, 'account', undefined, f.db); await updateConsent(f.actor, { scope: 'account', action: 'revoke', requestId: 'demo-confirm-revocation', expectedRevision: consent.revision }, f.db); }
+  else await saveBookingDataPolicy(subjectAdmin, { businessId: f.business.id, expectedRevision: 1, dataMode: 'health', representedMinorsEnabled: false, reason: 'Synthetic restricted policy' }, f.db);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db)).rejects.toMatchObject({ status: change === 'revocation' ? 428 : 409 });
+  expect(await appointmentCount(f)).toBe(0); expect((await waitlistRef(f).get()).data()).toEqual(f.record);
+});
+it('newRequestCannotBeResolvedByOldOffer', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await cancelWaitlist(f.actor, f.business.id, { requestId: 'demo-cancel-rejoin-offer', expectedRevision: 1, entryId: offer.entryId }, f.db);
+  await businessRef(f).collection('appointments').doc('block-one').set({ id: 'block-one', tenantId: f.business.id, dateKey: f.input.dateKey, resourceId: 'one', status: 'confirmed', type: 'manual_block', startTimeStr: '09:00', endTimeStr: '10:00' });
+  await joinWaitlist(f.actor, f.business.id, { ...f.input, expectedRevision: 2 }, f.db); await businessRef(f).collection('appointments').doc('block-one').delete();
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db)).rejects.toMatchObject({ code: 'OFFER_CHANGED' });
+  expect((await waitlistRef(f).get()).data()?.revision).toBe(3); expect((await waitlistRef(f).get()).data()?.request.id).toBe(offer.entryId); expect(await appointmentCount(f)).toBe(0);
+});
+it('ownerTransferBlocksFreshAcceptButKeepsOwnBookedRead', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f);
+  await businessRef(f).set({ ...f.business, ownerUid: f.secondOwner.uid });
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db)).rejects.toMatchObject({ code: 'OFFER_CHANGED' });
+  await businessRef(f).set(f.business); const result = await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, f.db);
+  await businessRef(f).set({ ...(await businessRef(f).get()).data(), ownerUid: f.secondOwner.uid });
+  expect(await confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, { clientPhone: null, intakeAnswers: null }, f.db)).toEqual({ ...result, replayed: true });
+});
+it('freshConfirmationGateAndTerminalPreparationPreserveDurableAuthority', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f); vi.stubEnv('SARIN_WAITLIST_OFFERS_ENABLED', 'false');
+  const monitor = observe(f.db);
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ code: 'WAITLIST_OFFERS_DISABLED' });
+  expect(monitor.writes).toEqual([]);
+  await withdrawOwnerWaitlistOffer(f.owner, f.business.id, offer.id, f.db);
+  await expect(prepareClientWaitlistOffer(f.actor, f.business.id, offer.id, { requestId: 'demo-terminal-proposal' }, f.db)).resolves.toMatchObject({ usability: null, offer: { persistedState: 'withdrawn' } });
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, { clientPhone: null, intakeAnswers: null }, f.db)).rejects.toMatchObject({ code: 'OFFER_CLOSED' });
+});
+it('finalSubscriptionBoundaryAfterStagingDoesNotApply', async () => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f), endsAt = Date.now() + 1000;
+  await businessRef(f).set({ ...f.business, subscription: { ...f.business.subscription, status: 'active', currentPeriodEndsAt: endsAt } });
+  let staging = false;
+  const monitor = observe(f.db, target => {
+    if ('path' in target && target.path.includes('/bookingLocks/')) staging = true;
+    if (staging && 'path' in target && target.path.endsWith('/resourceSchedulePolicies/current')) vi.setSystemTime(endsAt);
+  });
+  await expect(confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, monitor.db)).rejects.toMatchObject({ status: 402 });
+  expect(monitor.writes).toEqual([]); expect(await appointmentCount(f)).toBe(0); expect((await savedOffer(f, offer.id)).state).toBe('offered');
+});
+it.each(['cancel', 'withdraw', 'revoke', 'policy'] as const)('inFlightConfirmationRetriesAgainstCommittedWinner:%s', async winner => {
+  const f = await waitlistOffersFixture(), offer = await seedPrepared(f), barrier = pauseFinalStagingRead(f.db);
+  const pending = confirmClientWaitlistOffer(f.actor, f.business.id, offer.id, contact, barrier.db);
+  await barrier.reached;
+  try {
+    if (winner === 'cancel') await cancelWaitlist(f.actor, f.business.id, { requestId: 'demo-barrier-cancel', expectedRevision: 1, entryId: offer.entryId }, f.db);
+    if (winner === 'withdraw') await withdrawOwnerWaitlistOffer(f.owner, f.business.id, offer.id, f.db);
+    if (winner === 'revoke') { const consent = await readConsent(f.actor.uid, 'account', undefined, f.db); await updateConsent(f.actor, { scope: 'account', action: 'revoke', requestId: 'demo-barrier-revoke', expectedRevision: consent.revision }, f.db); }
+    if (winner === 'policy') await saveBookingDataPolicy(subjectAdmin, { businessId: f.business.id, expectedRevision: 1, dataMode: 'health', representedMinorsEnabled: false, reason: 'Synthetic racing policy' }, f.db);
+  } finally { barrier.release(); }
+  await expect(pending).rejects.toMatchObject({ code: winner === 'withdraw' ? 'OFFER_CLOSED' : winner === 'revoke' ? 'CONSENT_REQUIRED' : 'OFFER_CHANGED' });
+  expect(await appointmentCount(f)).toBe(0); expect((await businessRef(f).get()).data()?.subscription.paidTrial.appointmentsUsed).toBe(1);
+  expect((await savedOffer(f, offer.id)).state).toBe(winner === 'withdraw' ? 'withdrawn' : 'offered');
+});
+it.each(['same-slot', 'last-quota-distinct-resource'] as const)('twoOffersRaceForSharedCapacityAndQuota:%s', async mode => {
+  const f = await waitlistOffersFixture(), first = await seedPrepared(f), secondRecordId = waitlistDocumentId(f.secondClient.uid, f.business.id);
+  if (mode === 'last-quota-distinct-resource') await businessRef(f).collection('appointments').doc('block-two').delete();
+  const second = await createOwnerWaitlistOffer(f.owner, f.business.id, secondRecordId, command(f, { entryId: f.second.request!.id, requestId: 'demo-racing-second-offer', selection: { resourceId: mode === 'same-slot' ? 'one' : 'two', startTimeStr: '09:00' } }), f.db);
+  await prepareClientWaitlistOffer(f.secondClient, f.business.id, second.recovery.offer.id, { requestId: 'demo-racing-second-proposal' }, f.db);
+  if (mode === 'last-quota-distinct-resource') await businessRef(f).set({ ...f.business, subscription: { ...f.business.subscription, paidTrial: { ...f.business.subscription.paidTrial!, appointmentsUsed: 9 } } });
+  const outcomes = await Promise.allSettled([confirmClientWaitlistOffer(f.actor, f.business.id, first.id, contact, f.db), confirmClientWaitlistOffer(f.secondClient, f.business.id, second.recovery.offer.id, contact, f.db)]);
+  expect(outcomes.filter(result => result.status === 'fulfilled')).toHaveLength(1); expect(outcomes.filter(result => result.status === 'rejected')).toHaveLength(1);
+  expect(await appointmentCount(f)).toBe(1); expect((await businessRef(f).get()).data()?.subscription.paidTrial.appointmentsUsed).toBe(mode === 'same-slot' ? 2 : 10);
+  const records = [(await waitlistRef(f).get()).data(), (await businessRef(f).collection('waitlistRequests').doc(secondRecordId).get()).data()];
+  expect(records.filter(record => record?.request === null)).toHaveLength(1); expect(records.filter(record => record?.request !== null)).toHaveLength(1);
 });
