@@ -11,7 +11,7 @@ export function assertWaitlistOfferRequest(request: Request, readOnly = false) {
 export function waitlistOfferHttpError(error: unknown) {
   if (error instanceof WaitlistOfferModelError) return apiError(new HttpError(503, 'No se pudo verificar la oferta de espera.', 'WAITLIST_OFFER_UNVERIFIABLE'));
   // Only known domain/auth/validation errors can select status or public text.
-  return apiError(error instanceof HttpError || error instanceof z.ZodError ? error : new Error());
+  return apiError(error instanceof HttpError || error instanceof z.ZodError ? error : new HttpError(503, 'No se pudo verificar la oferta de espera.', 'WAITLIST_OFFER_UNVERIFIABLE'));
 }
 
 export function waitlistOfferGetOnly() {

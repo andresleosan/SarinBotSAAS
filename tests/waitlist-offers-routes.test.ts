@@ -138,7 +138,8 @@ it('bounds streamed chunks and hides stream failures, malformed UTF8 JSON and co
   }
   resetCalls(); const broken = new ReadableStream({ start(controller) { controller.error(new Error('private-stream-payload')); } });
   const failed = await invoke(cases[9], new Request('http://localhost', { method: 'POST', headers: { Authorization: 'Bearer synthetic', 'Content-Type': 'application/json' }, body: broken, duplex: 'half' } as RequestInit));
-  expect(failed.status).toBe(503); expect(failed.headers.get('Cache-Control')).toBe('no-store'); expect(await failed.text()).not.toContain('private-stream-payload'); noDomainCalls();
+  expect(failed.status).toBe(503); expect(failed.headers.get('Cache-Control')).toBe('no-store');
+  const streamError = await failed.json(); expect(streamError.code).toBe('WAITLIST_OFFER_UNVERIFIABLE'); expect(JSON.stringify(streamError)).not.toContain('private-stream-payload'); noDomainCalls();
   resetCalls(); const invalidUtf8 = await invoke(cases[9], new Request('http://localhost', { method: 'POST', headers: { Authorization: 'Bearer synthetic', 'Content-Type': 'application/json' }, body: new Uint8Array([0xc3, 0x28]) }));
   expect(invalidUtf8.status).toBe(400); expect(invalidUtf8.headers.get('Cache-Control')).toBe('no-store'); noDomainCalls();
 });
@@ -169,7 +170,8 @@ it('preserves domain auth scope policy conflict and admission errors and normali
     domain[row.name].mockRejectedValueOnce(new WaitlistOfferModelError());
     const model = await invoke(row); expect(model.status).toBe(503); expect(model.headers.get('Cache-Control')).toBe('no-store'); expect((await model.json()).code).toBe('WAITLIST_OFFER_UNVERIFIABLE');
     for (const error of [new Error('private-storage-payload'), Object.assign(new Error('private-spoofed-429'), { status: 429 })]) {
-      domain[row.name].mockRejectedValueOnce(error); const result = await invoke(row); expect(result.status).toBe(503); expect(result.headers.get('Cache-Control')).toBe('no-store'); expect(await result.text()).not.toContain('private-');
+      domain[row.name].mockRejectedValueOnce(error); const result = await invoke(row); expect(result.status).toBe(503); expect(result.headers.get('Cache-Control')).toBe('no-store');
+      const unexpected = await result.json(); expect(unexpected.code).toBe('WAITLIST_OFFER_UNVERIFIABLE'); expect(JSON.stringify(unexpected)).not.toContain('private-');
     }
   }
 });
