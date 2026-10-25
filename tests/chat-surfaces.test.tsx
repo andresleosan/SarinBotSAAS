@@ -1,3 +1,4 @@
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/dashboard', useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock('@/hooks/use-resource-schedules', () => ({ useResourceSchedules: vi.fn(() => ({ view: null, phase: 'loading' })) }));
 import { act, createElement, Suspense, useEffect, type ReactNode } from "react";
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
@@ -29,7 +30,7 @@ vi.mock('@/components/consent-panel', () => ({ useAccountConsent: () => ({ activ
 vi.mock('@/hooks/useConsent', () => ({ useConsent: () => ({ active: state.businessConsent }) }));
 vi.mock("@/hooks/useBusiness", () => ({ useBusiness: () => ({ business: state.business, loading: false, error: null }) }));
 vi.mock("@/hooks/useEngineHealth", () => ({ useEngineHealth: () => { state.engineMount(); return { health: { status: "online" }, checking: false, refresh: vi.fn() }; } }));
-vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user, signOut: vi.fn() }) }));
+vi.mock("@/components/auth-provider", () => ({ AuthGate: ({ children }: { children: ReactNode }) => children, useAuth: () => ({ user: state.user, authEpoch: 0, isCurrentSession: (uid: string, epoch: number) => uid === state.user.uid && epoch === 0, invalidateSession: vi.fn(), signOut: vi.fn() }) }));
 vi.mock("@/components/app-shell", () => ({ AppShell: ({ children }: { children: ReactNode }) => children, Notice: ({ children }: { children: ReactNode }) => children, buttonClass: "button", fieldClass: "field" }));
 vi.mock("@/lib/client/api", () => ({ apiFetch: vi.fn(), errorMessage: (error: Error) => error.message }));
 vi.mock("next/link", () => ({ default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children) }));
@@ -211,7 +212,7 @@ describe("chat pause surfaces", () => {
     const cancel = renderer.root.findAllByType("button").find(node => text(node).includes("Cancelar cita"))!;
     expect(cancel.props.disabled).toBe(false);
     await act(async () => cancel.props.onClick());
-    expect(vi.mocked(apiFetch)).toHaveBeenCalledWith("/api/businesses/fixture-business/appointments", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ appointmentId: 'appointment' }) }), state.user.uid, expect.any(Function));
+    expect(vi.mocked(apiFetch)).toHaveBeenCalledWith("/api/businesses/fixture-business/appointments", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ appointmentId: 'appointment' }) }), state.user.uid, expect.any(Function), expect.any(Function));
   });
 
   it("pauses new public messages after ten introductory appointments while preserving the confirmed appointment", async () => {
