@@ -9,7 +9,7 @@ export function ClientWaitlistOffer({ controller: c, actionsLocked = false, now 
   const expired = Boolean(offer && (now >= offer.expiresAt || value!.usability === 'expired_pending_close'));
   const appointment = value?.appointment;
   const appointmentStatus = appointment?.status === 'cancelled_by_client' ? 'Cancelada por ti' : appointment?.status === 'cancelled_by_owner' ? 'Cancelada por el negocio' : appointment?.status === 'completed' ? 'Completada por el negocio' : appointment?.status === 'no_show' ? 'Inasistencia registrada' : 'Confirmada';
-  return <section aria-label="Ofertas de tu lista de espera" className="min-w-0 space-y-3 rounded-xl border border-sarin-line bg-sarin-paper p-3 [overflow-wrap:anywhere]">
+  return <section aria-label="Ofertas de tu lista de espera" className="min-w-0 space-y-3 rounded-xl border border-sarin-line bg-sarin-paper p-3 [overflow-wrap:anywhere] [&_:is(button,input,select,textarea)]:scroll-mt-44">
     <h4 className="text-sm font-semibold">Ofertas en Sarin</h4>
     {!value && <><button type="button" className={action} disabled={actionsLocked || c.loading} onClick={() => c.check()}>Comprobar ofertas</button>{c.checked && !c.loading && !c.error && <p className="text-sm text-sarin-muted">No hay una oferta actual para tu solicitud.</p>}</>}
     {c.loading && <p role="status" className="text-sm text-sarin-muted">Comprobando ofertas…</p>}
