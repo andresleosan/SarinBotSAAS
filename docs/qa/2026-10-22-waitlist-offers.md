@@ -1,6 +1,6 @@
 # QA y entrega de ofertas de espera
 
-Actualizado: 25 de octubre de 2026, Colombia. **Task 8 incompleta: zoom real 200% y la matriz amplia de teclado siguen pendientes, además de los gates integrados/revisión aún indicados como pendientes. No se han desplegado las nuevas ofertas ni habilitado su gate en producción.** Este informe distingue resultados ejecutados, revisiones aceptadas y pendientes; el título conserva la fecha del diseño.
+Actualizado: 25 de octubre de 2026, Colombia. **Task 8 incompleta: zoom real 200% y la matriz amplia de teclado siguen pendientes. Código e integración tienen revisión cerrada: el único fallo de la suite completa se corrigió y verificó con 17/17 focales; no hay un nuevo full-suite GREEN. No se han desplegado las nuevas ofertas ni habilitado su gate en producción.** Este informe distingue resultados ejecutados, revisiones aceptadas y pendientes; el título conserva la fecha del diseño.
 
 Referencias de producto: [spec de ofertas](../superpowers/specs/2026-10-22-owner-waitlist-offers-design.md), [plan de ocho tareas](../superpowers/plans/2026-10-22-owner-waitlist-offers.md), [composición acumulativa](../product/sarin-admin-extension-composition.md) y [QA de la bandeja S10 ya publicada](2026-10-25-owner-waitlist.md). La spec describe una preparación histórica; los resultados nuevos son los de este informe y sus recibos.
 
@@ -10,12 +10,16 @@ Referencias de producto: [spec de ofertas](../superpowers/specs/2026-10-22-owner
 | --- | --- |
 | Fuente ejecutada | `C:/Users/Drean Skate/AppData/Local/SarinBot/fresha-p2-20261023/source`; rama `codex/owner-waitlist-offers-20261025`. `E:/Proyectos/Sarin Bot` permanece protegido y sin cambios de esta ejecución. |
 | Base compuesta publicada | `89409634f943ebf288f57fec24c60aa229248579`; árbol `72ddaf60582ea5a88e99434e4f326c360af83281`. CI 52 y recibos de publicación/runtime/smoke de la bandeja anterior en `../work/s10-publish-20261025`. No acreditan ofertas nuevas. |
-| Pin de implementación al redactar | `f6fafbc05b4cb320e68942e8132af01ce6b7d10a` (Task 6; parent `5ce01fd6364d38163a97e2c72e88e137cb8fdedd`). Pin final compuesto con documentación/revisión global: **pendiente**. |
+| Pin de implementación/documentación | Producto `f6fafbc05b4cb320e68942e8132af01ce6b7d10a` (Task 6; parent `5ce01fd6364d38163a97e2c72e88e137cb8fdedd`); primer informe `686770dcb6f840045d8ed5f4f2d2b4dfb5dea12d`. Revisión global sobre rango fijo `8940963..686770d`. Corrección final solo de test: `2d84c3e538164d31654d66b3f1b5113b77ee5517`; sin cambio productivo posterior. |
 | Fuente histórica de la spec | `463ae55f8c873468980746185fb3e91f55cb8681`; no es el pin ejecutado ni un destino de rollback. Preflight leyó `c818711ff5e61d1648943505b9760389ca3e9398` antes de publicación; el ledger registra la base publicada efectiva. |
 | Herramientas | Node `24.22.0`, pnpm `11.23.0`, Vitest `5.0.4`, TypeScript `5.9.3`, Next `16.4.1`; Java `21.0.12.1` y emulador oficial Firestore `1.22.0` en las pruebas que lo requieren. |
 | Lockfile | SHA-256 `f035b6bd0ddb862b899be3e15ec8115cf0a47ac508f8d1e644899aa902e12358`, verificado sin cambios por los runners. Sin dependencias nuevas ni reinstalación. |
 
+Comprobación remota de solo lectura al cierre: main/origin/main siguen en `8940963`; la nueva rama de ofertas no existe en remoto. El delta posterior a `f6fafbc` no modifica src/Cloudflare/shared/scripts/índices/dependencias: solo este informe y el literal del test de composición. No hubo push, merge, despliegue, migración remota o activación nueva.
+
 La raíz externa de evidencia, abreviada **W**, es `C:/Users/Drean Skate/AppData/Local/SarinBot/fresha-p2-20261023/work`. La raíz de coordinación **S** es `C:/Users/Drean Skate/AppData/Local/SarinBot/fresha-p2-20261023/source/.superpowers/sdd/2026-10-22-owner-waitlist-offers`. Allí permanecen `progress.md`, `preflight.md`, briefs, informes, paquetes de diff y revisiones por tarea. S está ignorada: conservarla sin force-add. W conserva runners, logs, JSON, diagnósticos y fallos intermedios; no se limpió ni sustituyó la evidencia anterior. Las rutas W/S de las tablas son referencias a archivos locales externos/ignorados, no archivos versionados de este informe.
+
+La comprobación de solo lectura `W/s10-offers-validation/preservation-1792967822970.json`, a 22:37:02Z, verificó 760 archivos, ref, índice y status de E contra el inicio de sesión: `matchesSessionStart=true`, `noWritesToE=true`. Su HEAD protegido sigue `458abd14d6557862bd0bd4424e0950f92075898f` en `codex/preserved-e-checkout-20261024`. No se restauró ni limpió E.
 
 ## Comportamiento y prueba exigida
 
@@ -50,14 +54,23 @@ Los recuentos se solapan entre suites; **no se suman como pruebas únicas**. Los
 
 | Gate | Estado / recibo previsto |
 | --- | --- |
-| Suite completa sin filtrar | En ejecución por root: `node ../work/s10-offers-validate.mjs suite task8-integrated-suite`; `W/s10-offers-validation/2026-10-25T22-30-08-466Z-task8-integrated-suite-655fcc`. No se declara resultado antes de result.json. |
+| Suite completa sin filtrar | `node ../work/s10-offers-validate.mjs suite task8-integrated-suite`, **exit 1**, 558,893 s: 4604 passed/1 failed/61 skipped, 4666 total; archivos 294 passed/1 failed/5 skipped, 300 total. Único fallo: `tests/owner-client-record-routes.test.ts:243`, aserción de 12 índices frente a 14 tras los dos nuevos índices aprobados de waitlistOffers. Root inspeccionó ese delta exacto; no se observó un fallo runtime de producto. Corrección focal descrita abajo: no se afirma suite verde. Recibos `W/s10-offers-validation/2026-10-25T22-30-08-466Z-task8-integrated-suite-655fcc/{result.json,vitest.json,output.log}`. |
+| Corrección focal de integración | `2d84c3e`: únicamente literal 12→14 en el test antiguo; conserva asserts legacy y los dos índices exactos de ofertas se verifican en storage. RED 14 passed/1 failed; GREEN 17/17 en dos archivos, exit 0. Comando `node ../work/s10-offers-validate.mjs test final-fix-green tests/owner-client-record-routes.test.ts tests/waitlist-offers-storage.test.ts`; recibos `W/s10-offers-validation/2026-10-25T22-41-04-336Z-final-fix-red-b93858` y `s10-offers-validation/2026-10-25T22-41-18-579Z-final-fix-green-5eeaff`. `S/final-fix-report.md` y `S/final-fix-review.md`: ADDRESSED, sin nueva rotura; revisión cerrada. |
 | Build de aplicación | `node ../work/s10-offers-validate.mjs build task8-integrated-build`, exit 0 en 41,153 s, terminado 22:30:49Z, con validación de tipos Next. Recibo `W/s10-offers-validation/2026-10-25T22-30-08-466Z-task8-integrated-build-01042b/result.json`. |
 | Firestore selección final completa | `node ../work/s10-offers-races-validate.mjs firestore-full task6-races-emulator-full`, exit 0, 59/59, terminado 22:31:30Z. Recibo `W/s10-offers-races-validation/2026-10-25T22-27-46-124Z-task6-races-emulator-full-ce503b/result.json`. |
-| Worker / rules / índices | Resultados focales aceptados arriba, sin cambios posteriores en esos archivos; no repetir solo por cierre documental. No prueba índices remotos aplicados. |
-| Revisión independiente de rama compuesta | Pendiente; incluir el diff final, los cinco Review Focus y triage de Minors. |
+| Worker / rules / índices | Resultados focales aceptados arriba. Root comprobó diff `d9a5253..HEAD` sin cambios en Cloudflare/shared/rules/índices/manifiestos/lock: exit 0. No repetir solo por cierre documental. No prueba índices remotos aplicados. |
+| Revisión independiente de rama compuesta | `S/final-code-review.md`, rango fijo `8940963..686770d`: código productivo aprobado, ningún Critical/Important productivo nuevo y cuatro Minors diferidos. Important de composición de índices cerrado por scoped re-review `686770d..2d84c3e`. No quedan hallazgos bloqueantes de código/integración. La evidencia requerida de zoom/teclado sigue abierta; **no está listo para merge/release ni Task 8 completa**. |
 | Publicación/CI de ofertas | Pendiente; CI 52 pertenece exclusivamente a la bandeja anterior. Gate de ofertas sigue false. |
 
+Las 61 omisiones de la suite normal se desglosan en Firestore legacy 22/rules 16/ofertas 21, ejecutadas 59/59 en el gate oficial del emulador aparte, más `deepseek-intent.live.test.ts` (1) y `local-journey.integration.test.ts` (1) no ejecutadas. Los 510 suite nodes del JSON incluyen describes; no se confunden con los 300 archivos del resumen. Se conserva íntegro el resultado fallido; una corrección focal posterior no lo convierte retrospectivamente en 4605 pruebas pasadas ni en un rerun completo aprobado.
+
+Tras la corrección de un literal solo de test no se repitieron suite completa, types/build, Worker ni emulador: se conservaron las 4604 aprobadas sin cambio y se volvió a ejecutar el archivo fallido junto con storage exacto (15+2). Esto sigue la instrucción de no repetir gates aprobados sin cambios y la verificación focal de esta reparación; no equivale a un nuevo full-suite GREEN.
+
 Fixture de navegador de root: negocio demo, veintitrés solicitudes sintéticas para el 26 de octubre, servicios de igual etiqueta con precios 25000/45000 y paid_trial usado 1. Run local en puerto 3054: `W/s10-offers-qa-runs/2026-10-25T22-31-42-603Z-803651`. Cliente y dueño autenticados son sintéticos. No se usaron personas reales, mensajería ni inferencia.
+
+El harness propio queda READY en localhost:3054 para la QA nativa restante, con sus documentos/evidencia conservados y parada bajo control de root. No se efectuaron más acciones CUA después del bloqueo descrito abajo.
+
+Registro duradero de las acciones reales: `browser-observations.json` bajo ese run, sourceCommit `f6fafbc`, JSON leído y válido; incluye límites de teclado/zoom, viewport restablecido e interceptación vaciada. Snapshot privado sintético de solo lectura: `offers-demo-snapshot-1792967873521.json`, 130 documentos, project `demo-sarin-bot`; hash interno del inventario `29905eff491ceac92d55ac2879a5555470d69a984ce1902ccef70a737c69c224`. SHA-256 del archivo JSON completo: `9f2be59fe5d8b656f0f2905a860fffb6d1b7b513f1076a91d32e78a66042a76d`. Se conserva fuera de Git; no es un restore ejecutado ni autoriza restaurar sobre actividad posterior.
 
 | QA real requerida | Estado / evidencia a incorporar |
 | --- | --- |
@@ -117,4 +130,4 @@ R1–R8 proceden del preflight; R9–R15 del ledger durante ejecución. Esta tab
 | R14 replay/expiry de proposal | Mismo requestId recupera antes del gate/plan/consent/admission nuevos; distinto ID 409. Preparar offered vencida devuelve expired_pending_close sin propuesta, admisión ni cierre implícito; confirm/cierre tienen sus propias rutas persistentes. | Romper recuperación con flag off, cobrar admisión doble o declarar terminal sin commit. |
 | R15 T7 cliente separado | Contratos congelados, ownership sin owner/server/routes; extender acquireAction/capturedrelease a waitlist/citas/structured booking y handoff reschedule/chat según necesidad. Bloqueo en el mismo tick; conservar fallback y API existente. | Exclusión solo por effect/staleenabled deja dos acciones competir; cleanup viejo libera flujo nuevo o paralelismo mezcla cambios. |
 
-Cierre de Task 8, pin documental y resultados finales: **pendientes de los recibos y QA indicados arriba**. Ningún resultado anterior autoriza activar ofertas sin esos gates.
+Cierre de código/integración documentado; **Task 8 y aceptación global permanecen incompletas por zoom nativo 200% y matriz amplia de teclado**. Publicación/CI nueva/migraciones remotas/activación no se realizaron; ningún resultado anterior sustituye esos gates.
