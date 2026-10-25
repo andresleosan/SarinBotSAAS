@@ -22,8 +22,9 @@ export async function createDataTestRuntime({ previousBusinessChildren = false, 
     plugins: [...(previousBusinessChildren || previousOwnerRescheduleChildren || previousFactualFaqChildren || previousOwnerWaitlistChildren ? [{ name: 'previous-business-children', setup(build) {
       build.onLoad({ filter: /[\\/]shared[\\/]data-protocol\.ts$/ }, ({ path }) => {
         const source = readFileSync(path, 'utf8');
-        const current = "businesses: ['appointments', 'attendanceEvents', 'ownerRescheduleProposals', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests', 'waitlistOwnerReviews', 'resourceSchedulePolicies', 'resourceScheduleOperations', 'factualFaq', 'factualFaqOperations']";
-        const beforeWaitlist = current.replace(", 'waitlistOwnerReviews'", '');
+        const current = "businesses: ['appointments', 'attendanceEvents', 'ownerRescheduleProposals', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests', 'waitlistOwnerReviews', 'waitlistOfferHeads', 'waitlistOffers', 'resourceSchedulePolicies', 'resourceScheduleOperations', 'factualFaq', 'factualFaqOperations']";
+        const beforeOffers = current.replace(", 'waitlistOfferHeads', 'waitlistOffers'", '');
+        const beforeWaitlist = beforeOffers.replace(", 'waitlistOwnerReviews'", '');
         const beforeFaq = beforeWaitlist.replace(", 'factualFaq', 'factualFaqOperations'", '');
         const previous = previousOwnerWaitlistChildren ? beforeWaitlist : previousBusinessChildren ? "businesses: ['appointments', 'bookingLocks', 'clientPolicies', 'reminderPreferences', 'reminderReceipts', 'waitlistRequests']" : previousOwnerRescheduleChildren ? beforeFaq.replace("'ownerRescheduleProposals', ", '') : beforeFaq;
         if (source.split(current).length !== 2) throw new Error('Previous businesses allowlist fixture must replace exactly one literal');

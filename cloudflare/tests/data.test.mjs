@@ -26,6 +26,36 @@ async function fixture(context) {
 }
 const isError = code => error => error.code === code && !/private-payload/.test(error.message);
 
+test('waitlist offers admit only private children with bounded existing typed query fields', async context => {
+  const env = await fixture(context);
+  const parent = 'businesses/demo-offers/waitlistOffers';
+  const head = 'businesses/demo-offers/waitlistOfferHeads/record';
+  for (const child of ['waitlistOfferHeads', 'waitlistOffers']) {
+    assert.equal(isDataPath(`businesses/demo-offers/${child}`, false), true);
+    assert.equal(isDataPath(`businesses/demo-offers/${child}/${'a'.repeat(128)}`, true), true);
+    assert.equal(isDataPath(`businesses/demo-offers/${child}/${'a'.repeat(129)}`, true), false);
+    assert.equal(isDataPath(`publicBusinesses/demo-offers/${child}/record`, true), false);
+  }
+  await executeDataCommand(commit(0, [set(head, { revision: 1, currentOfferId: 'offer-a' }),
+    set(parent + '/offer-b', { id: 'offer-b', waitlistRecordId: 'record', dateKey: '2030-01-07', createdAt: 100, state: 'booked' }),
+    set(parent + '/offer-a', { id: 'offer-a', waitlistRecordId: 'record', dateKey: '2030-01-07', createdAt: 100, state: 'offered' }),
+    set(parent + '/older', { id: 'older', waitlistRecordId: 'record', dateKey: '2030-01-07', createdAt: 99, state: 'offered' })]), env);
+  assert.equal((await executeDataCommand(read(head), env)).documents[0].data.currentOfferId, 'offer-a');
+  const order = [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }];
+  assert.deepEqual((await executeDataCommand(query(parent, [{ field: 'dateKey', op: '==', value: '2030-01-07' }], order, 2), env)).documents.map(row => row.data.id), ['offer-a', 'offer-b']);
+  assert.deepEqual((await executeDataCommand(query(parent, [{ field: 'dateKey', op: '==', value: '2030-01-07' }, { field: 'state', op: '==', value: 'offered' }], order, 21), env)).documents.map(row => row.data.id), ['offer-a', 'older']);
+  assert.equal((await executeDataCommand(query(parent, [{ field: 'waitlistRecordId', op: '==', value: 'record' }], [{ field: '__name__', direction: 'asc' }], 100), env)).documents.length, 3);
+  const noAccess = new Proxy({}, { get() { assert.fail('Invalid offer command accessed storage.'); } });
+  for (const command of [read(parent + '/offer-a/nested/secret'), query(parent + '/offer-a/nested'), read('waitlistOffers/offer-a'),
+    read('businesses/demo-offers/waitlistOfferHistory/offer-a'), read('publicBusinesses/demo-offers/waitlistOffers/offer-a'),
+    ...['dateKey', 'id', 'state', 'waitlistRecordId'].map(field => query(parent, [{ field, op: '==', value: 100 }])),
+    query(parent, [{ field: 'createdAt', op: '==', value: '100' }]), query(parent, [{ field: 'clientUid', op: '==', value: 'client' }]),
+    query(parent, [], [], 0), query(parent, [], [], 1001)]) {
+    await assert.rejects(executeDataCommand(command, noAccess), isError('DATA_INVALID'));
+  }
+  await assert.rejects(executeDataCommand(commit(1, [set(parent + '/oversized', { payload: 'é'.repeat(524288) })]), noAccess), isError('DATA_LIMIT'));
+});
+
 test('owner waitlist review child and four query fields are private and strictly typed', async context => {
   const env = await fixture(context);
   const path = 'businesses/demo-wait/waitlistOwnerReviews/entry';

@@ -18,7 +18,7 @@ const runtimeKeys = [
   'PLATFORM_YCLOUD_DIAGNOSTIC_ENABLED', 'PLATFORM_YCLOUD_DIAGNOSTIC_RUN_ID', 'PLATFORM_YCLOUD_DIAGNOSTIC_EXPIRES_AT', 'PLATFORM_YCLOUD_DIAGNOSTIC_SENDER', 'PLATFORM_YCLOUD_DIAGNOSTIC_NONCE',
   'MAX_CONCURRENT_LLM_SLOTS', 'MAX_QUEUED_LLM_REQUESTS', 'LLM_QUEUE_TIMEOUT_MS', 'LLM_REQUEST_TIMEOUT_MS',
   'WEEKLY_PRICE_COP', 'FORTNIGHTLY_PRICE_COP', 'MONTHLY_PRICE_COP',
-  'SARIN_DATA_BACKEND', 'SARIN_MAINTENANCE', 'SARIN_PUBLIC_BOOKING_ORIGIN', 'PILOT_AI_BUDGET_ENFORCED', 'SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED',
+  'SARIN_DATA_BACKEND', 'SARIN_MAINTENANCE', 'SARIN_PUBLIC_BOOKING_ORIGIN', 'PILOT_AI_BUDGET_ENFORCED', 'SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED', 'SARIN_WAITLIST_OFFERS_ENABLED',
 ] as const;
 const publicKeys = ['NEXT_PUBLIC_FIREBASE_API_KEY', 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', 'NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'NEXT_PUBLIC_FIREBASE_APP_ID'] as const;
 const forbiddenRuntimeKeys = ['FIREBASE_AUTH_EMULATOR_HOST', 'FIRESTORE_EMULATOR_HOST', 'NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST', 'NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST', 'NEXT_PUBLIC_FIREBASE_EMULATORS'];
@@ -41,6 +41,7 @@ export function runtimeEnvironment(input: Record<string, unknown>): Record<strin
   if (!['firestore', 'd1'].includes(env.SARIN_DATA_BACKEND)) throw new Error('El backend de datos no es válido.');
   if (env.SARIN_MAINTENANCE !== undefined && !['true', 'false'].includes(env.SARIN_MAINTENANCE)) throw new Error('El indicador de mantenimiento no es válido.');
   if (env.SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED !== undefined && !['true', 'false'].includes(env.SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED)) throw new Error('El indicador de escritura de horarios no es válido.');
+  if (env.SARIN_WAITLIST_OFFERS_ENABLED !== undefined && !['true', 'false'].includes(env.SARIN_WAITLIST_OFFERS_ENABLED)) throw new Error('El indicador de ofertas de espera no es válido.');
   if (env.PILOT_AI_BUDGET_ENFORCED !== undefined && !['true', 'false'].includes(env.PILOT_AI_BUDGET_ENFORCED)) throw new Error('El indicador de presupuesto no es válido.');
   if (env.FIREBASE_ADMIN_PROJECT_ID.startsWith('demo-')) throw new Error('No se permite el proyecto de emuladores.');
   const credentialMode = env.FIREBASE_ADMIN_CREDENTIAL_MODE ?? 'cert';

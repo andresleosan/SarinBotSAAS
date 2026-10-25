@@ -135,6 +135,22 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
       }
     }
   });
+  it('keeps waitlist offer heads and receipts private from every browser principal', async () => {
+    await environment.withSecurityRulesDisabled(async context => {
+      for (const child of ['waitlistOfferHeads', 'waitlistOffers']) await setDoc(doc(context.firestore(), `businesses/one/${child}/record`), { businessId: 'one', clientUid: 'customer', ownerActorUid: 'owner-one', waitlistRecordId: 'record', state: 'offered' });
+    });
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('customer'), environment.authenticatedContext('owner-one'), environment.authenticatedContext('other'), environment.authenticatedContext('stale-admin', { isSuperadmin: true })]) {
+      for (const child of ['waitlistOfferHeads', 'waitlistOffers']) {
+        const db = context.firestore(), ref = doc(db, `businesses/one/${child}/record`);
+        await assertFails(getDoc(ref));
+        await assertFails(getDocs(collection(db, `businesses/one/${child}`)));
+        await assertFails(getDocs(query(collection(db, `businesses/one/${child}`), where('clientUid', '==', 'customer'))));
+        await assertFails(setDoc(doc(db, `businesses/one/${child}/forged`), { clientUid: 'customer' }));
+        await assertFails(updateDoc(ref, { state: 'booked' }));
+        await assertFails(deleteDoc(ref));
+      }
+    }
+  });
   it('keeps owner waitlist reviews private from every browser principal', async () => {
     await environment.withSecurityRulesDisabled(async context => { await setDoc(doc(context.firestore(), 'businesses/one/waitlistOwnerReviews/entry'), { businessId: 'one', waitlistRecordId: 'private-record', entryId: 'entry', reviewed: true }); });
     for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('customer'), environment.authenticatedContext('owner-one'), environment.authenticatedContext('other'), environment.authenticatedContext('stale-admin', { isSuperadmin: true })]) {

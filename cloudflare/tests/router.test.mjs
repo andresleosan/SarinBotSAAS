@@ -1,6 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { forwardToSingleton, runtimeEnvironment, publicBuildArguments, SINGLETON_NAME } from '../src/router.ts';
+import { readFileSync } from 'node:fs';
+
+test('waitlist offers gate is private, strictly boolean and disabled by default', () => {
+  assert.equal(runtimeEnvironment(certificateRuntime).SARIN_WAITLIST_OFFERS_ENABLED, undefined);
+  for (const value of ['false', 'true']) assert.equal(runtimeEnvironment({ ...certificateRuntime, SARIN_WAITLIST_OFFERS_ENABLED: value }).SARIN_WAITLIST_OFFERS_ENABLED, value);
+  for (const value of ['enabled', 'TRUE', ' true ', '0']) assert.throws(() => runtimeEnvironment({ ...certificateRuntime, SARIN_WAITLIST_OFFERS_ENABLED: value }));
+  const config = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  assert.equal(runtimeEnvironment({ ...certificateRuntime, ...config.vars, FIREBASE_ADMIN_CREDENTIAL_MODE: 'cert', FIREBASE_WIF_AUDIENCE: '', FIREBASE_WIF_SERVICE_ACCOUNT_EMAIL: '' }).SARIN_WAITLIST_OFFERS_ENABLED, 'false');
+  assert.equal(publicBuildArguments({ ...certificateRuntime, SARIN_WAITLIST_OFFERS_ENABLED: 'true', NEXT_PUBLIC_FIREBASE_API_KEY: 'public-synthetic', NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'real-project.firebaseapp.com', NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'real-project', NEXT_PUBLIC_FIREBASE_APP_ID: 'app-id' }).SARIN_WAITLIST_OFFERS_ENABLED, undefined);
+});
 
 test('resource schedule write gate is private, boolean and forwarded without enabling by absence', () => {
   assert.equal(runtimeEnvironment(certificateRuntime).SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED, undefined);
