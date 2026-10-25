@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Send } from 'lucide-react';
 import { SarinMark } from '@/components/sarin-brand';
@@ -15,6 +15,8 @@ import { useWaitlist, validWaitlistDate, type WaitlistBookingHint, type Waitlist
 import type { WaitlistRequestView } from '@/types/waitlist';
 import { Notice, buttonClass, fieldClass } from '@/components/app-shell';
 import { ClientAppointments } from '@/components/client-appointments';
+import { ClientWaitlistOffer } from '@/components/client-waitlist-offer';
+import { useClientWaitlistOffer } from '@/hooks/use-client-waitlist-offer';
 import { BookingProposal } from '@/components/booking-proposal';
 import { useDebouncedChat } from '@/hooks/useDebouncedChat';
 import { useEngineHealth } from '@/hooks/useEngineHealth';
@@ -27,14 +29,17 @@ import { BusinessLocation } from '@/components/business-location';
 import type { BookingCapability } from '@/lib/booking-subject';
 import { businessSocialLabel, businessSocialPlatformLabels } from '@/lib/business-branding';
 
-function GeneralBookingChat({ business, uid, permitted, faqEnabled, now, onConfirmed, onLockedChange }: { business: PublicBusiness; uid: string; permitted: boolean; faqEnabled: boolean; now: number; onConfirmed: () => void; onLockedChange: (locked: boolean) => void }) {
+function GeneralBookingChat({ business, uid, permitted, faqEnabled, now, onConfirmed, onLockedChange, acquireAction }: { business: PublicBusiness; uid: string; permitted: boolean; faqEnabled: boolean; now: number; onConfirmed: () => void; onLockedChange: (locked: boolean) => void; acquireAction: () => false | (() => void) }) {
   const [input, setInput] = useState(''), end = useRef<HTMLDivElement>(null), engine = useEngineHealth();
   const chat = useDebouncedChat({ mode: 'sarin_client', tenantId: business.id, actorUid: uid, enabled: permitted, onToolExecuted: name => { if (name === 'cita_confirmada') onConfirmed(); } });
   const locked = chat.isWaitingBatch || chat.isGenerating || chat.confirming || chat.confirmationUncertain;
-  useEffect(() => { onLockedChange(locked); return () => onLockedChange(false); }, [locked, onLockedChange]);
+  const release = useRef<(() => void) | null>(null);
+  function enter() { if (release.current) return true; const own = acquireAction(); if (!own) return false; release.current = own; return true; }
+  useEffect(() => { onLockedChange(locked); if (!locked && !chat.proposal) { const own = release.current; release.current = null; own?.(); } }, [locked, chat.proposal, onLockedChange]);
+  useEffect(() => () => { const own = release.current; release.current = null; own?.(); onLockedChange(false); }, [onLockedChange]);
   useEffect(() => { void end.current?.scrollIntoView({ behavior: 'auto', block: 'nearest' }); }, [chat.messages, chat.isGenerating]);
   const allowed = isSubscriptionAllowed(business, now), available = allowed && !chat.quotaExhausted, canSend = permitted && available && !chat.confirming && !chat.confirmationUncertain;
-  function submit(event: FormEvent) { event.preventDefault(); if (!canSend || !input.trim()) return; chat.sendMessage(input); setInput(''); }
+  function submit(event: FormEvent) { event.preventDefault(); if (!canSend || !input.trim() || !enter()) return; chat.sendMessage(input); setInput(''); }
   return <section aria-label="Asistente de reservas" className="space-y-4">
     {!available && <Notice>La atención de IA está temporalmente en pausa. Puedes consultar y cancelar tus citas o contactar directamente al establecimiento.</Notice>}
     {engine.health?.status === 'offline' && <Notice>SarinBot no puede responder en este momento. <button className="min-h-11 text-sarin-blue underline" disabled={engine.checking} onClick={() => void engine.refresh()}>Comprobar conexión</button></Notice>}
@@ -43,9 +48,9 @@ function GeneralBookingChat({ business, uid, permitted, faqEnabled, now, onConfi
     <div aria-live="polite" className="space-y-4">
       {chat.messages.map(message => <div key={message.id} className={`whitespace-pre-wrap break-words rounded-2xl p-4 text-sm leading-relaxed ${message.role === 'user' ? 'ml-8 bg-sarin-blue text-white' : 'mr-5 border border-sarin-line bg-sarin-canvas text-sarin-ink'}`}>{message.content}</div>)}
       {(chat.isWaitingBatch || chat.isGenerating) && <p role="status" className="text-xs text-sarin-blue">{chat.isGenerating ? 'SarinBot está revisando tu solicitud…' : 'Preparando tu mensaje…'}</p>}
-      {chat.error && <div className="space-y-3">{!chat.quotaExhausted && <Notice error={!chat.requestAlreadyCompleted}>{chat.error}</Notice>}{!chat.requestAlreadyCompleted && !chat.confirmationUncertain && <button className="min-h-11 text-sm text-sarin-blue underline" onClick={chat.retry} disabled={chat.isGenerating || !permitted || !(allowed || getBusinessAccess(business, now) === 'trial_exhausted')}>{chat.quotaExhausted ? 'Comprobar disponibilidad' : 'Reintentar mensaje'}</button>}</div>}
+      {chat.error && <div className="space-y-3">{!chat.quotaExhausted && <Notice error={!chat.requestAlreadyCompleted}>{chat.error}</Notice>}{!chat.requestAlreadyCompleted && !chat.confirmationUncertain && <button className="min-h-11 text-sm text-sarin-blue underline" onClick={() => { if (enter()) chat.retry(); }} disabled={chat.isGenerating || !permitted || !(allowed || getBusinessAccess(business, now) === 'trial_exhausted')}>{chat.quotaExhausted ? 'Comprobar disponibilidad' : 'Reintentar mensaje'}</button>}</div>}
       {chat.confirmationUncertain && !chat.confirming && <Notice>Falta comprobar tu cita. Recupera la confirmación con los datos que enviaste antes de cambiar de recorrido.</Notice>}
-      {(permitted || chat.confirmationUncertain) && chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming || chat.isGenerating || chat.isWaitingBatch} recovering={chat.confirmationUncertain && !chat.confirming} onConfirm={chat.confirmProposal} />}
+      {(permitted || chat.confirmationUncertain) && chat.proposal && <BookingProposal proposal={chat.proposal} confirming={chat.confirming || chat.isGenerating || chat.isWaitingBatch} recovering={chat.confirmationUncertain && !chat.confirming} onConfirm={async (id, contact) => { if (enter()) await chat.confirmProposal(id, contact); }} />}
       <div ref={end} />
     </div>
     <form onSubmit={submit} className="sticky bottom-0 flex min-w-0 gap-2 border-t border-sarin-line bg-sarin-canvas py-3">
@@ -54,7 +59,7 @@ function GeneralBookingChat({ business, uid, permitted, faqEnabled, now, onConfi
     </form>
   </section>;
 }
-function BookingJourney({ business, capability, uid, permitted, policyReady, now, onConfirmed, initialServiceId, initialBookingHint, waitlist, onInitialServiceHandled, onLockedChange }: { business: PublicBusiness; capability: BookingCapability; uid: string; permitted: boolean; policyReady: boolean; now: number; onConfirmed: () => void; initialServiceId?: string; initialBookingHint?: WaitlistBookingHint; waitlist?: WaitlistController; onInitialServiceHandled?: () => void; onLockedChange?: (locked: boolean) => void }) {
+function BookingJourney({ business, capability, uid, permitted, policyReady, now, onConfirmed, initialServiceId, initialBookingHint, waitlist, onInitialServiceHandled, onLockedChange, acquireAction }: { business: PublicBusiness; capability: BookingCapability; uid: string; permitted: boolean; policyReady: boolean; now: number; onConfirmed: () => void; initialServiceId?: string; initialBookingHint?: WaitlistBookingHint; waitlist?: WaitlistController; onInitialServiceHandled?: () => void; onLockedChange?: (locked: boolean) => void; acquireAction: () => false | (() => void) }) {
   const [represented, setRepresented] = useState(initialBookingHint?.subjectKind === 'represented_minor'), [locked, setLocked] = useState(false), [mode, setMode] = useState<'calendar' | 'chat'>('calendar'), structuredStarted = useRef(capability.dataMode === 'health');
   useEffect(() => { onLockedChange?.(locked); return () => onLockedChange?.(false); }, [locked, onLockedChange]);
   const keepChat = mode === 'chat' && locked;
@@ -67,17 +72,20 @@ function BookingJourney({ business, capability, uid, permitted, policyReady, now
     {capability.dataMode === 'general' && capability.representedMinorsEnabled && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Para quién reservas?</legend><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" aria-pressed={!represented} disabled={switchLocked} onClick={() => { if (!switchLocked) { setMode('calendar'); setRepresented(false); } }}>Para mí</button><button className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue" aria-pressed={represented} disabled={switchLocked} onClick={() => { if (!switchLocked) setRepresented(true); }}>Para un menor a quien represento</button></fieldset>}
     {capability.dataMode === 'general' && !represented && <fieldset className="flex flex-wrap gap-2"><legend className="mb-2 text-sm font-medium">¿Cómo prefieres reservar?</legend>{([['calendar', 'Reservar con calendario'], ['chat', 'Hablar con SarinBot']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} disabled={switchLocked} onClick={() => selectMode(value)} className={`min-h-11 max-w-full rounded-lg border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue disabled:opacity-50 ${mode === value ? 'border-sarin-blue bg-sarin-soft text-sarin-blue' : 'border-sarin-line'}`}>{label}</button>)}</fieldset>}
     {!enabled && <Notice>Revisa los permisos y las opciones del negocio antes de comenzar una nueva reserva. Puedes recuperar una confirmación pendiente y consultar Mis citas.</Notice>}
-    {structured ? (structuredStarted.current && <StructuredBooking business={business} capability={capability} initialSubjectKind={represented ? 'represented_minor' : 'self'} initialServiceId={initialServiceId} initialBookingHint={initialBookingHint} waitlist={waitlist} onInitialServiceHandled={onInitialServiceHandled} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} />) : <GeneralBookingChat business={business} uid={uid} permitted={enabled && capability.dataMode === 'general' && !represented} faqEnabled={permitted && policyReady && capability.dataMode === 'general' && !capability.representedMinorsEnabled && !represented} now={now} onConfirmed={onConfirmed} onLockedChange={setLocked} />}
+    {structured ? (structuredStarted.current && <StructuredBooking business={business} capability={capability} initialSubjectKind={represented ? 'represented_minor' : 'self'} initialServiceId={initialServiceId} initialBookingHint={initialBookingHint} waitlist={waitlist} onInitialServiceHandled={onInitialServiceHandled} enabled={enabled} onConfirmed={onConfirmed} onLockedChange={setLocked} acquireAction={acquireAction} />) : <GeneralBookingChat business={business} uid={uid} permitted={enabled && capability.dataMode === 'general' && !represented} faqEnabled={permitted && policyReady && capability.dataMode === 'general' && !capability.representedMinorsEnabled && !represented} now={now} onConfirmed={onConfirmed} onLockedChange={setLocked} acquireAction={acquireAction} />}
   </div>;
 }
-function BookingWorkspace({ business, capability, uid, permitted, policyReady, catalogReady, now, initialServiceId, onInitialServiceHandled }: { business: PublicBusiness; capability: BookingCapability | null; uid: string; permitted: boolean; policyReady: boolean; catalogReady: boolean; now: number; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
+type ActionKind = 'appointment' | 'booking' | 'waitlist' | 'reschedule' | 'offer';
+function BookingWorkspace({ business, capability, uid, authEpoch, permitted, policyReady, catalogReady, now, initialServiceId, onInitialServiceHandled }: { business: PublicBusiness; capability: BookingCapability | null; uid: string; authEpoch: number; permitted: boolean; policyReady: boolean; catalogReady: boolean; now: number; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
   const [version, setVersion] = useState(0), [locked, setLocked] = useState(false);
   const [entry, setEntry] = useState<{ revision: number; serviceId?: string; hint?: WaitlistBookingHint } | null>(null);
   const [rescheduleEntry, setRescheduleEntry] = useState<{ source: Appointment; capability: BookingCapability } | null>(null), activeReschedule = useRef(rescheduleEntry);
-  const [appointmentActionLocked, setAppointmentActionLocked] = useState(false), localAction = useRef(false), rescheduleLocked = useRef(false);
+  const [actionKind, setActionKind] = useState<ActionKind | null>(null), localAction = useRef<{ kind: ActionKind } | null>(null), rescheduleLocked = useRef(false);
+  const bookingLocked = useRef(false), rescheduleRelease = useRef<(() => void) | null>(null);
+  const appointmentActionLocked = actionKind !== null && actionKind !== 'booking' && actionKind !== 'reschedule';
   const [sourceCurrent, setSourceCurrent] = useState(true), [changeNotice, setChangeNotice] = useState<string | null>(null);
   const start = useRef<HTMLDivElement>(null), changeStart = useRef<HTMLDivElement>(null), appointmentsStart = useRef<HTMLDivElement>(null), mounted = useRef(true);
-  const entryAllowed = permitted && policyReady && catalogReady && Boolean(capability) && !locked && !appointmentActionLocked && !rescheduleEntry;
+  const entryAllowed = permitted && policyReady && catalogReady && Boolean(capability) && !locked && !actionKind && !rescheduleEntry;
   const rebookingEnabled = entryAllowed && isSubscriptionAllowed(business, now), reschedulingEnabled = entryAllowed && canRescheduleSubscription(business, now);
   const current = useRef({ rebookingEnabled, reschedulingEnabled, services: business.services, onInitialServiceHandled });
   current.current = { rebookingEnabled, reschedulingEnabled, services: business.services, onInitialServiceHandled };
@@ -85,10 +93,25 @@ function BookingWorkspace({ business, capability, uid, permitted, policyReady, c
   useEffect(() => { if (entry) { start.current?.focus(); start.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [entry?.revision]);
   useEffect(() => { if (rescheduleEntry) { changeStart.current?.focus(); changeStart.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [rescheduleEntry]);
   useEffect(() => { if (changeNotice) { appointmentsStart.current?.focus(); appointmentsStart.current?.scrollIntoView({ behavior: 'auto', block: 'start' }); } }, [version, changeNotice]);
-  const handleActionLock = useCallback((value: boolean) => { if (!mounted.current || (value && localAction.current)) return false; localAction.current = value; setAppointmentActionLocked(value); return true; }, []);
-  const acquireWaitlistAction = useCallback(() => handleActionLock(true), [handleActionLock]);
-  const releaseWaitlistAction = useCallback(() => { handleActionLock(false); }, [handleActionLock]);
+  const acquire = useCallback((kind: ActionKind) => {
+    if (!mounted.current || localAction.current || bookingLocked.current) return false;
+    const token = { kind }; localAction.current = token; setActionKind(kind);
+    return () => { if (localAction.current !== token) return; localAction.current = null; if (mounted.current) setActionKind(null); };
+  }, []);
+  const acquireBooking = useCallback(() => acquire('booking'), [acquire]);
+  const acquireAppointment = useCallback(() => acquire('appointment'), [acquire]);
+  const acquireOffer = useCallback(() => acquire('offer'), [acquire]);
+  const handleBookingLock = useCallback((value: boolean) => { bookingLocked.current = value; setLocked(value); }, []);
+  // A keyed appointments subtree keeps its own legacy callback token as well.
+  const handleActionLock = useMemo(() => {
+    let own: (() => void) | false = false;
+    return (value: boolean) => { if (value) { if (own) return false; own = acquire('appointment'); return Boolean(own); } const release = own; own = false; if (release) release(); return true; };
+  }, [acquire, version]);
+  const acquireWaitlistAction = useCallback(() => acquire('waitlist'), [acquire]);
+  const releaseWaitlistAction = useCallback(() => {}, []);
   const waitlist = useWaitlist(business.id, uid, { canJoin: rebookingEnabled, actionsLocked: locked || Boolean(rescheduleEntry) || appointmentActionLocked, acquireAction: acquireWaitlistAction, releaseAction: releaseWaitlistAction });
+  const offers = useClientWaitlistOffer({ businessId: business.id, userId: uid, authEpoch, enabled: true, acquireAction: acquireOffer,
+    onConfirmed: () => { if (!mounted.current) return; setVersion(value => value + 1); void waitlist.refresh(); } });
   const latestWaitlist = useRef({ controller: waitlist, business, capability }); latestWaitlist.current = { controller: waitlist, business, capability };
   function chooseWaitlist(request: WaitlistRequestView, revision: number) {
     const latest = latestWaitlist.current, value = latest.controller;
@@ -116,29 +139,30 @@ function BookingWorkspace({ business, capability, uid, permitted, policyReady, c
   }
   function reschedule(source: Appointment) {
     if (!mounted.current || activeReschedule.current || localAction.current || !capability || !current.current.reschedulingEnabled || source.tenantId !== business.id || source.client?.uid !== uid || source.type !== 'appointment' || source.status !== 'confirmed' || source.startAt <= Date.now() || !Number.isSafeInteger(source.rescheduleRevision ?? 0) || (source.rescheduleRevision ?? 0) < 0) return;
+    const release = acquire('reschedule'); if (!release) return; rescheduleRelease.current = release;
     const next = { source, capability }; activeReschedule.current = next; setSourceCurrent(true); setChangeNotice(null); setRescheduleEntry(next);
     return true;
   }
   function closeReschedule(expected: NonNullable<typeof rescheduleEntry>) {
     if (!mounted.current || activeReschedule.current !== expected || rescheduleLocked.current) return;
-    activeReschedule.current = null; setRescheduleEntry(null); appointmentsStart.current?.focus();
+    activeReschedule.current = null; setRescheduleEntry(null); rescheduleRelease.current?.(); rescheduleRelease.current = null; appointmentsStart.current?.focus();
   }
   function changed(expected: NonNullable<typeof rescheduleEntry>, result: RescheduleResult) {
     if (!mounted.current || activeReschedule.current !== expected || result.appointmentId !== expected.source.id || result.revision !== (expected.source.rescheduleRevision ?? 0) + 1) return;
-    activeReschedule.current = null; rescheduleLocked.current = false; setRescheduleEntry(null); setVersion(value => value + 1);
+    activeReschedule.current = null; rescheduleRelease.current?.(); rescheduleRelease.current = null; rescheduleLocked.current = false; setRescheduleEntry(null); setVersion(value => value + 1);
     setChangeNotice('Cambio de horario confirmado. Consulta Mis citas para ver el horario y estado actuales. Si importaste un archivo de calendario, debes actualizarlo manualmente según Mis citas.');
   }
   return <>
     {capability && !rescheduleEntry && <div ref={start} role="region" aria-label="Nueva reserva" tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue">
-      <BookingJourney key={entry?.revision ?? 0} business={business} capability={capability} uid={uid} permitted={permitted && !appointmentActionLocked} policyReady={policyReady} now={now} initialServiceId={entry ? entry.serviceId : initialServiceId} initialBookingHint={entry?.hint} waitlist={waitlist} onInitialServiceHandled={handleInitialService} onConfirmed={() => setVersion(value => value + 1)} onLockedChange={setLocked} />
+      <BookingJourney key={entry?.revision ?? 0} business={business} capability={capability} uid={uid} permitted={permitted && !appointmentActionLocked} policyReady={policyReady} now={now} initialServiceId={entry ? entry.serviceId : initialServiceId} initialBookingHint={entry?.hint} waitlist={waitlist} onInitialServiceHandled={handleInitialService} onConfirmed={() => setVersion(value => value + 1)} onLockedChange={handleBookingLock} acquireAction={acquireBooking} />
     </div>}
     {rescheduleEntry && <div ref={changeStart} role="region" aria-label="Cambio de horario de mi cita" tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><AppointmentReschedule uid={uid} source={rescheduleEntry.source} business={business} capability={capability ?? rescheduleEntry.capability} enabled={permitted && policyReady && catalogReady && Boolean(capability) && !appointmentActionLocked} sourceCurrent={sourceCurrent} onConfirmed={result => changed(rescheduleEntry, result)} onCancel={() => closeReschedule(rescheduleEntry)} onLockedChange={handleRescheduleLock} /></div>}
     {changeNotice && <p role="status" className="rounded-xl border border-sarin-line bg-sarin-paper p-4 text-sm text-sarin-blue">{changeNotice}</p>}
-    <div ref={appointmentsStart} tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><ClientAppointments key={version} businessId={business.id} businessName={business.name} resources={business.resources} services={business.services} userId={uid} now={now} waitlist={waitlist} waitlistResumeEnabled={rebookingEnabled} onWaitlistChoose={chooseWaitlist} onRebook={rebook} rebookingEnabled={rebookingEnabled} onReschedule={reschedule} reschedulingEnabled={reschedulingEnabled} actionsLocked={locked || Boolean(rescheduleEntry) || waitlist.busy} onActionLockChange={handleActionLock} onAppointmentsRead={handleAppointmentsRead} /></div>
+    <div ref={appointmentsStart} tabIndex={-1} className="scroll-mt-44 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue"><ClientAppointments key={version} businessId={business.id} businessName={business.name} resources={business.resources} services={business.services} userId={uid} now={now} waitlist={waitlist} waitlistResumeEnabled={rebookingEnabled} onWaitlistChoose={chooseWaitlist} onRebook={rebook} rebookingEnabled={rebookingEnabled} onReschedule={reschedule} reschedulingEnabled={reschedulingEnabled} actionsLocked={locked || Boolean(rescheduleEntry) || waitlist.busy || Boolean(actionKind)} acquireAction={acquireAppointment} waitlistOfferContent={<ClientWaitlistOffer controller={offers} now={now} actionsLocked={locked || Boolean(rescheduleEntry) || waitlist.busy || Boolean(actionKind && actionKind !== 'offer')} />} onActionLockChange={handleActionLock} onAppointmentsRead={handleAppointmentsRead} /></div>
   </>;
 }
 function Island({ slug, initialServiceId, onInitialServiceHandled }: { slug: string; initialServiceId?: string; onInitialServiceHandled?: () => void }) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, authEpoch } = useAuth();
   const projection = useApiPoll<PublicBusiness | null>(slug, async signal => { const response = await fetch(`/api/public/businesses/${encodeURIComponent(slug)}`, { signal, cache: 'no-store' }); if (!response.ok) throw new Error('No pudimos consultar el negocio. Inténtalo de nuevo.'); return (await response.json() as { business: PublicBusiness | null }).business; });
   const business = projection.value, account = useAccountConsent(), businessConsent = useConsent(user?.uid, 'business_client', business ?? undefined), policy = useBookingDataPolicy(user?.uid, business?.id);
   const intentBusinessId = useRef<string | null>(null);
@@ -159,7 +183,7 @@ function Island({ slug, initialServiceId, onInitialServiceHandled }: { slug: str
       {projection.error && <Notice error>{projection.error}</Notice>}
       <section aria-label="Servicios del negocio" className="rounded-2xl border border-sarin-line bg-sarin-paper p-5"><h2 className="font-semibold">Servicios de {business.name}</h2><div className="mt-3 flex flex-wrap gap-2">{business.services.map(service => <span key={service.id} className="min-w-0 max-w-full break-words rounded-lg border border-sarin-line px-3 py-2 text-xs [overflow-wrap:anywhere]">{service.name} · {service.price.toLocaleString('es-CO')} COP</span>)}</div><nav className="mt-3 flex flex-wrap gap-x-5 text-xs text-sarin-blue" aria-label="Información del servicio"><Link href="/privacidad" className="inline-flex min-h-11 items-center underline">Privacidad</Link><Link href="/ayuda" className="inline-flex min-h-11 items-center underline">Ayuda</Link></nav></section>
       {!policy.ready && <div><Notice error={Boolean(policy.error)}>{policy.error || 'Comprobando las opciones de reserva…'}</Notice>{policy.error && <button className={buttonClass} onClick={policy.refresh}>Reintentar opciones de reserva</button>}</div>}
-      {user && <BookingWorkspace key={`${user.uid}:${business.id}`} business={business} capability={policy.capability} uid={user.uid} permitted={account.active && businessConsent.active} policyReady={policy.ready} catalogReady={!projection.error && !projection.loading} now={now} initialServiceId={scopedServiceId} onInitialServiceHandled={onInitialServiceHandled} />}
+      {user && <BookingWorkspace key={`${user.uid}:${authEpoch}:${business.id}`} authEpoch={authEpoch} business={business} capability={policy.capability} uid={user.uid} permitted={account.active && businessConsent.active} policyReady={policy.ready} catalogReady={!projection.error && !projection.loading} now={now} initialServiceId={scopedServiceId} onInitialServiceHandled={onInitialServiceHandled} />}
     </div>
   </main>;
 }

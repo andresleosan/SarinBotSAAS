@@ -5,7 +5,7 @@ import type { WaitlistState, WaitlistJoinInput, WaitlistRequestView } from '@/ty
 
 export type WaitlistSelection = Omit<WaitlistJoinInput, 'requestId' | 'expectedRevision'>;
 export type WaitlistBookingHint = Pick<WaitlistRequestView, 'serviceId' | 'dateKey' | 'resourceId' | 'subjectKind' | 'representativeRole'>;
-type Context = { canJoin: boolean; actionsLocked: boolean; acquireAction: () => boolean; releaseAction: () => void };
+type Context = { canJoin: boolean; actionsLocked: boolean; acquireAction: () => boolean | (() => void); releaseAction: () => void };
 const safeId = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 export function validWaitlistDate(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -70,8 +70,9 @@ export function useWaitlist(businessId: string, userId: string, context: Context
     if (!availableAction() || conditions.current.actionsLocked) return;
     const data = latest.current.data!, request = data.request;
     if (operation === 'join' ? !input || !conditions.current.canJoin || (request !== null && request.expiresAt > clock()) : !request || request.id !== observedEntry) return;
-    if (!conditions.current.acquireAction()) return;
-    release.current = conditions.current.releaseAction;
+    const acquired = conditions.current.acquireAction();
+    if (!acquired) return;
+    release.current = typeof acquired === 'function' ? acquired : conditions.current.releaseAction;
     const abort = mutation.current = new AbortController(), requestId = crypto.randomUUID();
     const body = operation === 'join' ? { ...input!, requestId, expectedRevision: data.revision } : { requestId, expectedRevision: data.revision, entryId: request!.id };
     update({ operation, actionError: null, uncertain: false });

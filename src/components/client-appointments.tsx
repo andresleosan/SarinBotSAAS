@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CalendarPlus, Download } from "lucide-react";
 import { Notice, buttonClass, fieldClass } from "@/components/app-shell";
 import { ClientAppointmentReminders } from "@/components/client-appointment-reminders";
@@ -46,7 +46,7 @@ function statusLabel(appointment: Appointment, now: number): string {
   }
 }
 
-export function ClientAppointments({ businessId, businessName, resources = [], services = [], userId, now, onRebook, rebookingEnabled = false, onReschedule, reschedulingEnabled = false, actionsLocked = false, onActionLockChange, onAppointmentsRead, waitlist, waitlistResumeEnabled = false, onWaitlistChoose }: { businessId: string; businessName: string; resources?: TenantResource[]; services?: TenantService[]; userId: string; now: number; onRebook?: (serviceId: string) => void; rebookingEnabled?: boolean; onReschedule?: (appointment: Appointment) => boolean | void; reschedulingEnabled?: boolean; actionsLocked?: boolean; onActionLockChange?: (locked: boolean) => boolean | void; waitlist?: WaitlistController; waitlistResumeEnabled?: boolean; onWaitlistChoose?: (request: WaitlistRequestView, revision: number) => void; onAppointmentsRead?: (appointments: Appointment[] | null) => void }) {
+export function ClientAppointments({ businessId, businessName, resources = [], services = [], userId, now, onRebook, rebookingEnabled = false, onReschedule, reschedulingEnabled = false, actionsLocked = false, onActionLockChange, onAppointmentsRead, waitlist, waitlistResumeEnabled = false, onWaitlistChoose, waitlistOfferContent, acquireAction }: { businessId: string; businessName: string; resources?: TenantResource[]; services?: TenantService[]; userId: string; now: number; onRebook?: (serviceId: string) => void; rebookingEnabled?: boolean; onReschedule?: (appointment: Appointment) => boolean | void; reschedulingEnabled?: boolean; actionsLocked?: boolean; onActionLockChange?: (locked: boolean) => boolean | void; acquireAction?: () => false | (() => void); waitlistOfferContent?: ReactNode; waitlist?: WaitlistController; waitlistResumeEnabled?: boolean; onWaitlistChoose?: (request: WaitlistRequestView, revision: number) => void; onAppointmentsRead?: (appointments: Appointment[] | null) => void }) {
   const [retry, setRetry] = useState(0);
   const scope = `${businessId}:${userId}`;
   const currentScope = useRef({ key: scope });
@@ -83,10 +83,27 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
   // The query is scoped by the authenticated UID; recheck it before displaying or acting.
   const ownAppointments = appointments.filter(item => item.tenantId === businessId && item.type === "appointment" && item.client?.uid === userId && knownStatuses.includes(item.status)
     && Number.isFinite(item.startAt) && Number.isFinite(item.endAt) && item.endAt > item.startAt);
-  const latest = useRef({ appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, onReschedule, reschedulingEnabled, actionsLocked, onActionLockChange, onAppointmentsRead, view, loading, readError });
-  latest.current = { appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, onReschedule, reschedulingEnabled, actionsLocked, onActionLockChange, onAppointmentsRead, view, loading, readError };
+  const latest = useRef({ appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, onReschedule, reschedulingEnabled, actionsLocked, onActionLockChange, acquireAction, onAppointmentsRead, view, loading, readError });
+  latest.current = { appointments: ownAppointments, businessName, resources, services, onRebook, rebookingEnabled, onReschedule, reschedulingEnabled, actionsLocked, onActionLockChange, acquireAction, onAppointmentsRead, view, loading, readError };
   useEffect(() => { latest.current.onAppointmentsRead?.(loading || readError ? null : latest.current.appointments); }, [appointmentRead.value, loading, readError, scope]);
-  useEffect(() => () => { latest.current.onActionLockChange?.(false); }, [scope]);
+  const ownedAction = useRef<{ scope: object; release: () => void } | null>(null);
+  function acquireLocalAction() {
+    const value = latest.current;
+    let release: (() => void) | false;
+    if (value.acquireAction) release = value.acquireAction();
+    else {
+      const callback = value.onActionLockChange;
+      if (callback?.(true) === false) return false;
+      release = () => { callback?.(false); };
+    }
+    if (!release) return false;
+    const lease = { scope: actionScope, release }; ownedAction.current = lease;
+    return () => { if (ownedAction.current !== lease) return; ownedAction.current = null; lease.release(); };
+  }
+  useEffect(() => () => {
+    const own = ownedAction.current;
+    if (own?.scope === actionScope) { ownedAction.current = null; own.release(); }
+  }, [scope]);
   const visible = ownAppointments.filter(item => view === "calendar" ? dateKey(item.startAt) === selectedDate
     : view === "upcoming" ? item.status === "confirmed" && item.endAt > now : isHistorical(item, now))
     .sort((a, b) => view === "history" ? b.startAt - a.startAt : a.startAt - b.startAt);
@@ -141,7 +158,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
   }
   async function cancel(appointment: Appointment) {
     if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
-    if (latest.current.onActionLockChange?.(true) === false) return;
+    const releaseAction = acquireLocalAction(); if (!releaseAction) return;
     pending.current = appointment.id;
     setPendingId(appointment.id);
     setActionError(null);
@@ -160,11 +177,11 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       setView("history");
       setNotice("Cita cancelada.");
     } catch (cause) { if (currentScope.current === actionScope) setActionError(errorMessage(cause)); }
-    finally { if (currentScope.current === actionScope) { pending.current = null; setPendingId(null); latest.current.onActionLockChange?.(false); } }
+    finally { if (currentScope.current === actionScope) { pending.current = null; setPendingId(null); } releaseAction(); }
   }
   async function download(appointment: Appointment) {
     if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current || appointment.client?.uid !== userId || !canChange(appointment, Date.now())) return;
-    if (latest.current.onActionLockChange?.(true) === false) return;
+    const releaseAction = acquireLocalAction(); if (!releaseAction) return;
     exporting.current = { id: appointment.id, kind: "image" };
     setExportAction(exporting.current); setActionError(null); setNotice(null);
     const generatedAt = Date.now();
@@ -190,7 +207,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       finally { anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }
       setNotice("Imagen de la cita descargada. Consulta Mis citas para ver cambios o cancelaciones.");
     } catch (cause) { if (currentScope.current === actionScope) setActionError(errorMessage(cause)); }
-    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); latest.current.onActionLockChange?.(false); } }
+    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); } releaseAction(); }
   }
   async function downloadCalendar(appointment: Appointment) {
     if (currentScope.current !== actionScope || latest.current.actionsLocked || handingOff.current || pending.current || exporting.current) return;
@@ -209,7 +226,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
     }
     const snapshot = details(saved);
     const serviceId = saved.serviceId, resourceId = saved.resourceId;
-    if (latest.current.onActionLockChange?.(true) === false) return;
+    const releaseAction = acquireLocalAction(); if (!releaseAction) return;
     exporting.current = { id: saved.id, kind: "calendar" };
     setExportAction(exporting.current); setActionError(null); setNotice(null);
     try {
@@ -225,7 +242,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       downloadICSFile(content, `cita-${dateKey(actual.startAt)}.ics`);
       setNotice("Archivo de calendario descargado. Los cambios y cancelaciones se consultan en Mis citas.");
     } catch (cause) { if (currentScope.current === actionScope) setActionError(errorMessage(cause)); }
-    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); latest.current.onActionLockChange?.(false); } }
+    finally { if (currentScope.current === actionScope) { exporting.current = null; setExportAction(null); } releaseAction(); }
   }
 
   return (
@@ -236,7 +253,7 @@ export function ClientAppointments({ businessId, businessName, resources = [], s
       </div>
       <ClientAppointmentReminders businessId={businessId} userId={userId} now={now} currentOccurrences={currentOccurrences}
         actionsLocked={actionsLocked || Boolean(pendingId || exportingId)} onViewAppointment={viewReminder} />
-      {waitlist && onWaitlistChoose && <ClientWaitlist controller={waitlist} services={services} resources={resources} actionsLocked={actionsLocked || Boolean(pendingId || exportingId)} canResume={waitlistResumeEnabled} onChoose={onWaitlistChoose} />}
+      {waitlist && onWaitlistChoose && <ClientWaitlist controller={waitlist} services={services} resources={resources} actionsLocked={actionsLocked || Boolean(pendingId || exportingId)} canResume={waitlistResumeEnabled} onChoose={onWaitlistChoose} offerContent={waitlistOfferContent} />}
       <div role="group" aria-label="Ver mis citas" className="grid grid-cols-3 gap-1 rounded-xl bg-sarin-canvas p-1">
         {views.map(item => <button key={item.id} type="button" aria-pressed={view === item.id} onClick={() => changeView(item.id)}
           className={`min-h-11 min-w-0 rounded-lg px-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue sm:text-sm ${view === item.id ? "bg-sarin-blue text-white" : "text-sarin-muted hover:bg-sarin-soft"}`}>{item.label}</button>)}

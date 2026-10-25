@@ -5,6 +5,11 @@ import { BookingProposal } from '@/components/booking-proposal';
 const proposal = { id: 'synthetic-proposal', businessId: 'business', serviceName: 'Corte', resourceName: 'Mateo', dateKey: '2030-01-07', startTimeStr: '09:00', endTimeStr: '09:30', priceCOP: 20000, expiresAt: 2000000, intakeFields: [{ key: 'note', label: 'Preferencia', required: false }] };
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let renderer: ReactTestRenderer;
+it('uses a supplied absolute validity text without changing the legacy default', async () => {
+  await act(async () => { renderer = create(createElement(BookingProposal, { proposal, confirming: false, onConfirm: vi.fn(), validityText: 'Vigente hasta las 09:01 (Colombia).' } as Parameters<typeof BookingProposal>[0])); });
+  expect(JSON.stringify(renderer.toJSON())).toContain('09:01');
+  expect(JSON.stringify(renderer.toJSON())).not.toContain('diez minutos');
+});
 afterEach(async () => { await act(async () => renderer?.unmount()); });
 it('shows the server summary and confirms only with locally collected contact', async () => {
   const confirm = vi.fn();

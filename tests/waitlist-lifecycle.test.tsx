@@ -13,12 +13,18 @@ const waiting: WaitlistState = { ...empty, revision: 1, request: { id: 'demo-ent
 const input = { case: { bookingRequestId: 'demo-case', subjectKind: 'self' as const }, serviceId: 'cut', dateKey: '2030-01-01', resourceId: 'one' };
 let renderer: ReactTestRenderer | undefined, controller!: ReturnType<typeof useWaitlist>;
 const acquire = vi.fn(() => true), release = vi.fn();
-function Harness({ uid = 'demo-client', businessId = 'demo-business', canJoin = true, actionsLocked = false }: { uid?: string; businessId?: string; canJoin?: boolean; actionsLocked?: boolean }) {
-  controller = useWaitlist(businessId, uid, { canJoin, actionsLocked, acquireAction: acquire, releaseAction: release }); return null;
+function Harness({ uid = 'demo-client', businessId = 'demo-business', canJoin = true, actionsLocked = false, lease }: { uid?: string; businessId?: string; canJoin?: boolean; actionsLocked?: boolean; lease?: () => false | (() => void) }) {
+  controller = useWaitlist(businessId, uid, { canJoin, actionsLocked, acquireAction: lease ?? acquire, releaseAction: release } as Parameters<typeof useWaitlist>[2]); return null;
 }
 const mount = async (props = {}) => act(async () => { renderer = create(createElement(Harness, props)); });
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); acquire.mockReturnValue(true); vi.mocked(apiFetch).mockResolvedValue(empty); });
 afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; vi.useRealTimers(); vi.clearAllMocks(); });
+it('releases only the callback captured by its own acquired lease', async () => {
+  const ownRelease = vi.fn(); await mount({ lease: () => ownRelease });
+  vi.mocked(apiFetch).mockResolvedValueOnce(waiting);
+  await act(async () => controller.join(input));
+  expect(ownRelease).toHaveBeenCalledTimes(1); expect(release).not.toHaveBeenCalled();
+});
 
 it('reads once with the expected identity, without polling, and refreshes explicitly', async () => {
   await mount(); expect(controller.data).toEqual(empty); expect(controller.loading).toBe(false);

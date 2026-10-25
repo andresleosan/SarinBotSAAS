@@ -7,8 +7,18 @@ vi.mock('@/lib/client/api', async original => ({ ...await original<typeof import
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let renderer: ReactTestRenderer | undefined, controller!: ReturnType<typeof useStructuredBooking>;
 const subjectCase = { bookingRequestId: 'demo-ui-case', subjectKind: 'represented_minor' as const, representativeRole: 'parent' as const }, business = { id: 'demo-business' };
-function Harness({ uid = 'demo-user', active = true, businessId = business.id, requestId = subjectCase.bookingRequestId, initialServiceId }: { uid?: string; active?: boolean; businessId?: string; requestId?: string; initialServiceId?: string }) { controller = useStructuredBooking(uid, { id: businessId }, { ...subjectCase, bookingRequestId: requestId }, active, initialServiceId); return null; }
+function Harness({ uid = 'demo-user', active = true, businessId = business.id, requestId = subjectCase.bookingRequestId, initialServiceId, acquireAction }: { uid?: string; active?: boolean; businessId?: string; requestId?: string; initialServiceId?: string; acquireAction?: () => false | (() => void) }) { controller = useStructuredBooking(uid, { id: businessId }, { ...subjectCase, bookingRequestId: requestId }, active, initialServiceId, undefined, acquireAction); return null; }
 afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; vi.mocked(apiFetch).mockReset(); });
+it('consults the shared lease synchronously before starting availability and captures its release', async () => {
+  const release = vi.fn(), acquireAction = vi.fn(() => release);
+  await act(async () => { renderer = create(createElement(Harness, { acquireAction, initialServiceId: 'one' })); });
+  vi.mocked(apiFetch).mockResolvedValueOnce({ availability: [] });
+  await act(async () => controller.loadAvailability());
+  expect(acquireAction).toHaveBeenCalledTimes(1); expect(release).toHaveBeenCalledTimes(1);
+  acquireAction.mockReturnValueOnce(false as unknown as typeof release);
+  const before = vi.mocked(apiFetch).mock.calls.length;
+  await act(async () => controller.loadAvailability()); expect(vi.mocked(apiFetch).mock.calls).toHaveLength(before);
+});
 it('distinguishes unsearched, loading, successful empty and failed availability', async () => {
   let resolve!: (value: unknown) => void;
   vi.mocked(apiFetch).mockImplementationOnce(() => new Promise(complete => { resolve = complete; })).mockRejectedValueOnce(new Error('No se pudo consultar'));

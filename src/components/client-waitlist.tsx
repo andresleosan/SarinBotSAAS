@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { ListChecks } from 'lucide-react';
 import { Notice } from '@/components/app-shell';
 import type { WaitlistController } from '@/hooks/use-waitlist';
@@ -7,7 +7,7 @@ import type { TenantService, TenantResource } from '@/types/firestore';
 import type { WaitlistRequestView } from '@/types/waitlist';
 const dateFormat = new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'long', year: 'numeric' });
 const actionClass = 'min-h-11 max-w-full rounded text-left text-sm font-semibold text-sarin-blue underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:cursor-not-allowed disabled:opacity-50';
-export function ClientWaitlist(props: { controller: WaitlistController; services: TenantService[]; resources: TenantResource[]; actionsLocked: boolean; canResume: boolean; onChoose: (request: WaitlistRequestView, revision: number) => void }) {
+export function ClientWaitlist(props: { controller: WaitlistController; services: TenantService[]; resources: TenantResource[]; actionsLocked: boolean; canResume: boolean; onChoose: (request: WaitlistRequestView, revision: number) => void; offerContent?: ReactNode }) {
   const { controller, services, resources, actionsLocked, canResume } = props, current = useRef(props); current.current = props;
   const mounted = useRef(true); useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const section = useRef<HTMLElement>(null), settledRevision = useRef<number | null>(null);
@@ -28,6 +28,7 @@ export function ClientWaitlist(props: { controller: WaitlistController; services
   return <section ref={section} tabIndex={-1} aria-labelledby="client-waitlist-title" className="min-w-0 scroll-mt-40 space-y-3 rounded-xl border border-sarin-line bg-sarin-canvas p-3 sm:p-4 [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue">
     <div className="flex items-center gap-2"><ListChecks aria-hidden="true" className="h-4 w-4 shrink-0" /><h3 id="client-waitlist-title" className="text-sm font-semibold">Lista de espera</h3></div>
     <p className="text-xs leading-relaxed text-sarin-muted">Consulta aquí si aparecen horarios. El horario se reserva cuando confirmas una cita.</p>
+    {props.offerContent}
     {controller.operation && <p role="status" className="text-sm text-sarin-muted">{controller.operation === 'join' ? 'Guardando solicitud…' : 'Saliendo de la lista…'}</p>}
     {controller.reconciling && <p role="status" className="text-sm text-sarin-muted">Comprobando si se guardó el cambio…</p>}
     {controller.loading && !controller.reconciling && <p role="status" className="text-sm text-sarin-muted">Comprobando tu lista de espera…</p>}

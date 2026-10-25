@@ -31,6 +31,16 @@ beforeEach(() => {
   });
 });
 afterEach(async () => { await act(async () => renderer?.unmount()); renderer = undefined; vi.unstubAllGlobals(); vi.useRealTimers(); });
+it('captures its acquired release so a late export cannot release a later action', async () => {
+  const ownRelease = vi.fn(), laterRelease = vi.fn(), legacy = vi.fn();
+  props = { ...props, acquireAction: () => ownRelease, onActionLockChange: legacy } as Props;
+  await mount(); let finish!: (value: Blob) => void; state.image.mockReturnValue(new Promise<Blob>(resolve => { finish = resolve; }));
+  let operation!: Promise<void>; await act(async () => { operation = button('Guardar imagen de la cita').props.onClick(); });
+  await update({ userId: 'other', acquireAction: () => laterRelease } as Partial<Props>);
+  expect(ownRelease).toHaveBeenCalledTimes(1); expect(laterRelease).not.toHaveBeenCalled();
+  await act(async () => { finish(new Blob()); await operation; });
+  expect(ownRelease).toHaveBeenCalledTimes(1); expect(laterRelease).not.toHaveBeenCalled(); expect(legacy).not.toHaveBeenCalled();
+});
 
 it('offers a manual schedule change only for own future confirmed appointments and emits the exact source without writing', async () => {
   state.rows.push({ ...source, id: 'past', startAt: now - 1000 }, { ...source, id: 'cancelled', status: 'cancelled_by_client' }, { ...source, id: 'other', client: { ...source.client!, uid: 'other' } }, { ...source, id: 'manual', type: 'manual_block' });
