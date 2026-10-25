@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { executeDataCommand, handleDataOutbound } from '../src/data.ts';
+import { isDataPath } from '../../shared/data-protocol.ts';
 
 const require = createRequire(import.meta.url);
 const wranglerRequire = createRequire(require.resolve('wrangler/package.json'));
@@ -24,6 +25,16 @@ async function fixture(context) {
   return env;
 }
 const isError = code => error => error.code === code && !/private-payload/.test(error.message);
+
+test('owner reschedule proofs use only the private business child', async context => {
+  assert.equal(isDataPath('businesses/demo/ownerRescheduleProposals/proof', true), true);
+  assert.equal(isDataPath('businesses/demo/ownerRescheduleProposals', false), true);
+  assert.equal(isDataPath('businesses/demo/arbitraryProofs/proof', true), false);
+  assert.equal(isDataPath('publicBusinesses/demo/ownerRescheduleProposals/proof', true), false);
+  const env = await fixture(context);
+  await executeDataCommand(commit(0, [set('businesses/demo/ownerRescheduleProposals/proof', { state: 'prepared' })]), env);
+  assert.deepEqual((await executeDataCommand(read('businesses/demo/ownerRescheduleProposals/proof'), env)).documents[0].data, { state: 'prepared' });
+});
 
 test('resource schedule policy and operation children are private and atomic', async context => {
   const env = await fixture(context);
