@@ -1,0 +1,16 @@
+﻿import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import type { Database } from '@/lib/storage/types';
+import { GET } from '@/app/api/businesses/[id]/operation-summary/route';
+import { HttpError } from '@/lib/server/http';
+import { memoryFirestore } from './memoryFirestore';
+import { seedOperationSummary, summaryNow } from './owner-operation-summary-contract';
+const state=vi.hoisted(()=>({db:null as unknown as Database,uid:'demo-s17-owner' as string|null}));
+vi.mock('@/lib/firebase/admin',()=>({getAdminDb:()=>state.db}));
+vi.mock('@/lib/server/auth',()=>({requireUser:async()=>{if(!state.uid)throw new HttpError(401,'Sign in');return{uid:state.uid};}}));
+const url='http://localhost/api/businesses/demo-s17/operation-summary',ctx={params:Promise.resolve({id:'demo-s17'})};
+const read=(query='?from=2030-01-01&through=2030-01-07')=>GET(new Request(url+query),ctx);
+beforeEach(async()=>{vi.spyOn(Date,'now').mockReturnValue(summaryNow);state.uid='demo-s17-owner';state.db=memoryFirestore().db as unknown as Database;await seedOperationSummary(state.db);});afterEach(()=>vi.restoreAllMocks());
+it('requiresSignedInCurrentOwnerAndNeverBypassesForAdmin',async()=>{state.uid=null;expect((await read()).status).toBe(401);for(const uid of ['demo-client','demo-superadmin']){state.uid=uid;expect((await read()).status).toBe(403);}});
+it.each(['','?from=2030-01-01','?through=2030-01-07','?from=2030-01-01&through=2030-01-07&uid=other','?from=2030-01-01&from=2030-01-01&through=2030-01-07','?from=2030-01-01&through=2030-01-07&through=2030-01-07','?from=2030-02-30&through=2030-02-30','?from=2030-01-01&through=2030-01-08'])('exactQueryAndRangeReject %s',async query=>{const response=await read(query);expect(response.status).toBe(400);expect(response.headers.get('Cache-Control')).toBe('no-store');expect((await response.json()).code).toBe('OPERATION_SUMMARY_INVALID_RANGE');});
+it('successAndErrorsAreNoStoreAndNoPrivateFields',async()=>{const response=await read();expect(response.status).toBe(200);expect(response.headers.get('Cache-Control')).toBe('no-store');const data=await response.json();expect(Object.keys(data).sort()).toEqual(['businessId','coverage','days','ownerUid','range','serverNow','timezone','totals']);const missing=await GET(new Request(url+'?from=2030-01-01&through=2030-01-07'),{params:Promise.resolve({id:'demo-missing'})});expect(missing.status).toBe(404);expect(missing.headers.get('Cache-Control')).toBe('no-store');});
+it('unexpectedBodyIsRejected',async()=>{const request=new Request(url+'?from=2030-01-01&through=2030-01-07',{method:'POST',body:'x'});expect((await GET(request,ctx)).status).toBe(400);});

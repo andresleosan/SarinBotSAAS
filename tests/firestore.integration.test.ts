@@ -1,3 +1,5 @@
+﻿import { seedOperationSummary, summaryBusinessId } from './owner-operation-summary-contract';
+import { readOwnerOperationSummary } from '@/lib/server/owner-operation-summary';
 import { seedFactualFaqScenario, factualFaqNow, syntheticFaqItems } from './business-factual-faq-contract';
 import { saveOwnerFactualFaq, readOwnerFactualFaq } from '@/lib/server/business-factual-faq';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -464,4 +466,21 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
       expect((await readOwnerFactualFaq(f.owner, f.business.id, winner.value.applied!.requestId, db)).applied).toEqual(winner.value.applied);
     }
   }, 60000);
-});
+  it('reads one bounded owner summary with legacy coverage and no writes on real Firestore', async () => {
+    const f = await seedOperationSummary(db, Date.now()), today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(Date.now()), range = { from: today, through: today }, appointments = f.ref.collection('appointments');
+    await appointments.doc('missing-date').set({ tenantId: summaryBusinessId, type: 'appointment', status: 'completed' });
+    await appointments.doc('numeric-date').set({ tenantId: summaryBusinessId, type: 'appointment', status: 'completed', dateKey: 20300107 });
+    const snap = async () => ({ business: (await f.ref.get()).data(), rows: (await appointments.get()).docs.map(doc => ({ id: doc.id, data: doc.data() })) });
+    const before = await snap(), result = await readOwnerOperationSummary(f.owner, summaryBusinessId, range, db);
+    expect(result.totals).toMatchObject({ total: 7, confirmed: 3, completed: 1, noShow: 1 });
+    expect(result.coverage).toEqual({ basis: 'stored_date_key', invalidRecords: 1, excludedManualBlocks: 1 });
+    expect(await snap()).toEqual(before);
+    await expect(readOwnerOperationSummary(user('demo-other-owner'), summaryBusinessId, range, db)).rejects.toMatchObject({ status: 403 });
+    for (let start = 0; start < 990; start += 90) {
+      const batch = db.batch(); for (let i = start; i < Math.min(990, start + 90); i++) batch.set(db.doc(`businesses/${summaryBusinessId}/appointments/capacity-${i}`), { tenantId: summaryBusinessId, dateKey: today, type: 'manual_block' }); await batch.commit();
+    }
+    expect((await readOwnerOperationSummary(f.owner, summaryBusinessId, range, db)).totals.total).toBe(7);
+    await appointments.doc('capacity-thousand').set({ tenantId: summaryBusinessId, dateKey: today, type: 'manual_block' });
+    await expect(readOwnerOperationSummary(f.owner, summaryBusinessId, range, db)).rejects.toMatchObject({ status: 413, code: 'OPERATION_SUMMARY_RANGE_TOO_LARGE' });
+  }, 60000);});
+
