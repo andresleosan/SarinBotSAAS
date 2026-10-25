@@ -6,9 +6,10 @@ import { isDataJson, isDataPath } from '../../../shared/data-protocol';
 import { documentIdSchema } from './schemas';
 import { HttpError } from './http';
 import { stableDocumentId } from './businesses';
+import { ownerWaitlistMarkerSchema } from '@/lib/owner-waitlist';
 
 // Private operational helpers, with no route, credentials or implicit database.
-const scopeSchema = z.object({ businessId: documentIdSchema, ownerUid: z.string().min(1).max(128).optional() }).strict();
+const scopeSchema = z.object({ businessId: documentIdSchema.refine(value => !/[\x00-\x1f\x7f]/.test(value)), ownerUid: z.string().min(1).max(128).refine(value => !/[\x00-\x1f\x7f]/.test(value)).optional() }).strict();
 type Scope = z.infer<typeof scopeSchema>;
 type Row = { path: string; data: DocumentData };
 export type WaitlistDataExport = { version: 1; scope: Scope; documents: Row[]; sha256: string };
@@ -36,7 +37,20 @@ async function collect(db: Database, tx: Transaction, scope: Scope): Promise<Row
   // Also include tombstones and unexpected IDs in the authorized inventory.
   const snapshot = await tx.get(scope.ownerUid ? collection.where('ownerUid', '==', scope.ownerUid) : collection);
   if (snapshot.size > 1000) throw new HttpError(413, 'Divide la exportación privada por cuentas.');
-  return snapshot.docs.map(document => validate(document.id, document.data())).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  const documents = snapshot.docs.map(document => validate(document.id, document.data()));
+  // Canonical record identity survives singleton deletion or replacement. Review
+  // markers remain private inventory even when no current request can join them.
+  const markers = db.collection('businesses').doc(scope.businessId).collection('waitlistOwnerReviews');
+  const recordId = scope.ownerUid ? stableDocumentId('waitlist', scope.businessId, scope.ownerUid) : null;
+  const markerSnapshot = await tx.get(recordId ? markers.where('waitlistRecordId', '==', recordId) : markers);
+  if (documents.length + markerSnapshot.size > 1000) throw new HttpError(413, 'Divide la exportación privada por cuentas.');
+  for (const document of markerSnapshot.docs) {
+    const data = document.data(), parsed = ownerWaitlistMarkerSchema.safeParse(data), path = `businesses/${scope.businessId}/waitlistOwnerReviews/${document.id}`;
+    if (!parsed.success || !isDataPath(path, true) || !isDataJson(data) || parsed.data.businessId !== scope.businessId || parsed.data.entryId !== document.id
+      || recordId && parsed.data.waitlistRecordId !== recordId) throw new HttpError(503, 'No se pudo validar el inventario privado de espera.');
+    documents.push({ path, data });
+  }
+  return documents.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 }
 
 /** Export includes personal identifiers and must stay in the private case file. */

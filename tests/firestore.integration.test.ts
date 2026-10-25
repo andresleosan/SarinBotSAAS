@@ -1,5 +1,7 @@
 ﻿import { seedOperationSummary, summaryBusinessId } from './owner-operation-summary-contract';
 import { readOwnerOperationSummary } from '@/lib/server/owner-operation-summary';
+import { ownerWaitlistFixture, seedOwnerWaitlistRows } from './owner-waitlist-contract';
+import { readOwnerWaitlistPage, updateOwnerWaitlistReview } from '@/lib/server/owner-waitlist';
 import { seedFactualFaqScenario, factualFaqNow, syntheticFaqItems } from './business-factual-faq-contract';
 import { saveOwnerFactualFaq, readOwnerFactualFaq } from '@/lib/server/business-factual-faq';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -61,6 +63,21 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('real Firestore serializab
     return createBusiness(identity, chosenConfig, db);
   }
   afterAll(async () => { if (db) { await db.terminate(); const app = getApps().find(value => value.name === 'sarin-admin'); if (app) await deleteApp(app); } });
+  it('owner waitlist FIFO ties anchor and review CAS work with the real Admin SDK', async () => {
+    const prior=process.env.SUPERADMIN_UID;process.env.SUPERADMIN_UID=subjectAdmin.uid;
+    try {
+      const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota'}).format(Date.now()+86400000);
+      const f=await ownerWaitlistFixture(db,'general',false,date),expected=await seedOwnerWaitlistRows(f),first=await readOwnerWaitlistPage(f.owner,f.business.id,{dateKey:date},db);
+      const second=await readOwnerWaitlistPage(f.owner,f.business.id,{dateKey:date,cursor:first.nextCursor!},db),third=await readOwnerWaitlistPage(f.owner,f.business.id,{dateKey:date,cursor:second.nextCursor!},db);
+      expect([first.rows.length,second.rows.length,third.rows.length]).toEqual([20,20,5]);expect([...first.rows,...second.rows,...third.rows].map(r=>r.recordId)).toEqual(expected.map(r=>r.recordId));
+      await db.doc(`businesses/${f.business.id}/waitlistRequests/${first.nextCursor!.recordId}`).delete();
+      await expect(readOwnerWaitlistPage(f.owner,f.business.id,{dateKey:date,cursor:first.nextCursor!},db)).rejects.toMatchObject({code:'OWNER_WAITLIST_CHANGED'});
+      await acceptSyntheticConsent(db,f.owner.uid);const row=first.rows[0],command={requestId:'firestore-review-a',entryId:row.entryId,expectedWaitlistRevision:row.waitlistRevision,expectedReviewRevision:0,reviewed:true};
+      const results=await Promise.allSettled([updateOwnerWaitlistReview(f.owner,f.business.id,row.recordId,command,db),updateOwnerWaitlistReview(f.owner,f.business.id,row.recordId,{...command,requestId:'firestore-review-b'},db)]);
+      expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect(results.find(r=>r.status==='rejected')).toMatchObject({reason:{status:409}});
+      expect((await db.doc(`businesses/${f.business.id}/waitlistOwnerReviews/${row.entryId}`).get()).data()?.revision).toBe(1);
+    } finally { if(prior===undefined)delete process.env.SUPERADMIN_UID;else process.env.SUPERADMIN_UID=prior; }
+  },60000);
   it('atomically moves owner appointment and receipt then serializes a destination competitor across Admin handles', async () => {
     expect(process.env.FIRESTORE_EMULATOR_HOST).toMatch(/^(?:127\.0\.0\.1|localhost):\d+$/);
     // gRPC deadlines combine Date.now() and new Date(); keep the SDK clock real.

@@ -9,6 +9,7 @@ import type { DataReadResult, DataCommitResult } from '../shared/data-protocol';
 
 const root = 'businesses/demo-business';
 const entry = (ownerUid: string, businessId = 'demo-business', revision = 1) => ({ version: 1, businessId, ownerUid, revision, updatedAt: 1792274400000, request: null, lastOperation: { requestId: 'demo-cancel', operationHash: 'a'.repeat(64), appliedRevision: revision } });
+const ownerReview = (entryId: string, uid = 'demo-alice') => ({ version: 1, businessId: 'demo-business', waitlistRecordId: stableDocumentId('waitlist', 'demo-business', uid), entryId, revision: 1, reviewed: true, updatedAt: 1792274400000, actorUid: 'demo-business-owner', lastOperation: { requestId: 'review-maintenance', operationHash: 'b'.repeat(64), appliedRevision: 1 } });
 function seed() {
   return memoryFirestore({
     [`${root}/waitlistRequests/alice`]: entry('demo-alice'),
@@ -18,6 +19,29 @@ function seed() {
   }).db as unknown as Database;
 }
 describe('private waitlist export and guarded deletion', () => {
+  it.each([true,false])('owner review inventory follows canonical record even when singleton missing=%s', async missing => {
+    const db=seed(),ref=db.collection('businesses').doc('demo-business'),id=stableDocumentId('waitlist','demo-business','demo-alice');
+    if(!missing)await ref.collection('waitlistRequests').doc(id).set(entry('demo-alice'));
+    await ref.collection('waitlistOwnerReviews').doc('old-entry').set(ownerReview('old-entry'));
+    await ref.collection('waitlistOwnerReviews').doc('other-entry').set(ownerReview('other-entry','demo-bob'));
+    const scope={businessId:'demo-business',ownerUid:'demo-alice'},exported=await exportWaitlistData(db,scope);
+    expect(exported.documents.map(d=>d.path)).toContain(root+'/waitlistOwnerReviews/old-entry');
+    expect(exported.documents.map(d=>d.path)).not.toContain(root+'/waitlistOwnerReviews/other-entry');
+    expect(await deleteExportedWaitlistData(db,exported)).toEqual({deleted:missing?2:3});
+    expect((await ref.collection('waitlistOwnerReviews').doc('other-entry').get()).exists).toBe(true);
+    expect((await exportWaitlistData(db,scope)).documents).toEqual([]);
+  });
+  it('owner review added after an old export prevents partial deletion and new joint inventory is bounded',async()=>{
+    const db=seed(),scope={businessId:'demo-business',ownerUid:'demo-alice'},old=await exportWaitlistData(db,scope),collection=db.collection('businesses').doc('demo-business').collection('waitlistOwnerReviews');
+    await collection.doc('new-entry').set(ownerReview('new-entry'));
+    await expect(deleteExportedWaitlistData(db,old)).rejects.toMatchObject({status:409});
+    for(let i=0;i<99;i++)await collection.doc('entry-'+i).set(ownerReview('entry-'+i));
+    const exported=await exportWaitlistData(db,scope);expect(exported.documents).toHaveLength(101);await expect(deleteExportedWaitlistData(db,exported)).rejects.toMatchObject({status:413});
+  });
+  it('owner review invalid cross-business marker fails inventory instead of silently omitting it',async()=>{
+    const db=seed();await db.collection('businesses').doc('demo-business').collection('waitlistOwnerReviews').doc('entry').set({...ownerReview('entry'),businessId:'other'});
+    await expect(exportWaitlistData(db,{businessId:'demo-business'})).rejects.toMatchObject({status:503});
+  });
   it.each(['missing_owner', 'other_owner', 'other_business'] as const)('fails closed on a canonical account document with %s instead of claiming an empty export', async corruption => {
     const db = seed(), scope = { businessId: 'demo-business', ownerUid: 'demo-alice' };
     const ref = db.collection('businesses').doc(scope.businessId).collection('waitlistRequests').doc(stableDocumentId('waitlist', scope.businessId, scope.ownerUid));

@@ -135,6 +135,15 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)('Firestore rules on real e
       }
     }
   });
+  it('keeps owner waitlist reviews private from every browser principal', async () => {
+    await environment.withSecurityRulesDisabled(async context => { await setDoc(doc(context.firestore(), 'businesses/one/waitlistOwnerReviews/entry'), { businessId: 'one', waitlistRecordId: 'private-record', entryId: 'entry', reviewed: true }); });
+    for (const context of [environment.unauthenticatedContext(), environment.authenticatedContext('customer'), environment.authenticatedContext('owner-one'), environment.authenticatedContext('other'), environment.authenticatedContext('stale-admin', { isSuperadmin: true })]) {
+      const db = context.firestore();
+      await assertFails(getDoc(doc(db, 'businesses/one/waitlistOwnerReviews/entry')));
+      await assertFails(getDocs(collection(db, 'businesses/one/waitlistOwnerReviews')));
+      await assertFails(setDoc(doc(db, 'businesses/one/waitlistOwnerReviews/entry'), { reviewed: false }));
+    }
+  });
   it('keeps active waitlist selections and cancellation tombstones private from browsers', async () => {
     await environment.withSecurityRulesDisabled(async context => {
       await setDoc(doc(context.firestore(), 'businesses/one/waitlistRequests/current'), { ownerUid: 'customer', businessId: 'one', revision: 1, request: { serviceId: 'private-service' } });
