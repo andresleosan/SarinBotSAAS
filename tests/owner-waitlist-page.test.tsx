@@ -1,0 +1,15 @@
+import { act, createElement, type ReactNode } from 'react';
+import { create, type ReactTestRenderer } from 'react-test-renderer';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import WaitlistPage from '@/app/dashboard/waitlist/page';
+const state=vi.hoisted(()=>({uid:'owner',epoch:1,businessOwner:'owner',error:null as string|null,enabled:false,available:false,push:vi.fn()}));
+vi.mock('@/components/auth-provider',()=>({useAuth:()=>({user:{uid:state.uid},authEpoch:state.epoch}),AuthGate:({children}:{children:ReactNode})=>children}));
+vi.mock('@/components/app-shell',()=>({AppShell:({children,...props}:{children:ReactNode})=>createElement('main',props,children),Notice:({children}:{children:ReactNode})=>createElement('p',{},children)}));
+vi.mock('@/hooks/useBusiness',()=>({useBusiness:()=>({business:{id:'biz',ownerUid:state.businessOwner},loading:false,error:state.error})}));
+vi.mock('@/hooks/use-owner-waitlist',()=>({useOwnerWaitlist:(input:{enabled:boolean;available:boolean})=>{state.enabled=input.enabled;state.available=input.available;return{busy:false,uncertain:false};}}));
+vi.mock('@/components/owner-waitlist-workspace',()=>({OwnerWaitlistWorkspace:({onViewAgenda}:{onViewAgenda:()=>void})=>createElement('button',{onClick:onViewAgenda},'Agenda')}));
+vi.mock('next/navigation',()=>({useRouter:()=>({push:state.push})}));
+Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});let tree:ReactTestRenderer|undefined;
+beforeEach(()=>{state.uid='owner';state.businessOwner='owner';state.error=null;state.push.mockReset();});afterEach(async()=>{await act(async()=>tree?.unmount());tree=undefined;});
+it('ownerUsesAgendaContextAndNormalAgendaUrl',async()=>{await act(async()=>{tree=create(createElement(WaitlistPage));});expect(tree!.root.findByType('main').props.businessNavigationPath).toBe('/dashboard');expect(state.enabled).toBe(true);await act(async()=>tree!.root.findByType('button').props.onClick());expect(state.push).toHaveBeenCalledWith('/dashboard');});
+it('doesNotGiveAdminOwnerBypassAndTransientReadDoesNotChangeIdentity',async()=>{state.uid='admin';await act(async()=>{tree=create(createElement(WaitlistPage));});expect(state.enabled).toBe(false);state.uid='owner';state.error='Temporary';await act(async()=>tree!.update(createElement(WaitlistPage)));expect(state.enabled).toBe(true);expect(state.available).toBe(false);});

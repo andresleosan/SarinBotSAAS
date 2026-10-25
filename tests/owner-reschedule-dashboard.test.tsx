@@ -168,13 +168,13 @@ it('initialUrlRecoveryRetriesAfterFeatureProtectionAndProbe', async () => {
   expect(text(renderer.root, true)).toContain('Cambio comprobado'); expect(writes()).toHaveLength(0);
 });
 
-it('summarySecondaryNavigationHonorsCurrentDashboardActionGuards', async () => {
+it.each(['/dashboard/reports','/dashboard/waitlist'])('secondaryNavigationHonorsCurrentDashboardActionGuards %s', async href => {
   await mount(true);
-  const link = renderer.root.findAllByType('a').find(node => node.props.href === '/dashboard/reports')!;
+  const link = renderer.root.findAllByType('a').find(node => node.props.href === href)!;
   const preventDefault = vi.fn(), retained = link.props.onClick;
   await act(async () => retained({ preventDefault })); expect(preventDefault).not.toHaveBeenCalled();
   await click('Cambiar horario');
-  expect(renderer.root.findAllByType('a').find(node => node.props.href === '/dashboard/reports')!.props['aria-disabled']).toBe(true);
+  expect(renderer.root.findAllByType('a').find(node => node.props.href === href)!.props['aria-disabled']).toBe(true);
   await act(async () => retained({ preventDefault })); expect(preventDefault).toHaveBeenCalledTimes(1);
   expect(writes()).toHaveLength(0);
 });
