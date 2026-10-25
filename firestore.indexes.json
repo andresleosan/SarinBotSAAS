@@ -1,5 +1,6 @@
 {
   "indexes": [
+    { "collectionGroup": "waitlistRequests", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "request.dateKey", "order": "ASCENDING" }, { "fieldPath": "request.createdAt", "order": "ASCENDING" }, { "fieldPath": "request.id", "order": "ASCENDING" }] },
     { "collectionGroup": "appointments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "client.uid", "order": "ASCENDING" }, { "fieldPath": "type", "order": "ASCENDING" }, { "fieldPath": "startAt", "order": "DESCENDING" }, { "fieldPath": "id", "order": "ASCENDING" }] },
     { "collectionGroup": "appointments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "client.uid", "order": "ASCENDING" }, { "fieldPath": "type", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "startAt", "order": "DESCENDING" }, { "fieldPath": "id", "order": "ASCENDING" }] },
     { "collectionGroup": "attendanceEvents", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "appointmentId", "order": "ASCENDING" }, { "fieldPath": "sequence", "order": "DESCENDING" }] },

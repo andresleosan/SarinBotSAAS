@@ -26,6 +26,27 @@ async function fixture(context) {
 }
 const isError = code => error => error.code === code && !/private-payload/.test(error.message);
 
+test('owner waitlist review child and four query fields are private and strictly typed', async context => {
+  const env = await fixture(context);
+  const path = 'businesses/demo-wait/waitlistOwnerReviews/entry';
+  assert.equal(isDataPath(path, true), true);
+  assert.equal(isDataPath('publicBusinesses/demo/waitlistOwnerReviews/entry', true), false);
+  await executeDataCommand(commit(0, [set(path, { waitlistRecordId: 'record', reviewed: true })]), env);
+  assert.equal((await executeDataCommand(query('businesses/demo-wait/waitlistOwnerReviews', [{ field: 'waitlistRecordId', op: '==', value: 'record' }], [], 20), env)).documents.length, 1);
+  await executeDataCommand(commit(1, [set('businesses/demo-wait/waitlistRequests/record', { request: { dateKey: '2030-01-07', createdAt: 100, id: 'entry' } })]), env);
+  const result = await executeDataCommand(query('businesses/demo-wait/waitlistRequests', [{ field: 'request.dateKey', op: '==', value: '2030-01-07' }], [{ field: 'request.createdAt', direction: 'asc' }, { field: 'request.id', direction: 'asc' }], 21), env);
+  assert.equal(result.documents.length, 1);
+  const noAccess = new Proxy({}, { get() { assert.fail('Invalid owner waitlist command accessed storage.'); } });
+  for (const command of [read('businesses/demo/waitlistOwnerReviewsUnknown/entry'), read('publicBusinesses/demo/waitlistOwnerReviews/entry'),
+    query('businesses/demo-wait/waitlistRequests', [{ field: 'request.createdAt', op: '==', value: '100' }]),
+    query('businesses/demo-wait/waitlistRequests', [{ field: 'request.id', op: '==', value: 100 }]),
+    query('businesses/demo-wait/waitlistRequests', [{ field: 'request.dateKey', op: '==', value: 100 }]),
+    query('businesses/demo-wait/waitlistOwnerReviews', [{ field: 'waitlistRecordId', op: '==', value: 100 }]),
+    query('businesses/demo-wait/waitlistRequests', [{ field: 'request.case.bookingRequestId', op: '==', value: 'private' }])]) {
+    await assert.rejects(executeDataCommand(command, noAccess), isError('DATA_INVALID'));
+  }
+});
+
 test('owner reschedule proofs use only the private business child', async context => {
   assert.equal(isDataPath('businesses/demo/ownerRescheduleProposals/proof', true), true);
   assert.equal(isDataPath('businesses/demo/ownerRescheduleProposals', false), true);

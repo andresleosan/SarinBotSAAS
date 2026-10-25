@@ -13,6 +13,7 @@ const fields: Record<string, 'string' | 'number' | 'boolean'> = {
   jobId: 'string', outboxId: 'string', conversationId: 'string', recordType: 'string', kind: 'string', sequence: 'number',
   ownerUid: 'string', 'client.uid': 'string', dateKey: 'string', resourceId: 'string', status: 'string', type: 'string', tenantId: 'string', businessId: 'string', phoneNumberId: 'string', state: 'string', bodyState: 'string', id: 'string', appointmentId: 'string',
   createdAt: 'number', updatedAt: 'number', submittedAt: 'number', startsAt: 'number', startAt: 'number', nextAttemptAt: 'number', bodyExpiresAt: 'number', expiresAt: 'number', enabled: 'boolean',
+  'request.dateKey': 'string', 'request.createdAt': 'number', 'request.id': 'string', waitlistRecordId: 'string',
 };
 type DataEnvironment = Pick<CloudflareBindings, 'SARIN_DB' | 'SARIN_FILES'>;
 type BlobReference = { key: string; contentType: string; byteLength: number; sha256: string };

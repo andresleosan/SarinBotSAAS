@@ -82,11 +82,11 @@ it('closedScheduleAndBufferUseTheSameTransactionAsClientProjection',async()=>{
 });
 it('occupancyOverflowFailsNotFreeSlots',async()=>{
   const f=await ownerWaitlistFixture();
-  const db={...f.db,runTransaction:<T>(handler:(tx:import('@/lib/storage/types').Transaction)=>Promise<T>)=>f.db.runTransaction(tx=>handler({...tx,get:async(target:any)=>{if(target.path?.endsWith('/appointments'))throw new Error('SYNTHETIC_STORAGE_OVERFLOW');return tx.get(target);}}))};
+  const db={...f.db,runTransaction:<T>(handler:(tx:import('@/lib/storage/types').Transaction)=>Promise<T>)=>f.db.runTransaction(tx=>handler({...tx,get:async(target:any)=>{if(target.path?.endsWith('/appointments'))throw new Error('SYNTHETIC_STORAGE_OVERFLOW');return tx.get(target);}} as import('@/lib/storage/types').Transaction))};
   await expect(readOwnerWaitlistDetail(f.owner,f.business.id,f.recordId,db)).rejects.toThrow();
 });
 it('scheduleReadCrossingMidnightReturnsExpiredWithoutOldClockSlots',async()=>{
   const f=await ownerWaitlistFixture();
-  const db={...f.db,runTransaction:<T>(handler:(tx:import('@/lib/storage/types').Transaction)=>Promise<T>)=>f.db.runTransaction(tx=>handler({...tx,get:async(target:any)=>{const result=await tx.get(target);if(target.path?.endsWith('/resourceSchedulePolicies/current'))vi.mocked(Date.now).mockReturnValue(f.state.request!.expiresAt);return result;}}))};
+  const db={...f.db,runTransaction:<T>(handler:(tx:import('@/lib/storage/types').Transaction)=>Promise<T>)=>f.db.runTransaction(tx=>handler({...tx,get:async(target:any)=>{const result=await tx.get(target);if(target.path?.endsWith('/resourceSchedulePolicies/current'))vi.mocked(Date.now).mockReturnValue(f.state.request!.expiresAt);return result;}} as import('@/lib/storage/types').Transaction))};
   expect(await readOwnerWaitlistDetail(f.owner,f.business.id,f.recordId,db)).toMatchObject({state:'expired',availability:[],row:{lifecycle:'expired'}});
 });
