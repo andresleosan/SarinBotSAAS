@@ -6,8 +6,9 @@ import { operationPresetRange, type OperationRange, type OwnerOperationSummary }
 export type OwnerOperationSummaryPanelProps = {
   summary: OwnerOperationSummary | null; appliedRange: OperationRange | null; loading: boolean; error: string | null; capacityError: boolean;
   onQuery: (range: OperationRange) => void; onRefresh: () => void; onPreset: (preset: 'today' | '7days' | '30days') => void;
+  disabled?: boolean;
 };
-export function OwnerOperationSummaryPanel({ summary, appliedRange, loading, error, capacityError, onQuery, onRefresh, onPreset }: OwnerOperationSummaryPanelProps) {
+export function OwnerOperationSummaryPanel({ summary, appliedRange, loading, error, capacityError, onQuery, onRefresh, onPreset, disabled = false }: OwnerOperationSummaryPanelProps) {
   const [draft, setDraft] = useState<OperationRange>(() => { try { return operationPresetRange('7days', Date.now()); } catch { return { from: '', through: '' }; } });
   const [editing, setEditing] = useState(false), focusPending = useRef(false), resultRef = useRef<HTMLElement>(null), errorRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (appliedRange && !editing) setDraft({ ...appliedRange }); }, [appliedRange?.from, appliedRange?.through, editing]);
@@ -19,7 +20,7 @@ export function OwnerOperationSummaryPanel({ summary, appliedRange, loading, err
   const shown = !loading && !error ? summary : null;
   return <div className="max-w-4xl min-w-0 space-y-5">
     <div><h1 className="text-3xl font-bold">Resumen operativo</h1><p className="mt-2 text-sm text-sarin-muted">Consulta el estado actual de las citas por su fecha guardada, en Colombia.</p></div>
-    <fieldset className="min-w-0 space-y-3 rounded-xl border border-sarin-line p-4"><legend className="px-1 font-semibold">Periodo de consulta</legend>
+    <fieldset disabled={disabled} className="min-w-0 space-y-3 rounded-xl border border-sarin-line p-4"><legend className="px-1 font-semibold">Periodo de consulta</legend>
       <div className="flex flex-wrap gap-3">{([['today', 'Hoy'], ['7days', '7 días'], ['30days', '30 días']] as const).map(([preset, label]) => <button type="button" key={preset} className={buttonClass} onClick={() => run(() => onPreset(preset))}>{label}</button>)}</div>
       <div className="flex flex-wrap items-end gap-3">{(['from', 'through'] as const).map(field => <label key={field} className="min-w-0 flex-1 space-y-1"><span className="block text-sm font-medium">{field === 'from' ? 'Desde' : 'Hasta'}</span><input type="date" aria-label={field === 'from' ? 'Desde' : 'Hasta'} className={`${fieldClass} min-h-11 w-full min-w-0`} value={draft[field]} onChange={event => { setEditing(true); setDraft({ ...draft, [field]: event.target.value }); }} /></label>)}<button type="button" className={buttonClass} onClick={() => run(() => onQuery({ ...draft }))}>Consultar</button><button type="button" className={buttonClass} onClick={() => run(onRefresh)}>Actualizar</button></div>
       <p className="text-sm text-sarin-muted">Entre 1 y 31 días, desde hace 365 días hasta hoy. Editar estas fechas no cambia el periodo de los recuentos hasta consultar.</p>

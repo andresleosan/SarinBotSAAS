@@ -1,0 +1,27 @@
+﻿import { act,createElement,type ReactNode } from 'react';
+import { create,type ReactTestRenderer,type ReactTestInstance } from 'react-test-renderer';
+import { afterEach,beforeEach,expect,it,vi } from 'vitest';
+import ReportsPage from '@/app/dashboard/reports/page';
+import { summarizeOwnerOperation } from '@/lib/owner-operation-summary';
+import { summaryNow } from './owner-operation-summary-contract';
+vi.mock('@/components/auth-provider',()=>({useAuth:()=>({user:{uid:'demo-owner'},authEpoch:1,isCurrentSession:(uid:string,epoch:number)=>uid==='demo-owner'&&epoch===1,invalidateSession:vi.fn()}),AuthGate:({children}:{children:ReactNode})=>children}));
+vi.mock('@/lib/firebase/client',()=>({getFirebaseClient:()=>({auth:{currentUser:{uid:'demo-owner',getIdToken:async()=>'demo-token'}}})}));
+vi.mock('@/components/app-shell',()=>({AppShell:({children}:{children:ReactNode})=>children,Notice:({children}:{children:ReactNode})=>createElement('p',null,children),buttonClass:'button',fieldClass:'field'}));
+vi.mock('next/link',()=>({default:({children,href}:{children:ReactNode;href:string})=>createElement('a',{href},children)}));
+Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
+let tree:ReactTestRenderer|undefined,businessStatus=200;const fetchMock=vi.fn<typeof fetch>();
+const text=(node:ReactTestInstance|string):string=>typeof node==='string'?node:node.children.map(text).join('');
+const click=async(label:string)=>act(async()=>tree!.root.findAllByType('button').find(node=>text(node)===label)!.props.onClick());
+const summaryCalls=()=>fetchMock.mock.calls.filter(([path])=>String(path).includes('/operation-summary?'));
+beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(summaryNow);businessStatus=200;vi.stubGlobal('document',Object.assign(new EventTarget(),{visibilityState:'visible'}));vi.stubGlobal('window',new EventTarget());fetchMock.mockReset().mockImplementation(async path=>{if(String(path)==='/api/businesses')return Response.json(businessStatus===200?{business:{id:'demo-summary',ownerUid:'demo-owner'}}:{error:'Temporary authority read failure'},{status:businessStatus});const q=new URL(String(path),'http://localhost').searchParams;return Response.json(summarizeOwnerOperation({businessId:'demo-summary',ownerUid:'demo-owner',range:{from:q.get('from')!,through:q.get('through')!},serverNow:summaryNow,records:[]}));});vi.stubGlobal('fetch',fetchMock);});
+afterEach(async()=>{await act(async()=>tree?.unmount());tree=undefined;vi.unstubAllGlobals();vi.useRealTimers();});
+it('realBusinessPollingUncertaintyPreservesRangeAndDraftWithoutAutomaticSummaryRetry',async()=>{
+ await act(async()=>{tree=create(createElement(ReportsPage));});expect(summaryCalls()).toHaveLength(1);
+ await act(async()=>tree!.root.findByProps({'aria-label':'Desde'}).props.onChange({target:{value:'2030-01-03'}}));await click('Consultar');expect(summaryCalls()).toHaveLength(2);
+ await act(async()=>tree!.root.findByProps({'aria-label':'Desde'}).props.onChange({target:{value:'2030-01-04'}}));
+ businessStatus=503;await act(async()=>vi.advanceTimersByTimeAsync(15000));expect(tree!.root.findAllByType('dl')).toHaveLength(0);
+ businessStatus=200;await act(async()=>vi.advanceTimersByTimeAsync(15000));
+ expect(summaryCalls()).toHaveLength(2);expect(tree!.root.findByProps({'aria-label':'Desde'}).props.value).toBe('2030-01-04');expect(tree!.root.findAllByType('dl')).toHaveLength(0);
+ await click('Actualizar');expect(summaryCalls()).toHaveLength(3);expect(String(summaryCalls().at(-1)?.[0])).toContain('from=2030-01-03&through=2030-01-07');
+});
+it('knownOwnerAuthority403StillPurgesAndCannotAutomaticallyReenable',async()=>{await act(async()=>{tree=create(createElement(ReportsPage));});expect(summaryCalls()).toHaveLength(1);businessStatus=403;await act(async()=>vi.advanceTimersByTimeAsync(15000));expect(tree!.root.findAllByType('dl')).toHaveLength(0);businessStatus=200;await act(async()=>vi.advanceTimersByTimeAsync(15000));expect(summaryCalls()).toHaveLength(1);expect(tree!.root.findAllByProps({'aria-label':'Desde'})).toHaveLength(0);});
