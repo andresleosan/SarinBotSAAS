@@ -170,8 +170,9 @@ it('synthetic team top/state/events survive migration reverse reconciliation SQL
   await writeFile(join(directory, 'export-manifest.json'), JSON.stringify({ ok: true, filename: 'sarin-bot-data.sql', sha256: digest, bytes: bytes.length }));
   await mkdir(join(directory, 'r2-objects'));
   await writeFile(join(directory, 'r2-backup-manifest.json'), JSON.stringify({ sourceSqlSha256: digest, bucket: 'sarin-bot-files', references: [] }));
+  await runtime.dispose();
   expect(await verifyD1Backup(directory)).toMatchObject({ ok: true, integrity: 'ok', dataPrinted: false, remoteMutations: false, tables: { app_documents: { count: bundle.rows.length } } });
-  await runtime.dispose(); runtime = await createDataTestRuntime({ captureSql: true });
+  runtime = await createDataTestRuntime({ captureSql: true });
   await runtime.db.exec(buildImportSql(bundle));
   const restored = (await runtime.db.prepare('SELECT * FROM app_documents ORDER BY path').all()).results;
   expect(verifyImportedRows(bundle, restored).documents).toBe(bundle.rows.length);
