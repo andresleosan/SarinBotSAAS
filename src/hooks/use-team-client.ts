@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useReducer, useRef } from 'react';
 import { useAuth } from '@/components/auth-provider';
-import { apiFetch, errorMessage } from '@/lib/client/api';
+import { apiFetch, ApiError, errorMessage } from '@/lib/client/api';
 import { ownerApiFetch, type OwnerRequestScope } from '@/lib/client/owner-request-scope';
 import { ownerBusinessTeamViewSchema, teamMembershipPageSchema, teamAgendaViewSchema, teamMutationResultSchema, teamSelfRequestCommandSchema, teamOwnerDecisionCommandSchema, teamLeaveCommandSchema, teamAccessCommandCanonicalString, teamBusinessSlugSchema, teamDocumentIdSchema, type TeamApplied, type TeamAccessCanonicalCommand, type TeamSelfRequestCommand, type TeamLeaveCommand, type TeamOwnerDecisionCommand, type TeamMutationResult, type OwnerBusinessTeamView, type TeamMembershipPage, type TeamAgendaView } from '@/lib/business-team';
 
 type Input = { uid: string; authEpoch: number; businessId?: string; enabled: boolean; audience: 'owner'|'member'; requestScope?: OwnerRequestScope };
-type Pending = { command: TeamAccessCanonicalCommand; membershipId: string | null; memberUid?: string; path: string; method: string; body: string; slug?: string; hash?: string; eventId?: string; running: boolean; proven: boolean };
+type Pending = { command: TeamAccessCanonicalCommand; membershipId: string | null; memberUid?: string; path: string; method: string; body: string; slug?: string; hash?: string; eventId?: string; running: boolean; proven: boolean; writeAttempts: number };
 type RecordState = { key: string; live: boolean; denied: boolean; view: OwnerBusinessTeamView|null; page: TeamMembershipPage|null; agenda: TeamAgendaView|null; loading: boolean; error: string|null; notice: string|null; applied: TeamApplied|null; current: TeamMutationResult['current']|null; proofMembershipId: string|null; currentTeamRevision: number; pending: Pending|null; read: { cancel: () => void }|null; generation: number; viewGeneration: number; date: string; slug: string|null };
 export const teamToday = () => new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);
 const sha256 = async (text: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))).map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -130,6 +130,8 @@ export function useTeamClient(input: Input) {
         if (pending.command.kind === 'request') pending.membershipId = membershipId;
       }
       if (!owns() || !actionable()) return;
+      // Count before token/transport can yield: any earlier uncertain attempt keeps the barrier.
+      pending.writeAttempts++;
       const raw = await fetcher('write', pending.path, { method: pending.method, body: pending.body }, owns);
       if (!owns()) return;
       const result = teamMutationResultSchema.parse(raw);
@@ -139,12 +141,22 @@ export function useTeamClient(input: Input) {
         || result.audience === 'owner' && result.current.memberUid !== pending.memberUid) throw Error('El resultado no corresponde a esta operación.');
       if (!owns()) return;
       acceptProof(result.applied, pending, member, result.teamRevision); cancelRead(); record.view = null; record.page = null; record.agenda = null;
-    } catch (error) { if (owns()) { record.error = errorMessage(error); record.notice = 'Resultado sin confirmar. Conservamos la petición exacta; consultar sin constancia no prueba que haya fallado.'; } }
+    } catch (error) {
+      if (owns()) {
+        record.error = errorMessage(error);
+        if (pending.writeAttempts === 1 && !pending.proven && error instanceof ApiError && error.status === 409 && error.code === 'TEAM_REVISION_CONFLICT') {
+          // This exact first attempt was refused before writes. A later retry409 cannot settle an earlier ambiguity.
+          cancelRead(); record.view = null; record.page = null; record.agenda = null; record.slug = null;
+          record.pending = null;
+          record.notice = 'Esta petición no se aplicó porque el equipo cambió. Actualiza el estado y revisa una nueva decisión antes de confirmar.';
+        } else record.notice = 'Resultado sin confirmar. Conservamos la petición exacta; consultar sin constancia no prueba que haya fallado.';
+      }
+    }
     finally { clearTimeout(timer); pending.running = false; if (owns() && pending.proven) record.pending = null; update(); }
   }
   function seal(command: TeamAccessCanonicalCommand, payload: object, path: string, method: string, membershipId: string|null, extra: Partial<Pending> = {}) {
     if (!actionable() || record.pending) return Promise.resolve();
-    const pending: Pending = { command: Object.freeze({ ...command }), membershipId, path, method, body: JSON.stringify(payload), running: false, proven: false, ...extra };
+    const pending: Pending = { command: Object.freeze({ ...command }), membershipId, path, method, body: JSON.stringify(payload), running: false, proven: false, writeAttempts: 0, ...extra };
     record.pending = pending; record.applied = null; record.current = null; record.proofMembershipId = null; record.currentTeamRevision = 0;
     return send(pending);
   }
