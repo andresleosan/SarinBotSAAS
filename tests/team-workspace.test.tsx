@@ -10,7 +10,7 @@ let renderer: ReactTestRenderer, controller: ReturnType<typeof useTeamWorkspace>
 function Harness({ businessId }: { businessId?: string }) { controller = useTeamWorkspace({ uid: auth.user.uid, authEpoch: auth.authEpoch, businessId, enabled: true }); return null; }
 const mount = async (businessId?: string) => { await act(async () => { renderer = create(createElement(Harness, { businessId })); }); };
 beforeEach(() => { setup(); auth.user.uid = 'staff'; vi.mocked(fetch).mockImplementation(async () => response(page())); });
-afterEach(async () => { await act(async () => renderer?.unmount()); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => renderer?.unmount()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe('staff assigned workspace', () => {
   it('pendingIsNotAgenda', async () => { await mount(); expect(controller.page?.items[0].status).toBe('requested'); expect(controller.agenda).toBeNull(); });
   it('spacesAreOwnAndPaged', async () => { await mount(); await act(async () => controller.loadMemberships('business0')); expect(String(vi.mocked(fetch).mock.calls.at(-1)?.[0])).toBe('/api/team/memberships?afterBusinessId=business0'); expect(controller.page?.items).toHaveLength(1); });
@@ -41,7 +41,7 @@ describe('staff focus, denial and exact scope', () => {
   it('otherResourceCannotBeChosenByQuery', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(agenda())); await mount('business1');
     await act(async () => controller.readAgenda('2026-10-25'));
-    expect(String(vi.mocked(fetch).mock.calls.at(-1)?.[0])).toBe('/api/team/businesses/business1/agenda?dateKey=2026-10-25');
+    expect(String(vi.mocked(fetch).mock.calls.at(-1)?.[0])).toBe('/api/team/businesses/business1/agenda?date=2026-10-25');
     expect(String(vi.mocked(fetch).mock.calls.at(-1)?.[0])).not.toContain('resource');
     expect(controller.agenda).toBeNull(); // The unrelated page response cannot be parsed as an agenda.
   });
@@ -117,4 +117,12 @@ it('verifiedSelfRequestRemainsRequestedWithoutGrantingAgenda', async () => {
   expect(controller.applied?.membershipRevision).toBe(1);
   expect(controller.current?.status).toBe('requested');
   expect(controller.agenda).toBeNull();
+});
+
+it('controlledFutureClockKeepsAgendaFixtureAndInitialReadCoherent', async () => {
+  vi.setSystemTime(new Date('2031-05-19T16:00:00Z'));
+  vi.mocked(fetch).mockResolvedValueOnce(response(agenda()));
+  await mount('business1');
+  expect(controller.agenda).toMatchObject({ dateKey: '2031-05-19', checkedAt: Date.parse('2031-05-19T16:00:00Z') });
+  expect(controller.error).toBeNull();
 });

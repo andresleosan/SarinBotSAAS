@@ -110,7 +110,7 @@ export function useTeamClient(input: Input) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
       cancelRead(); record.agenda = null; record.error = 'Elige un día válido para consultar la agenda.'; update(); return;
     }
-    await read(`/api/team/businesses/${encodeURIComponent(input.businessId)}/agenda?dateKey=${encodeURIComponent(dateKey)}`, raw => {
+    await read(`/api/team/businesses/${encodeURIComponent(input.businessId)}/agenda?date=${encodeURIComponent(dateKey)}`, raw => {
       const value = teamAgendaViewSchema.parse(raw);
       if (value.businessId !== input.businessId || value.dateKey !== dateKey || record.date !== dateKey) throw Error('La agenda no corresponde al día solicitado.');
       record.agenda = value;
