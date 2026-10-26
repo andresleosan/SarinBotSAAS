@@ -98,6 +98,7 @@ export function OwnerConfigurationWorkspace({ business: _business, capability, p
   };
   return <div ref={root} className="max-w-3xl min-w-0 space-y-5">
     <header className="space-y-2"><p className="text-xs uppercase tracking-widest text-sarin-blue">Configuración</p><h1 className="text-3xl font-bold">{configured ? 'Mi negocio' : 'Configura tu negocio'}</h1><p className="text-sm text-sarin-muted">{configured ? 'Elige una sección, revisa los cambios y guarda la configuración completa.' : 'Completa los datos y la agenda de tu negocio; revisa todo antes de guardar.'}</p></header>
+    <a href="/dashboard/team" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-sarin-blue underline">Equipo y accesos (abre en otra pestaña; tu borrador se conserva aquí)</a>
     {!configured && <ol aria-label="Etapas de configuración" className="flex flex-wrap gap-3 text-sm"><li>1. Tu negocio</li><li>2. Tu agenda</li><li>3. Revisión y guardado</li></ol>}
     {controller.dirty && <p role="status" className="text-sm text-sarin-muted">{mountedWithDirtyDraft ? 'Tienes cambios sin guardar de esta visita' : 'Cambios sin guardar'}</p>}
     {session.error && <Notice error>{session.error}</Notice>}
