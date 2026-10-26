@@ -11,7 +11,7 @@ const REPLAY_MS = 24 * 60 * 60 * 1000;
 const encoder = new TextEncoder();
 const fields: Record<string, 'string' | 'number' | 'boolean'> = {
   jobId: 'string', outboxId: 'string', conversationId: 'string', recordType: 'string', kind: 'string', sequence: 'number',
-  ownerUid: 'string', 'client.uid': 'string', dateKey: 'string', resourceId: 'string', status: 'string', type: 'string', tenantId: 'string', businessId: 'string', phoneNumberId: 'string', state: 'string', bodyState: 'string', id: 'string', appointmentId: 'string',
+  memberUid: 'string', ownerUid: 'string', 'client.uid': 'string', dateKey: 'string', resourceId: 'string', status: 'string', type: 'string', tenantId: 'string', businessId: 'string', phoneNumberId: 'string', state: 'string', bodyState: 'string', id: 'string', appointmentId: 'string',
   createdAt: 'number', updatedAt: 'number', submittedAt: 'number', startsAt: 'number', startAt: 'number', nextAttemptAt: 'number', bodyExpiresAt: 'number', expiresAt: 'number', enabled: 'boolean',
   'request.dateKey': 'string', 'request.createdAt': 'number', 'request.id': 'string', waitlistRecordId: 'string',
   __name__: 'string',

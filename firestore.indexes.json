@@ -1,5 +1,7 @@
 {
   "indexes": [
+    { "collectionGroup": "businessMemberships", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "memberUid", "order": "ASCENDING" }, { "fieldPath": "businessId", "order": "ASCENDING" }] },
+    { "collectionGroup": "businessMemberships", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "businessId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }] },
     { "collectionGroup": "waitlistOffers", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "dateKey", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }, { "fieldPath": "id", "order": "ASCENDING" }] },
     { "collectionGroup": "waitlistOffers", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "dateKey", "order": "ASCENDING" }, { "fieldPath": "state", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }, { "fieldPath": "id", "order": "ASCENDING" }] },
     { "collectionGroup": "waitlistRequests", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "request.dateKey", "order": "ASCENDING" }, { "fieldPath": "request.createdAt", "order": "ASCENDING" }, { "fieldPath": "request.id", "order": "ASCENDING" }] },

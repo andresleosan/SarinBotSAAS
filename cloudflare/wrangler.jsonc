@@ -20,6 +20,7 @@
     "SARIN_MAINTENANCE": "false",
     "SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED": "false",
     "SARIN_WAITLIST_OFFERS_ENABLED": "false",
+    "SARIN_TEAM_ACCESS_ENABLED": "false",
     "PILOT_AI_BUDGET_ENFORCED": "true"
   },
   "observability": { "enabled": false, "logs": { "enabled": false }, "traces": { "enabled": false } },
