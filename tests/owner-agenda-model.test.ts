@@ -150,7 +150,8 @@ describe('saved owner agenda occupancy', () => {
   it('offsetTransitionStaysInTheListWithoutAnAmbiguousGraphInterval', () => {
     const historicalDate = '1992-05-03';
     const appointments = [appointment('transition', {
-      dateKey: historicalDate, startAt: Date.parse('1992-05-02T23:30:00-05:00'),
+      // Start before both transition dates represented by tzdata 2026a and 2026e.
+      dateKey: historicalDate, startAt: Date.parse('1992-05-01T23:30:00-05:00'),
       endAt: Date.parse('1992-05-03T01:30:00-04:00'), reservedUntilAt: Date.parse('1992-05-03T01:45:00-04:00'),
     })];
     const layout = getOwnerAgendaDayLayout(historicalDate, appointments);

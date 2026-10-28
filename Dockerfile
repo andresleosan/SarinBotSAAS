@@ -1,4 +1,4 @@
-FROM node:24-alpine AS builder
+FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS builder
 WORKDIR /app
 # npm bootstraps only the pinned pnpm CLI in this disposable build stage.
 RUN npm install --global pnpm@11.23.0
@@ -20,7 +20,7 @@ ENV NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY \
     NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 
-FROM node:24-alpine AS runner
+FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
 COPY --from=builder --chown=node:node /app/.next/standalone ./
