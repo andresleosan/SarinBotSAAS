@@ -61,3 +61,17 @@ When the user invokes `/avanzar`, read `.agents/skills/avanzar/SKILL.md` and `do
 The authorized consolidation of 2026-11-07 makes `E:/Proyectos/Sarin Bot` the canonical checkout on `main`, with `workspace.layout: "consolidated-main"` and both controlRoot and codeRoot pointing here. Keep this root on main. Implement product changes in a temporary isolated worktree based on this reconciled source, run product checks there, and integrate validated changes into main. Keep mutable progress only in controlRoot; archive temporary worktrees after integration and preservation of their remaining files. Historical mixed-checkout instructions describe the preserved backup, not the current root; never overlay older application files onto main.
 
 After the AgendIA split, the single Fresha progress authority remains here. Scope each task to the appropriate repository before implementation, and record evidence against the actual repository and commit. Do not copy `tasks.json` into AgendIA or count this migration as completion of pending Fresha requirements.
+
+## Cierre obligatorio: dónde continuar
+
+Al terminar cualquier tarea, también fuera de `/avanzar`, cerrar la respuesta en español con **«Continuar en: <Sarin Bot o AgendIA> — <carpeta absoluta>. Acción: <seguir en este proyecto o cambiar al proyecto indicado>. Motivo: <siguiente trabajo concreto>.»** Esta indicación va al final, después del resultado, comprobaciones y recomendaciones aplicables.
+
+Elegir el destino por el trabajo pendiente, no por el nombre de este chat, el editor, el modelo ni el repositorio recién modificado:
+
+- **Sarin Bot — `E:/Proyectos/Sarin Bot`:** motor compartido, API, datos, inferencia, WhatsApp, Hub administrativo y landing del servicio de chatbot.
+- **AgendIA — `E:/Proyectos/AgendIA`:** pantallas y experiencia de citas, marca comercial, gateway y despliegue de su interfaz.
+- **Trabajo mixto:** indicar primero el proyecto del siguiente paso ejecutable y después el cambio al otro proyecto, con el orden y la dependencia concreta. Evitar un cierre ambiguo como «seguir en ambos».
+
+Para `/avanzar`, consultar el selector y el estado vigente en el único controlRoot de Sarin Bot antes de indicar la siguiente tarea; no fijar un ID histórico ni deducir el repositorio solo de `workspace.codeRoot`. Distinguir dónde se coordina el plan de dónde se implementa su interfaz. Si falta adaptar el coordinador para una tarea mixta, indicar esa adaptación como paso previo en Sarin Bot. Una tarea incompleta retoma su pendiente en el repositorio correspondiente; no anunciar otra tarea como lista. Si no hay siguiente tarea elegible o no se conoce su alcance, decirlo y señalar Sarin Bot como lugar de revisión del plan, sin inventar una selección ni marcar progreso.
+
+En un cambio de proyecto, incluir un mensaje breve para pegar en la nueva sesión con el objetivo pendiente, tarea/ID si existe, repositorio/carpeta y referencias a contratos, commits o verificaciones relevantes. Referenciar el estado canónico en Sarin Bot; conservar una sola autoridad de progreso.
