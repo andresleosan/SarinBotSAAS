@@ -187,9 +187,9 @@ describe("billing plan screens", () => {
     expect(payload.settings).not.toHaveProperty("trialDaysDefault");
   });
 
-  it("shows commercial administration without a personal chat entry point", async () => {
+  it("shows linked businesses in the Hub without a personal chat entry point", async () => {
     await mount(AdminPage);
-    expect(text(renderer.root)).toContain("Negocios y suscripciones");
+    expect(text(renderer.root)).toContain("Negocios / proyectos enlazados");
     expect(text(renderer.root)).toContain("Comprobantes de pago");
     expect(renderer.root.findAllByType("a").some(link => link.props.href === "/admin/vault")).toBe(false);
   });

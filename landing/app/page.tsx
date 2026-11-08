@@ -1,5 +1,5 @@
-import { MarketingHome } from "../../src/components/marketing-home";
+import { BotServiceHome } from "../../src/components/bot-service-home";
 
-export default function ProductPage() {
-  return <MarketingHome standalone publicAppUrl={process.env.SARIN_PUBLIC_APP_URL} />;
+export default function BotServicePage() {
+  return <BotServiceHome standalone />;
 }

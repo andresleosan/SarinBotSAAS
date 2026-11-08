@@ -38,6 +38,8 @@ Follow existing English imperative subjects: `feat:`, `fix:`, `style:`, `chore:`
 
 ## Security & Architecture
 
+Sarin Bot owns the chatbot service landing, ALS Dev Studio administrative Hub and the shared API/runtime. AgendIA is the independent commercial appointment application in `E:/Proyectos/AgendIA`, with its own repository and UI deployment. Appointment UI changes belong in AgendIA; shared commercial API, data, inference and WhatsApp changes belong here. Keep the original protected engine and WhatsApp configuration intact. AgendIA reaches approved commercial API routes through its private service binding; never create a second data store or inference queue for it.
+
 Keep secrets and private exports outside Git. Avoid logging conversation bodies. The active product is the commercial appointment service; personal chat and Vault are retired. Removing the module must not silently purge browser data from earlier versions. Run one application replica: the inference queue is process-local. Remote Ollama requires HTTPS and Cloudflare Access Service Auth.
 
 Use only `alsdevstudio.com` for Sarin's engine hostname. Never use `bptjersey.com`, including temporary tests.
@@ -57,3 +59,5 @@ When the user invokes `/avanzar`, read `.agents/skills/avanzar/SKILL.md` and `do
 `docs/implementation/fresha/tasks.json` is the sole progress authority. Run `node .agents/skills/avanzar/scripts/check-plan.mjs --next` from its `workspace.controlRoot`. Do not create a second mutable state file in a code worktree. Validate dependencies, generated build/integration children, evidence and all 165 requirement mappings before claiming progress. Do not count design/decomposition as implemented product. Regenerate `docs/implementation/fresha/progreso.html` with the saved state using the skill's renderer. Final Playwright MCP QA follows all construction; capability activation, real sends and final release effects retain their explicit approval gates.
 
 The authorized consolidation of 2026-11-07 makes `E:/Proyectos/Sarin Bot` the canonical checkout on `main`, with `workspace.layout: "consolidated-main"` and both controlRoot and codeRoot pointing here. Keep this root on main. Implement product changes in a temporary isolated worktree based on this reconciled source, run product checks there, and integrate validated changes into main. Keep mutable progress only in controlRoot; archive temporary worktrees after integration and preservation of their remaining files. Historical mixed-checkout instructions describe the preserved backup, not the current root; never overlay older application files onto main.
+
+After the AgendIA split, the single Fresha progress authority remains here. Scope each task to the appropriate repository before implementation, and record evidence against the actual repository and commit. Do not copy `tasks.json` into AgendIA or count this migration as completion of pending Fresha requirements.

@@ -1,5 +1,5 @@
-import { MarketingHome } from "@/components/marketing-home";
+import { BotServiceHome } from "@/components/bot-service-home";
 
 export default function HomePage() {
-  return <MarketingHome />;
+  return <BotServiceHome />;
 }

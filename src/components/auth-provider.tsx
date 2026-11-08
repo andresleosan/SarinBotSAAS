@@ -180,12 +180,12 @@ export function AuthGate({
     return (
       <main className="sarin-backdrop grid min-h-screen place-items-center px-5 py-12">
         <section className="sarin-surface w-full max-w-md space-y-6 rounded-2xl p-7 shadow-[0_16px_48px_#233e7c09] sm:p-9">
-          <a href="/" aria-label="SarinBot, inicio" className="mb-3 inline-block"><SarinBrand /></a>
-          <div><p className="sarin-eyebrow mb-3 text-sarin-blue">Tu espacio está aquí</p><h1 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-sarin-ink">Inicia sesión para continuar</h1></div>
+          <a href="/" aria-label={admin ? "Sarin Bot Admin Hub, inicio" : "SarinBot, inicio"} className="mb-3 inline-block"><SarinBrand hub={admin} /></a>
+          <div><p className={admin ? "mb-3 text-sm font-medium text-sarin-blue" : "sarin-eyebrow mb-3 text-sarin-blue"}>{admin ? "Acceso de administración" : "Tu espacio está aquí"}</p><h1 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-sarin-ink">{admin ? "Sarin Bot Admin Hub" : "Inicia sesión para continuar"}</h1></div>
           <p className="text-sm leading-7 text-sarin-muted">
             {localEmulators
               ? "Usa una cuenta local de prueba para acceder a tu espacio."
-              : "Usa tu cuenta de Google para acceder a tu espacio."}
+              : admin ? "Usa tu cuenta de Google autorizada para acceder al centro de control de ALS Dev Studio." : "Usa tu cuenta de Google para acceder a tu espacio."}
           </p>
           {error && (
             <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
@@ -212,13 +212,15 @@ export function AuthGate({
               ))}
             </div>
           )}
-          <PreauthorizationChoices onContinue={signIn} />
-          <button onClick={() => void signIn()} disabled={localSigningIn !== null} className="min-h-11 w-full text-left text-sm text-sarin-blue underline">Entrar para consultar mis citas o ejercer mis derechos</button>
+          {admin ? <button onClick={() => void signIn()} disabled={localSigningIn !== null} className="min-h-12 w-full rounded-[10px] bg-sarin-blue px-4 py-3 text-sm font-semibold text-white hover:bg-sarin-blue/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sarin-blue disabled:opacity-50">Iniciar sesión con Google</button> : <>
+            <PreauthorizationChoices onContinue={signIn} />
+            <button onClick={() => void signIn()} disabled={localSigningIn !== null} className="min-h-11 w-full text-left text-sm text-sarin-blue underline">Entrar para consultar mis citas o ejercer mis derechos</button>
+          </>}
           <nav aria-label="Información del servicio" className="flex flex-wrap gap-x-5 text-xs text-sarin-blue">
             <a href="/privacidad" className="inline-flex min-h-11 items-center underline underline-offset-4">Privacidad</a>
             <a href="/ayuda" className="inline-flex min-h-11 items-center underline underline-offset-4">Ayuda</a>
           </nav>
-          <p className="border-t border-sarin-line pt-5 text-xs leading-6 text-sarin-muted">Tu agenda, tus servicios y tu forma de atender. Todo en un mismo espacio.</p>
+          <p className="border-t border-sarin-line pt-5 text-xs leading-6 text-sarin-muted">{admin ? <>Negocios enlazados, WhatsApp e inteligencia artificial.<br />Desarrollado por <a href="https://www.alsdevstudio.com/" className="inline-flex min-h-11 items-center text-sarin-blue underline underline-offset-4">ALS Dev Studio</a></> : "Tu agenda, tus servicios y tu forma de atender. Todo en un mismo espacio."}</p>
         </section>
       </main>
     );
@@ -228,7 +230,7 @@ export function AuthGate({
         <section className="w-full max-w-md space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-6">
           <h1 className="text-2xl font-bold">Acceso restringido</h1>
           <p className="text-sarin-muted">
-            Esta sección está reservada para el administrador.
+            Esta sección está reservada para la administración de ALS Dev Studio.
           </p>
           {error && (
             <p role="alert" className="text-rose-800">

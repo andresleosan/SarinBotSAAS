@@ -1,5 +1,6 @@
 @import '../../src/app/globals.css';
-@source '../../src/components/marketing-home.tsx';
+@source '../../src/components/bot-service-home.tsx';
+@source '../../src/components/bot-service-pricing.tsx';
 @source '../../src/components/sarin-brand.tsx';
 @source './';
 

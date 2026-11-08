@@ -43,11 +43,11 @@ export function AppShell({
       <a href="#workspace-content" className="sarin-skip">Saltar al contenido</a>
       <aside className="border-b border-sarin-line bg-sarin-paper lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-b-0">
         <div className="flex items-center justify-between px-5 py-5 lg:px-6 lg:py-8">
-          <Link href="/" aria-label="SarinBot, inicio"><SarinBrand /></Link>
+          <Link href="/" aria-label={admin ? "Sarin Bot Admin Hub, inicio" : "SarinBot, inicio"}><SarinBrand hub={admin} /></Link>
         </div>
         <WorkspaceNavigation context={admin ? 'platform' : 'business'} items={links} activeId={activeId} isSuperadmin={isSuperadmin} />
         <div className="mt-auto hidden px-6 pb-6 pt-10 lg:block">
-          <div className="border-t border-sarin-line pt-5"><p className="text-sm text-sarin-ink">Un poco más de orden.</p><p className="mt-1 text-xs leading-6 text-sarin-muted">Un poco más de tiempo para ti.</p></div>
+          <div className="border-t border-sarin-line pt-5"><p className="text-sm text-sarin-ink">{admin ? "Sarin Bot Control Center" : "Un poco más de orden."}</p><p className="mt-1 text-xs leading-6 text-sarin-muted">{admin ? "ALS Dev Studio" : "Un poco más de tiempo para ti."}</p></div>
         </div>
       </aside>
       <div className="min-w-0">

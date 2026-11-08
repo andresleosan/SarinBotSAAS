@@ -9,9 +9,11 @@ const spaceGrotesk = localFont({ src: "../../public/fonts/space-grotesk-latin.wo
 const plexMono = localFont({ src: "../../public/fonts/ibm-plex-mono-latin.woff2", weight: "400", variable: "--font-plex-mono", display: "swap", preload: false });
 
 export const metadata: Metadata = {
-  title: "SarinBot — Plataforma Inteligente de Citas con IA",
+  metadataBase: new URL("https://sarinbotsaas.pages.dev"),
+  title: "Sarin Bot | Chatbots para webs y emprendimientos",
   description:
-    "Agenda automatizada con SarinBot para emprendedores y negocios por citas.",
+    "Servicio de chatbot de ALS Dev Studio para atender consultas sobre tu negocio. Conoce las opciones de atención web y WhatsApp y solicita una cotización.",
+  icons: { icon: [{ url: "/brand/sarin-face-192.png", sizes: "192x192", type: "image/png" }], apple: "/brand/sarin-face-192.png" },
 };
 
 export default function RootLayout({

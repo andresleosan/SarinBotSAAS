@@ -233,12 +233,12 @@ function Console({ location }: { location: AdminLocation }) {
     <div className="min-w-0 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-widest text-sarin-blue">
-            Administración
+          <p className="text-sm font-medium text-sarin-blue">
+            ALS Dev Studio
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Control de SarinBot</h1>
+          <h1 className="mt-2 text-3xl font-bold">Sarin Bot Control Center</h1>
           <p className="mt-2 text-sm text-sarin-muted">
-            Administra las suscripciones, revisa pagos y elige la IA de los negocios.
+            Administra los negocios enlazados, sus canales, consumo de IA, cuotas y políticas.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -464,7 +464,7 @@ function Console({ location }: { location: AdminLocation }) {
         )}
       </section>
       </AdminModulePanel>
-      <AdminModulePanel id="admin-list" active={location.section === "list"} title="Negocios y suscripciones" description="Consulta el estado de los negocios incluidos en la lectura actual.">
+      <AdminModulePanel id="admin-list" active={location.section === "list"} title="Negocios / proyectos enlazados" description="Consulta el estado y la suscripción de los negocios incluidos en la lectura actual.">
       <details className="mb-4 text-sm text-sarin-muted"><summary className="min-h-11 cursor-pointer py-3">Sobre los registros consultados</summary><p>Esta tabla muestra los negocios incluidos en el snapshot disponible. Seleccionar un enlace público no cambia tu identidad ni te convierte en el dueño.</p></details>
       <section className="space-y-3">
         {data.businesses.length === 0 ? (

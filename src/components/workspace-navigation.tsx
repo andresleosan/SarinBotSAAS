@@ -36,7 +36,7 @@ export function WorkspaceNavigation({ context, items, activeId, isSuperadmin }: 
   return (
     <div onKeyDown={onKeyDown}>
       <div className="flex min-w-0 items-center justify-between gap-3 px-5 pb-3 lg:px-7">
-        <p className="sarin-eyebrow min-w-0 text-sarin-muted">{context === 'platform' ? 'Administración de Sarin' : 'Mi negocio'}</p>
+        <p className={context === 'platform' ? 'min-w-0 text-xs font-medium text-sarin-muted' : 'sarin-eyebrow min-w-0 text-sarin-muted'}>{context === 'platform' ? 'Administración de Sarin Bot' : 'Mi negocio'}</p>
         <button ref={button} type="button" aria-expanded={open} aria-controls={navigationId} onClick={() => setOpen(value => !value)} className="flex min-h-11 shrink-0 items-center gap-2 rounded-[10px] px-3 text-sm text-sarin-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sarin-blue lg:hidden"><Menu aria-hidden="true" className="h-4 w-4" />Menú</button>
       </div>
       <nav id={navigationId} aria-label={context === 'platform' ? 'Navegación de administración' : 'Navegación del negocio'} className={`${open ? 'flex' : 'hidden'} min-w-0 flex-col gap-1 px-3 pb-3 lg:flex lg:px-4`}>

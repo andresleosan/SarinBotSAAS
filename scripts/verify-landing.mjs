@@ -11,10 +11,9 @@ const anchors = [...html.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((match) => ma
 const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
 const appOrigin = 'https://sarinbotsaas.pages.dev';
 const applicationLinks = [];
-assert.ok(!/próximamente|aún no están disponibles/i.test(html), 'The product page must not retain the former launch notice.');
-assert.ok(ids.has('planes') && ids.has('empezar'), 'Plans and access sections must be present.');
-assert.ok(/data-offer-state="(?:loading|unavailable)"/.test(html), 'Variable prices require an accessible runtime offer state.');
-assert.ok(!/(?:Semanal|Quincenal|Mensual):\s*\$/.test(html), 'The export must not advertise build-time subscription tariffs as current.');
+assert.ok(['bot-heading', 'servicio', 'planes', 'contacto'].every(id => ids.has(id)), 'The chatbot service, pricing and contact sections must be present.');
+assert.ok(html.includes('Un chatbot para atender a tus clientes.'), 'The chatbot service heading must be present.');
+assert.ok(!/Prueba pagada|SarinBot Esencial|data-offer-state|Sarin Bot Admin Hub/i.test(html), 'The chatbot landing must not retain appointment plans or an admin-only homepage.');
 for (const link of anchors) {
   if (link.startsWith('#')) {
     assert.ok(ids.has(link.slice(1)), `Navigation has no target: ${link}`);
@@ -25,18 +24,14 @@ for (const link of anchors) {
   const url = new URL(link);
   assert.ok(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash, 'Public destinations require clean HTTPS URLs.');
   if (url.origin === appOrigin) {
-    const entry = /^\/dashboard(?:\/onboarding)?$/.test(url.pathname);
-    assert.ok(entry || ['/ayuda', '/privacidad'].includes(url.pathname), 'Only approved application entry and information routes may be linked.');
-    if (entry) applicationLinks.push(url.pathname);
+    assert.equal(url.pathname, '/admin', 'The secondary administration entry must lead to the console.');
+    applicationLinks.push(url.pathname);
   } else {
     assert.ok(url.href === 'https://www.alsdevstudio.com/' || url.href === sarinWhatsAppUrl, 'An unapproved external destination was exported.');
   }
 }
-if (applicationLinks.length) {
-  assert.ok(applicationLinks.includes('/dashboard') && applicationLinks.includes('/dashboard/onboarding'), 'Enabled access requires both application entry actions.');
-} else {
-  assert.ok(anchors.includes('#planes') && anchors.includes('#empezar'), 'Coordinated access requires useful local actions.');
-}
+assert.deepEqual(applicationLinks, ['/admin'], 'The service landing requires one secondary administration entry.');
+assert.ok(anchors.includes(sarinWhatsAppUrl), 'The service requires a working quotation contact.');
 assert.ok(!html.includes('/_next/image?'), 'The export must not require the Next image server.');
 const icons = ['sarin-face.ico', 'sarin-face-32.png', 'sarin-face-48.png', 'sarin-face-apple.png'];
 for (const file of ['404.html', '_headers', 'robots.txt', 'sitemap.xml', 'brand/sarin-welcome.png', 'brand/sarin-flight.png', 'brand/sarin-face-mark.png', 'favicon.ico', ...icons]) await stat(join(output, file));
@@ -66,4 +61,4 @@ for (const asset of html.matchAll(/(?:src|href)="(\/(?:_next|brand)\/[^"?#]+)"/g
   assert.ok(path.startsWith(output), 'Asset escapes output directory.');
   await stat(path);
 }
-console.log(`Landing verified: ${files} public files, product sections and link targets present, ${applicationLinks.length ? 'approved application access enabled' : 'coordinated access'}, no backend configuration.`);
+console.log(`Bot service landing verified: ${files} public files, service, pricing, contact and administrative entry present, no backend configuration.`);

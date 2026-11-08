@@ -64,7 +64,7 @@ describe('administrative navigation', () => {
     const items = getAdminNavigationItems();
     expect(items.map(item => [item.id, item.label, item.href])).toEqual([
       ['summary', 'Resumen', '/admin?module=summary&section=overview'],
-      ['businesses', 'Negocios', '/admin?module=businesses&section=list'],
+      ['businesses', 'Negocios enlazados', '/admin?module=businesses&section=list'],
       ['access', 'Pagos y acceso', '/admin?module=access&section=receipts'],
       ['intelligence', 'IA y canales', '/admin?module=intelligence&section=provider'],
       ['attention', 'Asistente y atención', '/admin/assistant?section=query'],

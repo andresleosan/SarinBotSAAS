@@ -18,8 +18,8 @@ export type WorkspaceNavItem = { id: string; label: string; href: string };
 type ModuleDefinition = { id: AdminModule; label: string; sections: { id: AdminSection; label: string }[] };
 const modules: ModuleDefinition[] = [
   { id: 'summary', label: 'Resumen', sections: [{ id: 'overview', label: 'Resumen' }] },
-  { id: 'businesses', label: 'Negocios', sections: [
-    { id: 'list', label: 'Negocios y suscripciones' },
+  { id: 'businesses', label: 'Negocios enlazados', sections: [
+    { id: 'list', label: 'Negocios / proyectos enlazados' },
     { id: 'booking-policy', label: 'Política de datos de reservas' },
   ] },
   { id: 'access', label: 'Pagos y acceso', sections: [
