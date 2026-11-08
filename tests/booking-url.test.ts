@@ -17,4 +17,10 @@ describe('canonical printed booking URL', () => {
     vi.stubEnv('NODE_ENV', 'production'); vi.stubEnv('SARIN_PUBLIC_BOOKING_ORIGIN', 'https://sarinbotsaas.pages.dev');
     expect(getCanonicalBookingUrl('barberia-norte')).toBe('https://sarinbotsaas.pages.dev/b/barberia-norte');
   });
+  it('allows the independent AgendIA domain but not its previews or lookalikes', () => {
+    expect(getCanonicalBookingUrl('barberia-norte', 'https://agendia.pages.dev')).toBe('https://agendia.pages.dev/b/barberia-norte');
+    for (const origin of ['https://preview.agendia.pages.dev', 'https://agendia-other.pages.dev', 'https://agendia.pages.dev:443']) {
+      expect(() => getCanonicalBookingUrl('barberia-norte', origin)).toThrow();
+    }
+  });
 });

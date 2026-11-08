@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { consentDocuments, preauthorizationSchema, preauthorizeAccount } from '@/lib/server/consent';
 import { apiError, HttpError, readJson } from '@/lib/server/http';
-import { getCanonicalBookingUrl } from '@/lib/server/booking-url';
+import { AGENDIA_PUBLIC_ORIGIN, getCanonicalBookingUrl } from '@/lib/server/booking-url';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET() {
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
         // origin, never untrusted forwarded headers. Host is a development-only
         // fallback for Next's internal localhost URL, without cookies or identity.
         const target = new URL(`${browserOrigin.protocol}//${request.headers.get('host') ?? new URL(request.url).host}`);
-        sameHost = configuredOrigin ? origin === configuredOrigin : ['https:', 'http:'].includes(browserOrigin.protocol) && browserOrigin.origin === origin && browserOrigin.host === target.host;
+        sameHost = configuredOrigin ? origin === configuredOrigin || origin === AGENDIA_PUBLIC_ORIGIN : ['https:', 'http:'].includes(browserOrigin.protocol) && browserOrigin.origin === origin && browserOrigin.host === target.host;
       } catch { /* Reject malformed and opaque origins. */ }
       if (!sameHost) throw new HttpError(403, 'Origen no autorizado.');
     }
