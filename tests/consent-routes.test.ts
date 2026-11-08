@@ -68,8 +68,8 @@ describe('consent HTTP boundaries', () => {
     const body = JSON.stringify({ fingerprint: doc.fingerprint, termsAccepted: true, dataAuthorized: true });
     const make = (origin: string) => new Request('http://internal:3000/api/consent/preauthorize', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: 'runtime.synthetic.internal', Origin: origin, 'X-Forwarded-Host': 'foreign.test' }, body });
     expect((await preauthorize(make('https://sarinbotsaas.pages.dev'))).status).toBe(200);
-    expect((await preauthorize(make('https://agendia.pages.dev'))).status).toBe(200);
-    for (const origin of ['https://preview.agendia.pages.dev', 'https://agendia.pages.dev.attacker.test', 'http://agendia.pages.dev', 'https://agendia.pages.dev/']) {
+    expect((await preauthorize(make('https://agendia-app.pages.dev'))).status).toBe(200);
+    for (const origin of ['https://agendia.pages.dev', 'https://agendia-l75.pages.dev', 'https://preview.agendia-app.pages.dev', 'https://agendia-app.pages.dev.attacker.test', 'http://agendia-app.pages.dev', 'https://agendia-app.pages.dev/']) {
       expect((await preauthorize(make(origin))).status).toBe(403);
     }
     expect((await preauthorize(make('https://foreign.test'))).status).toBe(403);

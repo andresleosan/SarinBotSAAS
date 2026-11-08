@@ -18,8 +18,8 @@ describe('canonical printed booking URL', () => {
     expect(getCanonicalBookingUrl('barberia-norte')).toBe('https://sarinbotsaas.pages.dev/b/barberia-norte');
   });
   it('allows the independent AgendIA domain but not its previews or lookalikes', () => {
-    expect(getCanonicalBookingUrl('barberia-norte', 'https://agendia.pages.dev')).toBe('https://agendia.pages.dev/b/barberia-norte');
-    for (const origin of ['https://preview.agendia.pages.dev', 'https://agendia-other.pages.dev', 'https://agendia.pages.dev:443']) {
+    expect(getCanonicalBookingUrl('barberia-norte', 'https://agendia-app.pages.dev')).toBe('https://agendia-app.pages.dev/b/barberia-norte');
+    for (const origin of ['https://agendia.pages.dev', 'https://agendia-l75.pages.dev', 'https://preview.agendia-app.pages.dev', 'https://agendia-other.pages.dev', 'https://agendia-app.pages.dev:443']) {
       expect(() => getCanonicalBookingUrl('barberia-norte', origin)).toThrow();
     }
   });

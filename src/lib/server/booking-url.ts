@@ -2,7 +2,7 @@ import 'server-only';
 import { isIP } from 'node:net';
 import { HttpError } from './http';
 
-export const AGENDIA_PUBLIC_ORIGIN = 'https://agendia.pages.dev';
+export const AGENDIA_PUBLIC_ORIGIN = 'https://agendia-app.pages.dev';
 
 export function getCanonicalBookingUrl(slug: string, origin = process.env.SARIN_PUBLIC_BOOKING_ORIGIN): string {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length < 3 || slug.length > 70) throw new HttpError(400, 'El enlace del negocio no es válido.');
@@ -17,6 +17,6 @@ export function getCanonicalBookingUrl(slug: string, origin = process.env.SARIN_
   if (url.protocol === 'http:' && loopback && demo) return `${url.origin}/b/${slug}`;
   const authority = /^https:\/\/([^/]+)/i.exec(origin)?.[1];
   const reserved = ['localhost', 'example.com', 'example.net', 'example.org'];
-  if (url.protocol !== 'https:' || !authority || authority.includes(':') || isIP(hostname) || !hostname.includes('.') || reserved.some(host => hostname === host || hostname.endsWith(`.${host}`)) || /\.(test|invalid|example|localhost|workers\.dev|vercel\.app|netlify\.app)$/.test(hostname) || (hostname.endsWith('.pages.dev') && !['sarinbotsaas.pages.dev', 'agendia.pages.dev'].includes(hostname))) throw fail();
+  if (url.protocol !== 'https:' || !authority || authority.includes(':') || isIP(hostname) || !hostname.includes('.') || reserved.some(host => hostname === host || hostname.endsWith(`.${host}`)) || /\.(test|invalid|example|localhost|workers\.dev|vercel\.app|netlify\.app)$/.test(hostname) || (hostname.endsWith('.pages.dev') && !['sarinbotsaas.pages.dev', 'agendia-app.pages.dev'].includes(hostname))) throw fail();
   return `${url.origin}/b/${slug}`;
 }

@@ -15,7 +15,7 @@ describe('own booking kit', () => {
     const response = await GET(make('?application=agendia'));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(await response.json()).toMatchObject({ bookingUrl: 'https://agendia.pages.dev/b/barberia-norte', business: { id: value.id } });
+    expect(await response.json()).toMatchObject({ bookingUrl: 'https://agendia-app.pages.dev/b/barberia-norte', business: { id: value.id } });
     for (const query of ['?application=foreign', '?application=agendia&application=agendia', '?application=agendia&origin=https://attacker.invalid']) {
       expect((await GET(make(query))).status).toBe(400);
     }
