@@ -8,7 +8,7 @@ it('bounds new authorization writes while always allowing withdrawal and stable 
   vi.stubEnv('SUPERADMIN_UID', subjectAdmin.uid); const { db, rows } = memoryFirestore(), f = await subjectFixture(db);
   const decision = async (index: number) => {
     const subjectCase = { ...f.subjectCase, bookingRequestId: `demo-rate-case-${index}` }, status = await readBookingSubjectConsent(f.actor, f.business.id, subjectCase, db);
-    return updateBookingSubjectConsent(f.actor, { businessId: f.business.id, case: subjectCase, action: 'accept', requestId: `demo-rate-accept-${index}`, expectedRevision: status.revision, fingerprint: status.documents.fingerprint, decisions: { dataAuthorized: true, sensitiveDataAuthorized: true, representationDeclared: true } }, db);
+    return updateBookingSubjectConsent(f.actor, { businessId: f.business.id, case: subjectCase, action: 'accept', requestId: `demo-rate-accept-${index}`, expectedRevision: status.revision, fingerprint: status.documents!.fingerprint, decisions: { dataAuthorized: true, sensitiveDataAuthorized: true, representationDeclared: true } }, db);
   };
   for (let index = 0; index < 20; index++) await decision(index);
   await expect(decision(20)).rejects.toMatchObject({ status: 429, code: 'BOOKING_ACTION_RATE_LIMITED' });

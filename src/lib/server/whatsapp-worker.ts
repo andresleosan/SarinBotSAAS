@@ -9,6 +9,8 @@ import { decryptWhatsApp, readBoundedBytes } from './whatsapp-security';
 import { claimWhatsAppOutbox, cleanupWhatsAppRetention, inboundContentSchema, outboundContentSchema, persistWhatsAppReply, readWhatsAppHistory, updateWhatsAppOutbox, whatsappHash, WHATSAPP_TERMINAL, type WhatsAppInbox, type WhatsAppOutbox } from './whatsapp-store';
 import { conversationAllowsReply, conversationPermitsReply, markConversationForReview, registerWhatsAppOperation } from './whatsapp-conversations';
 import { withBookingDispatch } from './booking-policy-transition';
+import { readBookingAdmission } from './booking-admission';
+import type { BookingAdmissionCapability } from '@/lib/booking-admission';
 import { HttpError } from './http';
 
 const processing = new WeakSet<Firestore>();
@@ -94,6 +96,12 @@ async function sendPending(db: Firestore) {
     }
     if (initial.state !== 'ready') continue;
     if (!await conversationAllowsReply(initial, db)) {
+      await updateWhatsAppOutbox(candidate.id, row => row.state === 'ready' ? { state: 'cancelled', nextAttemptAt: WHATSAPP_TERMINAL } : null, db); continue;
+    }
+    let capability: BookingAdmissionCapability | null = null;
+    try { capability = await readBookingAdmission(initial.businessId, db); }
+    catch { await updateWhatsAppOutbox(candidate.id, row => row.state === 'ready' ? { state: 'cancelled', nextAttemptAt: WHATSAPP_TERMINAL } : null, db); continue; }
+    if (capability.admission !== 'active' || (initial.policyRevision !== undefined && capability.revision !== initial.policyRevision)) {
       await updateWhatsAppOutbox(candidate.id, row => row.state === 'ready' ? { state: 'cancelled', nextAttemptAt: WHATSAPP_TERMINAL } : null, db); continue;
     }
     if (!initial.content || initial.windowEndsAt <= Date.now() || initial.bodyExpiresAt <= Date.now()) {

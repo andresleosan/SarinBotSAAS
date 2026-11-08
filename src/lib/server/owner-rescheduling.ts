@@ -17,6 +17,7 @@ import { appointmentRescheduleRevision, appointmentRescheduleFingerprint } from 
 import { assertOwner, stableDocumentId } from './businesses';
 import { assertConsent } from './consent';
 import { readBookingDataPolicy } from './booking-data-policy';
+import { assertBookingAdmission } from './booking-admission';
 import { bookingSubjectHash } from './booking-subject-consent';
 import { clientPolicyKey, clientUidSchema } from './client-policy';
 import { prepareBookingActionAdmission } from './booking-action-admission';
@@ -87,7 +88,7 @@ async function sourceState(tx: Transaction, db: Database, business: Business, so
   const head = await readVerifiedAttendanceHead(tx, db, business.id, source);
   const { capability } = await readBookingDataPolicy(business.id, db, tx);
   const beneficiary = source.beneficiary === undefined ? null : bookingBeneficiarySchema.safeParse(source.beneficiary);
-  const restricted = capability.dataMode !== 'general' || capability.representedMinorsEnabled
+  const restricted = capability.admission !== 'active' || capability.dataMode !== 'general' || capability.representedMinorsEnabled
     || (beneficiary !== null && (!beneficiary.success || beneficiary.data.kind !== 'self'))
     || Object.prototype.hasOwnProperty.call(source, 'subjectAuthorization') || Object.prototype.hasOwnProperty.call(source, 'representationReview');
   const reason = source.type !== 'appointment' || source.status !== 'confirmed' ? 'unsupported_source'
@@ -161,6 +162,7 @@ export async function prepareOwnerReschedule(owner: ChatActor, businessId: strin
       recovery(record, source);
       return { proposal: view(record), replayed: true };
     }
+    await assertBookingAdmission(tx, business, 'proposal', db);
     const state = await sourceState(tx, db, business, source, Date.now()); assertWritable(state, input, Date.now(), business);
     await assertConsent(owner.uid, 'account', undefined, db, tx);
     const { selection } = input, catalog = targetCatalog(business, source, selection.resourceId);
@@ -204,6 +206,7 @@ export async function confirmOwnerReschedule(owner: ChatActor, businessId: strin
     if (record.state === 'closed') return null;
     const close = (now: number) => { tx.set(ref, { ...record, state: 'closed', closedAt: now, closedReason: 'expired' }); return null; };
     if (record.expiresAt <= Date.now()) return close(Date.now());
+    await assertBookingAdmission(tx, business, 'reschedule', db);
     const state = await sourceState(tx, db, business, source, Date.now()); assertWritable(state, record, Date.now(), business);
     await assertConsent(owner.uid, 'account', undefined, db, tx);
     const target = record.target, catalog = targetCatalog(business, source, target.resourceId);

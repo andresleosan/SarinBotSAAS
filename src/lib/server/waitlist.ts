@@ -15,6 +15,7 @@ import { clientUidSchema, assertClientCanBook } from './client-policy';
 import { readVerifiedConsentAnchor } from './consent';
 import { readVerifiedBookingSubjectAnchor, bookingSubjectHash } from './booking-subject-consent';
 import { assertBookingIntakePolicy } from './booking-data-policy';
+import { assertBookingAdmission } from './booking-admission';
 import { prepareBookingActionAdmission } from './booking-action-admission';
 import { HttpError } from './http';
 
@@ -96,9 +97,6 @@ async function policyIssue(tx: Transaction, user: ReadPrincipal, business: Busin
   return reason;
 }
 async function appointments(tx: Transaction, current: Awaited<ReturnType<typeof context>>, dateKey: string) {
-  // Never truncate: a storage overflow must fail instead of inventing free slots.
-  // Date ordering keeps the selected document set unchanged and uses the
-  // existing date prefix instead of a parent/path scan over historical visits.
   const docs = await tx.get(current.businessRef.collection('appointments').where('dateKey', '==', dateKey).where('status', '==', 'confirmed').orderBy('dateKey'));
   return docs.docs.map(doc => doc.data() as Appointment);
 }
@@ -115,10 +113,7 @@ async function projectWaitlist(tx: Transaction, user: ReadPrincipal, businessId:
   const businessDoc = await tx.get(current.businessRef);
   if (!businessDoc.exists) return withoutSlots(response(user, businessId, current.record, view(item, 'suspended', null, 'business_unavailable')));
   const business = parseBusiness(businessDoc.data(), businessId);
-  // Validate all evidence before classifying a legitimate suspension. Corruption
-  // in one permission cannot hide behind another permission being inactive.
   const currentPermissions = await permissions(tx, user, business, item.case, db).catch(error => {
-    // This case came from our immutable saved request, not this GET's caller.
     if (error instanceof HttpError && error.code === 'BOOKING_SUBJECT_CONFLICT') throw unavailable();
     throw error;
   }), issue = await policyIssue(tx, user, business, db);
@@ -140,7 +135,6 @@ async function projectWaitlist(tx: Transaction, user: ReadPrincipal, businessId:
 async function projection(tx: Transaction, user: ReadPrincipal, businessId: string, current: Awaited<ReturnType<typeof context>>, db: Database): Promise<WaitlistState> {
   return (await projectWaitlist(tx, user, businessId, current, db)).state;
 }
-/** Owner authority is checked here too; a stored data principal never authorizes a mutation. */
 export async function readOwnerWaitlistProjection(tx: Transaction, owner: ChatActor, businessId: string, recordId: string, db: Database) {
   const businessRef = db.collection('businesses').doc(businessId), businessDoc = await tx.get(businessRef);
   if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
@@ -161,12 +155,10 @@ function replay(record: WaitlistRecord | null, input: { requestId: string; expec
   if ((record?.revision ?? 0) !== input.expectedRevision) throw changed();
   return false;
 }
-/** Read-only, including availability refresh; no inference, notifications or admission writes. */
 export async function readWaitlist(user: ChatActor, businessId: string, db: Database = getAdminDb()): Promise<WaitlistState> {
   validateScope(user, businessId);
   return db.runTransaction(async tx => projection(tx, user, businessId, await context(tx, user, businessId, db), db));
 }
-/** Read-only projection for an authenticated or stored data principal; grants no mutation authority. */
 export async function readWaitlistProjectionInTransaction(tx: Transaction, user: ReadPrincipal, businessId: string, db: Database) {
   const current = await context(tx, user, businessId, db);
   return { record: current.record, ...await projectWaitlist(tx, user, businessId, current, db) };
@@ -179,7 +171,9 @@ export async function joinWaitlist(user: ChatActor, businessId: string, supplied
     if (current.record?.request && current.record.request.expiresAt > Date.now()) throw new HttpError(409, 'Ya tienes una solicitud en este negocio. Sal de la lista antes de elegir otra.', 'WAITLIST_REQUEST_EXISTS');
     const businessDoc = await tx.get(current.businessRef);
     if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
-    const business = parseBusiness(businessDoc.data(), businessId), permit = await permissions(tx, user, business, input.case, db);
+    const business = parseBusiness(businessDoc.data(), businessId);
+    await assertBookingAdmission(tx, business, 'waitlist', db);
+    const permit = await permissions(tx, user, business, input.case, db);
     if (!permit.active || !permit.account || !permit.business) throw new HttpError(428, 'Revisa los permisos actuales de tu cuenta, del negocio y de esta reserva.', 'CONSENT_REQUIRED');
     await assertBookingIntakePolicy(tx, businessId, business.sarinConfig.intakeFields, db);
     if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
@@ -188,8 +182,6 @@ export async function joinWaitlist(user: ChatActor, businessId: string, supplied
     const selection = { serviceId: input.serviceId, dateKey: input.dateKey, resourceId: input.resourceId ?? null };
     if (!selectedService(business, selection)) throw new HttpError(400, 'Selecciona un servicio y profesional disponibles.');
     const existingAppointments = await appointments(tx, current, input.dateKey);
-    // The same caller requestId can be reused after a cancellation with a new
-    // revision. Count that new intention while exact replay above stays free.
     const admit = await prepareBookingActionAdmission(tx, db, user.uid, businessId, 'waitlist', operationHash);
     const now = Date.now(), expiresAt = expiry(input.dateKey);
     if (input.dateKey < dateAt(now) || input.dateKey > dateAt(now + 366 * DAY) || expiresAt <= now) throw new HttpError(400, 'Elige un día entre hoy y los próximos 366 días.');

@@ -35,6 +35,7 @@ import { assertConsent } from './consent';
 import { prepareBookingActionAdmission } from './booking-action-admission';
 import { prepareAppointmentInTransaction } from './bookings';
 import { assertClientCanBook } from './client-policy';
+import { assertBookingAdmission } from './booking-admission';
 import { bookingSchema } from './schemas';
 
 export const waitlistOfferHeadSchema = z.object({ version: z.literal(1), businessId: id, waitlistRecordId: id, revision: revision.min(1), entryId: id, currentOfferId: id }).strict();
@@ -255,6 +256,7 @@ export async function createOwnerWaitlistOffer(owner: ChatActor, businessId: str
       const status = await usability(tx, business, offer, db);
       return verified(ownerWaitlistOfferResultSchema, { recovery: ownerRecovery(owner, offer, status, Date.now()), appliedHeadRevision: offer.headRevisionAtCreation, headRevision: head.view.revision, replayed: true });
     }
+    await assertBookingAdmission(tx, business, 'offer', db);
     if (!writesEnabled()) throw new HttpError(503, 'Las nuevas ofertas están en pausa.', 'WAITLIST_OFFERS_DISABLED');
     if (!record?.request || record.request.id !== input.entryId || record.revision !== input.expectedWaitlistRevision || head.view.revision !== input.expectedHeadRevision) throw conflict();
     if (head.view.revision >= Number.MAX_SAFE_INTEGER - 1) throw unverifiable();

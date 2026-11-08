@@ -11,7 +11,7 @@ export function useBookingSubjectConsent(uid: string | undefined, business: Cons
   const current = identity.current, request = useRef<AbortController | null>(null), pending = useRef<{ key: string; body: string } | null>(null);
   const [action, setAction] = useState<{ identity: object; busy: boolean; error: string | null } | null>(null), [withdrawn, setWithdrawn] = useState<object | null>(null);
   const validate = (status: BookingSubjectConsentStatus) => {
-    if (!status || typeof status.active !== 'boolean' || typeof status.required !== 'boolean' || !Number.isSafeInteger(status.revision) || !/^[a-f0-9]{64}$/.test(status.documents?.fingerprint ?? '') || status.documents.business.id !== business.id || status.documents.case.bookingRequestId !== subjectCase.bookingRequestId || status.documents.case.subjectKind !== subjectCase.subjectKind || (subjectCase.subjectKind === 'represented_minor' && (status.documents.case.subjectKind !== 'represented_minor' || status.documents.case.representativeRole !== subjectCase.representativeRole)) || (status.receipt && status.receipt.uid !== uid)) throw new Error('No se pudieron comprobar los permisos de esta reserva.');
+    if (!status || typeof status.active !== 'boolean' || typeof status.required !== 'boolean' || !Number.isSafeInteger(status.revision) || (status.documents !== null && (!/^[a-f0-9]{64}$/.test(status.documents.fingerprint) || status.documents.business.id !== business.id || status.documents.case.bookingRequestId !== subjectCase.bookingRequestId || status.documents.case.subjectKind !== subjectCase.subjectKind || (subjectCase.subjectKind === 'represented_minor' && (status.documents.case.subjectKind !== 'represented_minor' || status.documents.case.representativeRole !== subjectCase.representativeRole)))) || (status.receipt && status.receipt.uid !== uid)) throw new Error('No se pudieron comprobar los permisos de esta reserva.');
     return status;
   };
   const poll = useApiPoll<BookingSubjectConsentStatus>(key, async signal => {
@@ -24,11 +24,11 @@ export function useBookingSubjectConsent(uid: string | undefined, business: Cons
   async function decide(decision: 'accept' | 'revoke', decisions?: BookingSubjectDecisions) {
     if (!key || request.current || !poll.value || (withdrawalRequested && decision === 'accept')) return;
     const abort = request.current = new AbortController(), status = poll.value;
-    const operationKey = JSON.stringify([key, decision, decision === 'revoke' ? null : [status.revision, status.documents.fingerprint, decisions]]);
+    const operationKey = JSON.stringify([key, decision, decision === 'revoke' ? null : [status.revision, status.documents?.fingerprint, decisions]]);
     setAction({ identity: current, busy: true, error: null });
     if (decision === 'revoke') { setWithdrawn(current); poll.setValue(previous => previous && { ...previous, active: false }); }
     try {
-      const body = pending.current?.key === operationKey ? pending.current.body : JSON.stringify({ businessId: business.id, case: subjectCase, action: decision, requestId: crypto.randomUUID(), expectedRevision: status.revision, ...(decision === 'accept' ? { fingerprint: status.documents.fingerprint, decisions } : {}) });
+      const body = pending.current?.key === operationKey ? pending.current.body : JSON.stringify({ businessId: business.id, case: subjectCase, action: decision, requestId: crypto.randomUUID(), expectedRevision: status.revision, ...(decision === 'accept' ? { fingerprint: status.documents?.fingerprint, decisions } : {}) });
       pending.current = { key: operationKey, body };
       const result = validate(await apiFetch<BookingSubjectConsentStatus>('/api/booking-subject-consent', { method: 'POST', body, signal: abort.signal }, uid));
       if (identity.current !== current || abort.signal.aborted) return;

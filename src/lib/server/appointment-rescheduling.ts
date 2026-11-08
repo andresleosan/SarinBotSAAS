@@ -10,6 +10,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { getAvailableSlots, toColombiaTimestamp, toMinutes, toTimeStr } from '@/lib/sarin/availability';
 import { assertConsent } from './consent';
 import { readBookingDataPolicy, assertBookingIntakePolicy } from './booking-data-policy';
+import { assertBookingAdmission } from './booking-admission';
 import { assertBookingSubjectConsent, bookingSubjectHash } from './booking-subject-consent';
 import { assertClientCanReschedule, clientPolicyKey } from './client-policy';
 import { businessConfigSchema, documentIdSchema, type BookingInput } from './schemas';
@@ -86,7 +87,7 @@ export async function rescheduleAppointmentInTransaction(tx: Transaction, user: 
   const source = await readRescheduleSource(tx, user, business.id, context, db);
   if (appointmentRescheduleFingerprint(source) !== metadata.sourceFingerprint || source.serviceId !== selection.serviceId) throw changed();
   if (source.dateKey === selection.dateKey && source.startTimeStr === selection.startTimeStr && source.resourceId === selection.resourceId) throw new HttpError(400, 'Selecciona un horario o profesional diferente.', 'RESCHEDULE_NO_CHANGE');
-  const { capability } = await readBookingDataPolicy(business.id, db, tx), canonicalSubject = resolveRescheduleSubject(source, subject?.case, capability);
+  const capability = await assertBookingAdmission(tx, business, 'reschedule', db), canonicalSubject = resolveRescheduleSubject(source, subject?.case, capability);
   if (Boolean(canonicalSubject) !== Boolean(subject) || (canonicalSubject && bookingSubjectHash(canonicalSubject.beneficiary) !== bookingSubjectHash(subject?.beneficiary))) throw new HttpError(409, 'El beneficiario cambió.', 'BOOKING_SUBJECT_CONFLICT');
   if (contact.clientPhone !== null || !contact.intakeAnswers || typeof contact.intakeAnswers !== 'object' || Array.isArray(contact.intakeAnswers) || Object.keys(contact.intakeAnswers).length) throw new HttpError(400, 'El cambio de horario conserva tus datos de contacto y respuestas.');
   if (!canonicalSubject && contact.beneficiary !== undefined) throw new HttpError(400, 'Esta cita no declara un beneficiario.');

@@ -97,7 +97,7 @@ export async function createBusiness(user: ChatActor, config: BusinessConfig, db
     const business = existing.data() as Business;
     assertOwner(business, user.uid);
     await assertConsent(user.uid, 'account', undefined, db, transaction);
-    await assertBookingIntakePolicy(transaction, id, config.intakeFields, db);
+    await assertBookingIntakePolicy(transaction, id, config.intakeFields, db, business.sarinConfig?.intakeFields);
     if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa un plan para configurar tu negocio.', 'PAYMENT_REQUIRED');
     if (business.slug && business.slug !== config.slug) throw new HttpError(409, 'El enlace del negocio es permanente para conservar tu código QR.');
     if (!business.slug && slug.exists) throw new HttpError(409, 'Este enlace ya está ocupado. Escoge otro slug.');

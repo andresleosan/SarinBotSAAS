@@ -12,7 +12,7 @@ export async function acceptSyntheticSubjectConsent(db: Database, actor: ChatAct
   await acceptSyntheticConsent(db, actor.uid, business);
   const status = await readBookingSubjectConsent(actor, business.id, subjectCase, db);
   if (!status.required || status.active) return;
-  await updateBookingSubjectConsent(actor, { businessId: business.id, case: subjectCase, action: 'accept', requestId: `demo-subject-${crypto.randomUUID()}`, expectedRevision: status.revision, fingerprint: status.documents.fingerprint,
+  await updateBookingSubjectConsent(actor, { businessId: business.id, case: subjectCase, action: 'accept', requestId: `demo-subject-${crypto.randomUUID()}`, expectedRevision: status.revision, fingerprint: status.documents!.fingerprint,
     decisions: { dataAuthorized: true, sensitiveDataAuthorized: policy.dataMode === 'health', representationDeclared: subjectCase.subjectKind === 'represented_minor' },
   }, db);
 }

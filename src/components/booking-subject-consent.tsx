@@ -4,7 +4,7 @@ import type { BookingSubjectDecisions } from '@/lib/booking-subject';
 import type { BookingSubjectConsentController } from '@/hooks/useBookingSubjectConsent';
 import { buttonClass, Notice } from './app-shell';
 function SubjectChoices({ controller, enabled }: { controller: BookingSubjectConsentController; enabled: boolean }) {
-  const [choices, setChoices] = useState<BookingSubjectDecisions>({ dataAuthorized: false, sensitiveDataAuthorized: false, representationDeclared: false }), documents = controller.status!.documents, needs = documents.requirements;
+  const documents = controller.status?.documents; const [choices, setChoices] = useState<BookingSubjectDecisions>({ dataAuthorized: false, sensitiveDataAuthorized: false, representationDeclared: false }); if (!documents) return null; const needs = documents.requirements;
   const ready = Object.entries(needs).every(([key, needed]) => !needed || choices[key as keyof BookingSubjectDecisions]);
   async function submit(event: FormEvent) { event.preventDefault(); if (enabled && ready && !controller.busy && !controller.withdrawalRequested) await controller.accept(choices); }
   const labels = { dataAuthorized: documents.dataAuthorization, sensitiveDataAuthorized: documents.sensitiveDataAuthorization, representationDeclared: documents.representationDeclaration };
@@ -16,8 +16,8 @@ export function BookingSubjectConsent({ controller, enabled = true }: { controll
   return <section aria-label="Permisos de esta reserva" className="space-y-4 rounded-2xl border border-sarin-line bg-sarin-paper p-4 text-sm leading-6 [overflow-wrap:anywhere]">
     <h3 className="text-base font-semibold">Permisos de esta reserva</h3>
     {controller.error && <Notice error>{controller.error}</Notice>}
-    {status && <><p>{status.documents.notice}</p><p className="text-sarin-muted">{status.documents.processors}</p><p>{status.documents.alternative}</p><details><summary className="min-h-11 cursor-pointer text-sarin-blue">Derechos y conservación</summary><p>{status.documents.rights}</p></details><a href="/privacidad" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sarin-blue underline">Privacidad y datos</a>
-      {status.required && !controller.active && !controller.withdrawalRequested && <SubjectChoices key={`${status.documents.fingerprint}:${status.revision}`} controller={controller} enabled={enabled} />}
+    {status && <>{status.documents && <><p>{status.documents.notice}</p><p className="text-sarin-muted">{status.documents.processors}</p><p>{status.documents.alternative}</p><details><summary className="min-h-11 cursor-pointer text-sarin-blue">Derechos y conservación</summary><p>{status.documents.rights}</p></details><a href="/privacidad" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sarin-blue underline">Privacidad y datos</a>
+      {status.required && !controller.active && !controller.withdrawalRequested && <SubjectChoices key={`${status.documents.fingerprint}:${status.revision}`} controller={controller} enabled={enabled} />}</>}
       {controller.active && status.required && <button className="min-h-11 text-sarin-blue underline disabled:opacity-50" disabled={controller.busy} onClick={() => void controller.revoke()}>Retirar autorización de esta reserva</button>}
       {status.receipt && <button className="min-h-11 text-sarin-blue underline" onClick={controller.downloadReceipt}>Descargar constancia de esta reserva</button>}
     </>}

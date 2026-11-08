@@ -16,17 +16,20 @@ import { HttpError } from './http';
 import { assertConsent } from './consent';
 import { bookingSubjectCaseSchema, bookingBeneficiarySchema, type StructuredProposalContext, type ValidatedBookingSubject } from '@/lib/booking-subject';
 import { readBookingDataPolicy, assertBookingIntakePolicy } from './booking-data-policy';
+import { assertBookingAdmission } from './booking-admission';
 import { assertBookingSubjectConsent, bookingSubjectHash } from './booking-subject-consent';
 import { prepareBookingActionAdmission } from './booking-action-admission';
 import { appointmentRescheduleViewSchema, rescheduleResultSchema, type RescheduleResult } from '@/lib/appointment-reschedule';
 import { appointmentRescheduleFingerprint, assertRescheduleAccess, assertRescheduleSource, currentRescheduleService, readRescheduleSource, resolveRescheduleSubject, rescheduleAppointmentInTransaction, type AppointmentRescheduleContext, type AppointmentRescheduleMetadata } from './appointment-rescheduling';
 import { assertClientCanReschedule } from './client-policy';
 import type { QuotaEffectHooks } from './response-quota-store';
+
 const selectionSchema = bookingSchema.pick({ dateKey: true, startTimeStr: true, serviceId: true, resourceId: true });
 const rescheduleMetadataSchema = appointmentRescheduleViewSchema.extend({ sourceFingerprint: z.string().regex(/^[a-f0-9]{64}$/), requestId: requestIdSchema }).strict();
 const legacyProposalSchema = z.object({ version: z.literal(1), id: documentIdSchema, businessId: documentIdSchema, actorUid: z.string().min(1).max(128), selection: selectionSchema,
   service: businessConfigSchema.shape.services.element, resource: businessConfigSchema.shape.resources.element, intakeFields: businessConfigSchema.shape.intakeFields,
   createdAt: z.number().int().nonnegative(), expiresAt: z.number().int().nonnegative(), appointmentId: documentIdSchema.nullable(),
+  policyRevision: z.number().int().nonnegative().safe().optional(),
   reschedule: rescheduleMetadataSchema.optional(), rescheduleResult: rescheduleResultSchema.optional(), closedAt: z.number().int().nonnegative().safe().optional(),
 }).strict();
 const authorizationSchema = z.object({ receiptId: documentIdSchema, fingerprint: z.string().regex(/^[a-f0-9]{64}$/), policyRevision: z.number().int().nonnegative().safe() }).strict();
@@ -63,18 +66,18 @@ export async function createBookingProposal(user: ChatActor, businessId: string,
     }
     if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDoc.data() as Business;
+    const capability = await assertBookingAdmission(tx, business, 'proposal', db);
     const source = reschedule ? await readRescheduleSource(tx, user, businessId, reschedule, db) : undefined;
     const selection = source ? { ...requestedSelection, serviceId: currentRescheduleService(business, source).id } : requestedSelection;
     await assertConsent(user.uid, 'account', undefined, db, tx);
     await assertConsent(user.uid, 'business_client', business, db, tx);
-    const { capability } = await readBookingDataPolicy(businessId, db, tx);
     const subject = source ? resolveRescheduleSubject(source, reschedule?.case, capability, requestId) : supplied;
     if (!subject && capability.dataMode === 'health') throw new HttpError(409, 'Utiliza el formulario para esta reserva.', 'STRUCTURED_BOOKING_REQUIRED');
     const authorization = subject ? await assertBookingSubjectConsent(tx, user, business, subject.case, db) : null;
     await assertBookingIntakePolicy(tx, businessId, business.sarinConfig.intakeFields, db);
     if (source) await assertClientCanReschedule(tx, business, user.uid, db);
     if (previous) {
-      if (previous.version === 2 && (previous.policyRevision !== capability.revision || bookingSubjectHash(previous.authorization) !== bookingSubjectHash(authorization))) throw new HttpError(409, 'La política o autorización cambió. Inicia una nueva reserva.', 'BOOKING_PROPOSAL_CHANGED');
+      if ((previous.policyRevision !== undefined && previous.policyRevision !== capability.revision) || (previous.version === 2 && (previous.policyRevision !== capability.revision || bookingSubjectHash(previous.authorization) !== bookingSubjectHash(authorization)))) throw new HttpError(409, 'La política o autorización cambió. Inicia una nueva reserva.', 'BOOKING_PROPOSAL_CHANGED');
       if (source && (appointmentRescheduleFingerprint(source) !== previous.reschedule?.sourceFingerprint || (previous.version === 2 && previous.beneficiaryHash !== bookingSubjectHash(subject?.beneficiary)))) throw new HttpError(409, 'La cita cambió. Actualiza Mis citas.', 'RESCHEDULE_SOURCE_CHANGED');
       if (source && reschedule) { const now = Date.now(); assertRescheduleSource(source, user, businessId, reschedule, now); assertRescheduleAccess(business, now); }
       const apply = await quota?.prepare(tx, { kind: 'proposal', id: previous.id }); apply?.();
@@ -95,8 +98,8 @@ export async function createBookingProposal(user: ChatActor, businessId: string,
     if (toColombiaTimestamp(selection.dateKey, '00:00') > now + 366 * 86400000) throw new HttpError(400, 'Puedes reservar hasta un año por adelantado.');
     if (!getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(tx, business.id, db), tenant: business, ...selection, existingAppointments: appointments.docs.filter(doc => doc.id !== source?.id).map(doc => doc.data() as Appointment), now }).some(item => item.slots.includes(selection.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible.');
     const metadata: AppointmentRescheduleMetadata | undefined = source && reschedule ? { appointmentId: source.id, sourceRevision: reschedule.sourceRevision, sourceFingerprint: appointmentRescheduleFingerprint(source), requestId, source: { dateKey: source.dateKey, startTimeStr: source.startTimeStr, endTimeStr: source.endTimeStr, resourceId: source.resourceId, ...(business.resources.find(item => item.id === source.resourceId)?.name ? { resourceName: business.resources.find(item => item.id === source.resourceId)!.name } : {}), ...(source.price !== undefined ? { priceCOP: source.price } : {}) }, targetServiceId: service.id, targetResourceId: resource.id } : undefined;
-    const proposal: Proposal = proposalSchema.parse({ version: subject ? 2 : 1, id, businessId, actorUid: user.uid, selection, service, resource, intakeFields: subject && (capability.dataMode === 'health' || subject.case.subjectKind === 'represented_minor') ? [] : business.sarinConfig.intakeFields, createdAt: now, expiresAt: now + 600000, appointmentId: null,
-      ...(subject ? { subjectCase: subject.case, beneficiaryHash: bookingSubjectHash(subject.beneficiary), policyRevision: capability.revision, authorization } : {}), ...(metadata ? { reschedule: metadata } : {}) });
+    const proposal: Proposal = proposalSchema.parse({ version: subject ? 2 : 1, id, businessId, actorUid: user.uid, selection, service, resource, intakeFields: subject && (capability.dataMode === 'health' || subject.case.subjectKind === 'represented_minor') ? [] : business.sarinConfig.intakeFields, createdAt: now, expiresAt: now + 600000, appointmentId: null, policyRevision: capability.revision,
+      ...(subject ? { subjectCase: subject.case, beneficiaryHash: bookingSubjectHash(subject.beneficiary), authorization } : {}), ...(metadata ? { reschedule: metadata } : {}) });
     const applyQuota = await quota?.prepare(tx, { kind: 'proposal', id });
     admit?.(); tx.create(collection.doc(id), proposal); tx.create(requestRef, { actorUid: user.uid, businessId, selection, proposalId: id, ...(metadata ? { reschedule: metadata } : {}) }); applyQuota?.();
     return view(proposal);
@@ -121,20 +124,19 @@ export async function confirmBookingProposalDetailed(user: ChatActor, businessId
     }
     const now = Date.now();
     if ((proposal.version === 2 || proposal.reschedule) && (proposal.closedAt !== undefined || proposal.expiresAt <= now)) {
-      // Commit a terminal state that conflicts with an older confirmation.
-      // Throwing inside the transaction would roll this closure back.
       if (proposal.closedAt === undefined) tx.set(ref, { ...proposal, closedAt: now });
       return null;
     }
     if (proposal.expiresAt <= now) throw new HttpError(409, 'La propuesta venció. Consulta otra vez la disponibilidad.', 'BOOKING_PROPOSAL_EXPIRED');
     if (!businessDoc.exists) throw new HttpError(404, 'El negocio no existe.');
     const business = businessDoc.data() as Business;
+    const capability = await assertBookingAdmission(tx, business, 'appointment', db);
+    if (proposal.version === 1 && capability.dataMode === 'health') throw new HttpError(409, 'Utiliza el formulario para esta reserva.', 'STRUCTURED_BOOKING_REQUIRED');
+    if (proposal.version === 1 && proposal.policyRevision !== undefined && proposal.policyRevision !== capability.revision) throw new HttpError(409, 'La política o autorización cambió. Inicia una nueva reserva.', 'BOOKING_PROPOSAL_CHANGED');
     if (proposal.reschedule) {
       const mapping = (await tx.get(db.collection('bookingProposals').doc(proposalRequestKey(user.uid, businessId, proposal.reschedule.requestId)))).data();
       if (!mapping || mapping.actorUid !== user.uid || mapping.businessId !== businessId || mapping.proposalId !== proposal.id || bookingSubjectHash(mapping.selection) !== bookingSubjectHash(proposal.selection) || bookingSubjectHash(mapping.reschedule ?? null) !== bookingSubjectHash(proposal.reschedule) || (proposal.version === 2 && proposal.subjectCase.bookingRequestId !== proposal.reschedule.requestId)) throw new HttpError(503, 'No se pudo validar la referencia del cambio de horario.');
     }
-    const { capability } = await readBookingDataPolicy(businessId, db, tx);
-    if (proposal.version === 1 && capability.dataMode === 'health') throw new HttpError(409, 'Utiliza el formulario para esta reserva.', 'STRUCTURED_BOOKING_REQUIRED');
     let subject: ValidatedBookingSubject | undefined;
     if (proposal.version === 2) {
       const beneficiary = bookingBeneficiarySchema.parse(contact.beneficiary);

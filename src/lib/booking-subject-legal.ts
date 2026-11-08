@@ -21,4 +21,4 @@ export function bookingSubjectContent(business: ConsentBusiness, subjectCase: Bo
 }
 export type BookingSubjectDocuments = ReturnType<typeof bookingSubjectContent> & { fingerprint: string };
 export type BookingSubjectReceipt = { uid: string; scope: 'booking_subject'; businessId: string; case: BookingSubjectCase; requestId: string; action: 'accept' | 'revoke'; revision: number; occurredAt: number; policyRevision: number; decisions: BookingSubjectDecisions; documents: BookingSubjectDocuments };
-export type BookingSubjectConsentStatus = { required: boolean; active: boolean; revision: number; capability: BookingCapability; documents: BookingSubjectDocuments; receipt: BookingSubjectReceipt | null };
+export type BookingSubjectConsentStatus = { required: boolean; active: boolean; revision: number; capability: BookingCapability; documents: BookingSubjectDocuments | null; receipt: BookingSubjectReceipt | null };

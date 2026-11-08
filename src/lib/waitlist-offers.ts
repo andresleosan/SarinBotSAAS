@@ -135,5 +135,5 @@ export function waitlistOfferExpiry(createdAt: number, requestExpiresAt: number,
 }
 /** This boundary is not a substitute for transactional authorization/availability. */
 export function waitlistOfferEligible(capability: BookingCapability, subjectCase: BookingSubjectCase): boolean {
-  return capability.configured && capability.dataMode === 'general' && !capability.representedMinorsEnabled && subjectCase.subjectKind === 'self';
+  return capability.configured && capability.dataMode === 'general' && !capability.representedMinorsEnabled && subjectCase.subjectKind === 'self' && (!('admission' in capability) || (capability as { admission?: string }).admission === 'active');
 }

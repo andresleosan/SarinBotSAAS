@@ -12,7 +12,8 @@ import { documentIdSchema, type BookingInput } from './schemas';
 import { assertClientCanBook, clientPolicyKey } from './client-policy';
 import { assertConsent } from './consent';
 import type { ValidatedBookingSubject } from '@/lib/booking-subject';
-import { readBookingDataPolicy, assertBookingIntakePolicy } from './booking-data-policy';
+import { assertBookingIntakePolicy } from './booking-data-policy';
+import { assertBookingAdmission } from './booking-admission';
 import { assertBookingSubjectConsent, bookingSubjectHash } from './booking-subject-consent';
 
 type BlockInput = { dateKey: string; startTimeStr: string; endTimeStr: string; resourceId: string; requestId: string; motivo?: string };
@@ -69,69 +70,65 @@ export async function prepareAppointmentInTransaction(transaction: Transaction, 
   const appointmentReference = businessReference.collection('appointments').doc(id);
   const lockReference = businessReference.collection('bookingLocks').doc(`${input.dateKey}_${input.resourceId}`);
   const clientLockReference = businessReference.collection('bookingLocks').doc(`client_${clientPolicyKey(user.uid)}`);
-    const [existing, lock, clientLock] = await Promise.all([transaction.get(appointmentReference), transaction.get(lockReference), transaction.get(clientLockReference)]);
-    if (existing.exists) {
-      const appointment = existing.data() as Appointment;
-      if (appointment.client?.uid !== user.uid || appointment.startTimeStr !== input.startTimeStr || appointment.dateKey !== input.dateKey || appointment.resourceId !== input.resourceId || appointment.serviceId !== input.serviceId) throw new HttpError(409, 'Este identificador ya se utilizó para otra reserva.');
-      return { kind: 'existing', appointment };
+  const [existing, lock, clientLock] = await Promise.all([transaction.get(appointmentReference), transaction.get(lockReference), transaction.get(clientLockReference)]);
+  if (existing.exists) {
+    const appointment = existing.data() as Appointment;
+    if (appointment.client?.uid !== user.uid || appointment.startTimeStr !== input.startTimeStr || appointment.dateKey !== input.dateKey || appointment.resourceId !== input.resourceId || appointment.serviceId !== input.serviceId) throw new HttpError(409, 'Este identificador ya se utilizó para otra reserva.');
+    return { kind: 'existing', appointment };
+  }
+  const capability = await assertBookingAdmission(transaction, business, 'appointment', db);
+  await assertConsent(user.uid, 'account', undefined, db, transaction);
+  await assertConsent(user.uid, 'business_client', business, db, transaction);
+  if (!subject && capability.dataMode === 'health') throw new HttpError(409, 'Utiliza el formulario para esta reserva.', 'STRUCTURED_BOOKING_REQUIRED');
+  await assertBookingIntakePolicy(transaction, businessId, business.sarinConfig.intakeFields, db);
+  if (subject) {
+    const authorization = await assertBookingSubjectConsent(transaction, user, business, subject.case, db);
+    if (bookingSubjectHash(authorization) !== bookingSubjectHash(subject.authorization)) throw new HttpError(409, 'La autorización cambió. Inicia una nueva reserva.');
+    if ((capability.dataMode === 'health' || subject.case.subjectKind === 'represented_minor') && Object.keys(input.intakeAnswers).length) throw new HttpError(400, 'Este formulario no admite respuestas de texto libre.');
+  }
+  if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
+  if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar agendando.');
+  assertDate(input.dateKey);
+  await assertClientCanBook(transaction, business, user.uid, now, db);
+  const service = business.services.find((candidate) => candidate.id === input.serviceId);
+  if (!service) throw new HttpError(400, 'El servicio no existe.');
+  if (business.sarinConfig.intakeFields.some((field) => field.required && !input.intakeAnswers[field.key]?.trim())) throw new HttpError(400, 'Faltan respuestas obligatorias para agendar.');
+  const query = businessReference.collection('appointments').where('dateKey', '==', input.dateKey).where('resourceId', '==', input.resourceId).where('status', '==', 'confirmed');
+  const snapshot = await transaction.get(query);
+  const availability = getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(transaction, business.id, db), tenant: business, dateKey: input.dateKey, serviceId: input.serviceId, resourceId: input.resourceId, existingAppointments: snapshot.docs.map((document) => document.data() as Appointment) });
+  if (!availability.some((resource) => resource.slots.includes(input.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible. Consulta otra hora.');
+  const startAt = toColombiaTimestamp(input.dateKey, input.startTimeStr);
+  const endAt = startAt + service.durationMinutes * 60000;
+  const appointment: Appointment = {
+    id, tenantId: businessId, dateKey: input.dateKey, startAt, endAt,
+    reservedUntilAt: endAt + service.bufferMinutes * 60000,
+    startTimeStr: input.startTimeStr, endTimeStr: toTimeStr(toMinutes(input.startTimeStr) + service.durationMinutes),
+    type: 'appointment', resourceId: input.resourceId, serviceId: service.id, serviceName: service.name, price: service.price,
+    client: { uid: user.uid, name: typeof user.name === 'string' ? user.name : user.email ?? 'Cliente', email: user.email ?? '', phone: input.clientPhone, intakeAnswers: input.intakeAnswers },
+    status: 'confirmed', createdBy: business.ownerUid === user.uid ? 'sarin_owner' : 'sarin_client', createdAt: now,
+    ...(subject ? { beneficiary: subject.beneficiary, ...(subject.authorization ? { subjectAuthorization: { receiptId: subject.authorization.receiptId, bookingRequestId: subject.case.bookingRequestId, policyRevision: subject.authorization.policyRevision } } : {}), ...(subject.beneficiary.kind === 'represented_minor' ? { representationReview: { revision: 0, status: 'declared' as const, reviewedBy: null, reviewedAt: null } } : {}) } : {}),
+  };
+  const resourceLock = { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: now };
+  const nextClientLock = { version: Number(clientLock.data()?.version ?? 0) + 1, updatedAt: now };
+  let trialUpdate: { business: Business; public: ReturnType<typeof publicBusiness> } | undefined;
+  if (getBusinessAccess(business) === 'paid_trial') {
+    const trial = business.subscription.paidTrial!;
+    const updated: Business = { ...business, subscription: { ...business.subscription, paidTrial: { ...trial, appointmentsUsed: trial.appointmentsUsed + 1 } } };
+    trialUpdate = { business: updated, public: publicBusiness(updated) };
+  }
+  const publicReference = trialUpdate ? db.collection('publicBusinesses').doc(business.slug) : undefined;
+  let applied = false;
+  return { kind: 'new', appointment, apply: () => {
+    if (applied) return;
+    applied = true;
+    transaction.set(lockReference, resourceLock);
+    transaction.set(clientLockReference, nextClientLock);
+    if (trialUpdate) {
+      transaction.set(businessReference, trialUpdate.business);
+      transaction.set(publicReference!, trialUpdate.public);
     }
-    await assertConsent(user.uid, 'account', undefined, db, transaction);
-    await assertConsent(user.uid, 'business_client', business, db, transaction);
-    const { capability } = await readBookingDataPolicy(businessId, db, transaction);
-    if (!subject && capability.dataMode === 'health') throw new HttpError(409, 'Utiliza el formulario para esta reserva.', 'STRUCTURED_BOOKING_REQUIRED');
-    await assertBookingIntakePolicy(transaction, businessId, business.sarinConfig.intakeFields, db);
-    if (subject) {
-      const authorization = await assertBookingSubjectConsent(transaction, user, business, subject.case, db);
-      if (bookingSubjectHash(authorization) !== bookingSubjectHash(subject.authorization)) throw new HttpError(409, 'La autorización cambió. Inicia una nueva reserva.');
-      if ((capability.dataMode === 'health' || subject.case.subjectKind === 'represented_minor') && Object.keys(input.intakeAnswers).length) throw new HttpError(400, 'Este formulario no admite respuestas de texto libre.');
-    }
-    if (!business.sarinConfig.onboardingCompleted || !business.slug) throw new HttpError(403, 'El negocio todavía no está configurado.');
-    if (!isSubscriptionAllowed(business)) throw new HttpError(402, 'Activa una suscripción para continuar agendando.');
-    assertDate(input.dateKey);
-    await assertClientCanBook(transaction, business, user.uid, now, db);
-    const service = business.services.find((candidate) => candidate.id === input.serviceId);
-    if (!service) throw new HttpError(400, 'El servicio no existe.');
-    if (business.sarinConfig.intakeFields.some((field) => field.required && !input.intakeAnswers[field.key]?.trim())) throw new HttpError(400, 'Faltan respuestas obligatorias para agendar.');
-    const query = businessReference.collection('appointments').where('dateKey', '==', input.dateKey).where('resourceId', '==', input.resourceId).where('status', '==', 'confirmed');
-    const snapshot = await transaction.get(query);
-    const availability = getAvailableSlots({ resourceSchedulePolicy: await readResourceSchedulePolicy(transaction, business.id, db), tenant: business, dateKey: input.dateKey, serviceId: input.serviceId, resourceId: input.resourceId, existingAppointments: snapshot.docs.map((document) => document.data() as Appointment) });
-    if (!availability.some((resource) => resource.slots.includes(input.startTimeStr))) throw new HttpError(409, 'El horario ya no está disponible. Consulta otra hora.');
-    const startAt = toColombiaTimestamp(input.dateKey, input.startTimeStr);
-    const endAt = startAt + service.durationMinutes * 60000;
-    const appointment: Appointment = {
-      id, tenantId: businessId, dateKey: input.dateKey, startAt, endAt,
-      reservedUntilAt: endAt + service.bufferMinutes * 60000,
-      startTimeStr: input.startTimeStr, endTimeStr: toTimeStr(toMinutes(input.startTimeStr) + service.durationMinutes),
-      type: 'appointment', resourceId: input.resourceId, serviceId: service.id, serviceName: service.name, price: service.price,
-      client: { uid: user.uid, name: typeof user.name === 'string' ? user.name : user.email ?? 'Cliente', email: user.email ?? '', phone: input.clientPhone, intakeAnswers: input.intakeAnswers },
-      status: 'confirmed', createdBy: business.ownerUid === user.uid ? 'sarin_owner' : 'sarin_client', createdAt: now,
-      ...(subject ? { beneficiary: subject.beneficiary, ...(subject.authorization ? { subjectAuthorization: { receiptId: subject.authorization.receiptId, bookingRequestId: subject.case.bookingRequestId, policyRevision: subject.authorization.policyRevision } } : {}), ...(subject.beneficiary.kind === 'represented_minor' ? { representationReview: { revision: 0, status: 'declared' as const, reviewedBy: null, reviewedAt: null } } : {}) } : {}),
-    };
-    const resourceLock = { version: Number(lock.data()?.version ?? 0) + 1, updatedAt: now };
-    const nextClientLock = { version: Number(clientLock.data()?.version ?? 0) + 1, updatedAt: now };
-    let trialUpdate: { business: Business; public: ReturnType<typeof publicBusiness> } | undefined;
-    if (getBusinessAccess(business) === 'paid_trial') {
-      const trial = business.subscription.paidTrial!;
-      const updated: Business = { ...business, subscription: { ...business.subscription, paidTrial: { ...trial, appointmentsUsed: trial.appointmentsUsed + 1 } } };
-      trialUpdate = { business: updated, public: publicBusiness(updated) };
-    }
-    const publicReference = trialUpdate ? db.collection('publicBusinesses').doc(business.slug) : undefined;
-    let applied = false;
-    return { kind: 'new', appointment, apply: () => {
-      if (applied) return;
-      applied = true;
-      // The shared per-resource/day document prevents empty-query phantom races.
-      // Every mutation of that resource/date must participate in the same lock.
-      transaction.set(lockReference, resourceLock);
-      transaction.set(clientLockReference, nextClientLock);
-      if (trialUpdate) {
-        // A business-wide write serializes the final unit across every resource
-        // and date, beyond the resource/day lock used for slot conflicts.
-        transaction.set(businessReference, trialUpdate.business);
-        transaction.set(publicReference!, trialUpdate.public);
-      }
-      transaction.create(appointmentReference, appointment);
-    } };
+    transaction.create(appointmentReference, appointment);
+  } };
 }
 
 export async function createManualBlock(user: ChatActor, businessId: string, input: BlockInput, db: Firestore = getAdminDb()): Promise<Appointment> {

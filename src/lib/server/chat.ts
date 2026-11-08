@@ -115,15 +115,19 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
     await assertConsent(user.uid, 'account', undefined, db, tx);
     if (body.mode === 'sarin_client') await assertConsent(user.uid, 'business_client', current, db, tx);
   };
-  const recoverHealth = async (error: unknown) => {
-    if (!(error instanceof HttpError) || error.code !== 'STRUCTURED_BOOKING_REQUIRED' || channel !== 'web') return null;
+  const recoverAdmission = async (error: unknown) => {
+    if (!(error instanceof HttpError) || channel !== 'web') return null;
+    if (error.code !== 'STRUCTURED_BOOKING_REQUIRED' && !error.code?.startsWith('BOOKING_')) return null;
     const saved = cachedResponse(db, cacheKey);
     if (saved && saved.fingerprint !== fingerprint) throw new HttpError(409, 'Este identificador ya se utilizó para otro mensaje.', 'AI_REQUEST_CONFLICT');
-    return recoverLegacyMutation(user, body, business!, true);
+    const recovered = await recoverLegacyMutation(user, body, business!, true);
+    if (!recovered) return null;
+    rememberResponse(db, cacheKey, { fingerprint, response: structuredClone(recovered), reservation: { reservationId: '', scopeId: '', periodId: '', attemptId: '' }, expiresAt: Date.now() + 15 * 60 * 1000 });
+    return recovered;
   };
   try { await assertNewProcessing(); }
   catch (error) {
-    const confirmed = await recoverHealth(error); if (confirmed) return confirmed;
+    const confirmed = await recoverAdmission(error); if (confirmed) return confirmed;
     if (!(error instanceof HttpError) || error.code !== 'CONSENT_REQUIRED' || channel !== 'web') throw error;
     const saved = cachedResponse(db, cacheKey);
     if (saved && saved.fingerprint !== fingerprint) throw new HttpError(409, 'Este identificador ya se utilizó para otro mensaje.', 'AI_REQUEST_CONFLICT');
@@ -137,7 +141,7 @@ export async function runSarinChat({ user, body: suppliedBody, signal, channel =
   await enforceInferenceAdmission({ businessId: business.id, actorUid: user.uid, mode: body.mode, requestId: body.requestId, fingerprint, channel }, db);
   return runUserInference(user.uid, () => runInSarinQueue(async () => {
     business = await getBusiness(business!.id); await assertAccess(false);
-    try { await assertNewProcessing(); } catch (error) { const confirmed = await recoverHealth(error); if (confirmed) return confirmed; throw error; }
+    try { await assertNewProcessing(); } catch (error) { const confirmed = await recoverAdmission(error); if (confirmed) return confirmed; throw error; }
     await assertAccess();
     const cached = cachedResponse(db, cacheKey);
     if (cached) {

@@ -32,9 +32,17 @@ export async function readBookingDataPolicy(businessId: string, db: Database = g
     throw new HttpError(503, 'La configuración de reservas requiere revisión.', 'BOOKING_POLICY_UNAVAILABLE');
   }
 }
-export async function assertBookingIntakePolicy(tx: Transaction, businessId: string, intakeFields: readonly unknown[], db: Database): Promise<void> {
-  const { capability } = await readBookingDataPolicy(businessId, db, tx);
-  if ((capability.dataMode === 'health' || capability.representedMinorsEnabled) && intakeFields.length) throw new HttpError(409, 'Retira los campos de texto libre para habilitar salud o reservas para menores.', 'BOOKING_FREE_INTAKE_NOT_ALLOWED');
+export async function assertBookingIntakePolicy(tx: Transaction, businessId: string, intakeFields: readonly unknown[], db: Database, previousIntakeFields?: readonly unknown[]): Promise<void> {
+  const fields = Array.isArray(intakeFields) ? intakeFields : [];
+  const previous = Array.isArray(previousIntakeFields) ? previousIntakeFields : undefined;
+  const unchanged = previous !== undefined && (fields.length === 0 || createHash('sha256').update(JSON.stringify(fields)).digest('hex') === createHash('sha256').update(JSON.stringify(previous)).digest('hex'));
+  try {
+    const { capability } = await readBookingDataPolicy(businessId, db, tx);
+    if ((capability.dataMode === 'health' || capability.representedMinorsEnabled) && fields.length) throw new HttpError(409, 'Retira los campos de texto libre para habilitar salud o reservas para menores.', 'BOOKING_FREE_INTAKE_NOT_ALLOWED');
+  } catch (error) {
+    if (unchanged && !(error instanceof HttpError && error.status === 409)) return;
+    throw error;
+  }
 }
 export async function assertBusinessAllowsInference(businessId: string, db: Database = getAdminDb(), tx?: Transaction): Promise<void> {
   if ((await readBookingDataPolicy(businessId, db, tx)).capability.dataMode === 'health') throw new HttpError(409, 'Este negocio gestiona reservas mediante formulario. Usa la agenda o contacta directamente al negocio.', 'STRUCTURED_BOOKING_REQUIRED');

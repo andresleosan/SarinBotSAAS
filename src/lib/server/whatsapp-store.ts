@@ -42,6 +42,7 @@ export interface WhatsAppInbox {
 export interface WhatsAppOutbox {
   businessId: string; phoneNumberId: string; wabaId: string; conversationId: string;
   conversationRevision?: number;
+  policyRevision?: number;
   state: 'ready' | 'sending' | 'accepted' | 'delivered' | 'unknown' | 'failed' | 'expired' | 'cancelled';
   createdAt: number; windowEndsAt: number; bodyExpiresAt: number; expiresAt: number; nextAttemptAt: number;
   content: WhatsAppCiphertext | null; reservation: ResponseQuotaReservation;
@@ -264,7 +265,7 @@ export async function persistWhatsAppReply(id: string, leaseId: string, response
     const historyRef = db.collection('whatsappConversations').doc(inbox.conversationId);
     const historyDoc = await transaction.get(historyRef);
     if (!conversationPermitsReply(historyDoc.data(), inbox)) throw new HttpError(409, 'La atención de la conversación cambió.', 'WHATSAPP_CONTROL_CHANGED');
-    await assertBookingAdmission(transaction, { id: inbox.businessId }, 'channel_reply', db);
+    const capability = await assertBookingAdmission(transaction, { id: inbox.businessId }, 'channel_reply', db);
     const activeHistory = historyDoc.exists && Number(historyDoc.data()?.bodyExpiresAt) > Date.now() && historyDoc.data()?.content;
     const history = activeHistory ? historySchema.parse(decryptWhatsApp(historyDoc.data()!.content, historyRef.path)) : [];
     let quotaStage: QuotaStage | undefined;
@@ -286,6 +287,7 @@ export async function persistWhatsAppReply(id: string, leaseId: string, response
     const bodyExpiresAt = retainedContent ? Math.min(Number(historyDoc.data()!.bodyExpiresAt), inbox.bodyExpiresAt) : inbox.bodyExpiresAt;
     const record: WhatsAppOutbox = { businessId: inbox.businessId, phoneNumberId: inbox.phoneNumberId, wabaId: inbox.wabaId, conversationId: inbox.conversationId,
       ...(inbox.conversationRevision !== undefined ? { conversationRevision: inbox.conversationRevision } : {}),
+      policyRevision: capability.revision,
       state: 'ready', createdAt: Date.now(), windowEndsAt: inbox.windowEndsAt, bodyExpiresAt: inbox.bodyExpiresAt, expiresAt: inbox.expiresAt, nextAttemptAt: Date.now(),
       content: encryptWhatsApp({ to: source.from, reply: response.reply, messageId: source.messageId }, outbox.path), reservation,
       sent: false, delivered: false, read: false, failed: false, attempts: 0 };

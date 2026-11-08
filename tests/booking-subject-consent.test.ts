@@ -14,7 +14,7 @@ async function setup(dataMode: 'general' | 'health', representedMinorsEnabled = 
 }
 async function accept(db: ReturnType<typeof consentedFirestore>['db'], subjectCase = minor, decisions = yes, requestId = 'demo-accept-1') {
   const current = await readBookingSubjectConsent(actor, business.id, subjectCase, db);
-  return updateBookingSubjectConsent(actor, { businessId: business.id, case: subjectCase, action: 'accept', requestId, expectedRevision: current.revision, fingerprint: current.documents.fingerprint, decisions }, db);
+  return updateBookingSubjectConsent(actor, { businessId: business.id, case: subjectCase, action: 'accept', requestId, expectedRevision: current.revision, fingerprint: current.documents!.fingerprint, decisions }, db);
 }
 afterEach(() => vi.unstubAllEnvs());
 it('requires explicit sensitive choice for adult health and no extra receipt for general self', async () => {
@@ -38,7 +38,7 @@ it('requires representation and child-data authorization and both for pediatrics
 it('cannot replay acceptance over withdrawal or reuse a decision with different input', async () => {
   const { db } = await setup('health'); const accepted = await accept(db);
   await updateBookingSubjectConsent(actor, { businessId: business.id, case: minor, action: 'revoke', expectedRevision: 1, requestId: 'demo-revoke-1' }, db);
-  const replay = await updateBookingSubjectConsent(actor, { businessId: business.id, case: minor, action: 'accept', requestId: 'demo-accept-1', expectedRevision: 0, fingerprint: accepted.documents.fingerprint, decisions: yes }, db);
+  const replay = await updateBookingSubjectConsent(actor, { businessId: business.id, case: minor, action: 'accept', requestId: 'demo-accept-1', expectedRevision: 0, fingerprint: accepted.documents!.fingerprint, decisions: yes }, db);
   expect(replay).toMatchObject({ active: false, revision: 2 });
   await expect(db.runTransaction(tx => assertBookingSubjectConsent(tx, actor, business, minor, db))).rejects.toMatchObject({ status: 428 });
   await expect(updateBookingSubjectConsent(actor, { businessId: business.id, case: minor, action: 'revoke', expectedRevision: 0, requestId: 'demo-accept-1' }, db)).rejects.toMatchObject({ status: 409 });
