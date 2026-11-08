@@ -45,3 +45,15 @@ Use only `alsdevstudio.com` for Sarin's engine hostname. Never use `bptjersey.co
 ## Agent Instructions
 
 When requested to run `/graphify`, read and follow `~/.codex/skills/graphify/SKILL.md` before other work.
+
+## Fresha Implementation Workflow
+
+Read `DESIGN.md` before planning or changing interfaces. It consolidates the approved Agenda clara system; generic skill recommendations must not silently replace its palette, typography, behavior, or scope.
+
+Project skills are installed in `.agents/skills/`; read `docs/tooling/sarin-skills.md` for their real names, pinned sources, aliases, compatibility notes, and Playwright MCP setup. Use only skills relevant to the current task. Installation does not mean a review or acceptance has passed.
+
+When the user invokes `/avanzar`, read `.agents/skills/avanzar/SKILL.md` and `docs/implementation/fresha/PLAN.md`. The approved workflow design is in `docs/superpowers/specs/2026-10-30-fresha-avanzar-workflow-design.md`. The first `/avanzar` after delivery of plan v1 records that version's review approval unless the message requests changes. Complete or resume exactly one task, then stop; a material unanswered question preserves the same task as `needs_input`.
+
+`docs/implementation/fresha/tasks.json` is the sole progress authority. Run `node .agents/skills/avanzar/scripts/check-plan.mjs --next` from its `workspace.controlRoot`. Do not create a second mutable state file in a code worktree. Validate dependencies, generated build/integration children, evidence and all 165 requirement mappings before claiming progress. Do not count design/decomposition as implemented product. Regenerate `docs/implementation/fresha/progreso.html` with the saved state using the skill's renderer. Final Playwright MCP QA follows all construction; capability activation, real sends and final release effects retain their explicit approval gates.
+
+The authorized consolidation of 2026-11-07 makes `E:/Proyectos/Sarin Bot` the canonical checkout on `main`, with `workspace.layout: "consolidated-main"` and both controlRoot and codeRoot pointing here. Keep this root on main. Implement product changes in a temporary isolated worktree based on this reconciled source, run product checks there, and integrate validated changes into main. Keep mutable progress only in controlRoot; archive temporary worktrees after integration and preservation of their remaining files. Historical mixed-checkout instructions describe the preserved backup, not the current root; never overlay older application files onto main.

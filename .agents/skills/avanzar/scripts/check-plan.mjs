@@ -11,6 +11,7 @@ const reviewedKinds = new Set(['design', 'decompose', 'gate', 'qa']);
 const finished = task => task && (reviewedKinds.has(task.kind) ? task.status === 'verified' : task.kind === 'release' ? task.status === 'published' : task.kind === 'activate' ? task.status === 'activated' : ['implemented', 'verified'].includes(task.status));
 const safePath = value => typeof value === 'string' && value.length > 0 && !/^(?:[a-z]:|[/\\])|(?:^|[/\\])\.\.(?:[/\\]|$)|[\0\r\n]/i.test(value);
 const nonempty = value => typeof value === 'string' && Boolean(value.trim());
+const samePath = (left, right) => nonempty(left) && nonempty(right) && path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
 const proof = value => Array.isArray(value) && value.some(item => item && ['command', 'artifact', 'review', 'qa', 'remote', 'existingImplementation'].includes(item.type) && ['reference', 'cwd', 'result'].every(key => nonempty(item[key])) && /^[a-f0-9]{40}$/i.test(item.sha ?? '') && (item.type !== 'command' || (nonempty(item.command) && Number.isInteger(item.exitCode))));
 const approved = value => value?.status === 'approved' && typeof value.reference === 'string' && Boolean(value.reference.trim());
 const concreteCases = value => Array.isArray(value) && value.length > 0 && value.every(item => item && ['id', 'actor', 'fixture'].every(key => typeof item[key] === 'string' && item[key].trim()) && ['steps', 'expected'].every(key => Array.isArray(item[key]) && item[key].length > 0 && item[key].every(step => typeof step === 'string' && step.trim())));
@@ -22,6 +23,8 @@ export function validatePlan(plan, { expectedRequirements = [], controlRoot } = 
   if (!plan || plan.schemaVersion !== 1 || !Number.isInteger(plan.revision) || plan.revision < 0 || !Number.isInteger(plan.planVersion) || plan.planVersion < 1) return ['Invalid plan schema/version/revision'];
   if (!Array.isArray(plan.tasks) || !Array.isArray(plan.requirements)) return ['Invalid task/requirement arrays'];
   if (plan.approval?.plan?.status === 'approved' && (!approved(plan.approval.plan) || plan.approval.plan.approvedVersion !== plan.planVersion)) fail('Plan approval does not match the current version');
+  const consolidatedWorkspace = plan.workspace?.layout === 'consolidated-main' && plan.workspace.branch === 'main' && samePath(plan.workspace.controlRoot, controlRoot) && samePath(plan.workspace.codeRoot, controlRoot);
+  if (plan.workspace?.layout === 'consolidated-main' && !consolidatedWorkspace) fail('Invalid consolidated code workspace');
   const tasks = new Map(), requirements = new Map();
   for (const task of plan.tasks) {
     if (!task || typeof task.id !== 'string' || !/^[A-Z][A-Z0-9-]*$/.test(task.id)) { fail('Invalid task id'); continue; }
@@ -35,7 +38,7 @@ export function validatePlan(plan, { expectedRequirements = [], controlRoot } = 
     if (doneStatuses.has(task.status) && !proof(task.evidence)) fail(`Missing completion evidence ${task.id}`);
     if (doneStatuses.has(task.status) && !finished(task)) fail(`Invalid completion status ${task.id}`);
     if (task.kind === 'design' && task.status === 'verified' && (!approved(task.contractApproval) || !safePath(task.contractApproval?.artifact?.path) || !/^[a-f0-9]{64}$/i.test(task.contractApproval?.artifact?.sha256 ?? ''))) fail(`Missing concrete contract approval ${task.id}`);
-    if (task.requiresCodeWorkspace && (activeStatuses.has(task.status) || doneStatuses.has(task.status)) && (!plan.workspace?.codeRoot || (controlRoot && path.resolve(plan.workspace.codeRoot).toLowerCase() === path.resolve(controlRoot).toLowerCase()))) fail(`Invalid code workspace ${task.id}`);
+    if (task.requiresCodeWorkspace && (activeStatuses.has(task.status) || doneStatuses.has(task.status)) && (!plan.workspace?.codeRoot || (samePath(plan.workspace.codeRoot, controlRoot) && !consolidatedWorkspace))) fail(`Invalid code workspace ${task.id}`);
     if (['published', 'activated'].includes(task.status) && (!['release', 'activate'].includes(task.kind) || !approved(plan.approval?.external?.[task.authorizationKey]))) fail(`Missing explicit external approval ${task.id}`);
   }
   for (const requirement of plan.requirements) {

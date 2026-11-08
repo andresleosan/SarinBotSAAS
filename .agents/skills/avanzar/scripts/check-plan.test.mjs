@@ -107,6 +107,27 @@ test('product edits cannot run in the mixed control checkout', () => {
   assert.match(validatePlan(state, { expectedRequirements, controlRoot: '/control' }).join('\n'), /code workspace/);
 });
 
+test('an explicitly consolidated main source preserves product progress and task checks', () => {
+  const state = plan([task('T1', { status: 'implemented', evidence: proof, requiresCodeWorkspace: true })]);
+  state.workspace = { layout: 'consolidated-main', controlRoot: '/control', codeRoot: '/control', branch: 'main' };
+  assert.deepEqual(validatePlan(state, { expectedRequirements, controlRoot: '/control' }), []);
+  state.tasks[0].evidence = [];
+  assert.match(validatePlan(state, { expectedRequirements, controlRoot: '/control' }).join('\n'), /completion evidence/);
+});
+
+test('a consolidated layout requires the actual control root and main identity', () => {
+  for (const workspace of [
+    { controlRoot: '/other', codeRoot: '/control', branch: 'main' },
+    { controlRoot: '/control', codeRoot: '/other', branch: 'main' },
+    { controlRoot: '/control', codeRoot: '/control', branch: 'feature' },
+    { controlRoot: '/control', codeRoot: null, branch: 'main' },
+  ]) {
+    const state = plan([task('T1', { status: 'implemented', evidence: proof, requiresCodeWorkspace: true })]);
+    state.workspace = { layout: 'consolidated-main', ...workspace };
+    assert.match(validatePlan(state, { expectedRequirements, controlRoot: '/control' }).join('\n'), /code workspace/);
+  }
+});
+
 test('malformed entries produce diagnostics rather than crashing validation', () => {
   const state = plan(); state.tasks.push(null);
   assert.match(check(state).join('\n'), /Invalid task id/);
