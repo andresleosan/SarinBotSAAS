@@ -54,7 +54,7 @@ function adapters(initialProtocol = null) {
 test('release requires exact main and validates both preflights before Worker, then waits before Pages', async () => {
   const deps = adapters();
   const result = await runRelease({ sha, account, config }, deps);
-  assert.deepEqual(deps.events, ['source', 'main', 'read-protocol', 'snapshot', 'image', 'main', 'snapshot', 'read-protocol', 'worker', 'worker-ready', 'pages', 'pages-ready']);
+  assert.deepEqual(deps.events, ['source', 'main', 'read-protocol', 'snapshot', 'image', 'main', 'snapshot', 'read-protocol', 'ensure-protocol', 'worker', 'worker-ready', 'pages', 'pages-ready']);
   assert.equal(result.sha, sha);
   assert.equal(JSON.stringify(result).includes('private-never-log'), false);
 });
