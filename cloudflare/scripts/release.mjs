@@ -65,7 +65,7 @@ async function main() {
   const dockerEnvironment = { DOCKER_CONFIG: dockerConfig };
   const cloudflareEnvironment = { ...dockerEnvironment, CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_API_TOKEN: token, WRANGLER_SEND_METRICS: 'false', WRANGLER_WRITE_LOGS: 'false' };
   const cli = (args, options = {}) => command(process.execPath, [wrangler, ...args], { ...options, env: cloudflareEnvironment });
-  const cliJson = async args => json(await cli(args));
+  const cliJson = async (args, options = {}) => json(await cli(args, options));
   const api = async path => {
     const body = await boundedJson(`https://api.cloudflare.com/client/v4/accounts/${account}/${path}`, { headers: { Authorization: `Bearer ${token}` } });
     if (body.success !== true || body.result == null) fail('API_UNSUCCESSFUL');
