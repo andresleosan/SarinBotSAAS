@@ -4,7 +4,7 @@ import { useAuth } from './auth-provider';
 import { apiFetch, errorMessage } from '@/lib/client/api';
 import type { BookingCapability, BookingDataPolicy } from '@/lib/booking-subject';
 import { Notice, buttonClass, fieldClass } from './app-shell';
-type PolicyView = { policy: BookingDataPolicy | null; capability: BookingCapability };
+type PolicyView = { policy: (BookingDataPolicy & { status?: string }) | null; capability: BookingCapability };
 function Classification({ uid, businessId }: { uid: string; businessId: string }) {
   const version = useRef(0), pending = useRef(false), [view, setView] = useState<PolicyView | null>(null), [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0), [mode, setMode] = useState<'general' | 'health'>('general'), [minors, setMinors] = useState(false), [reason, setReason] = useState(''), [error, setError] = useState<string | null>(null), [saved, setSaved] = useState(false);
   function accept(value: PolicyView) {
@@ -16,18 +16,24 @@ function Classification({ uid, businessId }: { uid: string; businessId: string }
     apiFetch<PolicyView>(`/api/admin/booking-data-policy?businessId=${encodeURIComponent(businessId)}`, { signal: abort.signal }, uid).then(value => { if (!abort.signal.aborted && version.current === generation) accept(value); }).catch(cause => { if (!abort.signal.aborted && version.current === generation) setError(errorMessage(cause)); });
     return () => { abort.abort(); ++version.current; };
   }, [uid, businessId, attempt]);
-  async function save(event: FormEvent) {
-    event.preventDefault(); if (!ready || pending.current || !view || !reason.trim()) return;
+  async function submitAction(action: 'classify' | 'suspend' | 'resume') {
+    if (!ready || pending.current || !view || !reason.trim()) return;
     pending.current = true; setBusy(true); setReady(false); setError(null); setSaved(false); const generation = ++version.current;
     try {
-      const result = await apiFetch<PolicyView>('/api/admin/booking-data-policy', { method: 'PATCH', body: JSON.stringify({ businessId, expectedRevision: view.capability.revision, dataMode: mode, representedMinorsEnabled: minors, reason: reason.trim() }) }, uid);
+      const result = await apiFetch<PolicyView>('/api/admin/booking-data-policy', { method: 'PATCH', body: JSON.stringify({ businessId, expectedRevision: view.capability.revision, dataMode: mode, representedMinorsEnabled: minors, reason: reason.trim(), action, requestId: `adm_${Date.now()}_${Math.random().toString(36).slice(2, 10)}` }) }, uid);
       if (version.current === generation) { accept(result); setSaved(true); }
     } catch (cause) { if (version.current === generation) setError(`${errorMessage(cause)} Actualiza antes de volver a guardar; el cambio podría haberse aplicado.`); }
     finally { if (version.current === generation) setBusy(false); pending.current = false; }
   }
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    await submitAction('classify');
+  }
+  const isSuspended = view?.policy?.status === 'suspended';
   return <div className="space-y-4">
     <button className="min-h-11 text-sm text-sarin-blue underline" disabled={busy} onClick={() => setAttempt(value => value + 1)}>Actualizar clasificación</button>
     {error && <Notice error>{error}</Notice>}{saved && <Notice>Clasificación guardada.</Notice>}
+    {isSuspended && <Notice>Este negocio se encuentra suspendido por administración.</Notice>}
     {!view && !error && <p role="status" className="text-sm">Consultando clasificación…</p>}
     {view && <form aria-label="Clasificación del negocio" onSubmit={save} className="space-y-4">
       <p className="text-sm text-sarin-muted">{view.capability.configured ? `Clasificación revisada · versión ${view.capability.revision}` : 'Negocio todavía sin clasificación revisada. Las capacidades de salud y menores no están habilitadas.'}</p>
@@ -35,7 +41,14 @@ function Classification({ uid, businessId }: { uid: string; businessId: string }
       <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={minors} disabled={!ready || busy} onChange={event => setMinors(event.target.checked)} className="h-5 w-5 accent-sarin-blue" />Permitir reservas para menores por su representante</label>
       <p className="text-sm leading-6 text-sarin-muted">Antes de habilitar salud o menores, retira las preguntas libres y revisa con el negocio su identificación, autorizaciones y procedimiento de representación. Una declaración no certifica parentesco. En salud se detiene el chat y se conserva la configuración manual.</p>
       <label className="block text-sm">Motivo de la clasificación<input aria-label="Motivo de la clasificación" className={fieldClass} value={reason} maxLength={300} required disabled={!ready || busy} onChange={event => setReason(event.target.value)} /></label>
-      <button className={buttonClass} disabled={!ready || busy || !reason.trim()}>Guardar clasificación</button>
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" className={buttonClass} disabled={!ready || busy || !reason.trim()}>Guardar clasificación</button>
+        {isSuspended ? (
+          <button type="button" className="min-h-11 rounded-lg border border-sarin-line px-3 text-sm" disabled={!ready || busy || !reason.trim()} onClick={() => submitAction('resume')}>Reanudar reservas</button>
+        ) : (
+          <button type="button" className="min-h-11 rounded-lg border border-rose-200 px-3 text-sm text-rose-700 hover:bg-rose-50" disabled={!ready || busy || !reason.trim()} onClick={() => submitAction('suspend')}>Suspender reservas</button>
+        )}
+      </div>
       {view.policy && <p className="text-xs text-sarin-muted">Último motivo: {view.policy.reason}</p>}
     </form>}
   </div>;

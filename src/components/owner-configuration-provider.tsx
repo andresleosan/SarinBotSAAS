@@ -16,7 +16,7 @@ export type ConfigurationAuthority = { scope: ConfigurationScope | null; generat
 export type PendingConfigurationCommand = { localId: string; payload: BusinessConfig; fingerprint: string; authorityGeneration: number; startedAt: number; transport: 'pending' | 'failed-unknown'; slow: boolean; observedCurrent: BusinessConfig | null };
 export type OwnerConfigurationSession = { scope: ConfigurationScope; draft: BusinessConfig; baseline: BusinessConfig; section: OwnerConfigurationSection; phase: OwnerConfigurationPhase; issues: ConfigurationIssue[]; external: BusinessConfig | null; savedConfiguration: BusinessConfig | null; pendingCommand: PendingConfigurationCommand | null; error: string | null };
 type VerifyInput = { uid: string; authEpoch: number; expectedBusinessId?: string };
-type SaveInput = { scope: ConfigurationScope; capability: BookingCapability; consentActive: boolean; reviewedExternalFingerprint?: string };
+type SaveInput = { scope: ConfigurationScope; capability?: BookingCapability | null; consentActive: boolean; reviewedExternalFingerprint?: string };
 type ConfigurationSessionApi = {
   authority: ConfigurationAuthority;
   session: OwnerConfigurationSession | null;

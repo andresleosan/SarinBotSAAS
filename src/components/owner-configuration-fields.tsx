@@ -16,11 +16,12 @@ import type { DaySchedule } from '@/types/firestore';
 const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const slugify = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70);
 export function OwnerConfigurationFields({ section, draft, capability, disabled, issues, onChange, configured = false }: {
-  section: OwnerConfigurationSection; draft: BusinessConfig; capability: BookingCapability; disabled: boolean; issues: ConfigurationIssue[]; onChange: (next: BusinessConfig) => void; configured?: boolean;
+  section: OwnerConfigurationSection; draft: BusinessConfig; capability?: BookingCapability | null; disabled: boolean; issues: ConfigurationIssue[]; onChange: (next: BusinessConfig) => void; configured?: boolean;
 }) {
   const { name, slug, category, phoneWhatsApp: phone, socialLinks = [], location = null, tone, customRules: rules, resources, services, weeklySchedule: schedule } = draft;
-  const health = capability.dataMode === 'health';
-  const restrictedIntake = health || capability.representedMinorsEnabled;
+  const unknownCapability = !capability;
+  const health = Boolean(capability && capability.dataMode === 'health');
+  const restrictedIntake = unknownCapability || health || Boolean(capability?.representedMinorsEnabled);
   const intake = draft.intakeFields.map(field => field.label).join('\n');
   const update = <K extends keyof BusinessConfig>(key: K, next: SetStateAction<BusinessConfig[K]>) => {
     if (!disabled) onChange({ ...draft, [key]: typeof next === 'function' ? (next as (value: BusinessConfig[K]) => BusinessConfig[K])(draft[key]) : next });
@@ -48,6 +49,8 @@ export function OwnerConfigurationFields({ section, draft, capability, disabled,
   return <fieldset aria-label="Campos de configuración" disabled={disabled} className="@container min-w-0 space-y-5">
     {issues.filter(issue => issue.section === section).map((issue, index) => <p role="alert" key={`${issue.path}-${index}`} className="text-sm text-rose-700">{issue.message}</p>)}
     {section === 'assistant' && health && <p className="text-sm text-sarin-muted">Las reservas de salud usan formulario sin IA. No incluyas información de pacientes en el catálogo.</p>}
+    {section === 'assistant' && unknownCapability && <p className="text-sm text-sarin-muted">No se pudo consultar la clasificación de reservas. Puedes corregir los datos de tu negocio o retirar preguntas existentes, pero no agregar nuevas preguntas de texto libre ni activar el asistente hasta resolver la clasificación.</p>}
+    {section === 'assistant' && unknownCapability && draft.intakeFields.length > 0 && <button type="button" className="min-h-11 text-sm text-rose-700 underline" onClick={() => update('intakeFields', [])}>Retirar preguntas de reserva existentes</button>}
           {section === 'identity' && <><div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs text-sarin-muted">
               Nombre
@@ -469,7 +472,7 @@ export function OwnerConfigurationFields({ section, draft, capability, disabled,
               ]}
             /></details>
           </section>}
-          {!health && <>
+          {!health && !unknownCapability && <>
           <label className="block text-xs text-sarin-muted">
             Tono del asistente
             <input

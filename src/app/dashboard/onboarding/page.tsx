@@ -7,6 +7,7 @@ import { BusinessLogoField } from '@/components/business-logo-field';
 import { BusinessAssistantScopeNotice } from '@/components/business-assistant-scope-notice';
 import { ConfigurationAssistant } from '@/components/configuration-assistant';
 import { OwnerConfigurationWorkspace } from '@/components/owner-configuration-workspace';
+import { OwnerBookingDeclaration } from '@/components/owner-booking-declaration';
 import { useOwnerConfiguration } from '@/hooks/use-owner-configuration';
 import { isSubscriptionAllowed } from '@/lib/sarin/subscription';
 import { canPurchasePaidTrial } from '@/lib/paid-trial';
@@ -30,15 +31,23 @@ function Configuration() {
   if (!config.business || !config.controller) return <div className="space-y-3"><Notice error>{config.error || 'No pudimos verificar tu acceso al negocio.'}</Notice><button type="button" className={buttonClass} onClick={config.retryAuthority}>Reintentar verificación</button></div>;
   const { business, controller } = config;
   if (!isSubscriptionAllowed(business)) return <AccessGate business={business} />;
-  if (!config.policyReady || !config.capability) return <div className="space-y-3"><Notice error={Boolean(config.policyError)}>{config.policyError || 'Comprobando las opciones de configuración…'}</Notice><button type="button" className={buttonClass} onClick={config.retryPolicy}>Reintentar clasificación</button></div>;
+  const declarationSlot = user && config.authority.scope ? (
+    <OwnerBookingDeclaration
+      businessId={business.id}
+      uid={user.uid}
+      authEpoch={config.authority.scope.authEpoch}
+    />
+  ) : null;
   return <div key={`${config.authority.generation}:${user?.uid}:${business.id}`} className="max-w-4xl space-y-5">
     {business.subscription.status === 'trial' && <Notice>{business.subscription.paidTrial?.source === 'invitation' ? 'Tu prueba de cortesía incluye diez citas y 700 respuestas; sin cobro ni caducidad.' : 'Tu prueba pagada incluye la configuración y hasta 10 citas, sin caducidad.'}</Notice>}
     {!config.consentActive && <Notice>Necesitas aceptar las condiciones y autorizar los datos para editar y guardar la configuración.</Notice>}
+    {declarationSlot}
+    {!config.policyReady && !config.capability && <div className="space-y-3"><Notice error={Boolean(config.policyError)}>{config.policyError || 'Comprobando las opciones de reserva…'}</Notice>{config.policyError && <button type="button" className={buttonClass} onClick={config.retryPolicy}>Reintentar clasificación</button>}</div>}
     <OwnerConfigurationWorkspace
       business={business} capability={config.capability} policyReady={config.policyReady} consentActive={config.consentActive} controller={controller}
-      assistantScope={<BusinessAssistantScopeNotice configured={business.sarinConfig.onboardingCompleted} dataMode={config.capability.dataMode} representedMinorsEnabled={config.capability.representedMinorsEnabled} faqHref="/dashboard/faq" />}
+      assistantScope={<BusinessAssistantScopeNotice configured={business.sarinConfig.onboardingCompleted} dataMode={config.capability?.dataMode ?? 'general'} representedMinorsEnabled={Boolean(config.capability?.representedMinorsEnabled)} faqHref="/dashboard/faq" />}
       logo={business.sarinConfig.onboardingCompleted ? <BusinessLogoField business={business} onSaved={config.onLogoSaved} /> : null}
-      assistant={config.capability.dataMode === 'general' && user ? <ConfigurationAssistant uid={user.uid} business={business} enabled={config.consentActive} draft={controller.session.draft} busy={controller.writeBlocked} onDraft={next => { controller.change(next); controller.go('review'); }} /> : null}
+      assistant={config.capability?.dataMode === 'general' && user ? <ConfigurationAssistant uid={user.uid} business={business} enabled={config.consentActive} draft={controller.session.draft} busy={controller.writeBlocked} onDraft={next => { controller.change(next); controller.go('review'); }} /> : null}
     />
   </div>;
 }

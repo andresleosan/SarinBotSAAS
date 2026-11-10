@@ -68,8 +68,7 @@ describe('business assistant scope real configuration integration', () => {
     state.capability = condition !== 'missing capability';
     await update();
     expect(scopes()).toHaveLength(0);
-    expect(renderer.root.findAllByType(OwnerConfigurationWorkspace)).toHaveLength(0);
-    expect(text(renderer.root)).toContain(state.policyError || 'Comprobando las opciones de configuración');
+    expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para SarinBot' })).toHaveLength(0);
     expectNoEffects();
   });
 

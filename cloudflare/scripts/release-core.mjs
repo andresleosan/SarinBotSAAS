@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { BOOKING_ADMISSION_COMPATIBILITY } from '../../src/lib/booking-admission-release.ts';
+import { assertBookingAdmissionRelease } from './booking-admission-preflight.mjs';
 
 export const WORKER = 'sarin-bot-app';
 export const PAGES = 'sarinbotsaas';
@@ -142,11 +144,19 @@ export async function runRelease({ sha, account, config }, deps) {
   const source = await deps.exactSource();
   if (source.sha !== sha) fail('CHECKOUT_SHA');
   if (await deps.mainSha() !== sha) fail('STALE_MAIN');
+  const candidate = deps.candidate ?? BOOKING_ADMISSION_COMPATIBILITY;
+  const protocolBeforeBuild = deps.readAdmissionProtocol ? await deps.readAdmissionProtocol() : null;
+  assertBookingAdmissionRelease({ candidate, liveProtocol: protocolBeforeBuild });
   const before = validateSnapshot(await deps.snapshot(), config, account);
   const image = await deps.buildAndPush(source);
   if (await deps.mainSha() !== sha) fail('STALE_MAIN');
   const current = validateSnapshot(await deps.snapshot(), config, account);
   if (!same(before, current)) fail('RUNTIME_CHANGED');
+  const protocolBeforeDeploy = deps.readAdmissionProtocol ? await deps.readAdmissionProtocol() : null;
+  assertBookingAdmissionRelease({ candidate, liveProtocol: protocolBeforeDeploy });
+  if (candidate.release === 'enforce' && !protocolBeforeDeploy && deps.ensureAdmissionProtocol) {
+    await deps.ensureAdmissionProtocol(sha);
+  }
   await deps.deployWorker(image);
   const worker = await deps.waitForWorker(image, before);
   // Complete this release even if main advances after the first runtime write.

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { resolve, join, posix, win32 } from 'node:path';
 import { runRelease, validateSnapshot, releaseConfig, boundedJson, verifyImage, workerReady, pagesReady, commandDiagnostic, pagesConfigFingerprint } from '../scripts/release-core.mjs';
+import { assertBookingAdmissionRelease } from '../scripts/booking-admission-preflight.mjs';
 
 const sha = 'a'.repeat(40);
 const account = 'b'.repeat(32);
@@ -31,14 +32,18 @@ function snapshot() {
     pages: { name: 'sarinbotsaas', production_branch: 'main', deployment_configs: { production: { env_vars: { SARIN_PUBLIC_ORIGIN: { type: 'plain_text', value: 'https://sarinbotsaas.pages.dev' } }, services: { SARIN_APP_HOST: { service: 'sarin-bot-app', environment: 'production' } } } } },
   };
 }
-function adapters() {
+function adapters(initialProtocol = null) {
   const events = [];
   let deployed = false;
+  let liveProtocol = initialProtocol;
   const current = snapshot();
   return { events, current,
+    get liveProtocol() { return liveProtocol; },
     exactSource: async () => { events.push('source'); return { sha, tree: 'd'.repeat(40) }; },
     mainSha: async () => { events.push('main'); return sha; },
     snapshot: async () => { events.push('snapshot'); return structuredClone(current); },
+    readAdmissionProtocol: async () => { events.push('read-protocol'); return structuredClone(liveProtocol); },
+    ensureAdmissionProtocol: async candidateSha => { events.push('ensure-protocol'); liveProtocol = { version: 1, minimumReader: 2, introducedBySha: candidateSha }; },
     buildAndPush: async () => { events.push('image'); return { reference: `registry.cloudflare.com/${account}/sarin-bot-app@${digest}`, digest }; },
     deployWorker: async () => { events.push('worker'); deployed = true; },
     waitForWorker: async () => { events.push('worker-ready'); assert.equal(deployed, true); return { workerVersion: 'v2', containerVersion: 31 }; },
@@ -49,7 +54,7 @@ function adapters() {
 test('release requires exact main and validates both preflights before Worker, then waits before Pages', async () => {
   const deps = adapters();
   const result = await runRelease({ sha, account, config }, deps);
-  assert.deepEqual(deps.events, ['source', 'main', 'snapshot', 'image', 'main', 'snapshot', 'worker', 'worker-ready', 'pages', 'pages-ready']);
+  assert.deepEqual(deps.events, ['source', 'main', 'read-protocol', 'snapshot', 'image', 'main', 'snapshot', 'read-protocol', 'worker', 'worker-ready', 'pages', 'pages-ready']);
   assert.equal(result.sha, sha);
   assert.equal(JSON.stringify(result).includes('private-never-log'), false);
 });
@@ -112,7 +117,7 @@ test('temporary release tsconfig resolves correctly through Wrangler path.join o
 test('installed Wrangler reads the generated config with the actual checkout tsconfig', async () => {
   const { unstable_readConfig } = await import('wrangler');
   const root = fileURLToPath(new URL('../../', import.meta.url));
-  const directory = await mkdtemp(join(tmpdir(), 'sarin-release-config-test-'));
+  const directory = await mkdtemp(join(root, 'cloudflare', '.release-config-test-'));
   try {
     const path = join(directory, 'release.json');
     await writeFile(path, JSON.stringify(releaseConfig(config, `registry.cloudflare.com/${account}/sarin-bot-app@${digest}`, root, directory)));
@@ -245,4 +250,40 @@ test('CLI diagnostics expose only fixed operation, bounded numeric codes and fix
   const many = Array.from({ length: 20 }, (_, i) => `[code: ${10000 + i}]`).join(' ');
   assert.equal(commandDiagnostic({ stderr: many }).cloudflareCodes.length, 8);
   assert.deepEqual(commandDiagnostic({ stderr: 'x'.repeat(65_536) + '[code: 10000]' }).cloudflareCodes, []);
+});
+
+test('assertBookingAdmissionRelease enforces protocol invariants', () => {
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: null, liveProtocol: null }), /INVALID_CANDIDATE/);
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 0, release: 'enforce', recoveryCompatible: true }, liveProtocol: null }), /INVALID_CANDIDATE_READER/);
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'invalid', recoveryCompatible: true }, liveProtocol: null }), /INVALID_CANDIDATE_RELEASE/);
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'enforce', recoveryCompatible: 'yes' }, liveProtocol: null }), /INVALID_CANDIDATE_RECOVERY/);
+
+  assert.doesNotThrow(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'enforce', recoveryCompatible: true }, liveProtocol: null }));
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 1, release: 'enforce', recoveryCompatible: true }, liveProtocol: null }), /INCOMPATIBLE_READER/);
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'enforce', recoveryCompatible: false }, liveProtocol: null }), /INCOMPATIBLE_RECOVERY/);
+
+  const validMarker = { version: 1, minimumReader: 2, introducedBySha: sha };
+  assert.doesNotThrow(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'enforce', recoveryCompatible: true }, liveProtocol: validMarker }));
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'prepare', recoveryCompatible: true }, liveProtocol: validMarker }), /ADMISSION_PREPARE_AFTER_ENFORCE/);
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 1, release: 'enforce', recoveryCompatible: true }, liveProtocol: validMarker }), /INCOMPATIBLE_READER/);
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'enforce', recoveryCompatible: false }, liveProtocol: validMarker }), /INCOMPATIBLE_RECOVERY/);
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'enforce', recoveryCompatible: true }, liveProtocol: { version: 2 } }), /LIVE_PROTOCOL_INVALID/);
+  assert.throws(() => assertBookingAdmissionRelease({ candidate: { reader: 2, release: 'enforce', recoveryCompatible: true }, liveProtocol: { ...validMarker, extra: 'forbidden' } }), /LIVE_PROTOCOL_INVALID/);
+});
+
+test('runRelease creates admission marker once for enforce candidate and rejects prepare when marker exists', async () => {
+  const deps = adapters();
+  deps.candidate = { reader: 2, release: 'enforce', recoveryCompatible: true };
+  const result = await runRelease({ sha, account, config }, deps);
+  assert.equal(deps.events.includes('ensure-protocol'), true);
+  assert.deepEqual(deps.liveProtocol, { version: 1, minimumReader: 2, introducedBySha: sha });
+
+  const deps2 = adapters(deps.liveProtocol);
+  deps2.candidate = { reader: 2, release: 'enforce', recoveryCompatible: true };
+  await runRelease({ sha, account, config }, deps2);
+  assert.equal(deps2.events.includes('ensure-protocol'), false);
+
+  const depsPrepare = adapters(deps.liveProtocol);
+  depsPrepare.candidate = { reader: 2, release: 'prepare', recoveryCompatible: true };
+  await assert.rejects(runRelease({ sha, account, config }, depsPrepare), /ADMISSION_PREPARE_AFTER_ENFORCE/);
 });

@@ -83,13 +83,13 @@ export function configurationSectionForPath(path: string): OwnerConfigurationSec
   }
 }
 
-export function effectiveOwnerConfiguration(config: BusinessConfig, capability: BookingCapability): BusinessConfig {
+export function effectiveOwnerConfiguration(config: BusinessConfig, capability?: BookingCapability | null): BusinessConfig {
   const effective = project(config);
-  if (capability.dataMode === 'health' || capability.representedMinorsEnabled) effective.intakeFields = [];
+  if (capability && (capability.dataMode === 'health' || capability.representedMinorsEnabled)) effective.intakeFields = [];
   return effective;
 }
 
-export function validateOwnerConfiguration(config: BusinessConfig, capability: BookingCapability, section?: OwnerConfigurationSection): ConfigurationIssue[] {
+export function validateOwnerConfiguration(config: BusinessConfig, capability?: BookingCapability | null, section?: OwnerConfigurationSection): ConfigurationIssue[] {
   const effective = effectiveOwnerConfiguration(config, capability);
   const parsed = businessConfigSchema.safeParse(effective);
   if (parsed.success) return [];

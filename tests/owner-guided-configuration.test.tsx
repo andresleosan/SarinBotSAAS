@@ -147,10 +147,10 @@ describe('owner guided configuration integration', () => {
     expect(control().session.external).toBeNull();
   });
 
-  it('keeps the editor and AI unmounted when policy is not ready', async () => {
+  it('keeps AI unmounted and offers non-blocking corrective editing when policy is not ready', async () => {
     state.ready = false;
     await mount();
-    expect(renderer.root.findAllByType(OwnerConfigurationWorkspace)).toHaveLength(0);
+    expect(renderer.root.findAllByType(OwnerConfigurationWorkspace)).toHaveLength(1);
     expect(renderer.root.findAllByProps({ 'aria-label': 'Mensaje para SarinBot' })).toHaveLength(0);
     expect(posts()).toHaveLength(0);
   });

@@ -91,7 +91,7 @@ export function useOwnerConfiguration() {
   const session = verified ? owner.session : null;
   const business = verified ? freshEntry!.business : null;
   const busy = session?.phase === 'checking' || session?.phase === 'saving';
-  const writeBlocked = busy || Boolean(session?.pendingCommand) || !accountConsent.active || !policy.ready || !policy.capability || !isSubscriptionAllowed(business);
+  const writeBlocked = busy || Boolean(session?.pendingCommand) || !accountConsent.active || !isSubscriptionAllowed(business);
   const controller: OwnerConfigurationController | null = session && expectedScope ? {
     session: issues.length ? { ...session, issues } : session,
     configured: Boolean(business?.sarinConfig.onboardingCompleted),
@@ -102,13 +102,12 @@ export function useOwnerConfiguration() {
     change: next => { if (writeBlocked) return; setIssues([]); edit(expectedScope, next); },
     go: section => { setIssues([]); go(expectedScope, section); },
     review: () => {
-      if (!policy.capability) return;
       const nextIssues = validateOwnerConfiguration(session.draft, policy.capability);
       setIssues(nextIssues);
       go(expectedScope, nextIssues[0]?.section ?? 'review');
     },
     save: reviewedExternalFingerprint => {
-      if (writeBlocked || !policy.capability) return;
+      if (writeBlocked) return;
       setIssues([]);
       void save({ scope: expectedScope, capability: policy.capability, consentActive: accountConsent.active, reviewedExternalFingerprint });
     },

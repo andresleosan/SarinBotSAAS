@@ -66,7 +66,7 @@ export function OwnerConfigurationWorkspace({ business: _business, capability, p
   const issues = session.issues.length ? session.issues : localIssues;
   const issuesKey = JSON.stringify(issues);
   const externalFingerprint = session.external ? configurationFingerprint(session.external) : undefined;
-  const blocked = busy || writeBlocked || !policyReady || !capability || !consentActive;
+  const blocked = busy || writeBlocked || !consentActive;
   const health = capability?.dataMode === 'health';
   useEffect(() => { setAssistantOpen(false); title.current?.focus(); }, [section]);
   useEffect(() => { setReviewExternal(false); setReviewedExternal(undefined); }, [externalFingerprint]);
@@ -83,7 +83,7 @@ export function OwnerConfigurationWorkspace({ business: _business, capability, p
   }, [section, issuesKey]);
   const navigate = (next: OwnerConfigurationSection) => { setAssistantOpen(false); setLocalIssues([]); controller.go(next); };
   const continueStep = () => {
-    if (blocked || !capability) return;
+    if (blocked) return;
     const found = validateOwnerConfiguration(draft, capability, section);
     setLocalIssues(found);
     if (found.length) return;
@@ -91,7 +91,7 @@ export function OwnerConfigurationWorkspace({ business: _business, capability, p
     else controller.go(steps[steps.indexOf(section) + 1] ?? 'review');
   };
   const save = () => {
-    if (blocked || !controller.canSave || !capability) return;
+    if (blocked || !controller.canSave) return;
     const found = validateOwnerConfiguration(draft, capability);
     setLocalIssues(found);
     if (!found.length) controller.save(reviewedExternal);
@@ -116,7 +116,8 @@ export function OwnerConfigurationWorkspace({ business: _business, capability, p
         {section === 'schedule' && configured && <a href="/dashboard/schedule" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sarin-blue underline">Turnos y cierres (abre en otra pestaña; tu borrador se conserva aquí)</a>}
         {configured && (section === 'resources' || section === 'services') && <nav aria-label="Servicios y recursos" className="flex flex-wrap gap-2"><button type="button" className={buttonClass} aria-current={section === 'resources' ? 'page' : undefined} onClick={() => navigate('resources')}>Personas o estaciones</button><button type="button" className={buttonClass} aria-current={section === 'services' ? 'page' : undefined} onClick={() => navigate('services')}>Servicios</button></nav>}
         {section === 'review' ? <><ConfigurationSummary draft={draft} /><p className="text-sm font-medium">Al guardar, estos datos aparecerán en tu página de reservas</p><p className="text-sm text-sarin-muted">Se guarda toda la configuración. Una edición simultánea desde otra vista puede sobrescribirse.</p><button type="button" className={buttonClass} onClick={() => navigate('assistant')}>Cómo responde Sarin</button><button type="submit" className={buttonClass} disabled={blocked || !controller.canSave || Boolean(session.external && reviewedExternal !== externalFingerprint)}>{reviewedExternal ? 'Guardar mi configuración completa sobre la actual' : 'Guardar configuración'}</button></> : <>
-          {policyReady && capability ? <OwnerConfigurationFields section={section} draft={draft} capability={capability} configured={configured} disabled={blocked} issues={issues} onChange={next => { if (!blocked) controller.change(next); }} /> : <Notice>Comprobando las opciones de configuración…</Notice>}
+          <OwnerConfigurationFields section={section} draft={draft} capability={capability} configured={configured} disabled={blocked} issues={issues} onChange={next => { if (!blocked) controller.change(next); }} />
+          {!policyReady && !capability && <Notice>Comprobando las opciones de reserva…</Notice>}
           {section === 'assistant' && policyReady && capability && assistantScope}
           {section === 'assistant' && policyReady && capability && !health && <button type="button" className={buttonClass} disabled={blocked} onClick={() => setAssistantOpen(true)}>Preparar con Sarin</button>}
           {!configured && steps.includes(section) && <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} onClick={() => navigate(section === 'identity' ? 'summary' : steps[steps.indexOf(section) - 1])}>Atrás</button><button type="button" className={buttonClass} disabled={blocked} onClick={continueStep}>Continuar</button></div>}

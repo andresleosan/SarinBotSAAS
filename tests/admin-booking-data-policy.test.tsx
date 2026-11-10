@@ -18,5 +18,24 @@ it('policy edits preserve current business on stale response and submit a scoped
   expect(JSON.stringify(renderer.toJSON())).not.toContain('Private old business');
   await act(async () => { renderer.root.findByProps({ 'aria-label': 'Clase de reservas' }).props.onChange({ target: { value: 'health' } }); renderer.root.findByProps({ 'aria-label': 'Motivo de la clasificación' }).props.onChange({ target: { value: 'Demo revisión' } }); });
   await act(async () => renderer.root.findByProps({ 'aria-label': 'Clasificación del negocio' }).props.onSubmit({ preventDefault() {} }));
-  const call = state.api.mock.calls.find(([, init]) => init?.method === 'PATCH')!; expect(call[2]).toBe('demo-admin'); expect(JSON.parse(call[1].body)).toEqual({ businessId: 'demo-two', expectedRevision: 0, dataMode: 'health', representedMinorsEnabled: false, reason: 'Demo revisión' });
+  const call = state.api.mock.calls.find(([, init]) => init?.method === 'PATCH')!;
+  expect(call[2]).toBe('demo-admin');
+  const body = JSON.parse(call[1].body);
+  expect(body).toMatchObject({ businessId: 'demo-two', expectedRevision: 0, dataMode: 'health', representedMinorsEnabled: false, reason: 'Demo revisión', action: 'classify' });
+  expect(typeof body.requestId).toBe('string');
+});
+
+it('admin sees suspended status and can resume or suspend with revision CAS', async () => {
+  const suspendedView = { policy: { status: 'suspended', reason: 'Revisión por actividad incompatible' }, capability: { configured: true, revision: 3, dataMode: 'general', representedMinorsEnabled: false } };
+  state.api.mockResolvedValue(suspendedView);
+  await act(async () => { renderer = create(createElement(AdminBookingDataPolicy, { businesses: [{ id: 'demo-suspended', name: 'Suspendido' }] })); });
+  expect(JSON.stringify(renderer.toJSON())).toContain('suspendido por administración');
+  expect(JSON.stringify(renderer.toJSON())).toContain('Revisión por actividad incompatible');
+  await act(async () => { renderer.root.findByProps({ 'aria-label': 'Motivo de la clasificación' }).props.onChange({ target: { value: 'Reanudación tras verificación' } }); });
+  const resumeBtn = renderer.root.findAllByType('button').find(b => b.children.includes('Reanudar reservas'));
+  expect(resumeBtn).toBeDefined();
+  await act(async () => resumeBtn!.props.onClick());
+  const call = state.api.mock.calls.find(([, init]) => init?.method === 'PATCH')!;
+  const body = JSON.parse(call[1].body);
+  expect(body).toMatchObject({ businessId: 'demo-suspended', expectedRevision: 3, dataMode: 'general', representedMinorsEnabled: false, reason: 'Reanudación tras verificación', action: 'resume' });
 });
