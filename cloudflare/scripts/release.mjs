@@ -23,9 +23,16 @@ function command(binary, args, { cwd = temporary, env = {}, timeout = 120_000, l
     const child = spawn(binary, args, { cwd, env: { ...baseEnvironment(), CI: 'true', NO_COLOR: '1', ...env }, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
     const chunks = []; const errorChunks = []; let errorSize = 0; let size = 0; let failure; let reported = false;
     const report = (exitCode, startupCode = '') => {
-      if (!diagnosticOperation || reported) return;
+      if (reported) return;
       reported = true;
-      console.error(JSON.stringify(commandDiagnostic({ operation: diagnosticOperation, exitCode, stdout: Buffer.concat(chunks).toString('utf8'), stderr: startupCode + Buffer.concat(errorChunks).toString('utf8') })));
+      const err = startupCode + Buffer.concat(errorChunks).toString('utf8');
+      const out = Buffer.concat(chunks).toString('utf8');
+      if (diagnosticOperation) {
+        console.error(JSON.stringify(commandDiagnostic({ operation: diagnosticOperation, exitCode, stdout: out, stderr: err })));
+      } else {
+        const detail = (err || out).trim().slice(0, 600).replace(/[\r\n]+/g, ' ');
+        console.log(`::error::Command ${args.slice(0, 3).join(' ')} exited ${exitCode}: ${detail}`);
+      }
     };
     const stop = code => {
       failure ??= code;
@@ -35,7 +42,7 @@ function command(binary, args, { cwd = temporary, env = {}, timeout = 120_000, l
     child.stdout.on('data', data => { size += data.length; if (size > limit) stop('COMMAND_OUTPUT_LIMIT'); else chunks.push(data); });
     child.stderr.on('data', data => {
       size += data.length;
-      if (diagnosticOperation && errorSize < 65_536) { const chunk = data.subarray(0, 65_536 - errorSize); errorChunks.push(chunk); errorSize += chunk.length; }
+      if (errorSize < 65_536) { const chunk = data.subarray(0, 65_536 - errorSize); errorChunks.push(chunk); errorSize += chunk.length; }
       if (size > limit) stop('COMMAND_OUTPUT_LIMIT');
     });
     child.on('error', error => { clearTimeout(timer); report(null, error.code === 'ENOENT' ? 'ENOENT' : ''); reject(new Error('COMMAND_START')); });
@@ -176,6 +183,7 @@ try { await main(); }
 catch (error) {
   const code = /^[A-Z][A-Z0-9_]{1,64}$/.test(error?.message ?? '') ? error.message : 'RELEASE_FAILED';
   console.error(`Release failed at ${stage}: ${code}. Inspect live deployment state before retrying; no automatic rollback was attempted.`);
+  console.log(`::error::Release failed at ${stage}: ${code} - ${error?.message ?? error}`);
   process.exitCode = 1;
 } finally {
   if (temporary) await rm(temporary, { recursive: true, force: true }).catch(() => { process.exitCode = 1; console.error('Release cleanup failed.'); });
