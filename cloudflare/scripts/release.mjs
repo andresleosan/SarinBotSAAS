@@ -109,7 +109,7 @@ async function main() {
     },
     snapshot: async () => { progress('PREFLIGHT'); const value = await snapshot(); baselinePagesHash = pagesConfigFingerprint(value.pages.deployment_configs); return value; },
     readAdmissionProtocol: async () => {
-      const result = await cliJson(['d1', 'execute', config.d1_databases[0].database_id, '--command', "SELECT data FROM app_documents WHERE path='serverSettings/bookingAdmissionProtocol'", '--json']);
+      const result = await cliJson(['d1', 'execute', config.d1_databases[0].database_id, '--remote', '--command', "SELECT data FROM app_documents WHERE path='serverSettings/bookingAdmissionProtocol'", '--json']);
       const row = result?.[0]?.results?.[0];
       if (!row?.data) return null;
       try { return JSON.parse(row.data); } catch { return null; }
@@ -117,7 +117,7 @@ async function main() {
     ensureAdmissionProtocol: async candidateSha => {
       const marker = JSON.stringify({ version: 1, minimumReader: 2, introducedBySha: candidateSha });
       const now = Date.now();
-      await cli(['d1', 'execute', config.d1_databases[0].database_id, '--command', `INSERT OR IGNORE INTO app_documents(path,parent,document_id,data,updated_at,blob) VALUES('serverSettings/bookingAdmissionProtocol','serverSettings','bookingAdmissionProtocol',json('${marker}'),${now},NULL)`]);
+      await cli(['d1', 'execute', config.d1_databases[0].database_id, '--remote', '--command', `INSERT OR IGNORE INTO app_documents(path,parent,document_id,data,updated_at,blob) VALUES('serverSettings/bookingAdmissionProtocol','serverSettings','bookingAdmissionProtocol',json('${marker}'),${now},NULL)`]);
     },
     buildAndPush: async source => {
       progress('IMAGE_BUILD');
