@@ -18,12 +18,12 @@ const json = value => { try { return JSON.parse(value); } catch { fail('COMMAND_
 const required = key => { const value = environment[key]; if (!value || /[\r\n\0]/.test(value)) fail('ENVIRONMENT'); return value; };
 const baseEnvironment = () => Object.fromEntries(['PATH', 'HOME', 'USERPROFILE', 'SYSTEMROOT', 'TEMP', 'TMP', 'TMPDIR', 'DOCKER_HOST', 'DOCKER_CONTEXT'].filter(key => environment[key]).map(key => [key, environment[key]]));
 
-function command(binary, args, { cwd = temporary, env = {}, timeout = 120_000, limit = 16_000_000, diagnosticOperation } = {}) {
+function command(binary, args, { cwd = temporary, env = {}, timeout = 120_000, limit = 16_000_000, diagnosticOperation, silent = false } = {}) {
   return new Promise((resolveCommand, reject) => {
     const child = spawn(binary, args, { cwd, env: { ...baseEnvironment(), CI: 'true', NO_COLOR: '1', ...env }, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
     const chunks = []; const errorChunks = []; let errorSize = 0; let size = 0; let failure; let reported = false;
     const report = (exitCode, startupCode = '') => {
-      if (reported) return;
+      if (reported || silent) return;
       reported = true;
       const err = startupCode + Buffer.concat(errorChunks).toString('utf8');
       const out = Buffer.concat(chunks).toString('utf8');
@@ -45,8 +45,26 @@ function command(binary, args, { cwd = temporary, env = {}, timeout = 120_000, l
       if (errorSize < 65_536) { const chunk = data.subarray(0, 65_536 - errorSize); errorChunks.push(chunk); errorSize += chunk.length; }
       if (size > limit) stop('COMMAND_OUTPUT_LIMIT');
     });
-    child.on('error', error => { clearTimeout(timer); report(null, error.code === 'ENOENT' ? 'ENOENT' : ''); reject(new Error('COMMAND_START')); });
-    child.on('close', code => { clearTimeout(timer); if (failure || code !== 0) { report(code); reject(new Error(failure ?? 'COMMAND_FAILED')); } else resolveCommand(Buffer.concat(chunks).toString('utf8').trim()); });
+    child.on('error', error => {
+      clearTimeout(timer);
+      report(null, error.code === 'ENOENT' ? 'ENOENT' : '');
+      const err = new Error('COMMAND_START');
+      err.cause = error;
+      reject(err);
+    });
+    child.on('close', code => {
+      clearTimeout(timer);
+      if (failure || code !== 0) {
+        report(code);
+        const err = Buffer.concat(errorChunks).toString('utf8');
+        const out = Buffer.concat(chunks).toString('utf8');
+        const error = new Error(failure ?? 'COMMAND_FAILED');
+        error.code = code;
+        error.stderr = err;
+        error.stdout = out;
+        reject(error);
+      } else resolveCommand(Buffer.concat(chunks).toString('utf8').trim());
+    });
   });
 }
 
@@ -117,13 +135,13 @@ async function main() {
     snapshot: async () => { progress('PREFLIGHT'); const value = await snapshot(); baselinePagesHash = pagesConfigFingerprint(value.pages.deployment_configs); return value; },
     readAdmissionProtocol: async () => {
       try {
-        const result = await cliJson(['d1', 'execute', config.d1_databases[0].database_name, '--remote', '--config', 'wrangler.jsonc', '--command', "SELECT data FROM app_documents WHERE path='serverSettings/bookingAdmissionProtocol'", '--json'], { cwd: join(root, 'cloudflare') });
+        const result = await cliJson(['d1', 'execute', config.d1_databases[0].database_name, '--remote', '--config', 'wrangler.jsonc', '--command', "SELECT data FROM app_documents WHERE path='serverSettings/bookingAdmissionProtocol'", '--json'], { cwd: join(root, 'cloudflare'), silent: true });
         const row = result?.[0]?.results?.[0];
         if (!row?.data) return null;
         try { return JSON.parse(row.data); } catch { return null; }
       } catch (error) {
-        const message = String(error?.message ?? error);
-        if (message.includes('7403') || message.includes('not authorized to access this service')) {
+        const details = `${error?.stderr ?? ''} ${error?.stdout ?? ''} ${error?.message ?? ''}`;
+        if (details.includes('7403') || details.includes('not authorized to access this service')) {
           console.warn('Admission protocol D1 read skipped: token not authorized for D1 (code 7403)');
           return null;
         }
@@ -134,10 +152,10 @@ async function main() {
       try {
         const marker = JSON.stringify({ version: 1, minimumReader: 2, introducedBySha: candidateSha });
         const now = Date.now();
-        await cli(['d1', 'execute', config.d1_databases[0].database_name, '--remote', '--config', 'wrangler.jsonc', '--command', `INSERT OR IGNORE INTO app_documents(path,parent,document_id,data,updated_at,blob) VALUES('serverSettings/bookingAdmissionProtocol','serverSettings','bookingAdmissionProtocol',json('${marker}'),${now},NULL)`], { cwd: join(root, 'cloudflare') });
+        await cli(['d1', 'execute', config.d1_databases[0].database_name, '--remote', '--config', 'wrangler.jsonc', '--command', `INSERT OR IGNORE INTO app_documents(path,parent,document_id,data,updated_at,blob) VALUES('serverSettings/bookingAdmissionProtocol','serverSettings','bookingAdmissionProtocol',json('${marker}'),${now},NULL)`], { cwd: join(root, 'cloudflare'), silent: true });
       } catch (error) {
-        const message = String(error?.message ?? error);
-        if (message.includes('7403') || message.includes('not authorized to access this service')) {
+        const details = `${error?.stderr ?? ''} ${error?.stdout ?? ''} ${error?.message ?? ''}`;
+        if (details.includes('7403') || details.includes('not authorized to access this service')) {
           console.warn('Admission protocol D1 write skipped: token not authorized for D1 (code 7403)');
           return;
         }

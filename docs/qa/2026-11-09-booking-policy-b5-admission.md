@@ -4,7 +4,7 @@
 - **Tarea:** `R0-POLICY-B5`
 - **Módulo:** `R0-POLICY` (Subplan `docs/superpowers/plans/2026-10-30-booking-policy-admission.md`, anchor `task5`)
 - **Contrato aprobado:** `docs/superpowers/specs/2026-10-30-booking-policy-admission-design.md`
-- **Commit SHA:** `af32f8ccaa1d1b7f5693b1c911b22ea30c165635`
+- **Commit SHA:** `b3c2f2f1211ef22395df123fd1fc8576bdc9d457`
 - **Rama:** `main` en `andresleosan/SarinBotSAAS`
 
 ---
@@ -94,7 +94,7 @@ node --test .agents/skills/avanzar/scripts/*.test.mjs
 - **Resultado:** 35 pruebas superadas (código de salida 0).
 
 ### Entrega Remota y CI en GitHub Actions
-- **Commit:** `af32f8ccaa1d1b7f5693b1c911b22ea30c165635`
-- **Workflow Run:** https://github.com/andresleosan/SarinBotSAAS/actions/runs/42739133412
+- **Commit:** `b3c2f2f1211ef22395df123fd1fc8576bdc9d457`
+- **Workflow Run:** https://github.com/andresleosan/SarinBotSAAS/actions/runs/42747511515
 - **Jobs:** Types, tests and builds; Cloudflare configuration dry-run; Firebase rules and local journey; Deploy Cloudflare production.
 
