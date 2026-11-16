@@ -189,4 +189,24 @@ describe('daily backup classification', () => {
     expect(result.data.price).toBe(1000.5);
     expect(() => classify('businesses/demo-business/appointments/demo-appointment', { ...recoveryAppointment, type: 'clinical_note' })).toThrow('D1_BACKUP_UNCLASSIFIED');
   });
+  it('retains strict operational signals documents without scrubbed key collisions and rejects extensions', () => {
+    const subtask = { lastAttemptAt: recoveryNow, lastSuccessAt: recoveryNow, failed: false, morePending: false, invalidRecords: 0, failedPhases: 0, clearedBodies: 2, deletedMetadata: 1 };
+    const workerDoc = {
+      version: 1, updatedAt: recoveryNow, maintenanceSkipped: false, cronLastAttemptAt: recoveryNow, cronLastSuccessAt: recoveryNow,
+      backlogCycles: 0, cronConsecutiveFailures: 0,
+      subtasks: { recovery_backup: subtask, response_quota_recovery: subtask, admin_payment_retention: subtask, platform_support_retention: subtask, platform_whatsapp_retention: subtask },
+      backup: { phase: 'sealed', health: 'ok', lastRecoverableAt: recoveryNow, failureCode: null, gaps: { weeks: [], months: [] } },
+      identityWifFailures15m: 0, containerProxyFailures15m: 0,
+      recentErrors: [{ boundary: 'engine_deepseek', errorClass: 'TIMEOUT', httpStatus: 504, providerCode: 'GW_TIMEOUT', observedAt: recoveryNow }],
+      signalWriteFailures: 0,
+    };
+    const stateDoc = {
+      version: 1, updatedAt: recoveryNow, alertsEnabled: false, signalWriteFailures: 0, signalReadFailures: 0,
+      incidents: [{ incidentKey: 'a'.repeat(64), family: 'd1_contention', code: 'D1_CONFLICT_EXHAUSTED', lastSeverity: 'critical', firstSeenAt: recoveryNow, lastSeenAt: recoveryNow, lastAlertAt: null, cooldownUntil: null, resolvedAt: null, deliveryState: 'disabled', lastAlertErrorClass: null }],
+    };
+    for (const [path, doc] of [['serverSettings/operationalSignalsWorker', workerDoc], ['serverSettings/operationalSignals', stateDoc]] as const) {
+      expect(classify(path, doc)).toEqual({ kind: 'retain', data: doc, reasonCodes: [] });
+      expect(() => classify(path, { ...doc, unexpected: 'PRIVATE' })).toThrow('D1_BACKUP_UNCLASSIFIED');
+    }
+  });
 });

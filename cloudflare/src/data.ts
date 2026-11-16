@@ -7,6 +7,12 @@ import { SINGLETON_NAME } from './router.ts';
 import { prepareRecoveryWitness, completeRecoveryWitness, recoveryAdmissionAllowed } from './recovery-witness.ts';
 import { recoveryRestricted } from '../../shared/recovery-admission.ts';
 import { bookingAdmissionProtocolSchema } from '../../src/lib/booking-admission-release.ts';
+import {
+  OPERATIONAL_SIGNALS_DOC_PATH,
+  OPERATIONAL_SIGNALS_WORKER_DOC_PATH,
+  operationalSignalsStateSchema,
+  operationalSignalsWorkerSchema,
+} from '../../shared/operational-signals.ts';
 
 const MAX_BODY = 8 * 1024 * 1024;
 const MAX_DOCUMENT = 1024 * 1024;
@@ -16,7 +22,7 @@ const encoder = new TextEncoder();
 const fields: Record<string, 'string' | 'number' | 'boolean'> = {
   jobId: 'string', outboxId: 'string', conversationId: 'string', recordType: 'string', kind: 'string', sequence: 'number',
   memberUid: 'string', ownerUid: 'string', 'client.uid': 'string', dateKey: 'string', resourceId: 'string', status: 'string', type: 'string', tenantId: 'string', businessId: 'string', phoneNumberId: 'string', state: 'string', bodyState: 'string', id: 'string', appointmentId: 'string',
-  createdAt: 'number', updatedAt: 'number', submittedAt: 'number', startsAt: 'number', startAt: 'number', endAt: 'number', nextAttemptAt: 'number', bodyExpiresAt: 'number', expiresAt: 'number', enabled: 'boolean',
+  createdAt: 'number', updatedAt: 'number', submittedAt: 'number', startsAt: 'number', startAt: 'number', startedAt: 'number', endAt: 'number', nextAttemptAt: 'number', bodyExpiresAt: 'number', expiresAt: 'number', enabled: 'boolean',
   'request.dateKey': 'string', 'request.createdAt': 'number', 'request.id': 'string', waitlistRecordId: 'string',
   __name__: 'string',
 };
@@ -91,6 +97,8 @@ function validateCommand(command: unknown): asserts command is DataCommand {
     if (/^responseQuotaTurns\/[^/]+$/.test(write.path) && write.data.execution !== undefined && (write.merge || !quotaTurnSchema.safeParse(write.data).success || write.data.reservationId !== write.path.split('/')[1])) throw invalid();
     if (write.path === 'serverSettings/responseQuotaProtocol' && (write.merge || !quotaProtocolSchema.safeParse(write.data).success)) throw invalid();
     if (write.path === 'serverSettings/bookingAdmissionProtocol' && (write.merge || !bookingAdmissionProtocolSchema.safeParse(write.data).success)) throw invalid();
+    if (write.path === OPERATIONAL_SIGNALS_DOC_PATH && (write.merge || !operationalSignalsStateSchema.safeParse(write.data).success)) throw invalid();
+    if (write.path === OPERATIONAL_SIGNALS_WORKER_DOC_PATH && (write.merge || !operationalSignalsWorkerSchema.safeParse(write.data).success)) throw invalid();
     if (/^payment(?:Images|Receipts)\//.test(write.path) && Object.hasOwn(write.data, 'receiptDataUrl')) receipt(write.data.receiptDataUrl);
     if (write.path.startsWith('businessLogos/')) {
       if (typeof write.data.businessId !== 'string' || !/^[A-Za-z0-9_-]{1,60}$/.test(write.data.businessId) || typeof write.data.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(write.data.sha256) || write.path !== `businessLogos/${write.data.businessId}_${write.data.sha256}` || typeof write.data.ownerUid !== 'string' || !write.data.ownerUid || write.data.ownerUid.length > 256 || !Number.isSafeInteger(write.data.createdAt) || Number(write.data.createdAt) < 0) throw invalid();

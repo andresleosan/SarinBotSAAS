@@ -405,3 +405,32 @@ test('factual FAQ admits exactly private state and receipt children', async cont
   }
   assert.equal(isDataPath('businesses/demo/factualFaqHistory/current', true), false);
 });
+
+test('operational signals documents require strict create/set schemas and forbid merge writes', async context => {
+  const env = await fixture(context);
+  const now = 1_800_000_000_000;
+  const subtask = { lastAttemptAt: now, lastSuccessAt: now, failed: false, morePending: false, invalidRecords: 0, failedPhases: 0 };
+  const workerDoc = {
+    version: 1, updatedAt: now, maintenanceSkipped: false, cronLastAttemptAt: now, cronLastSuccessAt: now,
+    backlogCycles: 0, cronConsecutiveFailures: 0,
+    subtasks: { recovery_backup: subtask, response_quota_recovery: subtask, admin_payment_retention: subtask, platform_support_retention: subtask, platform_whatsapp_retention: subtask },
+    backup: { phase: 'sealed', health: 'ok', lastRecoverableAt: now, failureCode: null, gaps: { weeks: [], months: [] } },
+    identityWifFailures15m: 0, containerProxyFailures15m: 0, recentErrors: [], signalWriteFailures: 0,
+  };
+  const stateDoc = { version: 1, updatedAt: now, alertsEnabled: false, signalWriteFailures: 0, signalReadFailures: 0, incidents: [] };
+  await executeDataCommand(commit(0, [{ op: 'create', path: 'serverSettings/operationalSignalsWorker', data: workerDoc }, { op: 'create', path: 'serverSettings/operationalSignals', data: stateDoc }]), env);
+  await executeDataCommand(commit(1, [set('serverSettings/operationalSignalsWorker', { ...workerDoc, updatedAt: now + 1000 }), set('serverSettings/operationalSignals', { ...stateDoc, updatedAt: now + 1000 })]), env);
+  assert.equal((await executeDataCommand(read('serverSettings/operationalSignalsWorker'), env)).documents[0].data.updatedAt, now + 1000);
+  assert.equal((await executeDataCommand(read('serverSettings/operationalSignals'), env)).documents[0].data.updatedAt, now + 1000);
+  for (const writes of [
+    [set('serverSettings/operationalSignalsWorker', workerDoc, true)],
+    [set('serverSettings/operationalSignals', stateDoc, true)],
+    [set('serverSettings/operationalSignalsWorker', { ...workerDoc, unexpected: true })],
+    [set('serverSettings/operationalSignals', { ...stateDoc, unexpected: true })],
+    [{ op: 'create', path: 'serverSettings/operationalSignals', data: { ...stateDoc, version: 2 } }],
+    [{ op: 'create', path: 'serverSettings/operationalSignalsWorker', data: { ...workerDoc, unexpected: true } }],
+  ]) {
+    const noAccess = new Proxy({}, { get() { assert.fail('Invalid operational signals write accessed storage.'); } });
+    await assert.rejects(executeDataCommand(commit(2, writes), noAccess), isError('DATA_INVALID'));
+  }
+});

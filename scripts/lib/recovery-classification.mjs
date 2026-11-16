@@ -12,6 +12,7 @@ import { isPlatformWhatsAppStoredLinkControl, isPlatformWhatsAppLinkKeyMarker } 
 import { bookingBeneficiarySchema, bookingSubjectCaseSchema } from '../../src/lib/booking-subject.ts';
 import { factualFaqStateSchema, factualFaqAppliedSchema } from '../../src/lib/business-factual-faq.ts';
 import { businessLocationSchema } from '../../src/lib/business-location.ts';
+import { operationalSignalsStateSchema, operationalSignalsWorkerSchema } from '../../shared/operational-signals.ts';
 
 /** @returns {never} */
 const fail = () => { throw new Error('D1_BACKUP_UNCLASSIFIED'); };
@@ -87,6 +88,8 @@ function serverSchema(id, data) {
   if (/^booking_policy_operation_[a-f0-9]{64}$/.test(id)) return value => bookingPolicyOperationSchema.safeParse(value).success && id === `booking_policy_operation_${digest([value.businessId, value.actorUid, value.requestId])}`;
   if (id === 'responseQuotaProtocol') return quotaProtocolSchema;
   if (id === 'responseQuotaRecoveryCursor') return quotaCursor;
+  if (id === 'operationalSignals') return operationalSignalsStateSchema;
+  if (id === 'operationalSignalsWorker') return operationalSignalsWorkerSchema;
   if (id === 'ai') return o({ provider: z.enum(['ollama', 'deepseek', 'gemini']), updatedAt: n });
   if (id === 'platform_whatsapp') return isPlatformWhatsAppConnectionRecord;
   if (id === 'platform_whatsapp_budget') return o({ version: n, ...counts('dayMicros monthMicros updatedAt'), updatedBy: s });
