@@ -368,3 +368,124 @@ test('only permits the private HTTPS engine under alsdevstudio.com', () => {
     assert.throws(() => runtimeEnvironment({ ...certificateRuntime, SARIN_TUNNEL_URL: `${origin}/v1/chat/completions` }));
   }
 });
+
+test('operational alerts flag is private, strictly boolean, disabled in wrangler/recovery, and excluded from build args', () => {
+  assert.equal(runtimeEnvironment(certificateRuntime).SARIN_OPERATIONAL_ALERTS_ENABLED, undefined);
+  for (const value of ['false', 'true']) {
+    assert.equal(runtimeEnvironment({ ...certificateRuntime, SARIN_OPERATIONAL_ALERTS_ENABLED: value }).SARIN_OPERATIONAL_ALERTS_ENABLED, value);
+  }
+  for (const value of ['enabled', 'TRUE', ' true ', '0']) {
+    assert.throws(() => runtimeEnvironment({ ...certificateRuntime, SARIN_OPERATIONAL_ALERTS_ENABLED: value }));
+  }
+  const config = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  assert.equal(config.vars.SARIN_OPERATIONAL_ALERTS_ENABLED, 'false');
+  assert.equal(runtimeEnvironment({ ...certificateRuntime, ...config.vars, FIREBASE_ADMIN_CREDENTIAL_MODE: 'cert', FIREBASE_WIF_AUDIENCE: '', FIREBASE_WIF_SERVICE_ACCOUNT_EMAIL: '' }).SARIN_OPERATIONAL_ALERTS_ENABLED, 'false');
+  assert.equal(runtimeEnvironment({ ...certificateRuntime, SARIN_RECOVERY_MODE: 'recovery', SARIN_OPERATIONAL_ALERTS_ENABLED: 'true' }).SARIN_OPERATIONAL_ALERTS_ENABLED, 'false');
+  assert.equal(runtimeEnvironment({ ...certificateRuntime, SARIN_RECOVERY_MODE: 'recovery' }).SARIN_OPERATIONAL_ALERTS_ENABLED, 'false');
+  assert.equal(publicBuildArguments({
+    ...certificateRuntime,
+    SARIN_OPERATIONAL_ALERTS_ENABLED: 'true',
+    NEXT_PUBLIC_FIREBASE_API_KEY: 'public-synthetic',
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'real-project.firebaseapp.com',
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'real-project',
+    NEXT_PUBLIC_FIREBASE_APP_ID: 'app-id',
+  }).SARIN_OPERATIONAL_ALERTS_ENABLED, undefined);
+});
+
+test('maintenance allows only strict GET /api/admin/operational-signals with Bearer and enforces no-store', async () => {
+  let calls = 0;
+  for (const status of [200, 401, 403]) {
+    const response = await forwardToSingleton(
+      new Request('https://sarinbotsaas.pages.dev/api/admin/operational-signals', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer synthetic-superadmin-token' },
+      }),
+      () => ({ fetch: async forwarded => { calls++; assert.equal(forwarded.method, 'GET'); return Response.json({ status }, { status }); } }),
+      { SARIN_MAINTENANCE: 'true' },
+    );
+    assert.equal(response.status, status);
+    for (const header of ['Cache-Control', 'CDN-Cache-Control', 'Cloudflare-CDN-Cache-Control']) {
+      assert.equal(response.headers.get(header), 'no-store');
+    }
+  }
+  assert.equal(calls, 3);
+
+  const reject = () => { calls++; throw new Error('must stay closed'); };
+  for (const path of [
+    '/api/admin/operational-signals?',
+    '/api/admin/operational-signals?scope=all',
+    '/api/admin/operational-signals#',
+    '/api/admin/operational-signals#section',
+    '/api/admin/operational-signals/',
+    '/api/admin/operational-signals/extra',
+    '/api/admin/Operational-Signals',
+    '/api/admin/%6fperational-signals',
+    '/api/internal/operational-signals',
+  ]) {
+    const res = await forwardToSingleton(
+      new Request(`https://sarinbotsaas.pages.dev${path}`, { headers: { Authorization: 'Bearer synthetic' } }),
+      reject,
+      { SARIN_MAINTENANCE: 'true' },
+    );
+    assert.equal(res.status, path.includes('/internal/') ? 404 : 503, path);
+  }
+  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    const res = await forwardToSingleton(
+      new Request('https://sarinbotsaas.pages.dev/api/admin/operational-signals', { method, headers: { Authorization: 'Bearer synthetic' } }),
+      reject,
+      { SARIN_MAINTENANCE: 'true' },
+    );
+    assert.equal(res.status, 503, method);
+  }
+  for (const authorization of [null, '', 'synthetic', 'Basic abc', 'Bearer', 'Bearer ', 'Bearer bad token', 'Bearer  abc', 'Bearer\tabc']) {
+    const res = await forwardToSingleton(
+      new Request('https://sarinbotsaas.pages.dev/api/admin/operational-signals', { headers: authorization === null ? {} : { Authorization: authorization } }),
+      reject,
+      { SARIN_MAINTENANCE: 'true' },
+    );
+    assert.equal(res.status, 503, String(authorization));
+  }
+  assert.equal(calls, 3);
+});
+
+test('public requests strip x-sarin-ops-evaluate, block /api/internal/operational-signals, and emit onProxyError only on real proxy errors', async () => {
+  const blocked = await forwardToSingleton(
+    new Request('https://sarinbotsaas.pages.dev/api/internal/operational-signals', {
+      method: 'POST',
+      headers: { 'x-sarin-ops-evaluate': 'true' },
+    }),
+    () => { throw new Error('must not wake'); },
+  );
+  assert.equal(blocked.status, 404);
+
+  let forwarded;
+  const ok = await forwardToSingleton(
+    new Request('https://sarinbotsaas.pages.dev/api/session', {
+      headers: { 'x-sarin-ops-evaluate': 'true', Authorization: 'Bearer synthetic' },
+    }),
+    () => ({ fetch: async req => { forwarded = req; return Response.json({ ok: true }); } }),
+  );
+  assert.equal(ok.status, 200);
+  assert.equal(forwarded.headers.get('x-sarin-ops-evaluate'), null);
+
+  const proxyErrors = [];
+  const maint = await forwardToSingleton(
+    new Request('https://sarinbotsaas.pages.dev/'),
+    () => { throw new Error('must not call'); },
+    { SARIN_MAINTENANCE: 'true' },
+    { onProxyError: err => proxyErrors.push(err) },
+  );
+  assert.equal(maint.status, 503);
+  assert.equal(proxyErrors.length, 0);
+
+  const crash = await forwardToSingleton(
+    new Request('https://sarinbotsaas.pages.dev/api/sarin/chat', { method: 'POST', body: 'hi' }),
+    () => ({ fetch: async () => new Response('sensitive error', { status: 502 }) }),
+    {},
+    { onProxyError: err => proxyErrors.push(err) },
+  );
+  assert.equal(crash.status, 503);
+  assert.equal(proxyErrors.length, 1);
+  assert.equal(proxyErrors[0].errorClass, 'UPSTREAM_5XX');
+  assert.equal(proxyErrors[0].httpStatus, 502);
+});

@@ -52,7 +52,7 @@ async function cleanupPhase(env: RetentionEnvironment, collection: RetentionColl
   return { changed: 0, morePending: true, invalidRecords, failedPhases: 1 };
 }
 
-export async function cleanupPlatformWhatsAppRetention(env: RetentionEnvironment, options: { now?: number; batchLimit?: number } = {}) {
+export async function cleanupPlatformWhatsAppRetentionReport(env: RetentionEnvironment, options: { now?: number; batchLimit?: number } = {}) {
   const now = options.now ?? Date.now();
   const batchLimit = options.batchLimit ?? 50;
   if (!Number.isSafeInteger(now) || now < 0 || now > 8_640_000_000_000_000 || !Number.isInteger(batchLimit) || batchLimit < 1 || batchLimit > 50) {
@@ -83,7 +83,12 @@ export async function cleanupPlatformWhatsAppRetention(env: RetentionEnvironment
   result.clearedBodies += support.clearedBodies; result.deletedMetadata += support.deletedMetadata; result.morePending ||= support.morePending;
   invalidRecords += support.invalidRecords; failedPhases += support.failedPhases;
   if (invalidRecords || failedPhases) console.warn({ event: 'platform_whatsapp_retention_incomplete', invalidRecords, failedPhases });
-  return result;
+  return { ...result, invalidRecords, failedPhases };
+}
+
+export async function cleanupPlatformWhatsAppRetention(env: RetentionEnvironment, options: { now?: number; batchLimit?: number } = {}) {
+  const { clearedBodies, deletedMetadata, morePending } = await cleanupPlatformWhatsAppRetentionReport(env, options);
+  return { clearedBodies, deletedMetadata, morePending };
 }
 
 const linkScopeEqual = (a: PlatformWhatsAppStoredLinkControl, b: PlatformWhatsAppStoredLinkControl) => a.wabaId === b.wabaId && a.phoneE164 === b.phoneE164 && a.phoneNumberId === b.phoneNumberId;

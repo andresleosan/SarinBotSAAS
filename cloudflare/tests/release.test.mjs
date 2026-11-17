@@ -287,3 +287,22 @@ test('runRelease creates admission marker once for enforce candidate and rejects
   depsPrepare.candidate = { reader: 2, release: 'prepare', recoveryCompatible: true };
   await assert.rejects(runRelease({ sha, account, config }, depsPrepare), /ADMISSION_PREPARE_AFTER_ENFORCE/);
 });
+
+test('validateSnapshot supports SARIN_OPERATIONAL_ALERTS_ENABLED="false" present or absent for --keep-vars and keeps observability off', () => {
+  assert.equal(config.vars.SARIN_OPERATIONAL_ALERTS_ENABLED, 'false');
+  assert.equal(config.observability.enabled, false);
+  assert.equal(config.observability.logs.enabled, false);
+  assert.equal(config.observability.traces.enabled, false);
+
+  const withBinding = snapshot();
+  assert.equal(withBinding.settings.bindings.some(b => b.name === 'SARIN_OPERATIONAL_ALERTS_ENABLED' && b.text === 'false'), true);
+  assert.doesNotThrow(() => validateSnapshot(withBinding, config, account));
+
+  const withoutBinding = snapshot();
+  withoutBinding.settings.bindings = withoutBinding.settings.bindings.filter(b => b.name !== 'SARIN_OPERATIONAL_ALERTS_ENABLED');
+  assert.doesNotThrow(() => validateSnapshot(withoutBinding, config, account));
+
+  const drift = snapshot();
+  drift.settings.observability = { logs: { enabled: true } };
+  assert.throws(() => validateSnapshot(drift, config, account), /OBSERVABILITY_DRIFT/);
+});

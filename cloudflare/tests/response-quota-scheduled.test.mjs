@@ -19,7 +19,8 @@ test('a quota recovery error is sanitized and does not block unrelated maintenan
         './platform-whatsapp-audio.ts': 'export const handlePlatformAudioOutbound=()=>{};',
         './identity.ts': 'export class SarinIdentity {}; export const handleIdentityOutbound=()=>{}; export const handlePublicIdentityRequest=()=>{};',
         './data.ts': 'export const handleDataOutbound=()=>{};',
-        './platform-whatsapp-retention.ts': 'export const cleanupPlatformWhatsAppRetention=async()=>({});',
+        './platform-whatsapp-retention.ts': 'export const cleanupPlatformWhatsAppRetention=async()=>({}); export const cleanupPlatformWhatsAppRetentionReport=async()=>({clearedBodies:0,deletedMetadata:0,morePending:false,invalidRecords:0,failedPhases:0});',
+        './operational-signals.ts': 'export const recordWorkerBoundaryError=async()=>({ok:true,signalWriteFailures:0}); export const recordWorkerBoundarySuccess=()=>undefined; export const recordWorkerCronSummary=async()=>({ok:true,signalWriteFailures:0});',
       }; if (!sources[args.path]) throw Error(`Unhandled scheduled dependency ${args.path}`); return { contents: sources[args.path], loader: 'js' };
     });
   } }] });

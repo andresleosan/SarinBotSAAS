@@ -1,4 +1,5 @@
 import { parseWorkloadAudience } from './identity-core.ts';
+import type { SignalErrorClass } from '../../shared/operational-signals.ts';
 import { recoveryRestricted } from '../../shared/recovery-admission.ts';
 import { recoveryAdmissionAllowed } from './recovery-witness.ts';
 
@@ -20,7 +21,7 @@ const runtimeKeys = [
   'PLATFORM_YCLOUD_DIAGNOSTIC_ENABLED', 'PLATFORM_YCLOUD_DIAGNOSTIC_RUN_ID', 'PLATFORM_YCLOUD_DIAGNOSTIC_EXPIRES_AT', 'PLATFORM_YCLOUD_DIAGNOSTIC_SENDER', 'PLATFORM_YCLOUD_DIAGNOSTIC_NONCE',
   'MAX_CONCURRENT_LLM_SLOTS', 'MAX_QUEUED_LLM_REQUESTS', 'LLM_QUEUE_TIMEOUT_MS', 'LLM_REQUEST_TIMEOUT_MS',
   'WEEKLY_PRICE_COP', 'FORTNIGHTLY_PRICE_COP', 'MONTHLY_PRICE_COP',
-  'SARIN_DATA_BACKEND', 'SARIN_MAINTENANCE', 'SARIN_PUBLIC_BOOKING_ORIGIN', 'PILOT_AI_BUDGET_ENFORCED', 'SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED', 'SARIN_WAITLIST_OFFERS_ENABLED', 'SARIN_TEAM_ACCESS_ENABLED',
+  'SARIN_DATA_BACKEND', 'SARIN_MAINTENANCE', 'SARIN_PUBLIC_BOOKING_ORIGIN', 'PILOT_AI_BUDGET_ENFORCED', 'SARIN_RESOURCE_SCHEDULE_WRITES_ENABLED', 'SARIN_WAITLIST_OFFERS_ENABLED', 'SARIN_TEAM_ACCESS_ENABLED', 'SARIN_OPERATIONAL_ALERTS_ENABLED',
   'SARIN_BACKUP_ENABLED', 'SARIN_BACKUP_HMAC_KEY', 'SARIN_BACKUP_RECIPIENT', 'SARIN_BACKUP_CONFIG_FILE', 'SARIN_BACKUP_PASSWORD_FILE', 'SARIN_BACKUP_SOURCE_SHA',
   'SARIN_RECOVERY_MODE',
 ] as const;
@@ -44,9 +45,11 @@ export function runtimeEnvironment(input: Record<string, unknown>): Record<strin
   if (input.SARIN_TEAM_ACCESS_ENABLED !== undefined && !['true', 'false'].includes(input.SARIN_TEAM_ACCESS_ENABLED as string)) throw new Error('El indicador de equipo no es válido.');
   env.SARIN_TEAM_ACCESS_ENABLED ??= 'false';
   env.SARIN_BACKUP_ENABLED ??= 'false';
+  if (env.SARIN_OPERATIONAL_ALERTS_ENABLED !== undefined && !['true', 'false'].includes(env.SARIN_OPERATIONAL_ALERTS_ENABLED)) throw new Error('El indicador de alertas operativas no es válido.');
   if (input.SARIN_RECOVERY_MODE !== undefined && !['normal', 'recovery'].includes(String(input.SARIN_RECOVERY_MODE))) throw new Error('El modo de recuperación no es válido.');
   if (recoveryRestricted(input)) {
     for (const key of Object.keys(env)) if (key.endsWith('_ENABLED')) env[key] = 'false';
+    env.SARIN_OPERATIONAL_ALERTS_ENABLED = 'false';
     env.SARIN_MAINTENANCE = 'true';
   }
   if (!['true', 'false'].includes(env.SARIN_BACKUP_ENABLED)) throw new Error('El indicador de copia no es válido.');
@@ -135,7 +138,21 @@ async function readDrainQueue(upstream: Response): Promise<Record<string, number
   return result;
 }
 
-export async function forwardToSingleton(request: Request, get: (name: string) => { fetch(request: Request): Promise<Response> }, input: Record<string, unknown> = {}): Promise<Response> {
+export type ProxyErrorDiagnostic = {
+  errorClass: SignalErrorClass;
+  httpStatus: number | null;
+  providerCode: string | null;
+};
+
+export async function forwardToSingleton(
+  request: Request,
+  get: (name: string) => { fetch(request: Request): Promise<Response> },
+  input: Record<string, unknown> = {},
+  options?: {
+    onProxyError?: (diagnostic: ProxyErrorDiagnostic) => Promise<unknown> | void;
+    onProxySuccess?: () => Promise<unknown> | void;
+  },
+): Promise<Response> {
   if (recoveryRestricted(input) && !await recoveryAdmissionAllowed(input as RecoveryBindings)) return Response.json({ error: 'La recuperación requiere validación operativa.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
   let publicPath: string;
   try { publicPath = decodeURIComponent(new URL(request.url).pathname).replaceAll('\\', '/'); }
@@ -157,11 +174,19 @@ export async function forwardToSingleton(request: Request, get: (name: string) =
     const businessBudgetRead = request.method === 'GET' && [...url.searchParams.keys()].every(key => key === 'businessId') && url.searchParams.getAll('businessId').length === 1 && /^[A-Za-z0-9_-]{1,128}$/.test(url.searchParams.get('businessId') ?? '');
     const budgetAdministration = ['GET', 'PATCH'].includes(request.method) && url.pathname === '/api/admin/abuse' && (!url.search || budgetCursorRead || businessBudgetRead) && !url.hash && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '');
     const bookingAdministration = url.pathname === '/api/admin/booking-data-policy' && !url.hash && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '') && ((request.method === 'GET' && businessBudgetRead) || (request.method === 'PATCH' && !url.search));
-    if (!sessionRead && !drainRead && !budgetAdministration && !bookingAdministration) return Response.json({ error: 'La aplicación está en mantenimiento.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
+    const operationalSignalsRead = request.method === 'GET'
+      && url.href === `${url.origin}/api/admin/operational-signals`
+      && /^Bearer [^\s]+$/i.test(request.headers.get('Authorization') ?? '');
+    if (!sessionRead && !drainRead && !budgetAdministration && !bookingAdministration && !operationalSignalsRead) return Response.json({ error: 'La aplicación está en mantenimiento.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '60' } });
   }
+  let proxyDiagnostic: ProxyErrorDiagnostic | null = null;
   try {
     const requestHeaders = new Headers(request.headers);
-    for (const name of [...requestHeaders.keys()]) if (name.startsWith('x-sarin-backup-') || name.startsWith('x-sarin-recovery-')) requestHeaders.delete(name);
+    for (const name of [...requestHeaders.keys()]) {
+      if (name.startsWith('x-sarin-backup-') || name.startsWith('x-sarin-recovery-') || name.startsWith('x-sarin-ops-')) {
+        requestHeaders.delete(name);
+      }
+    }
     // The SDK supports port switching through this header. It is never a public
     // capability: all traffic must reach the single Next port fixed at 3000.
     requestHeaders.delete('cf-container-target-port');
@@ -171,17 +196,27 @@ export async function forwardToSingleton(request: Request, get: (name: string) =
     if (drainRead && upstream.status === 503) {
       if (upstream.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
         await upstream.body?.cancel();
+        proxyDiagnostic = { errorClass: 'UPSTREAM_5XX', httpStatus: 503, providerCode: 'CONTAINER_HEALTH_NON_JSON' };
         throw new Error('El estado de la cola no está disponible.');
       }
       // Only the existing superadmin handler includes this queue. Offline Ollama
       // must not hide drain counters behind the Pages gateway's 5xx response.
-      const queue = await readDrainQueue(upstream);
+      let queue: Record<string, number>;
+      try {
+        queue = await readDrainQueue(upstream);
+      } catch (error) {
+        proxyDiagnostic = { errorClass: 'RESPONSE_INVALID', httpStatus: 503, providerCode: 'CONTAINER_HEALTH_INVALID' };
+        throw error;
+      }
+      try { await options?.onProxySuccess?.(); } catch { /* Best-effort streak reset. */ }
       return Response.json({ status: 'offline', online: false, provider: 'ollama', queue }, { headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store' } });
     }
     if (upstream.status >= 500 && !upstream.headers.get('Content-Type')?.toLowerCase().includes('application/json')) {
       await upstream.body?.cancel();
+      proxyDiagnostic = { errorClass: 'UPSTREAM_5XX', httpStatus: upstream.status, providerCode: 'CONTAINER_NON_JSON_5XX' };
       throw new Error('El transporte del contenedor no está disponible.');
     }
+    try { await options?.onProxySuccess?.(); } catch { /* Best-effort streak reset. */ }
     const headers = new Headers(upstream.headers);
     headers.set('Cache-Control', 'no-store');
     headers.set('CDN-Cache-Control', 'no-store');
@@ -190,7 +225,14 @@ export async function forwardToSingleton(request: Request, get: (name: string) =
     // Use the same stream without clone(), text(), json() or an application
     // retry loop. Next retains responsibility for Firebase authentication.
     return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers });
-  } catch {
-    return Response.json({ error: 'La aplicación está temporalmente indisponible. Reintenta cuando vuelva a estar disponible.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '5' } });
+  } catch (error) {
+    const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+    const diagnostic: ProxyErrorDiagnostic = proxyDiagnostic ?? {
+      errorClass: timedOut ? 'TIMEOUT' : 'TRANSPORT_UNAVAILABLE',
+      httpStatus: null,
+      providerCode: timedOut ? 'CONTAINER_PROXY_TIMEOUT' : 'CONTAINER_PROXY_ERROR',
+    };
+    try { await options?.onProxyError?.(diagnostic); } catch { /* Never mask safe 503 response. */ }
+    return Response.json({ error: 'La aplicación está temporalmente indisponible. Reintenta cuando vuelva a estar disponible.' }, { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-store', 'Retry-After': '5' } });
   }
 }
